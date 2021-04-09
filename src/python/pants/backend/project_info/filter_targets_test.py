@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
+from typing import Sequence
 
 import pytest
 
@@ -31,7 +32,7 @@ class MockTarget(Target):
 
 
 def run_goal(
-    targets: list[Target],
+    targets: Sequence[Target],
     *,
     target_type: list[str] | None = None,
     address_regex: list[str] | None = None,
