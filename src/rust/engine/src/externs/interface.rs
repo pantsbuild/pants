@@ -49,6 +49,7 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -65,6 +66,7 @@ use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
+use process_execution::RemoteCacheWarningsBehavior;
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
@@ -114,7 +116,8 @@ py_module_initializer!(native_engine, |py, m| {
         d: bool,
         e: PyDict,
         f: Vec<String>,
-        g: String
+        g: Vec<String>,
+        h: String
       )
     ),
   )?;
@@ -559,6 +562,7 @@ py_class!(class PyRemotingOptions |py| {
     store_chunk_bytes: u64,
     store_chunk_upload_timeout: u64,
     store_rpc_retries: u64,
+    cache_warnings_behavior: String,
     cache_eager_fetch: bool,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
@@ -576,6 +580,7 @@ py_class!(class PyRemotingOptions |py| {
         store_chunk_bytes: store_chunk_bytes as usize,
         store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
         store_rpc_retries: store_rpc_retries as usize,
+        cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior).unwrap(),
         cache_eager_fetch,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
@@ -1843,7 +1848,8 @@ fn stdio_initialize(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
-  message_regex_filters: Vec<String>,
+  literal_filters: Vec<String>,
+  regex_filters: Vec<String>,
   log_file: String,
 ) -> CPyResult<PyTuple> {
   let log_levels_by_target = log_levels_by_target
@@ -1855,21 +1861,29 @@ fn stdio_initialize(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
-  let message_regex_filters = message_regex_filters
+  let regex_filters = regex_filters
     .iter()
     .map(|re| {
       Regex::new(re).map_err(|e| {
-        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+        PyErr::new::<exc::Exception, _>(
+          py,
+          format!(
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
+            e,
+          )
+        )
       })
     })
     .collect::<Result<Vec<Regex>, _>>()?;
+
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
-    message_regex_filters,
+    literal_filters,
+    regex_filters,
     PathBuf::from(log_file),
   )
   .map_err(|s| {

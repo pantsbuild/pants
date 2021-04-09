@@ -11,7 +11,6 @@ from enum import Enum
 from textwrap import dedent
 from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -307,6 +306,7 @@ class InteractiveProcess:
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
+
         self.__post_init__()
 
     def __post_init__(self):

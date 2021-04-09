@@ -13,21 +13,14 @@ backend_packages.add = [
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
+  "pants.backend.shell",
+  "pants.backend.shell.lint.shellcheck",
+  "pants.backend.shell.lint.shfmt",
   "internal_plugins.releases",
-  "toolchain.pants.auth",
-  "toolchain.pants.buildsense",
-  "toolchain.pants.common",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
-  "toolchain.pants.plugin==0.7.0",
-]
-build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
-
-ignore_pants_warnings = [
-  # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
-  "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
+  "toolchain.pants.plugin==0.8.1",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -97,6 +90,13 @@ config = ["pyproject.toml"]
 config = "build-support/mypy/mypy.ini"
 source_plugins = ["pants-plugins/mypy_plugins"]
 
+[shellcheck]
+args = ["--external-sources"]
+
+[shfmt]
+# See https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd#printer-flags.
+args = ["-i 2", "-ci", "-sr"]
+
 [pants-releases]
 release_notes = """
 {
@@ -137,6 +137,7 @@ release_notes = """
   '2.2.x': 'src/python/pants/notes/2.2.x.md',
   '2.3.x': 'src/python/pants/notes/2.3.x.md',
   '2.4.x': 'src/python/pants/notes/2.4.x.md',
+  '2.5.x': 'src/python/pants/notes/2.5.x.md',
 }
 """
 

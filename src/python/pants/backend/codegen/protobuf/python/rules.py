@@ -108,9 +108,7 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=PexRequirements(
-            [python_protobuf_mypy_plugin.plugin_requirement(python_protobuf_subsystem)]
-        ),
+        requirements=PexRequirements([python_protobuf_mypy_plugin.requirement]),
         interpreter_constraints=PexInterpreterConstraints(
             python_protobuf_mypy_plugin.interpreter_constraints
         ),

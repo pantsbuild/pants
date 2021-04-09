@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.pex import (
     MaybeConstraintsFile,
+    Pex,
     PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
@@ -228,6 +229,7 @@ async def pex_from_targets(
     )
 
     requirements = exact_reqs
+    repository_pex: Pex | None = None
     description = request.description
 
     if constraints_file.path:
@@ -270,8 +272,17 @@ async def pex_from_targets(
                     "file does not cover all requirements."
                 )
             else:
-                requirements = PexRequirements(str(req) for req in constraints_file_reqs)
-                description = description or f"Resolving {python_setup.requirement_constraints}"
+                repository_pex = await Get(
+                    Pex,
+                    PexRequest(
+                        description=f"Resolving {python_setup.requirement_constraints}",
+                        output_filename="repository.pex",
+                        internal_only=request.internal_only,
+                        requirements=PexRequirements(str(req) for req in constraints_file_reqs),
+                        interpreter_constraints=interpreter_constraints,
+                        platforms=request.platforms,
+                    ),
+                )
     elif (
         python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER
         and python_setup.resolve_all_constraints_was_set_explicitly()
@@ -292,6 +303,7 @@ async def pex_from_targets(
         main=request.main,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
+        repository_pex=repository_pex,
         additional_args=request.additional_args,
         description=description,
     )

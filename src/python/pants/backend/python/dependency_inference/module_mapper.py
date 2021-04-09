@@ -18,12 +18,10 @@ from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import ExplicitlyProvidedDependencies, SourcesPathsRequest, Targets
+from pants.engine.target import SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
 
@@ -286,67 +284,6 @@ class PythonModuleOwners:
                 "dependency inference code. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
-
-    @memoized_method
-    def _unambiguous_via_includes(
-        self, explicitly_provided: ExplicitlyProvidedDependencies
-    ) -> bool:
-        # NB: `self.ambiguous` is always file addresses, but we allow for their original BUILD
-        # targets to disambiguate them.
-        disambiguation_candidates = {
-            *(addr.maybe_convert_to_build_target() for addr in self.ambiguous),
-            *self.ambiguous,
-        }
-        return bool(disambiguation_candidates.intersection(explicitly_provided.includes))
-
-    @memoized_method
-    def _remaining_after_ignores(
-        self, explicitly_provided: ExplicitlyProvidedDependencies
-    ) -> set[Address]:
-        # NB: `self.ambiguous` is always file addresses, but we allow for their original BUILD
-        # targets to disambiguate them.
-        return {
-            addr
-            for addr in self.ambiguous
-            if addr not in explicitly_provided.ignores
-            and addr.maybe_convert_to_build_target() not in explicitly_provided.ignores
-        }
-
-    def maybe_warn_of_ambiguity(
-        self,
-        explicitly_provided_deps: ExplicitlyProvidedDependencies,
-        original_address: Address,
-        *,
-        context: str,
-    ) -> None:
-        """If the module is ambiguous and the user did not disambiguate via explicitly provided
-        dependencies, warn that dependency inference will not be used."""
-        if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
-            return
-        remaining_after_ignores = self._remaining_after_ignores(explicitly_provided_deps)
-        if len(remaining_after_ignores) <= 1:
-            return
-        logger.warning(
-            f"{context}, but Pants cannot safely infer a dependency because >1 target exports "
-            f"this module, so it is ambiguous which to use: "
-            f"{sorted(addr.spec for addr in remaining_after_ignores)}."
-            f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
-            f"field of {original_address}, or ignore the ones you do not want by prefixing "
-            f"with `!` or `!!` so that <=1 targets are left."
-            f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
-            f"targets so that only 1 target exports this module. Refer to "
-            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
-        )
-
-    def disambiguated_via_ignores(
-        self, explicitly_provided_deps: ExplicitlyProvidedDependencies
-    ) -> Address | None:
-        """If ignores in the `dependencies` field ignore all but one of the ambiguous owners, the
-        remaining owner becomes unambiguous."""
-        if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
-            return None
-        remaining_after_ignores = self._remaining_after_ignores(explicitly_provided_deps)
-        return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
 @rule

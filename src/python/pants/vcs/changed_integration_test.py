@@ -125,10 +125,9 @@ def create_isolated_git_repo():
         create_file("README", "N.B. This is just a test tree.")
         create_file(
             "pants.toml",
-            f"""
+            """
             [GLOBAL]
-            pythonpath = ["{get_buildroot()}/pants-plugins"]
-            backend_packages.add = ["pants.backend.python", "internal_plugins.releases"]
+            backend_packages.add = ["pants.backend.python"]
             """,
         )
         copy_into(".gitignore")

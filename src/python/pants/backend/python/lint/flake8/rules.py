@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
-from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
@@ -62,7 +62,7 @@ def generate_args(
 async def flake8_lint_partition(
     partition: Flake8Partition, flake8: Flake8, lint_subsystem: LintSubsystem
 ) -> LintResult:
-    flake8_pex_request = Get(
+    flake8_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="flake8.pex",
@@ -72,25 +72,17 @@ async def flake8_lint_partition(
             main=flake8.main,
         ),
     )
-
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[flake8.config] if flake8.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--flake8-config`",
-        ),
-    )
-
-    source_files_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
+    source_files_get = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
-
-    flake8_pex, config_digest, source_files = await MultiGet(
-        flake8_pex_request, config_digest_request, source_files_request
+    flake8_pex, config_files, source_files = await MultiGet(
+        flake8_pex_get, config_files_get, source_files_get
     )
 
-    input_digest = await Get(Digest, MergeDigests((source_files.snapshot.digest, config_digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((source_files.snapshot.digest, config_files.snapshot.digest))
+    )
 
     report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
 
@@ -152,9 +144,4 @@ async def flake8_lint(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(LintRequest, Flake8Request),
-        *pex.rules(),
-        *stripped_source_files.rules(),
-    ]
+    return [*collect_rules(), UnionRule(LintRequest, Flake8Request), *pex.rules()]

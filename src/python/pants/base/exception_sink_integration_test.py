@@ -78,7 +78,12 @@ def test_logs_unhandled_exception() -> None:
     directory = "testprojects/src/python/hello/main"
     with temporary_dir() as tmpdir:
         pants_run = run_pants_with_workdir(
-            ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],
+            [
+                "--no-pantsd",
+                "list",
+                f"{directory}:this-target-does-not-exist",
+                "--backend-packages=['pants.backend.python']",
+            ],
             workdir=tmpdir,
             # The backtrace should be omitted when --print-stacktrace=False.
             print_stacktrace=False,

@@ -7,6 +7,7 @@ env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   PANTS_REMOTE_CACHE_READ: 'true'
   PANTS_REMOTE_CACHE_WRITE: 'true'
+  RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
     name: Bootstrap Pants, test+lint Rust (Linux)
@@ -34,7 +35,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -131,7 +132,7 @@ jobs:
         python-version:
         - 3.8.3
   bootstrap_pants_macos:
-    name: Bootstrap Pants, test Rust (MacOS)
+    name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
     - name: Check out code
@@ -232,7 +233,7 @@ jobs:
         python-version:
         - 3.8.3
   lint_python:
-    name: Lint Python
+    name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
@@ -258,7 +259,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -288,6 +289,11 @@ jobs:
         ./pants lint typecheck ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-lint
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
@@ -319,7 +325,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -349,6 +355,11 @@ jobs:
       run: './pants test ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-linux
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
@@ -356,7 +367,7 @@ jobs:
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
-    name: Test Python (MacOS)
+    name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
     steps:
@@ -382,7 +393,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -412,6 +423,11 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-macos
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:

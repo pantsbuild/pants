@@ -21,7 +21,6 @@ from pants.base.build_environment import (
     get_pants_cachedir,
     pants_version,
 )
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option
@@ -86,6 +85,13 @@ class OwnersNotFoundBehavior(Enum):
 
 
 @enum.unique
+class RemoteCacheWarningsBehavior(Enum):
+    ignore = "ignore"
+    first_only = "first_only"
+    backoff = "backoff"
+
+
+@enum.unique
 class AuthPluginState(Enum):
     OK = "ok"
     UNAVAILABLE = "unavailable"
@@ -141,6 +147,7 @@ class ExecutionOptions:
     remote_store_rpc_retries: int
 
     remote_cache_eager_fetch: bool
+    remote_cache_warnings: RemoteCacheWarningsBehavior
 
     remote_execution_address: str | None
     remote_execution_extra_platform_properties: List[str]
@@ -175,6 +182,7 @@ class ExecutionOptions:
         if (
             not local_only
             and bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_auth_plugin.strip()
             and (remote_execution or remote_cache_read or remote_cache_write)
         ):
             if ":" not in bootstrap_options.remote_auth_plugin:
@@ -245,24 +253,10 @@ class ExecutionOptions:
             remote_instance_name=remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
-            process_execution_local_cache=resolve_conflicting_options(
-                old_option="process_execution_use_local_cache",
-                new_option="process_execution_local_cache",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_local_cache=bootstrap_options.process_execution_local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
-            process_execution_local_cleanup=resolve_conflicting_options(
-                old_option="process_execution_cleanup_local_dirs",
-                new_option="process_execution_local_cleanup",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_local_cleanup=bootstrap_options.process_execution_local_cleanup,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
@@ -272,6 +266,7 @@ class ExecutionOptions:
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             # Remote execution setup.
             remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
@@ -343,6 +338,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_rpc_retries=2,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
@@ -403,16 +399,6 @@ class GlobalOptions(Subsystem):
             default=False,
             help="Re-resolve plugins, even if previously resolved.",
         )
-        register(
-            "--plugin-cache-dir",
-            advanced=True,
-            default=os.path.join(get_pants_cachedir(), "plugins"),
-            help="Cache resolved plugin requirements here.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "This option now no-ops, the plugins cache is now housed in the named caches."
-            ),
-        )
 
         register(
             "-l",
@@ -466,7 +452,24 @@ class GlobalOptions(Subsystem):
             ),
         )
 
-        # TODO(#7203): make a regexp option type!
+        register(
+            "--ignore-warnings",
+            type=list,
+            member_type=str,
+            default=[],
+            daemon=True,
+            advanced=True,
+            help=(
+                "Ignore logs and warnings matching these strings.\n\n"
+                "Normally, Pants will look for literal matches from the start of the log/warning "
+                "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
+                "your string as a regex pattern. For example:\n\n"
+                "  ignore_warnings = [\n"
+                "    'The option `[isort.config]` is not configured',\n"
+                "    '$regex$DeprecationWarning: DEPRECATED:\\s*'\n"
+                "  ]"
+            ),
+        )
         register(
             "--ignore-pants-warnings",
             type=list,
@@ -477,6 +480,13 @@ class GlobalOptions(Subsystem):
             help="Regexps matching warning strings to ignore, e.g. "
             '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
             "matched from the start of the warning string, and are case-insensitive.",
+            removal_version="2.6.0.dev0",
+            removal_hint=(
+                "Use the global option `--ignore-warnings` instead.\n\nUnlike this option, "
+                "`--ignore-warnings` uses literal string matches instead of regex patterns by "
+                "default. If you would still like to use a regex pattern, prefix the string with "
+                "`$regex$`."
+            ),
         )
 
         register(
@@ -872,17 +882,6 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
-            "--process-execution-use-local-cache",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
-            advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Use the shorter `--process-execution-local-cache`, which behaves the same."
-            ),
-        )
-        register(
             "--process-execution-local-cleanup",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
@@ -892,18 +891,6 @@ class GlobalOptions(Subsystem):
                 "processes. Pants will log their location so that you can inspect the chroot, and "
                 "run the `__run.sh` script to recreate the process using the same argv and "
                 "environment variables used by Pants. This option is useful for debugging."
-            ),
-        )
-        register(
-            "--process-execution-cleanup-local-dirs",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
-            advanced=True,
-            help="Whether or not to cleanup directories used for local process execution "
-            "(primarily useful for e.g. debugging).",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Use the shorter `--process-execution-local-cleanup`, which behaves the same."
             ),
         )
 
@@ -940,15 +927,6 @@ class GlobalOptions(Subsystem):
                 "Change this value to invalidate every artifact's execution, or to prevent "
                 "process cache entries from being (re)used for different usecases or users."
             ),
-        )
-        register(
-            "--process-execution-local-enable-nailgun",
-            type=bool,
-            default=False,
-            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
-            advanced=True,
-            removal_version="2.5.0.dev0",
-            removal_hint="This option no-ops as Pants does not yet support the JVM.",
         )
 
         register(
@@ -1083,6 +1061,17 @@ class GlobalOptions(Subsystem):
             help="Number of times to retry any RPC to the remote store before giving up.",
         )
 
+        register(
+            "--remote-cache-warnings",
+            type=RemoteCacheWarningsBehavior,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
+            advanced=True,
+            help=(
+                "Whether to log remote cache failures at the `warn` log level.\n\n"
+                "All errors not logged at the `warn` level will instead be logged at the "
+                "`debug` level."
+            ),
+        )
         register(
             "--remote-cache-eager-fetch",
             type=bool,

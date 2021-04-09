@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, List, Type
 
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
@@ -33,10 +32,8 @@ async def format_python_target(
     )
     prior_formatter_result = original_sources.snapshot
 
-    results: List[EnrichedFmtResult] = []
-    fmt_request_types: Iterable[Type[PythonFmtRequest]] = union_membership.union_rules[
-        PythonFmtRequest
-    ]
+    results = []
+    fmt_request_types = union_membership.union_rules[PythonFmtRequest]
     for fmt_request_type in fmt_request_types:
         result = await Get(
             EnrichedFmtResult,
