@@ -37,9 +37,6 @@ jobs:
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
-        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && echo PANTS_REMOTE_CACHE_WRITE=false
-        >> $GITHUB_ENV
-
         '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
@@ -405,9 +402,6 @@ jobs:
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
-        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && echo PANTS_REMOTE_CACHE_WRITE=false
-        >> $GITHUB_ENV
-
         '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
@@ -480,9 +474,6 @@ jobs:
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && echo PANTS_REMOTE_CACHE_WRITE=false
-        >> $GITHUB_ENV
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -558,9 +549,6 @@ jobs:
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && echo PANTS_REMOTE_CACHE_WRITE=false
-        >> $GITHUB_ENV
 
         '
     - name: Set up Python ${{ matrix.python-version }}
