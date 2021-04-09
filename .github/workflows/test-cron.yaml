@@ -244,6 +244,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 20
   lint_python:
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
@@ -308,6 +309,7 @@ jobs:
         ./pants lint typecheck ::
 
         '
+      timeout-minutes: 20
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -317,6 +319,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 60
   test_python_linux:
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
@@ -381,6 +384,7 @@ jobs:
       run: './pants test ::
 
         '
+      timeout-minutes: 40
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -390,6 +394,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 60
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
@@ -456,6 +461,7 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
+      timeout-minutes: 40
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -465,6 +471,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 60
 name: Daily Extended Python Testing
 'on':
   schedule:

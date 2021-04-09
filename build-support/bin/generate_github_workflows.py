@@ -293,6 +293,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "timeout-minutes": 60,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -300,7 +301,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_engine_so_download(),
-                {"name": "Run Python tests", "run": "./pants test ::\n"},
+                {"name": "Run Python tests", "timeout-minutes": 40, "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
         },
@@ -309,6 +310,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "timeout-minutes": 60,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -317,6 +319,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 native_engine_so_download(),
                 {
                     "name": "Lint",
+                    "timeout-minutes": 20,
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
                 },
                 upload_log_artifacts(name="lint"),
@@ -326,6 +329,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "timeout-minutes": 20,
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
@@ -349,6 +353,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": MACOS_ENV,
+            "timeout-minutes": 60,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -358,6 +363,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 native_engine_so_download(),
                 {
                     "name": "Run Python tests",
+                    "timeout-minutes": 40,
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
                 upload_log_artifacts(name="python-test-macos"),
@@ -400,6 +406,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Build wheels and fs_util (Linux)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
+                    "timeout-minutes": 40,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -418,6 +425,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 "build_wheels_macos": {
                     "name": "Build wheels and fs_util (macOS)",
                     "runs-on": MACOS_VERSION,
+                    "timeout-minutes": 40,
                     "steps": [
                         *checkout(),
                         expose_all_pythons(),
