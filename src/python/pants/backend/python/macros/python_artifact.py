@@ -1,7 +1,39 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Dict
+import collections.abc
+from typing import Any, Dict, List, Optional, Union
+
+
+def _normalize_entry_points(
+    entry_points: Optional[Dict[str, Union[List[str], Dict[str, str]]]]
+) -> Optional[Dict[str, Dict[str, str]]]:
+    """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
+    if not entry_points:
+        return None
+
+    if not isinstance(entry_points, collections.abc.Mapping):
+        raise ValueError(
+            f"The `entry_points` in `setup_py()` must be a dictionary, "
+            f"but was {entry_points!r} with type {type(entry_points)}"
+        )
+
+    def _values_to_entry_points(values):
+        if isinstance(values, collections.abc.Mapping):
+            return values
+        if isinstance(values, collections.abc.Iterable):
+            for entry_point in values:
+                if not isinstance(entry_point, str) or "=" not in entry_point:
+                    raise ValueError(
+                        f"Invalid `entry_point`, expected `<name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]`, but got {entry_point!r}"
+                    )
+
+            return dict(tuple(map(str.strip, entry_point.split("=", 1))) for entry_point in values)
+        raise ValueError(
+            f"The values of the `entry_points` dictionary in `setup_py()` must be a list of strings or a dictionary of string to string, but got {values!r} of type {type(values)}"
+        )
+
+    return {section: _values_to_entry_points(values) for section, values in entry_points.items()}
 
 
 class PythonArtifact:
@@ -20,6 +52,11 @@ class PythonArtifact:
                 f"The `name` in `setup_py()` must be a string, but was {repr(name)} with type "
                 f"{type(name)}."
             )
+
+        # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
+        entry_points = _normalize_entry_points(kwargs.get("entry_points"))
+        if entry_points:
+            kwargs["entry_points"] = entry_points
 
         self._kw: Dict[str, Any] = kwargs
         self._binaries = {}

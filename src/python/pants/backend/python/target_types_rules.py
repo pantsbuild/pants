@@ -9,16 +9,21 @@ defined in `target_types.py`.
 
 import dataclasses
 import os.path
+from collections import defaultdict
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.target_types import (
+    EntryPoint,
     PexBinaryDependencies,
     PexEntryPointField,
     PythonDistributionDependencies,
+    PythonDistributionEntryPoints,
     PythonProvidesField,
     ResolvedPexEntryPoint,
+    ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
+    ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -30,10 +35,12 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.frozendict import FrozenDict
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
@@ -143,29 +150,123 @@ async def inject_pex_binary_entry_point_dependency(
 # -----------------------------------------------------------------------------------------------
 
 
+@rule(desc="Determining the entry points for a `python_distribution` target")
+async def resolve_python_distribution_entry_points(
+    request: ResolvePythonDistributionEntryPointsRequest,
+) -> ResolvedPythonDistributionEntryPoints:
+    field_value = request.entry_points_field.value
+    if field_value is None:
+        return ResolvedPythonDistributionEntryPoints(None)
+
+    address = request.entry_points_field.address
+    entry_points: dict[str, dict[str, EntryPoint]] = defaultdict(dict)
+
+    for section, values in field_value.items():
+        for name, ref in values.items():
+            if ref.startswith(":") or "/" in ref:
+                targets = await Get(Targets, UnparsedAddressInputs([ref], owning_address=address))
+                if not targets:
+                    raise InvalidFieldException(
+                        f'The "entry_points" target address {repr(ref)} does not resolve to any known target.'
+                    )
+
+                for target in targets:
+                    if target.has_field(PexEntryPointField):
+                        binary_entry_point = await Get(
+                            ResolvedPexEntryPoint,
+                            ResolvePexEntryPointRequest(target[PexEntryPointField]),
+                        )
+                        ep = binary_entry_point.val
+                        break
+                else:
+                    raise InvalidFieldException(
+                        f'The "entry_points" target address {repr(ref)} does not resolve to a pex_binary() target, but:'
+                        + ", ".join(str(t) for t in targets)
+                    )
+            else:
+                ep = EntryPoint.parse(ref, f"{name} for {address} {section}")
+
+            if ep is not None:
+                entry_points[section][name] = ep
+
+    return ResolvedPythonDistributionEntryPoints(
+        FrozenDict({key: FrozenDict(value) for key, value in entry_points.items()})
+    )
+
+
 class InjectPythonDistributionDependencies(InjectDependenciesRequest):
     inject_for = PythonDistributionDependencies
 
 
 @rule
 async def inject_python_distribution_dependencies(
-    request: InjectPythonDistributionDependencies,
+    request: InjectPythonDistributionDependencies, python_infer_subsystem: PythonInferSubsystem
 ) -> InjectedDependencies:
-    """Inject any `.with_binaries()` values, as it would be redundant to have to include in the
-    `dependencies` field."""
+    """Inject dependencies that we can infer from entry points in the distribution.
+
+    Inject module owners referred to from `entry_points`.
+
+    Inject any `.with_binaries()` values, as it would be redundant to have to
+    include in the `dependencies` field.
+    """
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
-    if not with_binaries:
-        return InjectedDependencies()
-    # Note that we don't validate that these are all `pex_binary` targets; we don't care about
-    # that here. `setup_py.py` will do that validation.
-    addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            with_binaries.values(), owning_address=request.dependencies_field.address
+
+    entry_points = await Get(
+        ResolvedPythonDistributionEntryPoints,
+        ResolvePythonDistributionEntryPointsRequest(
+            original_tgt.target[PythonDistributionEntryPoints]
         ),
     )
-    return InjectedDependencies(addresses)
+    entry_point_addresses = Addresses()
+
+    if entry_points.val and python_infer_subsystem.entry_points:
+        address = original_tgt.target.address
+        explicitly_provided_deps = await Get(
+            ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])
+        )
+        all_entry_points = [
+            (key, name, entry_point)
+            for key, section in entry_points.val.items()
+            for name, entry_point in section.items()
+        ]
+        all_owners = await MultiGet(
+            Get(PythonModuleOwners, PythonModule(entry_point.module))
+            for _, _, entry_point in all_entry_points
+        )
+        for (key, name, entry_point), owners in zip(all_entry_points, all_owners):
+            field_str = repr({key: {name: entry_point.spec}})
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                owners.ambiguous,
+                address,
+                import_reference="module",
+                context=(
+                    f"The distribution target {address} has the field "
+                    f"`entry_points={field_str}`"
+                ),
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(
+                owners.ambiguous
+            )
+            unambiguous_owners = Addresses(
+                owners.unambiguous
+                or ((maybe_disambiguated,) if maybe_disambiguated else Addresses())
+            )
+            entry_point_addresses += unambiguous_owners  # type: ignore[assignment]
+
+    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
+    if not with_binaries:
+        pex_addresses = Addresses()
+    else:
+        # Note that we don't validate that these are all `pex_binary` targets; we don't care about
+        # that here. `setup_py.py` will do that validation.
+        pex_addresses = await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                with_binaries.values(), owning_address=request.dependencies_field.address
+            ),
+        )
+
+    return InjectedDependencies(entry_point_addresses + pex_addresses)
 
 
 def rules():

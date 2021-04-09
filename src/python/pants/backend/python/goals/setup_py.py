@@ -10,17 +10,21 @@ import pickle
 from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexEntryPointField,
+    PythonDistributionEntryPoints,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
     ResolvedPexEntryPoint,
+    ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
+    ResolvePythonDistributionEntryPointsRequest,
     SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -559,7 +563,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
 
-    # Add any `pex_binary` targets from `setup_py().with_binaries()` to the dist's entry points.
+    # Collect any `pex_binary` targets from `setup_py().with_binaries()`
     key_to_binary_spec = exported_target.provides.binaries
     binaries = await Get(
         Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
@@ -589,15 +593,45 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 f"`entry_point='{entry_point.module}:main'. See {url}."
             )
         entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
+
+    entry_point_sources = cast(
+        Dict[str, Dict[str, Dict[str, str]]], recursive_defaultdict_factory()
+    )
     binary_entry_points = await MultiGet(
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
         for request in entry_point_requests
     )
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
-        entry_points = setup_kwargs.setdefault("entry_points", {})
-        console_scripts = entry_points.setdefault("console_scripts", [])
         if binary_entry_point.val is not None:
-            console_scripts.append(f"{key}={binary_entry_point.val.spec}")
+            entry_point_sources[f"{exported_addr} `provides.with_binaries()`"]["console_scripts"][
+                key
+            ] = binary_entry_point.val.spec
+
+    # Collect entry points from `python_distribution(entry_points=...)`
+    if exported_target.target.has_field(PythonDistributionEntryPoints):
+        entry_points_field = await Get(
+            ResolvedPythonDistributionEntryPoints,
+            ResolvePythonDistributionEntryPointsRequest(
+                exported_target.target[PythonDistributionEntryPoints]
+            ),
+        )
+
+        if entry_points_field.val:
+            for key, section in entry_points_field.val.items():
+                entry_point_sources[f"{exported_addr} `entry_points`"][key] = {
+                    name: entry_point.spec for name, entry_point in section.items()
+                }
+
+    # Collect any entry points from the setup_py() target
+    if "entry_points" in setup_kwargs:
+        entry_point_sources[f"{exported_addr} `provides.entry_points`"] = setup_kwargs[
+            "entry_points"
+        ]
+
+    # Merge all collected entry points and add them to the dist's entry points.
+    entry_points = merge_entry_points(*list(entry_point_sources.items()))
+    if entry_points:
+        setup_kwargs["entry_points"] = entry_points
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
@@ -976,6 +1010,43 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
         ):
             return True
     return False
+
+
+def merge_entry_points(
+    *entry_points: Tuple[str, Dict[str, Dict[str, str]]]
+) -> Dict[str, List[str]]:
+    """Merge all entry points, throwing ValueError if there are any conflicts."""
+    # keep source_name info for each entry_point until we have merged all
+    # sources, so we can provide better error messages in case of conflicts
+    merged = cast(
+        Dict[str, Dict[str, List[Tuple[str, str]]]], defaultdict(partial(defaultdict, list))
+    )
+
+    for source_name, source_entry_points in entry_points:
+        for section, values in source_entry_points.items():
+            for name, entry_point in values.items():
+                merged[section][name].append((source_name, entry_point))
+
+    def _merge_entry_point(section, name, values):
+        if len(values) > 1:
+            raise ValueError(
+                f"Multiple entry_points registered for {section} {name} in: {', '.join(v[0] for v in values)}"
+            )
+        for source_name, entry_point in values:
+            return f"{name}={entry_point}"
+
+    return {
+        section: [
+            _merge_entry_point(section, name, values)
+            for name, values in merged_entry_points.items()
+        ]
+        for section, merged_entry_points in merged.items()
+    }
+
+
+def recursive_defaultdict_factory():
+    """Arbitrarily deeply nested defaultdicts."""
+    return defaultdict(recursive_defaultdict_factory)
 
 
 def rules():

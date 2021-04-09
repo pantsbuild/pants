@@ -34,6 +34,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -724,6 +725,34 @@ class PythonProvidesField(ScalarField, ProvidesField):
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
+class PythonDistributionEntryPoints(NestedDictStringToStringField, AsyncFieldMixin):
+    alias = "entry_points"
+    required = False
+    help = (
+        "The entry points for setup.py. Pants will infer a dependency on "
+        "the owner of the entry point modules.\n\n"
+        "The syntax for entry points is specified as a target or standard setuptools entry point reference:\n"
+        "`<name> = [//<target>][:<name>]`\n"
+        "`<name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]`\n\n"
+        "Target addresses [https://www.pantsbuild.org/docs/targets#target-addresses]\n"
+        "Setuptools [https://setuptools.readthedocs.io/en/latest/userguide/entry_point.html]."
+    )
+
+
+# See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
+@dataclass(frozen=True)
+class ResolvedPythonDistributionEntryPoints:
+    val: Optional[FrozenDict[str, FrozenDict[str, EntryPoint]]]
+
+
+@dataclass(frozen=True)
+class ResolvePythonDistributionEntryPointsRequest:
+    """Looks at the entry points to see if it is a setuptools entry point, or a BUILD target address
+    that should be resolved into a setuptools entry point."""
+
+    entry_points_field: PythonDistributionEntryPoints
+
+
 class SetupPyCommandsField(StringSequenceField):
     alias = "setup_py_commands"
     expected_type_help = (
@@ -742,6 +771,7 @@ class PythonDistribution(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonDistributionDependencies,
+        PythonDistributionEntryPoints,
         PythonProvidesField,
         SetupPyCommandsField,
     )
