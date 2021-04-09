@@ -1,15 +1,16 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import List, Optional, Tuple, cast
 
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
-from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
+from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
+from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -18,36 +19,36 @@ class MockTarget(Target):
 
 
 def run_goal(
-    targets: List[MockTarget],
+    targets: list[MockTarget],
     *,
     show_documented: bool = False,
     show_provides: bool = False,
-    provides_columns: Optional[str] = None,
-) -> Tuple[str, str]:
-    console = MockConsole(use_colors=False)
-    run_rule_with_mocks(
-        list_targets,
-        rule_args=[
-            Addresses(tgt.address for tgt in targets),
-            create_goal_subsystem(
-                ListSubsystem,
-                sep="\\n",
-                output_file=None,
-                documented=show_documented,
-                provides=show_provides,
-                provides_columns=provides_columns or "address,artifact_id",
-            ),
-            console,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=UnexpandedTargets,
-                input_type=Addresses,
-                mock=lambda _: UnexpandedTargets(targets),
-            )
-        ],
-    )
-    return cast(str, console.stdout.getvalue()), cast(str, console.stderr.getvalue())
+    provides_columns: str | None = None,
+) -> tuple[str, str]:
+    with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+        run_rule_with_mocks(
+            list_targets,
+            rule_args=[
+                Addresses(tgt.address for tgt in targets),
+                create_goal_subsystem(
+                    ListSubsystem,
+                    sep="\\n",
+                    output_file=None,
+                    documented=show_documented,
+                    provides=show_provides,
+                    provides_columns=provides_columns or "address,artifact_id",
+                ),
+                console,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=UnexpandedTargets,
+                    input_type=Addresses,
+                    mock=lambda _: UnexpandedTargets(targets),
+                )
+            ],
+        )
+        return stdio_reader.get_stdout(), stdio_reader.get_stderr()
 
 
 def test_list_normal() -> None:
