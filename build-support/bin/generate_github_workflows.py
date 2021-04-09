@@ -297,22 +297,22 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_linux": {
-            "name": "Test Python (Linux)",
-            "runs-on": LINUX_VERSION,
-            "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "steps": [
-                *checkout(),
-                *setup_toolchain_auth(),
-                *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
-                {"name": "Run Python tests", "run": "./pants test ::\n"},
-                upload_log_artifacts(name="python-test-linux"),
-            ],
-        },
+        # "test_python_linux": {
+        #     "name": "Test Python (Linux)",
+        #     "runs-on": LINUX_VERSION,
+        #     "needs": "bootstrap_pants_linux",
+        #     "strategy": {"matrix": {"python-version": [primary_python_version]}},
+        #     "steps": [
+        #         *checkout(),
+        #         *setup_toolchain_auth(),
+        #         *setup_primary_python(),
+        #         *expose_all_pythons(),
+        #         *pants_virtualenv_cache(),
+        #         *native_engine_so_download(),
+        #         {"name": "Run Python tests", "run": "./pants test ::\n"},
+        #         upload_log_artifacts(name="python-test-linux"),
+        #     ],
+        # },
         "lint_python": {
             "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
@@ -331,49 +331,49 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 upload_log_artifacts(name="lint"),
             ],
         },
-        "bootstrap_pants_macos": {
-            "name": "Bootstrap Pants, test Rust (macOS)",
-            "runs-on": MACOS_VERSION,
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "steps": [
-                *checkout(),
-                *setup_primary_python(),
-                *bootstrap_caches(),
-                {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                *native_engine_so_upload(),
-                {
-                    "name": "Test Rust",
-                    # We pass --tests to skip doc tests because our generated protos contain
-                    # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
-                    # pass on GHA MacOS containers.
-                    "run": "./cargo test --tests -- --nocapture",
-                    "if": DONT_SKIP_RUST,
-                    "env": {"TMPDIR": "${{ runner.temp }}"},
-                },
-            ],
-        },
-        "test_python_macos": {
-            "name": "Test Python (macOS)",
-            "runs-on": MACOS_VERSION,
-            "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-            # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-            "env": {"ARCHFLAGS": "-arch x86_64"},
-            "steps": [
-                *checkout(),
-                *setup_toolchain_auth(),
-                *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
-                {
-                    "name": "Run Python tests",
-                    "run": "./pants --tag=+platform_specific_behavior test ::\n",
-                },
-                upload_log_artifacts(name="python-test-macos"),
-            ],
-        },
+        # "bootstrap_pants_macos": {
+        #     "name": "Bootstrap Pants, test Rust (macOS)",
+        #     "runs-on": MACOS_VERSION,
+        #     "strategy": {"matrix": {"python-version": [primary_python_version]}},
+        #     "steps": [
+        #         *checkout(),
+        #         *setup_primary_python(),
+        #         *bootstrap_caches(),
+        #         {"name": "Bootstrap Pants", "run": "./pants --version\n"},
+        #         *native_engine_so_upload(),
+        #         {
+        #             "name": "Test Rust",
+        #             # We pass --tests to skip doc tests because our generated protos contain
+        #             # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
+        #             # pass on GHA MacOS containers.
+        #             "run": "./cargo test --tests -- --nocapture",
+        #             "if": DONT_SKIP_RUST,
+        #             "env": {"TMPDIR": "${{ runner.temp }}"},
+        #         },
+        #     ],
+        # },
+        # "test_python_macos": {
+        #     "name": "Test Python (macOS)",
+        #     "runs-on": MACOS_VERSION,
+        #     "needs": "bootstrap_pants_macos",
+        #     "strategy": {"matrix": {"python-version": [primary_python_version]}},
+        #     # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+        #     # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+        #     "env": {"ARCHFLAGS": "-arch x86_64"},
+        #     "steps": [
+        #         *checkout(),
+        #         *setup_toolchain_auth(),
+        #         *setup_primary_python(),
+        #         *expose_all_pythons(),
+        #         *pants_virtualenv_cache(),
+        #         *native_engine_so_download(),
+        #         {
+        #             "name": "Run Python tests",
+        #             "run": "./pants --tag=+platform_specific_behavior test ::\n",
+        #         },
+        #         upload_log_artifacts(name="python-test-macos"),
+        #     ],
+        # },
     }
     if not cron:
         deploy_to_s3_step = {
@@ -385,43 +385,43 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
             },
         }
-        jobs.update(
-            {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
-                    "runs-on": LINUX_VERSION,
-                    "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "steps": [
-                        *checkout(),
-                        install_rustup(),
-                        {
-                            "name": "Expose Pythons",
-                            "run": (
-                                'echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:'
-                                '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
-                            ),
-                        },
-                        get_build_wheels_step(is_macos=False),
-                        deploy_to_s3_step,
-                    ],
-                },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
-                    "runs-on": MACOS_VERSION,
-                    "steps": [
-                        *checkout(),
-                        *expose_all_pythons(),
-                        # NB: We only cache Rust, but not `native_engine.so` and the Pants
-                        # virtualenv. This is because we must build both these things with Python
-                        # multiple Python versions, whereas that caching assumes only one primary
-                        # Python version (marked via matrix.strategy).
-                        *rust_caches(),
-                        get_build_wheels_step(is_macos=True),
-                        deploy_to_s3_step,
-                    ],
-                },
-            }
-        )
+        # jobs.update(
+        #     {
+        #         "build_wheels_linux": {
+        #             "name": "Build wheels and fs_util (Linux)",
+        #             "runs-on": LINUX_VERSION,
+        #             "container": "quay.io/pypa/manylinux2014_x86_64:latest",
+        #             "steps": [
+        #                 *checkout(),
+        #                 install_rustup(),
+        #                 {
+        #                     "name": "Expose Pythons",
+        #                     "run": (
+        #                         'echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:'
+        #                         '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
+        #                     ),
+        #                 },
+        #                 get_build_wheels_step(is_macos=False),
+        #                 deploy_to_s3_step,
+        #             ],
+        #         },
+        #         "build_wheels_macos": {
+        #             "name": "Build wheels and fs_util (macOS)",
+        #             "runs-on": MACOS_VERSION,
+        #             "steps": [
+        #                 *checkout(),
+        #                 *expose_all_pythons(),
+        #                 # NB: We only cache Rust, but not `native_engine.so` and the Pants
+        #                 # virtualenv. This is because we must build both these things with Python
+        #                 # multiple Python versions, whereas that caching assumes only one primary
+        #                 # Python version (marked via matrix.strategy).
+        #                 *rust_caches(),
+        #                 get_build_wheels_step(is_macos=True),
+        #                 deploy_to_s3_step,
+        #             ],
+        #         },
+        #     }
+        # )
     return jobs
 
 
