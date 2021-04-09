@@ -15,10 +15,7 @@ from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
 
-from colors import blue, cyan, green, magenta, red, yellow
-
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -547,46 +544,3 @@ class StdioReader:
     def get_stderr(self) -> str:
         """Return all data that has been flushed to stderr so far."""
         return self._stderr.read_text()
-
-
-class MockConsole:
-    """An implementation of pants.engine.console.Console which captures output."""
-
-    @deprecated("2.5.0.dev1", hint_message="Use the mock_console contextmanager instead.")
-    def __init__(self, use_colors=True):
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-        self.use_colors = use_colors
-
-    def write_stdout(self, payload):
-        self.stdout.write(payload)
-
-    def write_stderr(self, payload):
-        self.stderr.write(payload)
-
-    def print_stdout(self, payload):
-        print(payload, file=self.stdout)
-
-    def print_stderr(self, payload):
-        print(payload, file=self.stderr)
-
-    def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
-        return color(text) if self.use_colors else text
-
-    def blue(self, text: str) -> str:
-        return self._safe_color(text, blue)
-
-    def cyan(self, text: str) -> str:
-        return self._safe_color(text, cyan)
-
-    def green(self, text: str) -> str:
-        return self._safe_color(text, green)
-
-    def magenta(self, text: str) -> str:
-        return self._safe_color(text, magenta)
-
-    def red(self, text: str) -> str:
-        return self._safe_color(text, red)
-
-    def yellow(self, text: str) -> str:
-        return self._safe_color(text, yellow)
