@@ -5,8 +5,6 @@
 
 env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
-  PANTS_REMOTE_CACHE_READ: 'true'
-  PANTS_REMOTE_CACHE_WRITE: 'true'
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
@@ -44,6 +42,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
@@ -130,7 +135,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - '3.7'
   bootstrap_pants_macos:
     name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
@@ -161,6 +166,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
@@ -231,7 +243,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - '3.7'
   build_wheels_linux:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     name: Build wheels and fs_util (Linux)
@@ -395,6 +407,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -416,15 +435,10 @@ jobs:
         ./pants lint typecheck ::
 
         '
-    - name: Upload pants log
-      uses: actions/upload-artifact@v2
-      with:
-        name: pants-log-lint
-        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - '3.7'
   test_python_linux:
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
@@ -461,6 +475,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
@@ -482,15 +503,10 @@ jobs:
       run: './pants test ::
 
         '
-    - name: Upload pants log
-      uses: actions/upload-artifact@v2
-      with:
-        name: pants-log-python-test-linux
-        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - '3.7'
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
@@ -529,6 +545,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
@@ -550,15 +573,10 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
-    - name: Upload pants log
-      uses: actions/upload-artifact@v2
-      with:
-        name: pants-log-python-test-macos
-        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - '3.7'
 name: Pull Request CI
 'on':
 - push

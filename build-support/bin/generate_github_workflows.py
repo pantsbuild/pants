@@ -37,8 +37,10 @@ NATIVE_ENGINE_SO_FILES = [
     "src/python/pants/engine/internals/native_engine.so.metadata",
 ]
 
-PYTHON37_VERSION = "3.7.10"
-PYTHON38_VERSION = "3.8.3"
+# We don't specify patch versions so that we get the latest, which comes pre-installed:
+#  https://github.com/actions/setup-python#available-versions-of-python
+PYTHON37_VERSION = "3.7"
+PYTHON38_VERSION = "3.8"
 
 LINUX_VERSION = "ubuntu-20.04"
 MACOS_VERSION = "macos-10.15"
@@ -47,6 +49,12 @@ DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
 DONT_SKIP_WHEELS = (
     "github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')"
 )
+
+
+# Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+# intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
+
 
 # ----------------------------------------------------------------------
 # Actions
@@ -93,38 +101,32 @@ def checkout() -> Sequence[Step]:
     ]
 
 
-def setup_toolchain_auth() -> Sequence[Step]:
-    return [
-        {
-            "name": "Setup toolchain auth",
-            "if": "github.event_name != 'pull_request'",
-            "run": dedent(
-                """\
-                echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-                """
-            ),
-        }
-    ]
+def setup_toolchain_auth() -> Step:
+    return {
+        "name": "Setup toolchain auth",
+        "if": "github.event_name != 'pull_request'",
+        "run": dedent(
+            """\
+            echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+            """
+        ),
+    }
 
 
-def pants_virtualenv_cache() -> Sequence[Step]:
-    return [
-        {
-            "name": "Cache Pants Virtualenv",
-            "uses": "actions/cache@v2",
-            "with": {
-                "path": "~/.cache/pants/pants_dev_deps\n",
-                "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}\n",
-            },
-        }
-    ]
+def pants_virtualenv_cache() -> Step:
+    return {
+        "name": "Cache Pants Virtualenv",
+        "uses": "actions/cache@v2",
+        "with": {
+            "path": "~/.cache/pants/pants_dev_deps\n",
+            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}\n",
+        },
+    }
 
 
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
-        "PANTS_REMOTE_CACHE_READ": "true",
-        "PANTS_REMOTE_CACHE_WRITE": "true",
         "RUST_BACKTRACE": "all",
     }
 
@@ -172,7 +174,7 @@ def rust_caches() -> Sequence[Step]:
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
-        *pants_virtualenv_cache(),
+        pants_virtualenv_cache(),
         {
             "name": "Get Engine Hash",
             "id": "get-engine-hash",
@@ -190,30 +192,26 @@ def bootstrap_caches() -> Sequence[Step]:
     ]
 
 
-def native_engine_so_upload() -> Sequence[Step]:
-    return [
-        {
-            "name": "Upload native_engine.so",
-            "uses": "actions/upload-artifact@v2",
-            "with": {
-                "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
-            },
+def native_engine_so_upload() -> Step:
+    return {
+        "name": "Upload native_engine.so",
+        "uses": "actions/upload-artifact@v2",
+        "with": {
+            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "\n".join(NATIVE_ENGINE_SO_FILES),
         },
-    ]
+    }
 
 
-def native_engine_so_download() -> Sequence[Step]:
-    return [
-        {
-            "name": "Download native_engine.so",
-            "uses": "actions/download-artifact@v2",
-            "with": {
-                "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "src/python/pants/engine/internals/",
-            },
+def native_engine_so_download() -> Step:
+    return {
+        "name": "Download native_engine.so",
+        "uses": "actions/download-artifact@v2",
+        "with": {
+            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "src/python/pants/engine/internals/",
         },
-    ]
+    }
 
 
 def setup_primary_python() -> Sequence[Step]:
@@ -222,39 +220,24 @@ def setup_primary_python() -> Sequence[Step]:
             "name": "Set up Python ${{ matrix.python-version }}",
             "uses": "actions/setup-python@v2",
             "with": {"python-version": "${{ matrix.python-version }}"},
-        }
-    ]
-
-
-def expose_all_pythons() -> Sequence[Step]:
-    return [
+        },
         {
-            "name": "Expose Pythons",
-            "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
-        }
+            "name": "Tell Pants to use Python ${{ matrix.python-version }}",
+            "run": dedent(
+                """\
+                echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+                echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
+                """
+            ),
+        },
     ]
 
 
-def get_build_wheels_step(is_macos: bool) -> Step:
-    step = {
-        "name": "Build wheels and fs_util",
-        "run": dedent(
-            # We use MODE=debug on PR builds to speed things up, given that those are only
-            # smoke tests of our release process.
-            """\
-                [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                ./build-support/bin/release.sh -n
-                USE_PY38=true ./build-support/bin/release.sh -n
-                ./build-support/bin/release.sh -f
-                """
-        ),
-        "if": DONT_SKIP_WHEELS,
+def expose_all_pythons() -> Step:
+    return {
+        "name": "Expose Pythons",
+        "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
     }
-    if is_macos:
-        # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-        # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-        step["env"] = {"ARCHFLAGS": "-arch x86_64"}  # type: ignore[assignment]
-    return step
 
 
 def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
@@ -265,7 +248,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -281,7 +264,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                         """
                     ),
                 },
-                *native_engine_so_upload(),
+                native_engine_so_upload(),
                 {
                     "name": "Test and Lint Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -304,13 +287,12 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                expose_all_pythons(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
-                upload_log_artifacts(name="python-test-linux"),
             ],
         },
         "lint_python": {
@@ -320,15 +302,14 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
                 },
-                upload_log_artifacts(name="lint"),
             ],
         },
         "bootstrap_pants_macos": {
@@ -340,7 +321,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                *native_engine_so_upload(),
+                native_engine_so_upload(),
                 {
                     "name": "Test Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -357,25 +338,42 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": MACOS_VERSION,
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-            # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-            "env": {"ARCHFLAGS": "-arch x86_64"},
+            "env": MACOS_ENV,
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                expose_all_pythons(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
-                upload_log_artifacts(name="python-test-macos"),
             ],
         },
     }
     if not cron:
+
+        def build_wheels_step(*, is_macos: bool) -> Step:
+            step = {
+                "name": "Build wheels and fs_util",
+                "run": dedent(
+                    # We use MODE=debug on PR builds to speed things up, given that those are only
+                    # smoke tests of our release process.
+                    """\
+                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                    ./build-support/bin/release.sh -n
+                    USE_PY38=true ./build-support/bin/release.sh -n
+                    ./build-support/bin/release.sh -f
+                    """
+                ),
+                "if": DONT_SKIP_WHEELS,
+            }
+            if is_macos:
+                step["env"] = MACOS_ENV  # type: ignore[assignment]
+            return step
+
         deploy_to_s3_step = {
             "name": "Deploy to S3",
             "run": "./build-support/bin/deploy_to_s3.py",
@@ -397,11 +395,12 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                         {
                             "name": "Expose Pythons",
                             "run": (
-                                'echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:'
+                                'echo "PATH=${PATH}:'
+                                "/opt/python/cp37-cp37m/bin:"
                                 '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
                             ),
                         },
-                        get_build_wheels_step(is_macos=False),
+                        build_wheels_step(is_macos=False),
                         deploy_to_s3_step,
                     ],
                 },
@@ -410,27 +409,19 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "runs-on": MACOS_VERSION,
                     "steps": [
                         *checkout(),
-                        *expose_all_pythons(),
+                        expose_all_pythons(),
                         # NB: We only cache Rust, but not `native_engine.so` and the Pants
                         # virtualenv. This is because we must build both these things with Python
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
                         *rust_caches(),
-                        get_build_wheels_step(is_macos=True),
+                        build_wheels_step(is_macos=True),
                         deploy_to_s3_step,
                     ],
                 },
             }
         )
     return jobs
-
-
-def upload_log_artifacts(name: str) -> Step:
-    return {
-        "name": "Upload pants log",
-        "uses": "actions/upload-artifact@v2",
-        "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
-    }
 
 
 # ----------------------------------------------------------------------
