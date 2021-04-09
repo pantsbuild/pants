@@ -240,6 +240,14 @@ def expose_all_pythons() -> Step:
     }
 
 
+def upload_log_artifacts(name: str) -> Step:
+    return {
+        "name": "Upload pants.log",
+        "uses": "actions/upload-artifact@v2",
+        "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
+    }
+
+
 def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
     jobs = {
         "bootstrap_pants_linux": {
@@ -293,6 +301,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 pants_virtualenv_cache(),
                 native_engine_so_download(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
+                upload_log_artifacts(name="python-test-linux"),
             ],
         },
         "lint_python": {
@@ -310,6 +319,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
                 },
+                upload_log_artifacts(name="lint"),
             ],
         },
         "bootstrap_pants_macos": {
@@ -350,6 +360,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
+                upload_log_artifacts(name="python-test-macos"),
             ],
         },
     }
