@@ -21,7 +21,7 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
-from pants.engine.rules import Get, goal_rule
+from pants.engine.rules import Get, goal_rule, collect_rules
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.goal import anonymous_telemetry, stats_aggregator
@@ -31,6 +31,7 @@ from pants.engine.platform import Platform
 
 class Debug(GoalSubsystem):
     name = "debug"
+    help = "foo"
 
 
 class DebugGoal(Goal):
@@ -46,6 +47,7 @@ async def debug_goal(shellcheck: Shellcheck) -> DebugGoal:
 def rules():
     return [
         # goals
+        *collect_rules(),
         *fmt.rules(),
         *lint.rules(),
         *package.rules(),
