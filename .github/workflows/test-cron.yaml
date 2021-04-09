@@ -251,6 +251,9 @@ jobs:
         python-version:
         - '3.8'
   lint_python:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -324,6 +327,9 @@ jobs:
         python-version:
         - '3.8'
   test_python_linux:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -399,6 +405,8 @@ jobs:
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15

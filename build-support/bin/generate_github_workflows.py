@@ -296,6 +296,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -311,6 +312,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
+            "env": DISABLE_REMOTE_CACHE_ENV,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "steps": [
                 *checkout(),
@@ -352,7 +354,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": MACOS_VERSION,
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": MACOS_ENV,
+            "env": {**MACOS_ENV, **DISABLE_REMOTE_CACHE_ENV},
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -369,75 +371,75 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
         },
     }
     if not cron:
+        pass
+        # def build_wheels_step(*, is_macos: bool) -> Step:
+        #     step = {
+        #         "name": "Build wheels and fs_util",
+        #         "run": dedent(
+        #             # We use MODE=debug on PR builds to speed things up, given that those are only
+        #             # smoke tests of our release process.
+        #             """\
+        #             [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+        #             ./build-support/bin/release.sh -n
+        #             USE_PY38=true ./build-support/bin/release.sh -n
+        #             ./build-support/bin/release.sh -f
+        #             """
+        #         ),
+        #         "if": DONT_SKIP_WHEELS,
+        #     }
+        #     if is_macos:
+        #         step["env"] = MACOS_ENV  # type: ignore[assignment]
+        #     return step
 
-        def build_wheels_step(*, is_macos: bool) -> Step:
-            step = {
-                "name": "Build wheels and fs_util",
-                "run": dedent(
-                    # We use MODE=debug on PR builds to speed things up, given that those are only
-                    # smoke tests of our release process.
-                    """\
-                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh -n
-                    USE_PY38=true ./build-support/bin/release.sh -n
-                    ./build-support/bin/release.sh -f
-                    """
-                ),
-                "if": DONT_SKIP_WHEELS,
-            }
-            if is_macos:
-                step["env"] = MACOS_ENV  # type: ignore[assignment]
-            return step
-
-        deploy_to_s3_step = {
-            "name": "Deploy to S3",
-            "run": "./build-support/bin/deploy_to_s3.py",
-            "if": "github.event_name == 'push'",
-            "env": {
-                "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
-                "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
-            },
-        }
-        jobs.update(
-            {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
-                    "runs-on": LINUX_VERSION,
-                    "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "steps": [
-                        *checkout(),
-                        install_rustup(),
-                        {
-                            "name": "Expose Pythons",
-                            "run": (
-                                'echo "PATH=${PATH}:'
-                                "/opt/python/cp37-cp37m/bin:"
-                                '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
-                            ),
-                        },
-                        build_wheels_step(is_macos=False),
-                        deploy_to_s3_step,
-                    ],
-                },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
-                    "runs-on": MACOS_VERSION,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "steps": [
-                        *checkout(),
-                        expose_all_pythons(),
-                        # NB: We only cache Rust, but not `native_engine.so` and the Pants
-                        # virtualenv. This is because we must build both these things with Python
-                        # multiple Python versions, whereas that caching assumes only one primary
-                        # Python version (marked via matrix.strategy).
-                        *rust_caches(),
-                        build_wheels_step(is_macos=True),
-                        deploy_to_s3_step,
-                    ],
-                },
-            }
-        )
+        # deploy_to_s3_step = {
+        #     "name": "Deploy to S3",
+        #     "run": "./build-support/bin/deploy_to_s3.py",
+        #     "if": "github.event_name == 'push'",
+        #     "env": {
+        #         "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+        #         "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
+        #     },
+        # }
+        # jobs.update(
+        #     {
+        #         "build_wheels_linux": {
+        #             "name": "Build wheels and fs_util (Linux)",
+        #             "runs-on": LINUX_VERSION,
+        #             "container": "quay.io/pypa/manylinux2014_x86_64:latest",
+        #             "env": DISABLE_REMOTE_CACHE_ENV,
+        #             "steps": [
+        #                 *checkout(),
+        #                 install_rustup(),
+        #                 {
+        #                     "name": "Expose Pythons",
+        #                     "run": (
+        #                         'echo "PATH=${PATH}:'
+        #                         "/opt/python/cp37-cp37m/bin:"
+        #                         '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
+        #                     ),
+        #                 },
+        #                 build_wheels_step(is_macos=False),
+        #                 deploy_to_s3_step,
+        #             ],
+        #         },
+        #         "build_wheels_macos": {
+        #             "name": "Build wheels and fs_util (macOS)",
+        #             "runs-on": MACOS_VERSION,
+        #             "env": DISABLE_REMOTE_CACHE_ENV,
+        #             "steps": [
+        #                 *checkout(),
+        #                 expose_all_pythons(),
+        #                 # NB: We only cache Rust, but not `native_engine.so` and the Pants
+        #                 # virtualenv. This is because we must build both these things with Python
+        #                 # multiple Python versions, whereas that caching assumes only one primary
+        #                 # Python version (marked via matrix.strategy).
+        #                 *rust_caches(),
+        #                 build_wheels_step(is_macos=True),
+        #                 deploy_to_s3_step,
+        #             ],
+        #         },
+        #     }
+        # )
     return jobs
 
 
