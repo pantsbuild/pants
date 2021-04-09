@@ -19,7 +19,6 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
     PexShebangField,
-    PexUnzipField,
     PexZipSafeField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -46,7 +45,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
@@ -65,26 +63,12 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     zip_safe: PexZipSafeField
     platforms: PythonPlatformsField
-    unzip: PexUnzipField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
 
-    @memoized_property
+    @property
     def _execution_mode(self) -> PexExecutionMode:
-        if self.unzip.value is True:
-            if self.execution_mode.value not in (None, PexExecutionMode.UNZIP.value):
-                raise Exception(
-                    f"The deprecated {PexUnzipField.alias} field is set to `True` but the "
-                    f"{PexExecutionModeField.alias} field contradicts this by requesting"
-                    f"`{self.execution_mode.value!r}`. Correct this by only specifying a value for "
-                    f"one field or the other, preferring the {PexExecutionModeField.alias} field."
-                )
-            return PexExecutionMode.UNZIP
-        return (
-            PexExecutionMode.ZIPAPP
-            if self.execution_mode.value is None
-            else PexExecutionMode(self.execution_mode.value)
-        )
+        return PexExecutionMode(self.execution_mode.value)
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
