@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
+from typing import ClassVar, Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
@@ -29,6 +29,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -695,6 +696,39 @@ class PythonProvidesField(ScalarField, ProvidesField):
         return cast(PythonArtifact, super().compute_value(raw_value, address=address))
 
 
+class PythonDistributionEntryPoints(NestedDictStringToStringField):
+    alias = "entry_points"
+    required = False
+    value: Optional[FrozenDict[str, FrozenDict[str, EntryPoint]]]  # type: ignore
+    default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, EntryPoint]]]] = None  # type: ignore
+    help = (
+        "The entry points for setup.py. Pants will infer a dependency on "
+        "the owner of the entry point modules.\n\n"
+        "The syntax for entry points is specified as follows:\n"
+        "`<name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]`\n\n"
+        "See [https://setuptools.readthedocs.io/en/latest/userguide/entry_point.html]."
+    )
+
+    @classmethod
+    def compute_value(  # type: ignore
+        cls, raw_value: Optional[Dict[str, Dict[str, str]]], *, address: Address
+    ) -> Optional[FrozenDict[str, FrozenDict[str, EntryPoint]]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return FrozenDict(
+            {
+                key: FrozenDict(
+                    {
+                        name: EntryPoint.parse(value, f"{name} for {address} {key}")
+                        for name, value in section.items()
+                    }
+                )
+                for key, section in value_or_default.items()
+            }
+        )
+
+
 class SetupPyCommandsField(StringSequenceField):
     alias = "setup_py_commands"
     expected_type_help = (
@@ -714,6 +748,7 @@ class PythonDistribution(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonDistributionDependencies,
+        PythonDistributionEntryPoints,
         PythonProvidesField,
         SetupPyCommandsField,
     )

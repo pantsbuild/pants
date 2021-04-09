@@ -1179,6 +1179,35 @@ class DictStringToStringField(Field):
         return FrozenDict(value_or_default)
 
 
+class NestedDictStringToStringField(Field):
+    value: Optional[FrozenDict[str, FrozenDict[str, str]]]
+    default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, str]]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Dict[str, str]]], *, address: Address
+    ) -> Optional[FrozenDict[str, FrozenDict[str, str]]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="a dictionary of string -> a dictionary of string -> string",
+        )
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception
+        for key, nested_value in value_or_default.items():
+            if not isinstance(key, str) or not isinstance(nested_value, collections.abc.Mapping):
+                raise invalid_type_exception
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in nested_value.items()):
+                raise invalid_type_exception
+        return FrozenDict(
+            {key: FrozenDict(nested_value) for key, nested_value in value_or_default.items()}
+        )
+
+
 class DictStringToStringSequenceField(Field):
     value: Optional[FrozenDict[str, Tuple[str, ...]]]
     default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None

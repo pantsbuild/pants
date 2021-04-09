@@ -227,6 +227,129 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo/bar/baz",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name="baz-dist",
+                dependencies=[':baz'],
+                provides=setup_py(
+                    name='baz',
+                    version='1.1.1'
+                )
+            )
+
+            python_library()
+            """
+        ),
+    )
+    chroot_rule_runner.create_file("src/python/foo/bar/baz/baz.py")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo/qux",
+        textwrap.dedent(
+            """
+            python_library()
+
+            pex_binary(name="bin", entry_point="foo.qux.bin:main")
+            """
+        ),
+    )
+    chroot_rule_runner.create_file("src/python/foo/qux/__init__.py")
+    chroot_rule_runner.create_file("src/python/foo/qux/qux.py")
+    # Add a `.pyi` stub file to ensure we include it in the final result.
+    chroot_rule_runner.create_file("src/python/foo/qux/qux.pyi")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo/resources", 'resources(sources=["js/code.js"])'
+    )
+    chroot_rule_runner.create_file("src/python/foo/resources/js/code.js")
+    chroot_rule_runner.add_to_build_file("files", 'files(sources=["README.txt"])')
+    chroot_rule_runner.create_file("files/README.txt")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name='foo-dist',
+                # TODO: remove this once dep inference from entry points works
+                dependencies=[
+                    ':foo',
+                ],
+                entry_points={
+                    "console_scripts":{
+                        "foo_tool":"foo.bar.baz:Tool.main",
+                    },
+                    "foo_plugins":{
+                        "qux":"foo.qux",
+                    },
+                },
+                provides=setup_py(
+                    name='foo', version='1.2.3',
+                    entry_points={
+                        "console_scripts":{
+                            "foo_qux":"foo.baz.qux",
+                        },
+                        "foo_plugins":[
+                            "foo-bar=foo.bar:plugin",
+                        ],
+                    },
+                ).with_binaries(
+                    foo_main='src/python/foo/qux:bin'
+                )
+            )
+
+            python_library(
+                dependencies=[
+                    'src/python/foo/bar/baz',
+                    'src/python/foo/qux',
+                    'src/python/foo/resources',
+                    'files',
+                ]
+            )
+            """
+        ),
+    )
+    chroot_rule_runner.create_file("src/python/foo/__init__.py", _namespace_decl)
+    chroot_rule_runner.create_file("src/python/foo/foo.py")
+    assert_chroot(
+        chroot_rule_runner,
+        [
+            "src/files/README.txt",
+            "src/foo/qux/__init__.py",
+            "src/foo/qux/qux.py",
+            "src/foo/qux/qux.pyi",
+            "src/foo/resources/js/code.js",
+            "src/foo/__init__.py",
+            "src/foo/foo.py",
+            "setup.py",
+            "MANIFEST.in",
+        ],
+        {
+            "name": "foo",
+            "version": "1.2.3",
+            "plugin_demo": "hello world",
+            "package_dir": {"": "src"},
+            "packages": ("foo", "foo.qux"),
+            "namespace_packages": ("foo",),
+            "package_data": {"foo": ("resources/js/code.js",)},
+            "install_requires": ("baz==1.1.1",),
+            "entry_points": {
+                "console_scripts": [
+                    "foo_qux=foo.baz.qux",
+                    "foo_main=foo.qux.bin:main",
+                    "foo_tool=foo.bar.baz:Tool.main",
+                ],
+                "foo_plugins": [
+                    "foo-bar=foo.bar:plugin",
+                    "qux=foo.qux",
+                ],
+            },
+        },
+        Address("src/python/foo", target_name="foo-dist"),
+    )
+
+
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     chroot_rule_runner.create_files("src/python/invalid_binary", ["app1.py", "app2.py"])
     chroot_rule_runner.add_to_build_file(

@@ -34,9 +34,12 @@ python_distribution(
     # consumers of pantsbuild.pants are using a compatible interpreter.
     # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
     ext_modules=[('native_engine', {'sources': ['src/pants/dummy.c']})],
-  ).with_binaries(
-    pants='src/python/pants/bin:pants',
-  )
+  ),
+  entry_points={
+    'console_scripts': {
+      'pants': 'pants.bin.pants_loader:main',
+    },
+  },
 )
 
 # NB: we use this to avoid clang/gcc complaining `error: no input files` when building

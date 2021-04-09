@@ -16,6 +16,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexEntryPointField,
+    PythonDistributionEntryPoints,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
@@ -545,11 +546,19 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
         for request in entry_point_requests
     )
+    entry_points = setup_kwargs.setdefault("entry_points", {})
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
-        entry_points = setup_kwargs.setdefault("entry_points", {})
         console_scripts = entry_points.setdefault("console_scripts", [])
         if binary_entry_point.val is not None:
             console_scripts.append(f"{key}={binary_entry_point.val.spec}")
+
+    # Add any `entry_points` from `python_distribution(entry_points=...)` to the dist's entry points.
+    entry_points_field = exported_target.target.get(PythonDistributionEntryPoints).value
+    if entry_points_field:
+        for key, section in entry_points_field.items():
+            entry_points.setdefault(key, []).extend(
+                [f"{name}={entry_point.spec}" for name, entry_point in section.items()]
+            )
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
