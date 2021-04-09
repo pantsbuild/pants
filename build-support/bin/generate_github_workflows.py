@@ -269,169 +269,173 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                         ./pants help goals
                         ./pants help targets
                         ./pants help subsystems
+                        ./pants debug
                         """
                     ),
                 },
-                native_engine_so_upload(),
-                {
-                    "name": "Test and Lint Rust",
-                    # We pass --tests to skip doc tests because our generated protos contain
-                    # invalid doc tests in their comments.
-                    "run": dedent(
-                        """\
-                        sudo apt-get install -y pkg-config fuse libfuse-dev
-                        ./cargo clippy --all
-                        ./cargo test --all --tests -- --nocapture
-                        """
-                    ),
-                    "if": DONT_SKIP_RUST,
-                },
-            ],
-        },
-        "test_python_linux": {
-            "name": "Test Python (Linux)",
-            "runs-on": LINUX_VERSION,
-            "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "steps": [
-                *checkout(),
-                setup_toolchain_auth(),
-                *setup_primary_python(),
-                expose_all_pythons(),
-                pants_virtualenv_cache(),
-                native_engine_so_download(),
-                {"name": "Run Python tests", "run": "./pants test ::\n"},
-                upload_log_artifacts(name="python-test-linux"),
-            ],
-        },
-        "lint_python": {
-            "name": "Lint Python and Shell",
-            "runs-on": LINUX_VERSION,
-            "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "steps": [
-                *checkout(),
-                setup_toolchain_auth(),
-                *setup_primary_python(),
-                pants_virtualenv_cache(),
-                native_engine_so_download(),
-                {
-                    "name": "Lint",
-                    "run": "./pants validate '**'\n./pants lint typecheck ::\n",
-                },
-                upload_log_artifacts(name="lint"),
-            ],
-        },
-        "bootstrap_pants_macos": {
-            "name": "Bootstrap Pants, test Rust (macOS)",
-            "runs-on": MACOS_VERSION,
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "steps": [
-                *checkout(),
-                *setup_primary_python(),
-                *bootstrap_caches(),
-                {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                native_engine_so_upload(),
-                {
-                    "name": "Test Rust",
-                    # We pass --tests to skip doc tests because our generated protos contain
-                    # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
-                    # pass on GHA MacOS containers.
-                    "run": "./cargo test --tests -- --nocapture",
-                    "if": DONT_SKIP_RUST,
-                    "env": {"TMPDIR": "${{ runner.temp }}"},
-                },
-            ],
-        },
-        "test_python_macos": {
-            "name": "Test Python (macOS)",
-            "runs-on": MACOS_VERSION,
-            "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": MACOS_ENV,
-            "steps": [
-                *checkout(),
-                setup_toolchain_auth(),
-                *setup_primary_python(),
-                expose_all_pythons(),
-                pants_virtualenv_cache(),
-                native_engine_so_download(),
-                {
-                    "name": "Run Python tests",
-                    "run": "./pants --tag=+platform_specific_behavior test ::\n",
-                },
-                upload_log_artifacts(name="python-test-macos"),
-            ],
-        },
-    }
-    if not cron:
-
-        def build_wheels_step(*, is_macos: bool) -> Step:
-            step = {
-                "name": "Build wheels and fs_util",
-                "run": dedent(
-                    # We use MODE=debug on PR builds to speed things up, given that those are only
-                    # smoke tests of our release process.
-                    """\
-                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh -n
-                    USE_PY38=true ./build-support/bin/release.sh -n
-                    ./build-support/bin/release.sh -f
-                    """
-                ),
-                "if": DONT_SKIP_WHEELS,
-            }
-            if is_macos:
-                step["env"] = MACOS_ENV  # type: ignore[assignment]
-            return step
-
-        deploy_to_s3_step = {
-            "name": "Deploy to S3",
-            "run": "./build-support/bin/deploy_to_s3.py",
-            "if": "github.event_name == 'push'",
-            "env": {
-                "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
-                "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
-            },
+            ]
         }
-        jobs.update(
-            {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
-                    "runs-on": LINUX_VERSION,
-                    "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "steps": [
-                        *checkout(),
-                        install_rustup(),
-                        {
-                            "name": "Expose Pythons",
-                            "run": (
-                                'echo "PATH=${PATH}:'
-                                "/opt/python/cp37-cp37m/bin:"
-                                '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
-                            ),
-                        },
-                        build_wheels_step(is_macos=False),
-                        deploy_to_s3_step,
-                    ],
-                },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
-                    "runs-on": MACOS_VERSION,
-                    "steps": [
-                        *checkout(),
-                        expose_all_pythons(),
-                        # NB: We only cache Rust, but not `native_engine.so` and the Pants
-                        # virtualenv. This is because we must build both these things with Python
-                        # multiple Python versions, whereas that caching assumes only one primary
-                        # Python version (marked via matrix.strategy).
-                        *rust_caches(),
-                        build_wheels_step(is_macos=True),
-                        deploy_to_s3_step,
-                    ],
-                },
-            }
-        )
+    }
+                # native_engine_so_upload(),
+                # {
+                #     "name": "Test and Lint Rust",
+                #     # We pass --tests to skip doc tests because our generated protos contain
+                #     # invalid doc tests in their comments.
+                #     "run": dedent(
+                #         """\
+                #         sudo apt-get install -y pkg-config fuse libfuse-dev
+                #         ./cargo clippy --all
+                #         ./cargo test --all --tests -- --nocapture
+                #         """
+                #     ),
+                #     "if": DONT_SKIP_RUST,
+                # },
+            # ],
+        # },
+        # "test_python_linux": {
+        #     "name": "Test Python (Linux)",
+        #     "runs-on": LINUX_VERSION,
+        #     "needs": "bootstrap_pants_linux",
+        #     "strategy": {"matrix": {"python-version": [primary_python_version]}},
+        #     "steps": [
+        #         *checkout(),
+        #         setup_toolchain_auth(),
+        #         *setup_primary_python(),
+        #         expose_all_pythons(),
+        #         pants_virtualenv_cache(),
+        #         native_engine_so_download(),
+        #         {"name": "Run Python tests", "run": "./pants test ::\n"},
+        #         upload_log_artifacts(name="python-test-linux"),
+        #     ],
+        # },
+    #     "lint_python": {
+    #         "name": "Lint Python and Shell",
+    #         "runs-on": LINUX_VERSION,
+    #         "needs": "bootstrap_pants_linux",
+    #         "strategy": {"matrix": {"python-version": [primary_python_version]}},
+    #         "steps": [
+    #             *checkout(),
+    #             setup_toolchain_auth(),
+    #             *setup_primary_python(),
+    #             pants_virtualenv_cache(),
+    #             native_engine_so_download(),
+    #             {
+    #                 "name": "Lint",
+    #                 "run": "./pants validate '**'\n./pants lint typecheck ::\n",
+    #             },
+    #             upload_log_artifacts(name="lint"),
+    #         ],
+    #     },
+    #     "bootstrap_pants_macos": {
+    #         "name": "Bootstrap Pants, test Rust (macOS)",
+    #         "runs-on": MACOS_VERSION,
+    #         "strategy": {"matrix": {"python-version": [primary_python_version]}},
+    #         "steps": [
+    #             *checkout(),
+    #             *setup_primary_python(),
+    #             *bootstrap_caches(),
+    #             {"name": "Bootstrap Pants", "run": "./pants --version\n"},
+    #             native_engine_so_upload(),
+    #             {
+    #                 "name": "Test Rust",
+    #                 # We pass --tests to skip doc tests because our generated protos contain
+    #                 # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
+    #                 # pass on GHA MacOS containers.
+    #                 "run": "./cargo test --tests -- --nocapture",
+    #                 "if": DONT_SKIP_RUST,
+    #                 "env": {"TMPDIR": "${{ runner.temp }}"},
+    #             },
+    #         ],
+    #     },
+    #     "test_python_macos": {
+    #         "name": "Test Python (macOS)",
+    #         "runs-on": MACOS_VERSION,
+    #         "needs": "bootstrap_pants_macos",
+    #         "strategy": {"matrix": {"python-version": [primary_python_version]}},
+    #         "env": MACOS_ENV,
+    #         "steps": [
+    #             *checkout(),
+    #             setup_toolchain_auth(),
+    #             *setup_primary_python(),
+    #             expose_all_pythons(),
+    #             pants_virtualenv_cache(),
+    #             native_engine_so_download(),
+    #             {
+    #                 "name": "Run Python tests",
+    #                 "run": "./pants --tag=+platform_specific_behavior test ::\n",
+    #             },
+    #             upload_log_artifacts(name="python-test-macos"),
+    #         ],
+    #     },
+    # }
+    # if not cron:
+    #
+    #     def build_wheels_step(*, is_macos: bool) -> Step:
+    #         step = {
+    #             "name": "Build wheels and fs_util",
+    #             "run": dedent(
+    #                 # We use MODE=debug on PR builds to speed things up, given that those are only
+    #                 # smoke tests of our release process.
+    #                 """\
+    #                 [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+    #                 ./build-support/bin/release.sh -n
+    #                 USE_PY38=true ./build-support/bin/release.sh -n
+    #                 ./build-support/bin/release.sh -f
+    #                 """
+    #             ),
+    #             "if": DONT_SKIP_WHEELS,
+    #         }
+    #         if is_macos:
+    #             step["env"] = MACOS_ENV  # type: ignore[assignment]
+    #         return step
+    #
+    #     deploy_to_s3_step = {
+    #         "name": "Deploy to S3",
+    #         "run": "./build-support/bin/deploy_to_s3.py",
+    #         "if": "github.event_name == 'push'",
+    #         "env": {
+    #             "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+    #             "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
+    #         },
+    #     }
+    #     jobs.update(
+    #         {
+    #             "build_wheels_linux": {
+    #                 "name": "Build wheels and fs_util (Linux)",
+    #                 "runs-on": LINUX_VERSION,
+    #                 "container": "quay.io/pypa/manylinux2014_x86_64:latest",
+    #                 "steps": [
+    #                     *checkout(),
+    #                     install_rustup(),
+    #                     {
+    #                         "name": "Expose Pythons",
+    #                         "run": (
+    #                             'echo "PATH=${PATH}:'
+    #                             "/opt/python/cp37-cp37m/bin:"
+    #                             '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
+    #                         ),
+    #                     },
+    #                     build_wheels_step(is_macos=False),
+    #                     deploy_to_s3_step,
+    #                 ],
+    #             },
+    #             "build_wheels_macos": {
+    #                 "name": "Build wheels and fs_util (macOS)",
+    #                 "runs-on": MACOS_VERSION,
+    #                 "steps": [
+    #                     *checkout(),
+    #                     expose_all_pythons(),
+    #                     # NB: We only cache Rust, but not `native_engine.so` and the Pants
+    #                     # virtualenv. This is because we must build both these things with Python
+    #                     # multiple Python versions, whereas that caching assumes only one primary
+    #                     # Python version (marked via matrix.strategy).
+    #                     *rust_caches(),
+    #                     build_wheels_step(is_macos=True),
+    #                     deploy_to_s3_step,
+    #                 ],
+    #             },
+    #         }
+    #     )
     return jobs
 
 

@@ -1,5 +1,6 @@
 [GLOBAL]
 print_stacktrace = true
+verify_config = false
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
