@@ -301,7 +301,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_engine_so_download(),
-                {"name": "Run Python tests", "timeout-minutes": 40, "run": "./pants test ::\n"},
+                {"name": "Run Python tests", "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
         },
@@ -319,7 +319,6 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 native_engine_so_download(),
                 {
                     "name": "Lint",
-                    "timeout-minutes": 20,
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
                 },
                 upload_log_artifacts(name="lint"),
@@ -329,7 +328,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "timeout-minutes": 20,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
@@ -353,7 +352,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": MACOS_ENV,
-            "timeout-minutes": 40,
+            "timeout-minutes": 20,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -363,7 +362,6 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 native_engine_so_download(),
                 {
                     "name": "Run Python tests",
-                    "timeout-minutes": 20,
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
                 upload_log_artifacts(name="python-test-macos"),

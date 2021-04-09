@@ -244,7 +244,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 20
+    timeout-minutes: 40
   build_wheels_linux:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     name: Build wheels and fs_util (Linux)
@@ -438,7 +438,6 @@ jobs:
         ./pants lint typecheck ::
 
         '
-      timeout-minutes: 20
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -513,7 +512,6 @@ jobs:
       run: './pants test ::
 
         '
-      timeout-minutes: 40
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -590,7 +588,6 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
-      timeout-minutes: 20
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -600,7 +597,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 20
 name: Pull Request CI
 'on':
 - push
