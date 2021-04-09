@@ -22,6 +22,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.engine.environment import CompleteEnvironment
+from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -29,11 +30,25 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
+
+
+_CPU_COUNT = (
+    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+) or 2
+
+
+# The time that leases are acquired for in the local store. Configured on the Python side
+# in order to ease interaction with the StoreGCService, which needs to be aware of its value.
+LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
+
+
+MEGABYTES = 1_000_000
+GIGABYTES = 1_000 * MEGABYTES
 
 
 class GlobMatchErrorBehavior(Enum):
@@ -67,6 +82,13 @@ class OwnersNotFoundBehavior(Enum):
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
         return GlobMatchErrorBehavior(self.value)
+
+
+@enum.unique
+class RemoteCacheWarningsBehavior(Enum):
+    ignore = "ignore"
+    first_only = "first_only"
+    backoff = "backoff"
 
 
 @enum.unique
@@ -109,14 +131,14 @@ class ExecutionOptions:
     remote_cache_read: bool
     remote_cache_write: bool
 
-    remote_instance_name: Optional[str]
-    remote_ca_certs_path: Optional[str]
+    remote_instance_name: str | None
+    remote_ca_certs_path: str | None
 
+    process_execution_local_cache: bool
+    process_execution_local_cleanup: bool
     process_execution_local_parallelism: int
     process_execution_remote_parallelism: int
-    process_execution_cache_namespace: Optional[str]
-    process_execution_cleanup_local_dirs: bool
-    process_execution_use_local_cache: bool
+    process_execution_cache_namespace: str | None
 
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
@@ -125,6 +147,7 @@ class ExecutionOptions:
     remote_store_rpc_retries: int
 
     remote_cache_eager_fetch: bool
+    remote_cache_warnings: RemoteCacheWarningsBehavior
 
     remote_execution_address: str | None
     remote_execution_extra_platform_properties: List[str]
@@ -159,6 +182,7 @@ class ExecutionOptions:
         if (
             not local_only
             and bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_auth_plugin.strip()
             and (remote_execution or remote_cache_read or remote_cache_write)
         ):
             if ":" not in bootstrap_options.remote_auth_plugin:
@@ -189,6 +213,9 @@ class ExecutionOptions:
                 remote_cache_read = False
                 remote_cache_write = False
             else:
+                logger.debug(
+                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
+                )
                 remote_execution_headers = auth_plugin_result.execution_headers
                 remote_store_headers = auth_plugin_result.store_headers
                 if (
@@ -226,10 +253,10 @@ class ExecutionOptions:
             remote_instance_name=remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
+            process_execution_local_cache=bootstrap_options.process_execution_local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
-            process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
-            process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
+            process_execution_local_cleanup=bootstrap_options.process_execution_local_cleanup,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
@@ -239,6 +266,7 @@ class ExecutionOptions:
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             # Remote execution setup.
             remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
@@ -247,9 +275,45 @@ class ExecutionOptions:
         )
 
 
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
+@dataclass(frozen=True)
+class LocalStoreOptions:
+    """A collection of all options related to the local store.
+
+    TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+    allowing Subsystems to be consumed before the Scheduler has been created).
+    """
+
+    store_dir: str = os.path.join(get_pants_cachedir(), "lmdb_store")
+    processes_max_size_bytes: int = 16 * GIGABYTES
+    files_max_size_bytes: int = 256 * GIGABYTES
+    directories_max_size_bytes: int = 16 * GIGABYTES
+    shard_count: int = 16
+
+    def target_total_size_bytes(self) -> int:
+        """Returns the target total size of all of the stores.
+
+        The `max_size` values are caps on the total size of each store: the "target" size
+        is the size that garbage collection will attempt to shrink the stores to each time
+        it runs.
+
+        NB: This value is not currently configurable, but that could be desirable in the future.
+        """
+        max_total_size_bytes = (
+            self.processes_max_size_bytes
+            + self.files_max_size_bytes
+            + self.directories_max_size_bytes
+        )
+        return max_total_size_bytes // 10
+
+    @classmethod
+    def from_options(cls, options: OptionValueContainer) -> LocalStoreOptions:
+        return cls(
+            store_dir=str(Path(options.local_store_dir).resolve()),
+            processes_max_size_bytes=options.local_store_processes_max_size_bytes,
+            files_max_size_bytes=options.local_store_files_max_size_bytes,
+            directories_max_size_bytes=options.local_store_directories_max_size_bytes,
+            shard_count=options.local_store_shard_count,
+        )
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
@@ -264,8 +328,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    process_execution_cleanup_local_dirs=True,
-    process_execution_use_local_cache=True,
+    process_execution_local_cleanup=True,
+    process_execution_local_cache=True,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={},
@@ -274,12 +338,15 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_rpc_retries=2,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
+
+DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
 class GlobalOptions(Subsystem):
@@ -331,16 +398,6 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             help="Re-resolve plugins, even if previously resolved.",
-        )
-        register(
-            "--plugin-cache-dir",
-            advanced=True,
-            default=os.path.join(get_pants_cachedir(), "plugins"),
-            help="Cache resolved plugin requirements here.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "This option now no-ops, the plugins cache is now housed in the named caches."
-            ),
         )
 
         register(
@@ -395,7 +452,24 @@ class GlobalOptions(Subsystem):
             ),
         )
 
-        # TODO(#7203): make a regexp option type!
+        register(
+            "--ignore-warnings",
+            type=list,
+            member_type=str,
+            default=[],
+            daemon=True,
+            advanced=True,
+            help=(
+                "Ignore logs and warnings matching these strings.\n\n"
+                "Normally, Pants will look for literal matches from the start of the log/warning "
+                "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
+                "your string as a regex pattern. For example:\n\n"
+                "  ignore_warnings = [\n"
+                "    'The option `[isort.config]` is not configured',\n"
+                "    '$regex$DeprecationWarning: DEPRECATED:\\s*'\n"
+                "  ]"
+            ),
+        )
         register(
             "--ignore-pants-warnings",
             type=list,
@@ -406,6 +480,13 @@ class GlobalOptions(Subsystem):
             help="Regexps matching warning strings to ignore, e.g. "
             '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
             "matched from the start of the warning string, and are case-insensitive.",
+            removal_version="2.6.0.dev0",
+            removal_hint=(
+                "Use the global option `--ignore-warnings` instead.\n\nUnlike this option, "
+                "`--ignore-warnings` uses literal string matches instead of regex patterns by "
+                "default. If you would still like to use a regex pattern, prefix the string with "
+                "`$regex$`."
+            ),
         )
 
         register(
@@ -416,7 +497,7 @@ class GlobalOptions(Subsystem):
             help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
             "is using once the program is already running.\n\nIf you use the `./pants` script from "
-            f"{docs_url('installation')}, however, changing the value in your "
+            f"{bracketed_docs_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
             "Run `./pants --version` to check what is being used.",
         )
@@ -697,12 +778,15 @@ class GlobalOptions(Subsystem):
             ),
         )
 
+        local_store_dir_flag = "--local-store-dir"
+        local_store_shard_count_flag = "--local-store-shard-count"
+        local_store_files_max_size_bytes_flag = "--local-store-files-max-size-bytes"
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
         )
         register(
-            "--local-store-dir",
+            local_store_dir_flag,
             advanced=True,
             help=(
                 f"Directory to use for the local file store, which stores the results of "
@@ -711,7 +795,65 @@ class GlobalOptions(Subsystem):
             # This default is also hard-coded into the engine's rust code in
             # fs::Store::default_path so that tools using a Store outside of pants
             # are likely to be able to use the same storage location.
-            default=os.path.join(get_pants_cachedir(), "lmdb_store"),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.store_dir,
+        )
+        register(
+            "--local-store-shard-count",
+            type=int,
+            advanced=True,
+            help=(
+                "The number of LMDB shards created for the local store. This setting also impacts "
+                f"the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}` "
+                "for more information."
+                "\n\n"
+                "Because LMDB allows only one simultaneous writer per database, the store is split "
+                "into multiple shards to allow for more concurrent writers. The faster your disks "
+                "are, the fewer shards you are likely to need for performance."
+                "\n\n"
+                "NB: After changing this value, you will likely want to manually clear the "
+                f"`{local_store_dir_flag}` directory to clear the space used by old shard layouts."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
+        )
+        register(
+            "--local-store-processes-max-size-bytes",
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing process cache entries. "
+                f"Stored below `{local_store_dir_flag}`."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
+        )
+        register(
+            local_store_files_max_size_bytes_flag,
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing files. "
+                f"Stored below `{local_store_dir_flag}`."
+                "\n\n"
+                "NB: This size value bounds the total size of all files, but (due to sharding of the "
+                "store on disk) it also bounds the per-file size to (VALUE / "
+                f"`{local_store_shard_count_flag}`)."
+                "\n\n"
+                "This value doesn't reflect space allocated on disk, or RAM allocated (it "
+                "may be reflected in VIRT but not RSS). However, the default is lower than you "
+                "might otherwise choose because macOS creates core dumps that include MMAP'd "
+                "pages, and setting this too high might cause core dumps to use an unreasonable "
+                "amount of disk if they are enabled."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.files_max_size_bytes,
+        )
+        register(
+            "--local-store-directories-max-size-bytes",
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing directories. "
+                f"Stored below `{local_store_dir_flag}`."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.directories_max_size_bytes,
         )
         register(
             "--named-caches-dir",
@@ -730,19 +872,26 @@ class GlobalOptions(Subsystem):
             default=tempfile.gettempdir(),
         )
         register(
-            "--process-execution-use-local-cache",
+            "--process-execution-local-cache",
             type=bool,
-            default=True,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
             advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
+            help=(
+                "Whether to cache process executions in a local cache persisted to disk at "
+                "`--local-store-dir`."
+            ),
         )
         register(
-            "--process-execution-cleanup-local-dirs",
+            "--process-execution-local-cleanup",
             type=bool,
-            default=True,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
             advanced=True,
-            help="Whether or not to cleanup directories used for local process execution "
-            "(primarily useful for e.g. debugging).",
+            help=(
+                "If false, Pants will not clean up local directories used as chroots for running "
+                "processes. Pants will log their location so that you can inspect the chroot, and "
+                "run the `__run.sh` script to recreate the process using the same argv and "
+                "environment variables used by Pants. This option is useful for debugging."
+            ),
         )
 
         register(
@@ -778,15 +927,6 @@ class GlobalOptions(Subsystem):
                 "Change this value to invalidate every artifact's execution, or to prevent "
                 "process cache entries from being (re)used for different usecases or users."
             ),
-        )
-        register(
-            "--process-execution-local-enable-nailgun",
-            type=bool,
-            default=False,
-            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
-            advanced=True,
-            removal_version="2.5.0.dev0",
-            removal_hint="This option no-ops as Pants does not yet support the JVM.",
         )
 
         register(
@@ -922,6 +1062,17 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--remote-cache-warnings",
+            type=RemoteCacheWarningsBehavior,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
+            advanced=True,
+            help=(
+                "Whether to log remote cache failures at the `warn` log level.\n\n"
+                "All errors not logged at the `warn` level will instead be logged at the "
+                "`debug` level."
+            ),
+        )
+        register(
             "--remote-cache-eager-fetch",
             type=bool,
             advanced=True,
@@ -995,7 +1146,7 @@ class GlobalOptions(Subsystem):
             metavar="[+-]tag1,tag2,...",
             help=(
                 "Include only targets with these tags (optional '+' prefix) or without these "
-                f"tags ('-' prefix). See {docs_url('advanced-target-selection')}."
+                f"tags ('-' prefix). See {bracketed_docs_url('advanced-target-selection')}."
             ),
         )
         register(
@@ -1055,7 +1206,7 @@ class GlobalOptions(Subsystem):
             default=[],
             help=(
                 "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-                f"See {docs_url('macros')}."
+                f"See {bracketed_docs_url('macros')}."
             ),
         )
         register(
@@ -1100,6 +1251,11 @@ class GlobalOptions(Subsystem):
 
         Raises pants.option.errors.OptionsError on validation failure.
         """
+        if opts.rule_threads_core < 2:
+            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
+            # at a time, and a `@goal_rule` will only block one thread.
+            raise OptionsError("--rule-threads-core values less than 2 are not supported.")
+
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
             raise OptionsError(
                 "`--remote-execution` cannot be set at the same time as either "
@@ -1160,21 +1316,15 @@ class GlobalOptions(Subsystem):
         validate_remote_headers("remote_store_headers")
 
     @staticmethod
-    def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
-        """Computes the arguments to construct a PyExecutor.
-
-        Does not directly construct a PyExecutor to avoid cycles.
-        """
-        if bootstrap_options.rule_threads_core < 2:
-            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
-            # at a time, and a `@goal_rule` will only block one thread.
-            raise ValueError("--rule-threads-core values less than 2 are not supported.")
+    def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:
         rule_threads_max = (
             bootstrap_options.rule_threads_max
             if bootstrap_options.rule_threads_max
             else 4 * bootstrap_options.rule_threads_core
         )
-        return bootstrap_options.rule_threads_core, rule_threads_max
+        return PyExecutor(
+            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
+        )
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):

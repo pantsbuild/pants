@@ -94,7 +94,7 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         assert_resolved("*.py:func", expected="doesnt matter")
 
 
-def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
+def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.add_to_build_file(
         "",
         dedent(
@@ -107,17 +107,16 @@ def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.create_files("project", ["app.py", "self.py"])
+    rule_runner.create_file("project/app.py")
     rule_runner.add_to_build_file(
         "project",
         dedent(
             """\
-            python_library()
+            python_library(sources=['app.py'])
             python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
             python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
             python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
             python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
-            python_awslambda(name='self', handler='self.py:func', runtime='python3.7')
             """
         ),
     )
@@ -143,11 +142,55 @@ def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
         expected=Address("", target_name="ansicolors"),
     )
     assert_injected(Address("project", target_name="unrecognized"), expected=None)
-    assert_injected(
-        Address("project", target_name="self"),
-        expected=Address("project", relative_file_path="self.py"),
-    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+    rule_runner.set_options([])
+
+    # Warn if there's ambiguity, meaning we cannot infer.
+    caplog.clear()
+    rule_runner.create_file("project/ambiguous.py")
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_library(name="dep1", sources=["ambiguous.py"])
+            python_library(name="dep2", sources=["ambiguous.py"])
+            python_awslambda(
+                name="ambiguous",
+                handler='ambiguous.py:func',
+                runtime='python3.7',
+            )
+            """
+        ),
+    )
+    assert_injected(Address("project", target_name="ambiguous"), expected=None)
+    assert len(caplog.records) == 1
+    assert (
+        "project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python "
+        "module `project.ambiguous`"
+    ) in caplog.text
+    assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
+    # warning about ambiguity.
+    caplog.clear()
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_awslambda(
+                name="disambiguated",
+                handler='ambiguous.py:func',
+                runtime='python3.7',
+                dependencies=["!./ambiguous.py:dep2"],
+            )
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="disambiguated"),
+        expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
+    )
+    assert not caplog.records

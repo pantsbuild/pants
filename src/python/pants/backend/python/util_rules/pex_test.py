@@ -11,27 +11,36 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import (
     EntryPoint,
     InterpreterConstraintsField,
     MainSpecification,
+    PythonRequirementConstraints,
 )
 from pants.backend.python.util_rules.pex import (
+    MaybeConstraintsFile,
     Pex,
+    PexDistributionInfo,
     PexInterpreterConstraints,
     PexPlatforms,
     PexProcess,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
+    resolve_requirements_constraints_file,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
@@ -286,6 +295,40 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
     )
 
 
+def test_maybe_constraints_file() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            resolve_requirements_constraints_file,
+            SubsystemRule(PythonSetup),
+            QueryRule(MaybeConstraintsFile, []),
+        ],
+        target_types=[PythonRequirementConstraints],
+    )
+    constraints = ["c1==1.1.1", "c2==2.2.2"]
+    constraints_file = "\n".join(constraints)
+    rule_runner.create_file("constraints.txt", constraints_file)
+    rule_runner.add_to_build_file(
+        "", f"_python_constraints(name='constraints', constraints={repr(constraints)})"
+    )
+
+    def get_constraints(arg: str | None) -> MaybeConstraintsFile:
+        if arg:
+            rule_runner.set_options([arg])
+        return rule_runner.request(MaybeConstraintsFile, [])
+
+    assert get_constraints(None) == MaybeConstraintsFile(None, EMPTY_DIGEST)
+    expected_digest = rule_runner.make_snapshot({"constraints.txt": constraints_file}).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints=constraints.txt"
+    ) == MaybeConstraintsFile("constraints.txt", expected_digest)
+    expected_digest = rule_runner.make_snapshot(
+        {"constraints.generated.txt": constraints_file}
+    ).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints-target=//:constraints"
+    ) == MaybeConstraintsFile("constraints.generated.txt", expected_digest)
+
+
 @dataclass(frozen=True)
 class ExactRequirement:
     project_name: str
@@ -321,6 +364,9 @@ def rule_runner() -> RuleRunner:
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(PexResolveInfo, (Pex,)),
+            QueryRule(PexResolveInfo, (VenvPex,)),
+            QueryRule(PexPEX, ()),
         ]
     )
 
@@ -359,16 +405,43 @@ def create_pex_and_get_all_data(
     pex = rule_runner.request(pex_type, [request])
     if isinstance(pex, Pex):
         digest = pex.digest
+        pex_pex = rule_runner.request(PexPEX, [])
+        process = rule_runner.request(
+            Process,
+            [
+                PexProcess(
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+                    argv=["-m", "pex.tools", pex.name, "info"],
+                    input_digest=pex.digest,
+                    extra_env=dict(PEX_INTERPRETER="1"),
+                    description="Extract PEX-INFO.",
+                )
+            ],
+        )
     elif isinstance(pex, VenvPex):
         digest = pex.digest
+        process = rule_runner.request(
+            Process,
+            [
+                VenvPexProcess(
+                    pex,
+                    argv=["info"],
+                    extra_env=dict(PEX_TOOLS="1"),
+                    description="Extract PEX-INFO.",
+                ),
+            ],
+        )
     else:
         raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
+
     rule_runner.scheduler.write_digest(digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
+    result = rule_runner.request(ProcessResult, [process])
+    pex_info_content = result.stdout.decode()
+
     with zipfile.ZipFile(pex_path, "r") as zipfp:
-        with zipfp.open("PEX-INFO", "r") as pex_info:
-            pex_info_content = pex_info.readline().decode()
-            pex_list = zipfp.namelist()
+        pex_list = zipfp.namelist()
+
     return {
         "pex": pex,
         "local_path": pex_path,
@@ -438,9 +511,7 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"from main\n"
 
 
-# TODO(John Sirois): Add VenvPex to the pex_type parameter list once Pants is upgraded to Pex with
-#  a fix for: https://github.com/pantsbuild/pex/issues/1239
-@pytest.mark.parametrize("pex_type", [Pex])
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     sources = rule_runner.request(
         Digest,
@@ -593,3 +664,20 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
         with zipfp.open("__main__.py", "r") as main:
             main_content = main.read().decode()
     assert main_content[: len(preamble)] == preamble
+
+
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
+    venv_pex = create_pex_and_get_all_data(
+        rule_runner, pex_type=pex_type, requirements=PexRequirements(["requests==2.23.0"])
+    )["pex"]
+    dists = rule_runner.request(PexResolveInfo, [venv_pex])
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
+    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
+    assert dists[2] == PexDistributionInfo(
+        "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
+    )
+    assert dists[3].project_name == "requests"
+    assert dists[3].version == Version("2.23.0")
+    assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
+    assert dists[4].project_name == "urllib3"

@@ -42,7 +42,7 @@ def test_invalid_options() -> None:
 
 
 @ensure_daemon
-def test_deprecation_and_ignore_pants_warnings(use_pantsd: bool) -> None:
+def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
     plugin = dedent(
         """\
         from pants.option.subsystem import Subsystem
@@ -65,7 +65,12 @@ def test_deprecation_and_ignore_pants_warnings(use_pantsd: bool) -> None:
             return [SubsystemRule(Options)]
         """
     )
-    with setup_tmpdir({"plugins/mock_options/register.py": plugin}) as tmpdir:
+    with setup_tmpdir(
+        {
+            "plugins/mock_options/register.py": plugin,
+            "BUILD": "files(name='t', sources=['fake'])",
+        }
+    ) as tmpdir:
         config = {
             "GLOBAL": {
                 "pythonpath": [f"%(buildroot)s/{tmpdir}/plugins"],
@@ -73,18 +78,24 @@ def test_deprecation_and_ignore_pants_warnings(use_pantsd: bool) -> None:
             },
             "mock-options": {"deprecated": "foo"},
         }
-        result = run_pants(["help"], config=config, use_pantsd=use_pantsd)
+        unmatched_glob_warning = f"Unmatched glob from {tmpdir}:t's `sources` field"
+
+        result = run_pants(["filedeps", f"{tmpdir}:t"], config=config, use_pantsd=use_pantsd)
         result.assert_success()
+        assert unmatched_glob_warning in result.stderr
         assert (
             "DEPRECATED: option 'deprecated' in scope 'mock-options' will be removed in version "
             "999.99.9.dev0."
         ) in result.stderr
 
-        # Now use `ignore_pants_warnings`.
-        config["GLOBAL"]["ignore_pants_warnings"] = ["DEPRECATED: option 'deprecated'"]  # type: ignore[index]
-        ignore_result = run_pants(["help"], config=config, use_pantsd=use_pantsd)
+        config["GLOBAL"]["ignore_warnings"] = [  # type: ignore[index]
+            unmatched_glob_warning,
+            "$regex$DeprecationWarning: DEPRECATED: option 'de.+ted'",
+        ]
+        ignore_result = run_pants(["filedeps", f"{tmpdir}:t"], config=config, use_pantsd=use_pantsd)
         ignore_result.assert_success()
-        assert "DEPRECATED: option 'deprecated'" not in ignore_result.stderr
+        assert unmatched_glob_warning not in ignore_result.stderr
+        assert "DEPRECATED: option 'another_deprecated'" not in ignore_result.stderr
 
 
 def test_pants_symlink_workdirs() -> None:

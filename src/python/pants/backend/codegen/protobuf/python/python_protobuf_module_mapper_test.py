@@ -12,6 +12,7 @@ from pants.backend.python.dependency_inference.module_mapper import FirstPartyPy
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -49,10 +50,20 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
     assert result == FirstPartyPythonMappingImpl(
-        {
-            "protos.f1_pb2": (Address("root1/protos", relative_file_path="f1.proto"),),
-            "protos.f2_pb2": (Address("root1/protos", relative_file_path="f2.proto"),),
-            "tests.f_pb2": (Address("root1/tests", relative_file_path="f.proto"),),
-            "tests.f_pb2_grpc": (Address("root1/tests", relative_file_path="f.proto"),),
-        }
+        mapping=FrozenDict(
+            {
+                "protos.f1_pb2": (Address("root1/protos", relative_file_path="f1.proto"),),
+                "protos.f2_pb2": (Address("root1/protos", relative_file_path="f2.proto"),),
+                "tests.f_pb2": (Address("root1/tests", relative_file_path="f.proto"),),
+                "tests.f_pb2_grpc": (Address("root1/tests", relative_file_path="f.proto"),),
+            }
+        ),
+        ambiguous_modules=FrozenDict(
+            {
+                "two_owners.f_pb2": (
+                    Address("root1/two_owners", relative_file_path="f.proto"),
+                    Address("root2/two_owners", relative_file_path="f.proto"),
+                )
+            }
+        ),
     )

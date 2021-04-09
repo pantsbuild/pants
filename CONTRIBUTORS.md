@@ -7,6 +7,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Alex Schmitt
 + Alexander Johnson
 + Alyssa Pohahau
++ Andreas Stenius
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
@@ -103,6 +104,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
@@ -154,6 +156,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
++ Neeraj Kashyap
 + Neil Sanchala
 + Nicholas Santos
 + Nik Shkrob

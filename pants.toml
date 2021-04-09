@@ -13,24 +13,15 @@ backend_packages.add = [
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
+  "pants.backend.shell",
+  "pants.backend.shell.lint.shellcheck",
+  "pants.backend.shell.lint.shfmt",
   "internal_plugins.releases",
-  "toolchain.pants.auth",
-  "toolchain.pants.buildsense",
-  "toolchain.pants.common",
 ]
-
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
-  "toolchain.pants.plugin==0.7.0",
+  "toolchain.pants.plugin==0.8.1",
 ]
-
-ignore_pants_warnings = [
-  # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
-  "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
-]
-
-build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
@@ -52,6 +43,15 @@ pants_ignore.add = [
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
 ]
+
+# NB: Users must still set `--remote-cache-read --remote-cache-write` to enable this all.
+remote_store_address = "grpcs://build.toolchain.com:443"
+remote_instance_name = "main"
+remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+
+[anonymous-telemetry]
+enabled = true
+repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [source]
 root_patterns = [
@@ -89,6 +89,13 @@ config = ["pyproject.toml"]
 [mypy]
 config = "build-support/mypy/mypy.ini"
 source_plugins = ["pants-plugins/mypy_plugins"]
+
+[shellcheck]
+args = ["--external-sources"]
+
+[shfmt]
+# See https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd#printer-flags.
+args = ["-i 2", "-ci", "-sr"]
 
 [pants-releases]
 release_notes = """
@@ -130,6 +137,7 @@ release_notes = """
   '2.2.x': 'src/python/pants/notes/2.2.x.md',
   '2.3.x': 'src/python/pants/notes/2.3.x.md',
   '2.4.x': 'src/python/pants/notes/2.4.x.md',
+  '2.5.x': 'src/python/pants/notes/2.5.x.md',
 }
 """
 
@@ -137,6 +145,7 @@ release_notes = """
 args = ["--no-header"]
 pytest_plugins.add = [
   "ipdb",
+  "pytest-html",
   "pytest-icdiff",
   "pygments",
 ]

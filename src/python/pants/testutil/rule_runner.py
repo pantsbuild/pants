@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 import multiprocessing
 import os
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
@@ -25,7 +27,6 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
@@ -37,7 +38,7 @@ from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
-from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.global_options import ExecutionOptions, GlobalOptions, LocalStoreOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -60,7 +61,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
-_EXECUTOR = PyExecutor(multiprocessing.cpu_count(), multiprocessing.cpu_count() * 4)
+_EXECUTOR = PyExecutor(
+    core_threads=multiprocessing.cpu_count(), max_threads=multiprocessing.cpu_count() * 4
+)
 
 
 @dataclass(frozen=True)
@@ -90,10 +93,29 @@ class RuleRunner:
         objects: dict[str, Any] | None = None,
         context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
+        preserve_tmpdirs: bool = False,
         ca_certs_path: str | None = None,
+        bootstrap_args: Iterable[str] = (),
     ) -> None:
-        self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
-        safe_mkdir(self.build_root, clean=True)
+
+        bootstrap_args = [*bootstrap_args]
+
+        root_dir: Path | None = None
+        if preserve_tmpdirs:
+            root_dir = Path(mkdtemp(prefix="RuleRunner."))
+            print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
+            bootstrap_args.extend(
+                [
+                    "--no-process-execution-local-cleanup",
+                    f"--local-execution-root-dir={root_dir}",
+                ]
+            )
+            build_root = (root_dir / "BUILD_ROOT").resolve()
+            build_root.mkdir()
+            self.build_root = str(build_root)
+        else:
+            self.build_root = os.path.realpath(safe_mkdtemp(prefix="_BUILD_ROOT"))
+
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
 
@@ -116,14 +138,20 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironment({})
-        self.options_bootstrapper = create_options_bootstrapper()
+        self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
-        local_store_dir = (
-            os.path.realpath(safe_mkdtemp())
-            if isolated_local_store
-            else global_options.local_store_dir
-        )
+
+        local_store_options = LocalStoreOptions.from_options(global_options)
+        if isolated_local_store:
+            if root_dir:
+                lmdb_store_dir = root_dir / "lmdb_store"
+                lmdb_store_dir.mkdir()
+                store_dir = str(lmdb_store_dir)
+            else:
+                store_dir = safe_mkdtemp(prefix="lmdb_store.")
+            local_store_options = dataclasses.replace(local_store_options, store_dir=store_dir)
+
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
@@ -132,10 +160,9 @@ class RuleRunner:
                 self.build_root, global_options
             ),
             use_gitignore=False,
-            local_store_dir=local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
-            native=Native(),
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
@@ -272,14 +299,16 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: bytes | str = "", mode: str = "w") -> str:
+    def create_file(
+        self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
+    ) -> str:
         """Writes to a file under the buildroot.
 
         :API: public
 
-        relpath:  The relative path to the file from the build root.
+        relpath: The relative path to the file from the build root.
         contents: A string containing the contents of the file - '' by default..
-        mode:     The mode to write to the file in - over-write by default.
+        mode: The mode to write to the file in - over-write by default.
         """
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
@@ -287,12 +316,12 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_files(self, path: str, files: Iterable[str]) -> None:
+    def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
         :API: public
 
-         path:  The relative path to the file from the build root.
+         path: The relative path to the file from the build root.
          files: List of file names.
         """
         for f in files:
@@ -315,8 +344,19 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
+    def write_files(self, files: Mapping[str, str]) -> None:
+        """Write the files to the build root.
+
+        :API: public
+        """
+        for path, content in files.items():
+            self.create_file(path, content)
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
-        """Makes a snapshot from a map of file name to file content."""
+        """Makes a snapshot from a map of file name to file content.
+
+        :API: public
+        """
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
@@ -330,14 +370,17 @@ class RuleRunner:
 
         This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
         for each file.
+
+        :API: public
         """
         return self.make_snapshot({fp: "" for fp in files})
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
 
-        This requires that the target actually exists, i.e. that you called
-        `rule_runner.add_to_build_file()`.
+        This requires that the target actually exists, i.e. that you set up its BUILD file.
+
+        :API: public
         """
         return self.request(WrappedTarget, [address]).target
 
@@ -462,13 +505,24 @@ def run_rule_with_mocks(
 @contextmanager
 def mock_console(
     options_bootstrapper: OptionsBootstrapper,
+    *,
+    stdin_content: bytes | str | None = None,
 ) -> Iterator[Tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    with initialize_stdio(global_bootstrap_options), open(
-        "/dev/null", "r"
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
+
+    @contextmanager
+    def stdin_context():
+        if stdin_content is None:
+            yield open("/dev/null", "r")
+        else:
+            with temporary_file(binary_mode=isinstance(stdin_content, bytes)) as stdin_file:
+                stdin_file.write(stdin_content)
+                stdin_file.close()
+                yield open(stdin_file.name, "r")
+
+    with initialize_stdio(global_bootstrap_options), stdin_context() as stdin, temporary_file(
         binary_mode=False
-    ) as stderr, stdio_destination(
+    ) as stdout, temporary_file(binary_mode=False) as stderr, stdio_destination(
         stdin_fileno=stdin.fileno(),
         stdout_fileno=stdout.fileno(),
         stderr_fileno=stderr.fileno(),
@@ -498,7 +552,7 @@ class StdioReader:
 class MockConsole:
     """An implementation of pants.engine.console.Console which captures output."""
 
-    @deprecated("2.5.0.dev0", hint_message="Use the mock_console contextmanager instead.")
+    @deprecated("2.5.0.dev1", hint_message="Use the mock_console contextmanager instead.")
     def __init__(self, use_colors=True):
         self.stdout = StringIO()
         self.stderr = StringIO()

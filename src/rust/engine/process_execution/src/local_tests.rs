@@ -2,7 +2,7 @@ use tempfile;
 use testutil;
 
 use crate::{
-  local::USER_EXECUTABLE_MODE, CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
@@ -10,14 +10,13 @@ use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
 use std;
 use std::collections::BTreeMap;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use testutil::path::find_bash;
+use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::WorkunitStore;
 
@@ -382,15 +381,39 @@ async fn test_directory_preservation() {
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
-  let bash_contents = format!("echo -n {} > {}", TestData::roland().string(), "roland");
-  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.clone()];
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
+  // from the ./cats directory.
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let cp = which("cp").expect("No cp on $PATH.");
+  let bash_contents = format!("echo $PWD && {} roland ..", cp.display());
+  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
+
+  let mut process = Process::new(argv.clone()).output_files(relative_paths(&["roland"]).collect());
+  process.input_files = TestDirectory::nested().digest();
+  process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
-    Process::new(argv.clone()).output_files(relative_paths(&["roland"]).collect()),
+    process,
     preserved_work_root.clone(),
     false,
-    None,
-    None,
+    Some(store),
+    Some(executor),
   )
   .await;
   result.unwrap();
@@ -403,16 +426,24 @@ async fn test_directory_preservation() {
 
   // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
   let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
-  assert!(rolands_path.exists());
+  assert!(&rolands_path.exists());
 
   // Ensure that when a directory is preserved, a __run.sh file is created with the process's
   // command line and environment variables.
   let run_script_path = preserved_work_root.join(&subdirs[0]).join("__run.sh");
-  assert!(run_script_path.exists());
-  let script_metadata = std::fs::metadata(&run_script_path).unwrap();
+  assert!(&run_script_path.exists());
 
-  // Ensure the script is executable.
-  assert!(USER_EXECUTABLE_MODE & script_metadata.permissions().mode() != 0);
+  std::fs::remove_file(&rolands_path).expect("Failed to remove roland.");
+
+  // Confirm the script when run directly sets up the proper CWD.
+  let mut child = std::process::Command::new(&run_script_path)
+    .spawn()
+    .expect("Failed to launch __run.sh");
+  let status = child
+    .wait()
+    .expect("Failed to gather the result of __run.sh.");
+  assert_eq!(Some(0), status.code());
+  assert!(rolands_path.exists());
 
   // Ensure the bash command line is provided.
   let bytes_quoted_command_line = bash::escape(&bash_contents);

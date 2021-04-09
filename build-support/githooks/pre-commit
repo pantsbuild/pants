@@ -17,9 +17,9 @@ set -e
 
 MERGE_BASE="$(git_merge_base)"
 
-# When travis builds a tag, it does so in a shallow clone without master fetched, which
+# When travis builds a tag, it does so in a shallow clone without main fetched, which
 # fails in pants changed.
-if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
+if git rev-parse --verify "${MERGE_BASE}" &> /dev/null; then
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
@@ -37,28 +37,25 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking MyPy"
   ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
 
-  echo "* Checking Flake8 and formatting"
-  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
+  echo "* Checking linters and formatters"
+  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint ||
     die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
-    actual_travis_yml=$(<.travis.yml)
+    actual_travis_yml=$(< .travis.yml)
     expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
-    [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
+    [ "${expected_travis_yml}" == "${actual_travis_yml}" ] ||
       die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
   fi
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
-    echo "* Checking github workflows generation"
+    echo "* Checking GitHub workflows generation"
     ./pants run build-support/bin/generate_github_workflows.py -- --check
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."
 fi
-
-echo "* Checking shell scripts via shellcheck"
-./build-support/bin/shellcheck.py || exit 1
 
 echo "* Checking shell scripts via our custom linter"
 ./build-support/bin/check_shell.sh || exit 1

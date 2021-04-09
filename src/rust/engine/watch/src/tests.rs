@@ -157,4 +157,8 @@ impl Invalidatable for TestInvalidatable {
     calls.push(paths.clone());
     invalidated
   }
+
+  fn invalidate_all(&self, _caller: &str) -> usize {
+    unimplemented!();
+  }
 }

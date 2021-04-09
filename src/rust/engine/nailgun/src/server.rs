@@ -122,7 +122,7 @@ impl Server {
     config: nails::Config,
     nail: impl Nail,
     mut should_exit: oneshot::Receiver<()>,
-    mut listener: TcpListener,
+    listener: TcpListener,
   ) -> Result<(), String> {
     // While connections are ongoing, they acquire `read`; before shutting down, the server
     // acquires `write`.
@@ -158,7 +158,7 @@ impl Server {
         let ongoing_connections = ongoing_connections.clone();
         async move {
           let ongoing_connection_guard = ongoing_connections.read().await;
-          connection_started.notify();
+          connection_started.notify_one();
           let result = nails::server::handle_connection(config, nail, tcp_stream).await;
           std::mem::drop(ongoing_connection_guard);
           result

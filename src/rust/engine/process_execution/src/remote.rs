@@ -20,6 +20,7 @@ use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
+use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -43,7 +44,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::headers_to_interceptor_fn;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -207,7 +207,7 @@ impl CommandRunner {
         .get_capabilities(request)
         .await
         .map(|r| r.into_inner())
-        .map_err(rpcerror_to_string)
+        .map_err(status_to_str)
     };
 
     self
@@ -313,7 +313,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -338,7 +338,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -363,7 +363,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -388,7 +388,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -585,11 +585,11 @@ impl CommandRunner {
           .workunit_store
           .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
+        let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
         let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
         debug!("delaying {:?} before retry", sleep_time);
-        tokio::time::delay_for(sleep_time).await;
+        tokio::time::sleep(sleep_time).await;
       }
 
       let rpc_result = match current_operation_name {
@@ -771,7 +771,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
       ensure_action_stored_locally(&self.store, &command, &action),
@@ -785,7 +786,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("check action cache for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
       check_action_cache(
@@ -813,7 +815,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
       ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
@@ -831,7 +834,7 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
         ..WorkunitMetadata::default()
       },
       timeout_fut,
@@ -1422,7 +1425,7 @@ pub async fn check_action_cache(
         context
           .workunit_store
           .increment_counter(Metric::RemoteCacheReadErrors, 1);
-        Err(rpcerror_to_string(status))
+        Err(status_to_str(status))
       }
     },
   }
@@ -1471,10 +1474,6 @@ pub fn format_error(error: &StatusProto) -> String {
     x => format!("{:?}", x),
   };
   format!("{}: {}", error_code, error.message)
-}
-
-pub(crate) fn rpcerror_to_string(status: Status) -> String {
-  format!("{:?}: {:?}", status.code(), status.message(),)
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {

@@ -15,7 +15,6 @@ import pytest
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.internals.selectors import GetConstraints, GetParseError
@@ -31,23 +30,20 @@ from pants.engine.rules import (
     rule,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
-_EXECUTOR = PyExecutor(2, 4)
+_EXECUTOR = PyExecutor(core_threads=2, max_threads=4)
 
 
-def create_scheduler(rules, validate=True, native=None):
+def create_scheduler(rules, validate=True):
     """Create a Scheduler."""
-    native = native or Native()
     return Scheduler(
-        native=native,
         ignore_patterns=[],
         use_gitignore=False,
         build_root=str(Path.cwd()),
-        local_store_dir="./.pants.d/lmdb_store",
         local_execution_root_dir="./.pants.d",
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,
@@ -55,6 +51,7 @@ def create_scheduler(rules, validate=True, native=None):
         union_membership=UnionMembership({}),
         executor=_EXECUTOR,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
+        local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,
     )
 

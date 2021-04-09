@@ -43,8 +43,9 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use store::Store;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::stream::StreamExt;
 use tokio::task;
+use tokio_stream::wrappers::SignalStream;
+use tokio_stream::StreamExt;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -733,21 +734,22 @@ async fn main() {
 
   let runtime = task_executor::Executor::new();
 
+  let local_only_store =
+    Store::local_only(runtime.clone(), &store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
-    Some(address) => Store::with_remote(
-      runtime.clone(),
-      &store_path,
-      address,
-      args.value_of("remote-instance-name").map(str::to_owned),
-      root_ca_certs,
-      headers,
-      4 * 1024 * 1024,
-      std::time::Duration::from_secs(5 * 60),
-      1,
-    ),
-    None => Store::local_only(runtime.clone(), &store_path),
-  }
-  .expect("Error making store");
+    Some(address) => local_only_store
+      .into_with_remote(
+        address,
+        args.value_of("remote-instance-name").map(str::to_owned),
+        root_ca_certs,
+        headers,
+        4 * 1024 * 1024,
+        std::time::Duration::from_secs(5 * 60),
+        1,
+      )
+      .expect("Error making remote store"),
+    None => local_only_store,
+  };
 
   #[derive(Clone, Copy, Debug)]
   enum Sig {
@@ -760,9 +762,10 @@ async fn main() {
   where
     F: Fn() -> SignalKind,
   {
-    signal(install_fn())
-      .unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig))
-      .map(move |_| Some(sig))
+    SignalStream::new(
+      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig)),
+    )
+    .map(move |_| Some(sig))
   }
 
   let sigint = install_handler(SignalKind::interrupt, Sig::INT);

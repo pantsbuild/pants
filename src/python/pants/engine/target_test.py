@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pytest
 
@@ -14,6 +14,7 @@ from pants.engine.target import (
     Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
     GenerateSourcesRequest,
@@ -36,7 +37,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import FrozenInstanceError
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # -----------------------------------------------------------------------------------------------
 # Test core Field and Target abstractions
@@ -745,3 +746,165 @@ def test_targets_with_sources_types() -> None:
         union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
     )
     assert set(result) == {tgt1, codegen_tgt}
+
+
+# -----------------------------------------------------------------------------------------------
+# Test `ExplicitlyProvidedDependencies` helper functions
+# -----------------------------------------------------------------------------------------------
+
+
+def test_explicitly_provided_dependencies_any_are_covered_by_includes() -> None:
+    build_tgt = Address("", target_name="a")
+    file_tgt = Address("", target_name="b", relative_file_path="f.ext")
+    epd = ExplicitlyProvidedDependencies(
+        includes=FrozenOrderedSet([build_tgt, file_tgt]),
+        ignores=FrozenOrderedSet(),
+    )
+
+    assert epd.any_are_covered_by_includes(()) is False
+    assert epd.any_are_covered_by_includes((build_tgt,)) is True
+    assert epd.any_are_covered_by_includes((file_tgt,)) is True
+    assert epd.any_are_covered_by_includes((build_tgt, file_tgt)) is True
+    # File addresses are covered if their original BUILD address is in the includes.
+    assert (
+        epd.any_are_covered_by_includes((Address("", target_name="a", relative_file_path="f.ext"),))
+        is True
+    )
+    assert epd.any_are_covered_by_includes((Address("", target_name="x"),)) is False
+    assert (
+        epd.any_are_covered_by_includes((Address("", target_name="x", relative_file_path="f.ext"),))
+        is False
+    )
+    # Ensure we check for _any_, not _all_.
+    assert epd.any_are_covered_by_includes((Address("", target_name="x"), build_tgt)) is True
+
+
+def test_explicitly_provided_dependencies_remaining_after_ignores() -> None:
+    build_tgt = Address("", target_name="a")
+    file_tgt = Address("", target_name="b", relative_file_path="f.ext")
+    epd = ExplicitlyProvidedDependencies(
+        includes=FrozenOrderedSet(),
+        ignores=FrozenOrderedSet([build_tgt, file_tgt]),
+    )
+
+    assert epd.remaining_after_ignores(()) == set()
+    assert epd.remaining_after_ignores((build_tgt,)) == set()
+    assert epd.remaining_after_ignores((file_tgt,)) == set()
+    assert epd.remaining_after_ignores((build_tgt, file_tgt)) == set()
+    # File addresses are covered if their original BUILD address is in the includes.
+    assert (
+        epd.remaining_after_ignores((Address("", target_name="a", relative_file_path="f.ext"),))
+        == set()
+    )
+
+    bad_build_tgt = Address("", target_name="x")
+    bad_file_tgt = Address("", target_name="x", relative_file_path="f.ext")
+    assert epd.remaining_after_ignores((bad_build_tgt,)) == {bad_build_tgt}
+    assert epd.remaining_after_ignores((bad_file_tgt,)) == {bad_file_tgt}
+    assert epd.remaining_after_ignores((bad_file_tgt, build_tgt, file_tgt)) == {bad_file_tgt}
+
+
+def test_explicitly_provided_dependencies_disambiguated_via_ignores() -> None:
+    def get_disambiguated(
+        *,
+        ambiguous: List[Address],
+        ignores: List[Address],
+        includes: Optional[List[Address]] = None,
+    ) -> Optional[Address]:
+        epd = ExplicitlyProvidedDependencies(
+            includes=FrozenOrderedSet(includes or []), ignores=FrozenOrderedSet(ignores)
+        )
+        return epd.disambiguated_via_ignores(tuple(ambiguous))
+
+    # A mix of file and BUILD targets.
+    tgt_a = Address("dir", target_name="a", relative_file_path="f")
+    tgt_b = Address("dir", target_name="b", relative_file_path="f")
+    tgt_c = Address("dir", target_name="c")
+    all_tgts = [tgt_a, tgt_b, tgt_c]
+
+    # If 1 target remains after ignores, it's disambiguated. Note that the ignores can be file
+    # targets or BUILD targets.
+    assert get_disambiguated(ambiguous=all_tgts, ignores=[tgt_b, tgt_c]) == tgt_a
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts,
+            ignores=[tgt_b.maybe_convert_to_build_target(), tgt_c],
+        )
+        == tgt_a
+    )
+
+    assert get_disambiguated(ambiguous=all_tgts, ignores=[tgt_a]) is None
+    assert (
+        get_disambiguated(ambiguous=all_tgts, ignores=[tgt_a.maybe_convert_to_build_target()])
+        is None
+    )
+    assert get_disambiguated(ambiguous=all_tgts, ignores=all_tgts) is None
+    assert get_disambiguated(ambiguous=[], ignores=[]) is None
+    # If any includes would disambiguate the ambiguous target, we don't consider disambiguating
+    # via excludes as the user has already explicitly disambiguated the module.
+    assert get_disambiguated(ambiguous=all_tgts, ignores=[tgt_a, tgt_b], includes=[tgt_a]) is None
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts,
+            ignores=[tgt_a, tgt_b],
+            includes=[tgt_a.maybe_convert_to_build_target()],
+        )
+        is None
+    )
+
+
+def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inference(
+    caplog,
+) -> None:
+    def maybe_warn(
+        *,
+        ambiguous: List[Address],
+        ignores: Optional[List[Address]] = None,
+        includes: Optional[List[Address]] = None,
+    ) -> None:
+        caplog.clear()
+        epd = ExplicitlyProvidedDependencies(
+            includes=FrozenOrderedSet(includes or []), ignores=FrozenOrderedSet(ignores or [])
+        )
+        epd.maybe_warn_of_ambiguous_dependency_inference(
+            tuple(ambiguous), Address("some_dir"), import_reference="file", context="foo"
+        )
+
+    maybe_warn(ambiguous=[])
+    assert not caplog.records
+
+    # A mix of file and BUILD targets.
+    tgt_a = Address("dir", target_name="a", relative_file_path="f")
+    tgt_b = Address("dir", target_name="b", relative_file_path="f")
+    tgt_c = Address("dir", target_name="c")
+    all_tgts = [tgt_a, tgt_b, tgt_c]
+
+    maybe_warn(ambiguous=all_tgts)
+    assert len(caplog.records) == 1
+    assert f"['{tgt_a}', '{tgt_b}', '{tgt_c}']" in caplog.text
+
+    # Ignored addresses do not show up in the list of ambiguous owners, including for ignores of
+    # both file and BUILD targets.
+    maybe_warn(ambiguous=all_tgts, ignores=[tgt_b])
+    assert len(caplog.records)
+    assert f"['{tgt_a}', '{tgt_c}']" in caplog.text
+    maybe_warn(ambiguous=all_tgts, ignores=[tgt_b.maybe_convert_to_build_target()])
+    assert len(caplog.records)
+    assert f"['{tgt_a}', '{tgt_c}']" in caplog.text
+
+    # Disambiguating via ignores turns off the warning, including for ignores of both file and
+    # BUILD targets.
+    maybe_warn(ambiguous=all_tgts, ignores=[tgt_a, tgt_b])
+    assert not caplog.records
+    maybe_warn(
+        ambiguous=all_tgts,
+        ignores=[tgt_a.maybe_convert_to_build_target(), tgt_b.maybe_convert_to_build_target()],
+    )
+    assert not caplog.records
+
+    # Including a target turns off the warning, including for includes of both file and
+    # BUILD targets.
+    maybe_warn(ambiguous=all_tgts, includes=[tgt_a])
+    assert not caplog.records
+    maybe_warn(ambiguous=all_tgts, includes=[tgt_a.maybe_convert_to_build_target()])
+    assert not caplog.records

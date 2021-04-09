@@ -48,6 +48,7 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use serde_derive::Serialize;
+use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -65,15 +66,6 @@ use remexec::Tree;
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-///
-/// This is the target number of bytes which should be present in all combined LMDB store files
-/// after garbage collection. We almost certainly want to make this configurable.
-///
-/// Because LMDB is sharded (by ShardedLmdb::NUM_SHARDS), this value also bounds the maximum size
-/// of individual items in the store: see the relevant calls to `ShardedLmdb::new` for more info.
-///
-pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
-
 mod local;
 #[cfg(test)]
 pub mod local_tests;
@@ -81,6 +73,28 @@ pub mod local_tests;
 mod remote;
 #[cfg(test)]
 mod remote_tests;
+
+pub struct LocalOptions {
+  pub files_max_size_bytes: usize,
+  pub directories_max_size_bytes: usize,
+  pub lease_time: Duration,
+  pub shard_count: u8,
+}
+
+///
+/// NB: These defaults are intended primarily for use in tests: high level code should expose
+/// explicit settings in most cases.
+///
+impl Default for LocalOptions {
+  fn default() -> Self {
+    Self {
+      files_max_size_bytes: 16 * 4 * GIGABYTES,
+      directories_max_size_bytes: 2 * 4 * GIGABYTES,
+      lease_time: DEFAULT_LEASE_TIME,
+      shard_count: 16,
+    }
+  }
+}
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -237,6 +251,17 @@ impl Store {
     })
   }
 
+  pub fn local_only_with_options<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+    options: LocalOptions,
+  ) -> Result<Store, String> {
+    Ok(Store {
+      local: local::ByteStore::new_with_options(executor, path, options)?,
+      remote: None,
+    })
+  }
+
   ///
   /// Converts this (copy of) a Store to local only by dropping the remote half.
   ///
@@ -251,12 +276,11 @@ impl Store {
   }
 
   ///
-  /// Make a store which uses local storage, and if it is missing a value which it tries to load,
-  /// will attempt to back-fill its local storage from a remote CAS.
+  /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
+  /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn with_remote<P: AsRef<Path>>(
-    executor: task_executor::Executor,
-    path: P,
+  pub fn into_with_remote(
+    self,
     cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
@@ -266,7 +290,7 @@ impl Store {
     rpc_retries: usize,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(executor, path)?,
+      local: self.local,
       remote: Some(remote::ByteStore::new(
         cas_address,
         instance_name,

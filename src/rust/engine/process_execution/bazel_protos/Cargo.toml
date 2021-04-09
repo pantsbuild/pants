@@ -6,18 +6,18 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-bytes = "0.5"
+bytes = "1.0"
 hashing = { path = "../../hashing" }
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-prost-types = "0.6"
-tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots"] }
+prost = "0.7"
+prost-build = "0.7"
+prost-types = "0.7"
+tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
 copy_dir = "0.1.2"
 dir-diff = "0.3.1"
 tempfile = "3"
-prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-tonic-build = { version = "0.3", features = ["prost"] }
+prost-build = "0.7"
+tonic-build = { version = "0.4", features = ["prost"] }
 walkdir = "2"

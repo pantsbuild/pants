@@ -6,9 +6,8 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Iterator, Sequence, Tuple
+from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
@@ -170,7 +169,10 @@ async def construct_workunits_callback_factories(
 
 
 class StreamingWorkunitHandler:
-    """Periodically calls each registered WorkunitsCallback in a dedicated thread."""
+    """Periodically calls each registered WorkunitsCallback in a dedicated thread.
+
+    This class should be used as a context manager.
+    """
 
     def __init__(
         self,
@@ -180,54 +182,43 @@ class StreamingWorkunitHandler:
         options_bootstrapper: OptionsBootstrapper,
         specs: Specs,
         report_interval_seconds: float,
+        pantsd: bool,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ) -> None:
-        self.scheduler = scheduler
-        self.report_interval = report_interval_seconds
+        scheduler = scheduler.isolated_shallow_clone()
         self.callbacks = callbacks
-        self._thread_runner: _InnerHandler | None = None
-        self._context = StreamingWorkunitContext(
-            _scheduler=self.scheduler,
+        self.context = StreamingWorkunitContext(
+            _scheduler=scheduler,
             _run_tracker=run_tracker,
             _specs=specs,
             _options_bootstrapper=options_bootstrapper,
         )
-        # TODO(10092) The max verbosity should be a per-client setting, rather than a global
-        #  setting.
-        self.max_workunit_verbosity = max_workunit_verbosity
-
-    def start(self) -> None:
-        if not self.callbacks:
-            return
-        self._thread_runner = _InnerHandler(
-            scheduler=self.scheduler,
-            context=self._context,
-            callbacks=self.callbacks,
-            report_interval=self.report_interval,
-            max_workunit_verbosity=self.max_workunit_verbosity,
+        self.thread_runner = (
+            _InnerHandler(
+                scheduler=scheduler,
+                context=self.context,
+                callbacks=self.callbacks,
+                report_interval=report_interval_seconds,
+                # TODO(10092) The max verbosity should be a per-client setting, rather than a global
+                #  setting.
+                max_workunit_verbosity=max_workunit_verbosity,
+                pantsd=pantsd,
+            )
+            if callbacks
+            else None
         )
-        self._thread_runner.start()
 
-    def end(self, *, pantsd: bool) -> None:
-        if not self._thread_runner:
+    def __enter__(self) -> None:
+        if not self.thread_runner:
             return
-        # TODO: Have a thread per callback so that some callbacks can always finish async even
-        #  if others must be finished synchronously.
-        block_until_complete = not pantsd or any(
-            callback.can_finish_async is False for callback in self.callbacks
-        )
-        self._thread_runner.end(block_until_complete=block_until_complete)
+        self.thread_runner.start()
 
-    @contextmanager
-    def session(self, *, pantsd: bool) -> Iterator[None]:
-        try:
-            self.start()
-            yield
-            self.end(pantsd=pantsd)
-        except Exception as e:
-            if self._thread_runner:
-                self._thread_runner.join()
-            raise e
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if not self.thread_runner:
+            return
+        self.thread_runner.end()
+        if exc_type is not None:
+            self.thread_runner.join()
 
 
 class _InnerHandler(threading.Thread):
@@ -238,14 +229,20 @@ class _InnerHandler(threading.Thread):
         callbacks: Iterable[WorkunitsCallback],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
+        pantsd: bool,
     ) -> None:
         super().__init__(daemon=True)
         self.scheduler = scheduler
-        self._context = context
+        self.context = context
         self.stop_request = threading.Event()
         self.report_interval = report_interval
         self.callbacks = callbacks
         self.max_workunit_verbosity = max_workunit_verbosity
+        # TODO: Have a thread per callback so that some callbacks can always finish async even
+        #  if others must be finished synchronously.
+        self.block_until_complete = not pantsd or any(
+            callback.can_finish_async is False for callback in self.callbacks
+        )
         # Get the parent thread's logging destination. Note that this thread has not yet started
         # as we are only in the constructor.
         self.logging_destination = native_engine.stdio_thread_get_destination()
@@ -257,7 +254,7 @@ class _InnerHandler(threading.Thread):
                 started_workunits=workunits["started"],
                 completed_workunits=workunits["completed"],
                 finished=finished,
-                context=self._context,
+                context=self.context,
             )
 
     def run(self) -> None:
@@ -271,9 +268,9 @@ class _InnerHandler(threading.Thread):
             # completed, depending on whether the thread was joined or not.
             self.poll_workunits(finished=True)
 
-    def end(self, *, block_until_complete: bool) -> None:
+    def end(self) -> None:
         self.stop_request.set()
-        if block_until_complete:
+        if self.block_until_complete:
             super().join()
 
 

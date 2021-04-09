@@ -106,7 +106,7 @@ impl CommandRunner {
 
     Box::pin(async move {
       let path_stats = posix_fs
-        .expand_globs(output_globs)
+        .expand_globs(output_globs, None)
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
       Snapshot::from_path_stats(
@@ -330,7 +330,7 @@ impl CapturedWorkdir for CommandRunner {
         // process but outside of our control (in libraries). As such, we back-stop by sleeping and
         // trying again for a while if we do hit one of these fork races we do not control.
         const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
-        let mut retries = 0;
+        let mut retries: u32 = 0;
         let mut sleep_millis = 1;
 
         let start_time = std::time::Instant::now();
@@ -339,7 +339,7 @@ impl CapturedWorkdir for CommandRunner {
             Err(e) => {
               if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT
               {
-                tokio::time::delay_for(std::time::Duration::from_millis(sleep_millis)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
                 retries += 1;
                 sleep_millis *= 2;
                 continue;
@@ -363,27 +363,35 @@ impl CapturedWorkdir for CommandRunner {
       }
     }?;
 
-    debug!("spawned local process as {} for {:?}", child.id(), req);
+    debug!("spawned local process as {:?} for {:?}", child.id(), req);
     let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
       .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
+      .fuse()
       .boxed();
     let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
       .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
+      .fuse()
       .boxed();
-    let exit_stream = child
-      .into_stream()
-      .map_ok(|exit_status| {
-        ChildOutput::Exit(ExitCode(
-          exit_status
-            .code()
-            .or_else(|| exit_status.signal().map(Neg::neg))
-            .expect("Child process should exit via returned code or signal."),
-        ))
-      })
-      .boxed();
+    let exit_stream = async move {
+      child
+        .wait()
+        .map_ok(|exit_status| {
+          ChildOutput::Exit(ExitCode(
+            exit_status
+              .code()
+              .or_else(|| exit_status.signal().map(Neg::neg))
+              .expect("Child process should exit via returned code or signal."),
+          ))
+        })
+        .await
+    }
+    .into_stream()
+    .boxed();
+    let result_stream =
+      futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream]);
 
     Ok(
-      futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+      result_stream
         .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
         .boxed(),
     )
@@ -565,7 +573,7 @@ pub trait CapturedWorkdir {
         let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
       }
       None => {
-        setup_run_sh_script(&req.env, &req.argv, &workdir_path)?;
+        setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
       }
     }
 
@@ -638,9 +646,10 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-/// Create a file called __run.sh with the env and argv used by Pants to facilitate debugging.
+/// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
 fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
+  working_directory: &Option<RelativePath>,
   argv: &[String],
   workdir_path: &PathBuf,
 ) -> Result<(), String> {
@@ -665,15 +674,27 @@ fn setup_run_sh_script(
     full_command_line.push(arg_str);
   }
 
+  let stringified_cwd = {
+    let cwd = if let Some(ref working_directory) = working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_owned()
+    };
+    let quoted_cwd = bash::escape(&cwd);
+    str::from_utf8(&quoted_cwd)
+      .map_err(|e| format!("{:?}", e))?
+      .to_string()
+  };
+
   let stringified_command_line: String = full_command_line.join(" ");
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
 export {}
-
+cd {}
 {}
 ",
-    stringified_env_vars, stringified_command_line,
+    stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
   let full_file_path = workdir_path.join("__run.sh");

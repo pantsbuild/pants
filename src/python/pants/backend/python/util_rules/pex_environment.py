@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Mapping, Optional, Tuple, cast
 
@@ -106,7 +106,6 @@ class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
-    named_caches_dir: str
     bootstrap_python: Optional[PythonExecutable] = None
 
     def create_argv(
@@ -129,7 +128,7 @@ class PexEnvironment(EngineAwareReturnType):
             PATH=create_path_env_var(self.path),
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
-            PEX_ROOT=os.path.join(self.named_caches_dir, "pex_root"),
+            PEX_ROOT=str(self.pex_root),
             **self.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
@@ -138,6 +137,13 @@ class PexEnvironment(EngineAwareReturnType):
         if not python_configured:
             d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
         return d
+
+    @property
+    def pex_root(self) -> PurePath:
+        return PurePath(".cache/pex_root")
+
+    def append_only_caches(self) -> Mapping[str, str]:
+        return {"pex_root": str(self.pex_root)}
 
     def level(self) -> LogLevel:
         return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
@@ -227,9 +233,6 @@ async def find_pex_python(
             python_setup.interpreter_search_paths(pex_relevant_environment)
         ),
         subprocess_environment_dict=subprocess_env_vars.vars,
-        # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
-        #  the normalization only once, via the options system?
-        named_caches_dir=Path(global_options.options.named_caches_dir).resolve().as_posix(),
         bootstrap_python=first_python_binary(),
     )
 

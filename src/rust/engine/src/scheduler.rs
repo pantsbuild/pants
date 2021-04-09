@@ -14,10 +14,10 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
 use crate::session::{ObservedValueResult, Root, Session};
 
-use futures::{future, FutureExt};
-use graph::{InvalidationResult, LastObserved};
+use futures::{future, FutureExt, TryFutureExt};
+use graph::LastObserved;
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{debug, info, warn};
+use log::{debug, warn};
 use stdio::TryCloneAsFile;
 use tempfile::TempDir;
 use tokio::process;
@@ -34,6 +34,7 @@ pub enum ExecutionTermination {
   Fatal(String),
 }
 
+#[derive(Default)]
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
@@ -55,17 +56,6 @@ pub struct ExecutionRequest {
   // A timeout applied globally to the request. When a request times out, work is _not_ cancelled,
   // and will continue to completion in the background.
   pub timeout: Option<Duration>,
-}
-
-impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest {
-      roots: Vec::new(),
-      poll: false,
-      poll_delay: None,
-      timeout: None,
-    }
-  }
 }
 
 ///
@@ -119,15 +109,7 @@ impl Scheduler {
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    let InvalidationResult { cleared, dirtied } = self
-      .core
-      .graph
-      .invalidate_from_roots(|node| node.fs_subject().is_some());
-    info!(
-      "invalidation: cleared {} and dirtied {} nodes for all paths",
-      cleared, dirtied
-    );
-    cleared + dirtied
+    self.core.graph.invalidate_all("external")
   }
 
   ///
@@ -272,10 +254,10 @@ impl Scheduler {
           _ = session.cancelled() => {
             // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
             // zombies).
-            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e))?;
-            subprocess.await.map_err(|e| e.to_string())
+            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+            subprocess.wait().await.map_err(|e| e.to_string())
           }
-          exit_status = &mut subprocess => {
+          exit_status = subprocess.wait() => {
             // The process exited.
             exit_status.map_err(|e| e.to_string())
           }
@@ -384,7 +366,7 @@ impl Scheduler {
     let mut execution_task = self.execute_helper(request, session).boxed();
 
     self.core.executor.block_on(async move {
-      let mut refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
+      let mut refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
       let result = loop {
         tokio::select! {
           _ = session.cancelled() => {
@@ -401,7 +383,7 @@ impl Scheduler {
               // Just a receive timeout. render and continue.
               session.maybe_display_render();
             }
-            refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
+            refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
           }
           res = &mut execution_task => {
             // Completed successfully.

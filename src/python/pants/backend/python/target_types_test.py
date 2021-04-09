@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from textwrap import dedent
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -22,6 +24,7 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonDistributionDependencies,
     PythonLibrary,
+    PythonRequirementConstraintsField,
     PythonRequirementLibrary,
     PythonRequirementsField,
     PythonTestsTimeout,
@@ -39,6 +42,7 @@ from pants.backend.python.target_types_rules import (
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
+    Field,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -157,7 +161,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"))
 
 
-def test_inject_pex_binary_entry_point_dependency() -> None:
+def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
             inject_pex_binary_entry_point_dependency,
@@ -179,7 +183,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             """
         ),
     )
-    rule_runner.create_files("project", ["app.py", "self.py"])
+    rule_runner.create_file("project/app.py")
     rule_runner.add_to_build_file(
         "project",
         dedent(
@@ -187,7 +191,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             python_library(sources=['app.py'])
             pex_binary(name='first_party', entry_point='project.app')
             pex_binary(name='first_party_func', entry_point='project.app:func')
-            pex_binary(name='first_party_shorthand', entry_point='app.py:func')
+            pex_binary(name='first_party_shorthand', entry_point='app.py')
             pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
             pex_binary(name='third_party', entry_point='colors')
             pex_binary(name='third_party_func', entry_point='colors:func')
@@ -233,9 +237,56 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+    rule_runner.set_options([])
+
+    # Warn if there's ambiguity, meaning we cannot infer.
+    caplog.clear()
+    rule_runner.create_file("project/ambiguous.py")
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_library(name="dep1", sources=["ambiguous.py"])
+            python_library(name="dep2", sources=["ambiguous.py"])
+            pex_binary(name="ambiguous", entry_point="ambiguous.py")
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="ambiguous"),
+        expected=None,
+    )
+    assert len(caplog.records) == 1
+    assert (
+        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
+        "module `project.ambiguous`"
+    ) in caplog.text
+    assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
+    # warning about ambiguity.
+    caplog.clear()
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            pex_binary(
+                name="disambiguated",
+                entry_point="ambiguous.py",
+                dependencies=["!./ambiguous.py:dep2"],
+            )
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="disambiguated"),
+        expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
+    )
+    assert not caplog.records
 
 
-def test_requirements_field() -> None:
+@pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])
+def test_requirements_and_constraints_fields(field: type[Field]) -> None:
     raw_value = (
         "argparse==1.2.1",
         "configparser ; python_version<'3'",
@@ -243,30 +294,28 @@ def test_requirements_field() -> None:
     )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
-    assert PythonRequirementsField(raw_value, address=Address("demo")).value == parsed_value
+    assert field(raw_value, address=Address("demo")).value == parsed_value
 
     # Macros can pass pre-parsed Requirement objects.
-    assert PythonRequirementsField(parsed_value, address=Address("demo")).value == parsed_value
+    assert field(parsed_value, address=Address("demo")).value == parsed_value
 
     # Reject invalid types.
     with pytest.raises(InvalidFieldTypeException):
-        PythonRequirementsField("sneaky_str", address=Address("demo"))
+        field("sneaky_str", address=Address("demo"))
     with pytest.raises(InvalidFieldTypeException):
-        PythonRequirementsField([1, 2], address=Address("demo"))
+        field([1, 2], address=Address("demo"))
 
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(["not valid! === 3.1"], address=Address("demo"))
+        field(["not valid! === 3.1"], address=Address("demo"))
     assert (
-        "Invalid requirement 'not valid! === 3.1' in the 'requirements' field for the "
+        f"Invalid requirement 'not valid! === 3.1' in the '{field.alias}' field for the "
         "target demo:"
     ) in str(exc.value)
 
     # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
     with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(
-            ["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo")
-        )
+        field(["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo"))
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 

@@ -6,10 +6,10 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-stream = "0.2"
+async-stream = "0.3"
 bazel_protos = { path = "../process_execution/bazel_protos" }
-bytes = "0.5"
+bytes = "1.0"
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost = "0.7" 

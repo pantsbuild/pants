@@ -3,6 +3,10 @@ beautifulsoup4>=4.6.0,<4.7
 fasteners==0.15.0
 freezegun==1.0.0
 
+# Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
+# anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
+humbug==0.1.9
+
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
 #   ./pants help-all | \
@@ -15,7 +19,7 @@ mypy==0.800
 
 packaging==20.9
 pathspec==0.8.0
-pex==2.1.33
+pex==2.1.38
 psutil==5.7.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.
@@ -25,4 +29,4 @@ requests[security]>=2.20.1
 setproctitle==1.2
 setuptools>=50.3.0,<54.0
 toml==0.10.2
-typing-extensions==3.7.4.2
+typing-extensions==3.7.4.3

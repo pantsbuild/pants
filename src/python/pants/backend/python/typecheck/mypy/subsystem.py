@@ -7,6 +7,7 @@ from typing import Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 
@@ -30,7 +31,7 @@ class MyPy(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} lint`.",
+            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} typecheck`.",
         )
         register(
             "--args",
@@ -72,6 +73,15 @@ class MyPy(PythonToolBase):
     @property
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=["mypy.ini", ".mypy.ini"],
+            check_content={"setup.cfg": b"[mypy"},
+            option_name="[mypy].config",
+        )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

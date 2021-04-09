@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# shellcheck shell=bash
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 # Defines:
@@ -42,8 +44,8 @@ function bootstrap_native_code() {
   if [[ "${SKIP_NATIVE_ENGINE_SO_BOOTSTRAP}" == "true" ]]; then
     if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" ]]; then
       die "You requested to override bootstrapping native_engine.so via the env var" \
-          "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
-           "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
+        "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
+        "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
     fi
     return
   fi
@@ -68,6 +70,9 @@ function bootstrap_native_code() {
     engine_version_calculated="$(calculate_current_hash)"
 
     # Create the native engine resource.
+    # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
+    #  process from being killed when recompiling.
+    rm -f "${NATIVE_ENGINE_RESOURCE}"
     cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
 
     # Create the accompanying metadata file.

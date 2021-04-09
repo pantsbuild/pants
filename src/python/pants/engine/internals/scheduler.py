@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -31,8 +31,20 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, PyTypes
+from pants.engine.internals.native_engine import (
+    PyExecutionRequest,
+    PyExecutionStrategyOptions,
+    PyExecutor,
+    PyLocalStoreOptions,
+    PyRemotingOptions,
+    PyScheduler,
+    PySession,
+    PySessionCancellationLatch,
+    PyTasks,
+    PyTypes,
+)
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -45,7 +57,11 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import (
+    LOCAL_STORE_LEASE_TIME_SECS,
+    ExecutionOptions,
+    LocalStoreOptions,
+)
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -66,13 +82,10 @@ class ExecutionRequest:
     """Holds the roots for an execution, which might have been requested by a user.
 
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
-
-    :param roots: Roots for this request.
-    :type roots: list of tuples of subject and product.
     """
 
-    roots: Any
-    native: Any
+    roots: tuple[Any, ...]
+    native: PyExecutionRequest
 
 
 class ExecutionError(Exception):
@@ -89,48 +102,45 @@ class Scheduler:
     def __init__(
         self,
         *,
-        native,
         ignore_patterns: List[str],
         use_gitignore: bool,
         build_root: str,
-        local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str],
         rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
+        local_store_options: LocalStoreOptions,
         executor: PyExecutor,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
         validate_reachability: bool = True,
     ) -> None:
         """
-        :param native: An instance of engine.native.Native.
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
-        :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param ca_certs_path: Path to pem file for custom CA, if needed.
         :param rules: A set of Rules which is used to compute values in the graph.
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
+        :param local_store_options: Options for the engine's LMDB store(s).
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
           is always a fatal error.
         """
-        self._native = native
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
+        self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
+        tasks = register_rules(rule_index, union_membership)
 
         # Create the native Scheduler and Session.
-        tasks = self._register_rules(rule_index, union_membership)
-
         types = PyTypes(
             file_digest=FileDigest,
             snapshot=Snapshot,
@@ -152,19 +162,56 @@ class Scheduler:
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
         )
+        remoting_options = PyRemotingOptions(
+            execution_enable=execution_options.remote_execution,
+            store_address=execution_options.remote_store_address,
+            execution_address=execution_options.remote_execution_address,
+            execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
+            instance_name=execution_options.remote_instance_name,
+            root_ca_certs_path=execution_options.remote_ca_certs_path,
+            store_headers=tuple(execution_options.remote_store_headers.items()),
+            store_chunk_bytes=execution_options.remote_store_chunk_bytes,
+            store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
+            store_rpc_retries=execution_options.remote_store_rpc_retries,
+            cache_warnings_behavior=execution_options.remote_cache_warnings.value,
+            cache_eager_fetch=execution_options.remote_cache_eager_fetch,
+            execution_extra_platform_properties=tuple(
+                tuple(pair.split("=", 1))
+                for pair in execution_options.remote_execution_extra_platform_properties
+            ),
+            execution_headers=tuple(execution_options.remote_execution_headers.items()),
+            execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
+        )
+        py_local_store_options = PyLocalStoreOptions(
+            store_dir=local_store_options.store_dir,
+            process_cache_max_size_bytes=local_store_options.processes_max_size_bytes,
+            files_max_size_bytes=local_store_options.files_max_size_bytes,
+            directories_max_size_bytes=local_store_options.directories_max_size_bytes,
+            lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
+            shard_count=local_store_options.shard_count,
+        )
+        exec_stategy_opts = PyExecutionStrategyOptions(
+            local_cache=execution_options.process_execution_local_cache,
+            remote_cache_read=execution_options.remote_cache_read,
+            remote_cache_write=execution_options.remote_cache_write,
+            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_parallelism=execution_options.process_execution_local_parallelism,
+            remote_parallelism=execution_options.process_execution_remote_parallelism,
+        )
 
-        self._scheduler = native.new_scheduler(
-            tasks=tasks,
-            build_root=build_root,
-            local_store_dir=local_store_dir,
-            local_execution_root_dir=local_execution_root_dir,
-            named_caches_dir=named_caches_dir,
-            ca_certs_path=ca_certs_path,
-            ignore_patterns=ignore_patterns,
-            use_gitignore=use_gitignore,
-            executor=executor,
-            execution_options=execution_options,
-            types=types,
+        self._py_scheduler = native_engine.scheduler_create(
+            executor,
+            tasks,
+            types,
+            build_root,
+            local_execution_root_dir,
+            named_caches_dir,
+            ca_certs_path,
+            ignore_patterns,
+            use_gitignore,
+            remoting_options,
+            py_local_store_options,
+            exec_stategy_opts,
         )
 
         # If configured, visualize the rule graph before asserting that it is valid.
@@ -173,74 +220,25 @@ class Scheduler:
             self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
         if validate_reachability:
-            self._native.lib.validate_reachability(self._scheduler)
+            native_engine.validate_reachability(self.py_scheduler)
 
-    def graph_trace(self, session, execution_request):
-        with temporary_file_path() as path:
-            self._native.lib.graph_trace(self._scheduler, session, execution_request, path)
-            with open(path, "r") as fd:
-                for line in fd.readlines():
-                    yield line.rstrip()
+    @property
+    def py_scheduler(self) -> PyScheduler:
+        return self._py_scheduler
 
-    def _to_params_list(self, subject_or_params):
+    def _to_params_list(self, subject_or_params: Any | Params) -> Sequence[Any]:
         if isinstance(subject_or_params, Params):
             return subject_or_params.params
         return [subject_or_params]
 
-    def _register_rules(self, rule_index: RuleIndex, union_membership: UnionMembership):
-        """Create a native Tasks object, and record the given RuleIndex on it."""
+    def visualize_rule_graph_to_file(self, filename: str) -> None:
+        native_engine.rule_graph_visualize(self.py_scheduler, filename)
 
-        tasks = self._native.new_tasks()
-
-        for rule in rule_index.rules:
-            self._register_task(tasks, rule, union_membership)
-        for query in rule_index.queries:
-            self._native.lib.tasks_query_add(
-                tasks,
-                query.output_type,
-                query.input_types,
-            )
-        return tasks
-
-    def _register_task(self, tasks, rule: TaskRule, union_membership: UnionMembership) -> None:
-        """Register the given TaskRule with the native scheduler."""
-        self._native.lib.tasks_task_begin(
-            tasks,
-            rule.func,
-            rule.output_type,
-            issubclass(rule.output_type, EngineAwareReturnType),
-            rule.cacheable,
-            rule.canonical_name,
-            rule.desc or "",
-            rule.level.level,
-        )
-        for selector in rule.input_selectors:
-            self._native.lib.tasks_add_select(tasks, selector)
-
-        def add_get_edge(product, subject):
-            self._native.lib.tasks_add_get(tasks, product, subject)
-
-        for the_get in rule.input_gets:
-            if union.is_instance(the_get.input_type):
-                # If the registered subject type is a union, add Get edges to all registered
-                # union members.
-                for union_member in union_membership.get(the_get.input_type):
-                    add_get_edge(the_get.output_type, union_member)
-            else:
-                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.output_type, the_get.input_type)
-
-        self._native.lib.tasks_task_end(tasks)
-
-    def visualize_graph_to_file(self, session, filename):
-        self._native.lib.graph_visualize(self._scheduler, session, filename)
-
-    def visualize_rule_graph_to_file(self, filename):
-        self._native.lib.rule_graph_visualize(self._scheduler, filename)
-
-    def visualize_rule_subgraph_to_file(self, filename, root_subject_types, product_type):
-        self._native.lib.rule_subgraph_visualize(
-            self._scheduler, root_subject_types, product_type, filename
+    def visualize_rule_subgraph_to_file(
+        self, filename: str, root_subject_types: list[type], product_type: type
+    ) -> None:
+        native_engine.rule_subgraph_visualize(
+            self.py_scheduler, root_subject_types, product_type, filename
         )
 
     def rule_graph_visualization(self):
@@ -250,7 +248,7 @@ class Scheduler:
                 for line in fd.readlines():
                     yield line.rstrip()
 
-    def rule_subgraph_visualization(self, root_subject_types, product_type):
+    def rule_subgraph_visualization(self, root_subject_types: list[type], product_type: type):
         with temporary_file_path() as path:
             self.visualize_rule_subgraph_to_file(path, root_subject_types, product_type)
             with open(path, "r") as fd:
@@ -259,109 +257,57 @@ class Scheduler:
 
     def rule_graph_consumed_types(
         self, root_subject_types: Sequence[Type], product_type: Type
-    ) -> Sequence[Type]:
-        return cast(
-            Sequence[Type],
-            self._native.lib.rule_graph_consumed_types(
-                self._scheduler, root_subject_types, product_type
-            ),
+    ) -> Sequence[type]:
+        return native_engine.rule_graph_consumed_types(
+            self.py_scheduler, root_subject_types, product_type
         )
 
-    def invalidate_files(self, direct_filenames):
-        # NB: Watchman no longer triggers events when children are created/deleted under a directory,
-        # so we always need to invalidate the direct parent as well.
+    def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
         filenames = set(direct_filenames)
+        # TODO(#11707): Evaluate removing the invalidation of parent directories.
         filenames.update(os.path.dirname(f) for f in direct_filenames)
-        return self._native.lib.graph_invalidate(self._scheduler, tuple(filenames))
+        return native_engine.graph_invalidate(self.py_scheduler, tuple(filenames))
 
-    def invalidate_all_files(self):
-        return self._native.lib.graph_invalidate_all_paths(self._scheduler)
+    def invalidate_all_files(self) -> int:
+        return native_engine.graph_invalidate_all_paths(self.py_scheduler)
 
-    def check_invalidation_watcher_liveness(self):
-        self._native.lib.check_invalidation_watcher_liveness(self._scheduler)
+    def check_invalidation_watcher_liveness(self) -> None:
+        native_engine.check_invalidation_watcher_liveness(self.py_scheduler)
 
-    def graph_len(self):
-        return self._native.lib.graph_len(self._scheduler)
+    def graph_len(self) -> int:
+        return native_engine.graph_len(self.py_scheduler)
 
-    def execution_add_root_select(self, execution_request, subject_or_params, product):
+    def execution_add_root_select(
+        self, execution_request: PyExecutionRequest, subject_or_params: Any | Params, product: type
+    ) -> None:
         params = self._to_params_list(subject_or_params)
-        self._native.lib.execution_add_root_select(
-            self._scheduler, execution_request, params, product
+        native_engine.execution_add_root_select(
+            self.py_scheduler, execution_request, params, product
         )
-
-    def execution_set_timeout(self, execution_request, timeout: float):
-        timeout_in_ms = int(timeout * 1000)
-        self._native.lib.execution_set_timeout(execution_request, timeout_in_ms)
-
-    def execution_set_poll(self, execution_request, poll: bool):
-        self._native.lib.execution_set_poll(execution_request, poll)
-
-    def execution_set_poll_delay(self, execution_request, poll_delay: float):
-        poll_delay_in_ms = int(poll_delay * 1000)
-        self._native.lib.execution_set_poll_delay(execution_request, poll_delay_in_ms)
 
     @property
-    def visualize_to_dir(self):
+    def visualize_to_dir(self) -> str | None:
         return self._visualize_to_dir
 
-    def _metrics(self, session):
-        return self._native.lib.scheduler_metrics(self._scheduler, session)
-
-    def poll_workunits(self, session, max_log_verbosity: LogLevel) -> PolledWorkunits:
-        result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._native.lib.session_poll_workunits(
-            self._scheduler, session, max_log_verbosity.level
-        )
-        return {"started": result[0], "completed": result[1]}
-
-    def get_observation_histograms(self, session):
-        return self._native.lib.session_get_observation_histograms(self._scheduler, session)
-
-    def record_test_observation(self, session, value: int) -> None:
-        self._native.lib.session_record_test_observation(self._scheduler, session, value)
-
-    def _run_and_return_roots(self, session, execution_request):
-        try:
-            raw_roots = self._native.lib.scheduler_execute(
-                self._scheduler,
-                session,
-                execution_request,
-            )
-        except self._native.lib.PollTimeout:
-            raise ExecutionTimeoutError("Timed out")
-
-        return [
-            Throw(
-                raw_root.result(),
-                python_traceback=raw_root.python_traceback(),
-                engine_traceback=raw_root.engine_traceback(),
-            )
-            if raw_root.is_throw()
-            else Return(raw_root.result())
-            for raw_root in raw_roots
-        ]
-
-    def lease_files_in_graph(self, session):
-        self._native.lib.lease_files_in_graph(self._scheduler, session)
-
     def garbage_collect_store(self, target_size_bytes: int) -> None:
-        self._native.lib.garbage_collect_store(self._scheduler, target_size_bytes)
+        native_engine.garbage_collect_store(self.py_scheduler, target_size_bytes)
 
     def new_session(
         self,
-        build_id,
+        build_id: str,
         dynamic_ui: bool = False,
-        session_values: Optional[SessionValues] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
-            self._native.new_session(
-                self._scheduler,
-                dynamic_ui,
-                build_id,
-                session_values or SessionValues(),
-                cancellation_latch or PySessionCancellationLatch(),
+            PySession(
+                scheduler=self.py_scheduler,
+                should_render_ui=dynamic_ui,
+                build_id=build_id,
+                session_values=session_values or SessionValues(),
+                cancellation_latch=cancellation_latch or PySessionCancellationLatch(),
             ),
         )
 
@@ -377,67 +323,62 @@ class SchedulerSession:
     Session.
     """
 
-    def __init__(self, scheduler, session):
+    def __init__(self, scheduler: Scheduler, session: PySession) -> None:
         self._scheduler = scheduler
-        self._session = session
-        self._run_count = 0
+        self._py_session = session
 
     @property
-    def scheduler(self):
+    def scheduler(self) -> Scheduler:
         return self._scheduler
 
     @property
-    def session(self):
-        return self._session
+    def py_scheduler(self) -> PyScheduler:
+        return self._scheduler.py_scheduler
 
-    def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
-        return cast(
-            PolledWorkunits, self._scheduler.poll_workunits(self._session, max_log_verbosity)
+    @property
+    def py_session(self) -> PySession:
+        return self._py_session
+
+    def isolated_shallow_clone(self) -> SchedulerSession:
+        return SchedulerSession(
+            self._scheduler, native_engine.session_isolated_shallow_clone(self._py_session)
         )
 
-    def graph_len(self):
-        return self._scheduler.graph_len()
+    def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
+        result = native_engine.session_poll_workunits(
+            self.py_scheduler, self.py_session, max_log_verbosity.level
+        )
+        return {"started": result[0], "completed": result[1]}
 
-    def new_run_id(self):
+    def new_run_id(self) -> None:
         """Assigns a new "run id" to this Session, without creating a new Session.
 
         Usually each Session corresponds to one end user "run", but there are exceptions: notably,
         the `--loop` feature uses one Session, but would like to observe new values for uncacheable
         nodes in each iteration of its loop.
         """
-        self._scheduler._native.lib.session_new_run_id(self._session)
+        native_engine.session_new_run_id(self.py_session)
 
-    def set_per_session(self):
-        """Assigns a new "run id" to this Session, without creating a new Session.
+    def visualize_graph_to_file(self, filename: str) -> None:
+        """Visualize a graph walk by writing graphviz `dot` output to a file."""
+        native_engine.graph_visualize(self.py_scheduler, self.py_session, filename)
 
-        Usually each Session corresponds to one end user "run", but there are exceptions: notably,
-        the `--loop` feature uses one Session, but would like to observe new values for uncacheable
-        nodes in each iteration of its loop.
-        """
-        self._scheduler._native.lib.session_new_run_id(self._session)
-
-    def visualize_graph_to_file(self, filename):
-        """Visualize a graph walk by writing graphviz `dot` output to a file.
-
-        :param str filename: The filename to output the graphviz output to.
-        """
-        self._scheduler.visualize_graph_to_file(self._session, filename)
-
-    def visualize_rule_graph_to_file(self, filename):
+    def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
 
     def execution_request(
         self,
-        products: Sequence[Type],
-        subjects: Sequence[Union[Any, Params]],
+        products: Sequence[type],
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        poll_delay: Optional[float] = None,
-        timeout: Optional[float] = None,
+        poll_delay: float | None = None,
+        timeout: float | None = None,
     ) -> ExecutionRequest:
         """Create and return an ExecutionRequest for the given products and subjects.
 
-        The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
-        and so it will not be directly usable with other scheduler instances without being re-created.
+        The resulting ExecutionRequest object will contain keys tied to this scheduler's product
+        Graph, and so it will not be directly usable with other scheduler instances without being
+        re-created.
 
         NB: This method does a "cross product", mapping all subjects to all products.
 
@@ -452,59 +393,72 @@ class SchedulerSession:
         :returns: An ExecutionRequest for the given products and subjects.
         """
         request_specs = tuple((s, p) for s in subjects for p in products)
-        native_execution_request = self._scheduler._native.new_execution_request()
+        native_execution_request = PyExecutionRequest(
+            poll=poll,
+            poll_delay_in_ms=int(poll_delay * 1000) if poll_delay else None,
+            timeout_in_ms=int(timeout * 1000) if timeout else None,
+        )
         for subject, product in request_specs:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        if timeout:
-            self._scheduler.execution_set_timeout(native_execution_request, timeout)
-        if poll_delay:
-            self._scheduler.execution_set_poll_delay(native_execution_request, poll_delay)
-        self._scheduler.execution_set_poll(native_execution_request, poll)
         return ExecutionRequest(request_specs, native_execution_request)
 
-    def invalidate_files(self, direct_filenames):
+    def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
         """Invalidates the given filenames in an internal product Graph instance."""
         invalidated = self._scheduler.invalidate_files(direct_filenames)
         self._maybe_visualize()
         return invalidated
 
-    def invalidate_all_files(self):
+    def invalidate_all_files(self) -> int:
         """Invalidates all filenames in an internal product Graph instance."""
         invalidated = self._scheduler.invalidate_all_files()
         self._maybe_visualize()
         return invalidated
 
-    def node_count(self):
-        return self._scheduler.graph_len()
-
-    def metrics(self) -> Dict[str, int]:
+    def metrics(self) -> dict[str, int]:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
-        return cast(Dict[str, int], self._scheduler._metrics(self._session))
+        return native_engine.scheduler_metrics(self.py_scheduler, self.py_session)
 
-    def _maybe_visualize(self):
+    def _maybe_visualize(self) -> None:
         if self._scheduler.visualize_to_dir is not None:
-            name = f"graph.{self._run_count:03d}.dot"
-            self._run_count += 1
+            # TODO: This increment-and-get is racey.
+            name = f"graph.{self._scheduler._visualize_run_count:03d}.dot"
+            self._scheduler._visualize_run_count += 1
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
     def teardown_dynamic_ui(self) -> None:
-        native_engine.teardown_dynamic_ui(self._scheduler._scheduler, self._session)
+        native_engine.teardown_dynamic_ui(self.py_scheduler, self.py_session)
 
-    def execute(self, execution_request: ExecutionRequest):
+    def execute(
+        self, execution_request: ExecutionRequest
+    ) -> tuple[tuple[tuple[Any, Return], ...], tuple[tuple[Any, Throw], ...]]:
         """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
 
         :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
         """
         start_time = time.time()
-        roots = list(
-            zip(
-                execution_request.roots,
-                self._scheduler._run_and_return_roots(self._session, execution_request.native),
-            ),
-        )
+        try:
+            raw_roots = native_engine.scheduler_execute(
+                self.py_scheduler,
+                self.py_session,
+                execution_request.native,
+            )
+        except native_engine.PollTimeout:
+            raise ExecutionTimeoutError("Timed out")
+
+        states = [
+            Throw(
+                raw_root.result(),
+                python_traceback=raw_root.python_traceback(),
+                engine_traceback=raw_root.engine_traceback(),
+            )
+            if raw_root.is_throw()
+            else Return(raw_root.result())
+            for raw_root in raw_roots
+        ]
+
+        roots = list(zip(execution_request.roots, states))
 
         self._maybe_visualize()
-
         logger.debug(
             "computed %s nodes in %f seconds. there are %s total nodes.",
             len(roots),
@@ -512,11 +466,11 @@ class SchedulerSession:
             self._scheduler.graph_len(),
         )
 
-        returns = tuple((root, state) for root, state in roots if type(state) is Return)
-        throws = tuple((root, state) for root, state in roots if type(state) is Throw)
-        return cast(Tuple[Tuple[Return, ...], Tuple[Throw, ...]], (returns, throws))
+        returns = tuple((root, state) for root, state in roots if isinstance(state, Return))
+        throws = tuple((root, state) for root, state in roots if isinstance(state, Throw))
+        return returns, throws
 
-    def _raise_on_error(self, throws: List[Throw]) -> NoReturn:
+    def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
 
         if self._scheduler.include_trace_on_error:
@@ -544,10 +498,10 @@ class SchedulerSession:
 
     def run_goal_rule(
         self,
-        product: Type,
+        product: type[Goal],
         subject: Params,
         poll: bool = False,
-        poll_delay: Optional[float] = None,
+        poll_delay: float | None = None,
     ) -> int:
         """
         :param product: A Goal subtype.
@@ -575,11 +529,11 @@ class SchedulerSession:
 
     def product_request(
         self,
-        product: Type,
-        subjects: Sequence[Union[Any, Params]],
+        product: type,
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        timeout: Optional[float] = None,
-    ):
+        timeout: float | None = None,
+    ) -> list:
         """Executes a request for a single product for some subjects, and returns the products.
 
         :param product: A product type for the request.
@@ -601,35 +555,24 @@ class SchedulerSession:
 
     def capture_snapshots(
         self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
-    ) -> Tuple[Snapshot, ...]:
+    ) -> tuple[Snapshot, ...]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
         This is a blocking operation, and should be avoided where possible.
         """
-        return cast(
-            Tuple[Snapshot, ...],
-            self._scheduler._native.lib.capture_snapshots(
-                self._scheduler._scheduler,
-                self._session,
-                _PathGlobsAndRootCollection(path_globs_and_roots),
-            ),
+        return native_engine.capture_snapshots(
+            self.py_scheduler,
+            self.py_session,
+            _PathGlobsAndRootCollection(path_globs_and_roots),
         )
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
-        sched_pointer = self._scheduler._scheduler
-        return cast(
-            Tuple[bytes, ...],
-            tuple(
-                self._scheduler._native.lib.single_file_digests_to_bytes(
-                    sched_pointer, list(digests)
-                )
-            ),
-        )
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
+        return tuple(native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests)))
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
-    ) -> Tuple[DigestContents, ...]:
+    ) -> tuple[DigestContents, ...]:
         """For each input `Snapshot`, yield a single `DigestContents` containing all the
         `FileContent`s corresponding to the file(s) contained within that `Snapshot`.
 
@@ -637,25 +580,18 @@ class SchedulerSession:
         each snapshot needs to yield a separate `DigestContents`.
         """
         return tuple(
-            cast(DigestContents, self.product_request(DigestContents, [snapshot.digest])[0])
-            for snapshot in snapshots
+            self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
         )
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
-        sched_pointer = self._scheduler._scheduler
-        self._scheduler._native.lib.ensure_remote_has_recursive(sched_pointer, list(digests))
+        native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
     def run_local_interactive_process(
-        self, request: "InteractiveProcess"
+        self, request: InteractiveProcess
     ) -> InteractiveProcessResult:
-        sched_pointer = self._scheduler._scheduler
-        session_pointer = self._session
-        result: "InteractiveProcessResult" = (
-            self._scheduler._native.lib.run_local_interactive_process(
-                sched_pointer, session_pointer, request
-            )
+        return native_engine.run_local_interactive_process(
+            self.py_scheduler, self.py_session, request
         )
-        return result
 
     def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
         """Write a digest to disk, relative to the build root."""
@@ -664,18 +600,61 @@ class SchedulerSession:
                 f"The `path_prefix` {path_prefix} must be a relative path, as the engine writes "
                 "the digest relative to the build root."
             )
-        self._scheduler._native.lib.write_digest(
-            self._scheduler._scheduler, self._session, digest, path_prefix or ""
-        )
+        native_engine.write_digest(self.py_scheduler, self.py_session, digest, path_prefix or "")
 
-    def lease_files_in_graph(self):
-        self._scheduler.lease_files_in_graph(self._session)
+    def lease_files_in_graph(self) -> None:
+        native_engine.lease_files_in_graph(self.py_scheduler, self.py_session)
 
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
 
-    def get_observation_histograms(self):
-        return self._scheduler.get_observation_histograms(self._session)
+    def get_observation_histograms(self) -> dict:
+        return native_engine.session_get_observation_histograms(self.py_scheduler, self.py_session)
 
     def record_test_observation(self, value: int) -> None:
-        self._scheduler.record_test_observation(self._session, value)
+        native_engine.session_record_test_observation(self.py_scheduler, self.py_session, value)
+
+
+def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
+    """Create a native Tasks object loaded with given RuleIndex."""
+    tasks = PyTasks()
+
+    def register_task(rule: TaskRule) -> None:
+        native_engine.tasks_task_begin(
+            tasks,
+            rule.func,
+            rule.output_type,
+            issubclass(rule.output_type, EngineAwareReturnType),
+            rule.cacheable,
+            rule.canonical_name,
+            rule.desc or "",
+            rule.level.level,
+        )
+
+        for selector in rule.input_selectors:
+            native_engine.tasks_add_select(tasks, selector)
+
+        def add_get_edge(product: type, subject: type) -> None:
+            native_engine.tasks_add_get(tasks, product, subject)
+
+        for the_get in rule.input_gets:
+            if union.is_instance(the_get.input_type):
+                # If the registered subject type is a union, add Get edges to all registered
+                # union members.
+                for union_member in union_membership.get(the_get.input_type):
+                    add_get_edge(the_get.output_type, union_member)
+            else:
+                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
+                add_get_edge(the_get.output_type, the_get.input_type)
+
+        native_engine.tasks_task_end(tasks)
+
+    for task_rule in rule_index.rules:
+        register_task(task_rule)
+    for query in rule_index.queries:
+        native_engine.tasks_add_query(
+            tasks,
+            query.output_type,
+            query.input_types,
+        )
+    return tasks

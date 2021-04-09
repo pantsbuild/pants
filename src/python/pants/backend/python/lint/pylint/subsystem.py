@@ -7,9 +7,10 @@ from typing import List, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 
 
 class Pylint(PythonToolBase):
@@ -55,7 +56,7 @@ class Pylint(PythonToolBase):
                 "example, if your plugin is at `build-support/pylint/custom_plugin.py`, add "
                 "'build-support/pylint' to `[source].root_patterns` in `pants.toml`. This is "
                 "necessary for Pants to know how to tell Pylint to discover your plugin. See "
-                f"{docs_url('source-roots')}\n\nYou must also set `load-plugins=$module_name` in "
+                f"{bracketed_docs_url('source-roots')}\n\nYou must also set `load-plugins=$module_name` in "
                 "your Pylint config file, and set the `[pylint].config` option in `pants.toml`."
                 "\n\nWhile your plugin's code can depend on other first-party code and third-party "
                 "requirements, all first-party dependencies of the plugin must live in the same "
@@ -76,6 +77,15 @@ class Pylint(PythonToolBase):
     @property
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=["pylintrc", ".pylinrc"],
+            check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
+            option_name=f"[{self.options_scope}].config",
+        )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

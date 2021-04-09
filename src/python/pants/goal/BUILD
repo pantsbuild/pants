@@ -3,4 +3,4 @@
 
 python_library()
 python_tests(name='tests', sources=["*_test.py", "!*_integration_test.py"])
-python_integration_tests(name="integration", uses_pants_run=True, timeout=120)
+python_tests(name="integration", sources=["*_integration_test.py"], timeout=120)

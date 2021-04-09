@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-bytes = "0.5"
+bytes = "1.0"
 clap = "2"
 env_logger = "0.5.4"
 grpc_util = { path = "../../grpc_util" }
@@ -15,12 +15,12 @@ fs = { path = ".." }
 futures = "0.3"
 hashing = { path = "../../hashing" }
 parking_lot = "0.11"
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-rand = "0.6"
+prost = "0.7"
+rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-tokio = { version = "0.2.23", features = ["rt-threaded", "macros"] }
+tokio = { version = "1.4", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../../workunit_store" }
