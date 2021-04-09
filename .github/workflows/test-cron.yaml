@@ -244,6 +244,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 40
   lint_python:
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
@@ -317,6 +318,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 30
   test_python_linux:
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
@@ -390,6 +392,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 45
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
@@ -465,6 +468,7 @@ jobs:
       matrix:
         python-version:
         - '3.8'
+    timeout-minutes: 20
 name: Daily Extended Python Testing
 'on':
   schedule:
