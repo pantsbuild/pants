@@ -416,6 +416,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                                 '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
                             ),
                         },
+                        setup_toolchain_auth(),
                         build_wheels_step(is_macos=False),
                         deploy_to_s3_step,
                     ],
@@ -426,6 +427,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "timeout-minutes": 60,
                     "steps": [
                         *checkout(),
+                        setup_toolchain_auth(),
                         expose_all_pythons(),
                         # NB: We only cache Rust, but not `native_engine.so` and the Pants
                         # virtualenv. This is because we must build both these things with Python

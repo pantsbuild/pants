@@ -282,6 +282,11 @@ jobs:
     - name: Expose Pythons
       run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin"
         >> $GITHUB_ENV
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -324,6 +329,11 @@ jobs:
         echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
 
         echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
     - name: Expose Pythons
