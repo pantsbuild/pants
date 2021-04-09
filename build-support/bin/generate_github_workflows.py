@@ -293,7 +293,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "timeout-minutes": 60,
+            "timeout-minutes": 30,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -310,7 +310,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "timeout-minutes": 60,
+            "timeout-minutes": 30,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -353,7 +353,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": MACOS_ENV,
-            "timeout-minutes": 60,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -363,7 +363,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 native_engine_so_download(),
                 {
                     "name": "Run Python tests",
-                    "timeout-minutes": 40,
+                    "timeout-minutes": 20,
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
                 upload_log_artifacts(name="python-test-macos"),
@@ -406,7 +406,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Build wheels and fs_util (Linux)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "timeout-minutes": 40,
+                    "timeout-minutes": 70,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -425,7 +425,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 "build_wheels_macos": {
                     "name": "Build wheels and fs_util (macOS)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 40,
+                    "timeout-minutes": 60,
                     "steps": [
                         *checkout(),
                         expose_all_pythons(),

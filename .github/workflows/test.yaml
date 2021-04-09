@@ -299,7 +299,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 40
+    timeout-minutes: 70
   build_wheels_macos:
     name: Build wheels and fs_util (macOS)
     runs-on: macos-10.15
@@ -373,7 +373,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 40
+    timeout-minutes: 60
   lint_python:
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
@@ -448,7 +448,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 30
   test_python_linux:
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
@@ -523,7 +523,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 30
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
@@ -590,7 +590,7 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
-      timeout-minutes: 40
+      timeout-minutes: 20
     - name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
@@ -600,7 +600,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 40
 name: Pull Request CI
 'on':
 - push
