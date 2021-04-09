@@ -104,11 +104,14 @@ impl CommandRunner {
     )
     .parse());
 
+    log::info!("output_globs: {:?}", output_globs);
+
     Box::pin(async move {
       let path_stats = posix_fs
         .expand_globs(output_globs, None)
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
+      log::info!("path_stats: {:?}", path_stats);
       Snapshot::from_path_stats(
         store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs),

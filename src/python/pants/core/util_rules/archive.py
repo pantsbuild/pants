@@ -196,13 +196,13 @@ async def maybe_extract_archive(
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
 
-        tar_version = await Get(
-            ProcessResult,
-            Process(
-                [tar_binary.path, "--version"], description="Version for tar", level=LogLevel.DEBUG
-            ),
-        )
-        logger.info(f"tar version: {tar_version.stdout.decode()}")
+        # tar_version = await Get(
+        #     ProcessResult,
+        #     Process(
+        #         [tar_binary.path, "--version"], description="Version for tar", level=LogLevel.DEBUG
+        #     ),
+        # )
+        # logger.info(f"tar version: {tar_version.stdout.decode()}")
     else:
         return ExtractedArchive(digest)
 
