@@ -10,7 +10,4 @@ def target_types():
 
 
 def rules():
-    # TODO: Restore Shell dep inference once Tar extraction is not flaky in CI, as the
-    #  implementation uses Shellcheck.
-    # return [*dependency_inference.rules(), *tailor.rules(), *shunit2_test_runner.rules()]
     return [*tailor.rules(), *shunit2_test_runner.rules()]
