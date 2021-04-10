@@ -293,7 +293,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "timeout-minutes": 45,
+            "timeout-minutes": 60,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
