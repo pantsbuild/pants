@@ -14,7 +14,7 @@ backend_packages.add = [
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
-  "pants.backend.shell.lint.shellcheck",
+#  "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
   "internal_plugins.releases",
 ]
@@ -90,8 +90,8 @@ config = ["pyproject.toml"]
 config = "build-support/mypy/mypy.ini"
 source_plugins = ["pants-plugins/mypy_plugins"]
 
-[shellcheck]
-args = ["--external-sources"]
+#[shellcheck]
+#args = ["--external-sources"]
 
 [shfmt]
 # See https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd#printer-flags.
