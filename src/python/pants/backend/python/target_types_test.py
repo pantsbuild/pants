@@ -338,35 +338,74 @@ def test_parse_requirements_file() -> None:
     }
 
 
-def test_python_distribution_dependency_injection() -> None:
+def test_inject_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
             inject_python_distribution_dependencies,
+            *import_rules(),
             QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
         ],
-        target_types=[PythonDistribution, PexBinary],
+        target_types=[PythonDistribution, PythonRequirementLibrary, PythonLibrary, PexBinary],
         objects={"setup_py": PythonArtifact},
     )
     rule_runner.add_to_build_file(
-        "project",
+        "",
         dedent(
             """\
-            pex_binary(name="my_binary")
-            python_distribution(
-                name="dist",
-                provides=setup_py(
-                    name='my-dist'
-                ).with_binaries({"my_cmd": ":my_binary"})
+            python_requirement_library(
+                name='ansicolors',
+                requirements=['ansicolors'],
+                module_mapping={'ansicolors': ['colors']},
             )
             """
         ),
     )
-    tgt = rule_runner.get_target(Address("project", target_name="dist"))
-    injected = rule_runner.request(
-        InjectedDependencies,
-        [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
+    rule_runner.create_file("project/app.py")
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            pex_binary(name="my_binary", entry_point="who_knows.module")
+            python_distribution(
+                name="dist-a",
+                provides=setup_py(
+                    name='my-dist-a'
+                ).with_binaries({"my_cmd": ":my_binary"})
+            )
+
+            python_library(name="my_library", sources=["app.py"])
+            python_distribution(
+                name="dist-b",
+                provides=setup_py(
+                    name="my-dist-b"
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "b_cmd": "project.app:main"
+                    }
+                },
+            )
+            """
+        ),
     )
-    assert injected == InjectedDependencies([Address("project", target_name="my_binary")])
+
+    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+        tgt = rule_runner.get_target(address)
+        injected = rule_runner.request(
+            InjectedDependencies,
+            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
+        )
+        assert injected == InjectedDependencies([expected] if expected else [])
+
+    assert_injected(
+        Address("project", target_name="dist-a"),
+        expected=Address("project", target_name="my_binary"),
+    )
+
+    assert_injected(
+        Address("project", target_name="dist-b"),
+        expected=Address("project", relative_file_path="app.py", target_name="my_library"),
+    )
 
 
 @pytest.mark.parametrize(

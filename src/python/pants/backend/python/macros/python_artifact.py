@@ -72,8 +72,7 @@ class PythonArtifact:
 
     @deprecated(
         "2.6.0dev0",
-        """Use `python_distribution(entry_points={'console_scripts':{'<name>': '<entry
-point>'}})` instead of
+        """Use `python_distribution(entry_points={...})` instead of
 `python_distribution(provides=setup_py().with_binaries(...))`.
 
 The syntax for entry points must follow that of setuptools, and is specified as
@@ -81,13 +80,24 @@ follows:
 
     <name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]
 
-Example:
+Example migration, before:
 
-    entry_points={
-      'console_scripts': {
-        'my_command': 'my.library.bin:main'
-      }
-    }
+    pex_binary(name="my_library_bin", entry_point="my.library.bin:main")
+
+    python_distribution(
+        provides=setup_py(...).with_binaries({'my_command': ':my_library_bin'})
+    )
+
+after:
+
+    python_distribution(
+        provides=setup_py(...),
+        entry_points={
+            'console_scripts': {
+                'my_command': 'my.library.bin:main'
+            }
+        }
+    )
 
 The entry point must now be provided explicitly and are not derived from a
 `pex_binary` target.
