@@ -146,6 +146,7 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             'a.b.c.d.e.f.g.Baz',
             'a.b_c.d._bar',
             'a.b2.c.D',
+            'a.b.c_狗',
 
             # Invalid strings
             '..a.b.c.d',
@@ -176,6 +177,7 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             "a.b.c.d.e.f.g.Baz",
             "a.b_c.d._bar",
             "a.b2.c.D",
+            "a.b.c_狗",
         ],
     )
 
@@ -198,6 +200,7 @@ def test_gracefully_handle_no_sources(rule_runner: RuleRunner) -> None:
 def test_works_with_python2(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
+        # -*- coding: utf-8 -*-
         print "Python 2 lives on."
 
         import demo
@@ -208,6 +211,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
+        importlib.import_module(u"dep.from.str_狗")
         """
     )
     assert_imports_parsed(
@@ -220,7 +224,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
             "pkg_resources",
             "treat.as.a.regular.import.not.a.string.import",
         ],
-        expected_string=["dep.from.bytes", "dep.from.str"],
+        expected_string=["dep.from.bytes", "dep.from.str", "dep.from.str_狗"],
     )
 
 
