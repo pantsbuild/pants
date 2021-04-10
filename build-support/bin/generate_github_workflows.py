@@ -51,6 +51,8 @@ DONT_SKIP_WHEELS = (
 )
 
 
+# NB: This overrides `pants.ci.toml`.
+DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
 # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
 # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
 MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
@@ -254,6 +256,8 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),

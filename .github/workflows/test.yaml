@@ -8,6 +8,9 @@ env:
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -122,6 +125,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+    timeout-minutes: 40
 name: Pull Request CI
 'on':
 - push

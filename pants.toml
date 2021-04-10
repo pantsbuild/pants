@@ -45,8 +45,8 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
-# NB: Users must still set `--remote-cache-read --remote-cache-write` to enable this all.
-remote_store_address = "grpcs://build.toolchain.com:443"
+# NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
+remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
