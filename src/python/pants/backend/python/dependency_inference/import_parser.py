@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
     # See below for where we explicitly decode.
-    buffer = sys.sydout if sys.version_info[0:2] == (2,7) else sys.stdout.buffer
+    buffer = sys.stdout if sys.version_info[0:2] == (2,7) else sys.stdout.buffer
     buffer.write("\\n".join(sorted(explicit_imports)).encode("utf8"))
     buffer.write(b"\\n--\\n")
     buffer.write("\\n".join(sorted(string_imports)).encode("utf8"))
