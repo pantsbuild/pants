@@ -126,9 +126,12 @@ if __name__ == "__main__":
         explicit_imports.update(visitor.explicit_imports)
         string_imports.update(visitor.string_imports)
 
-    print("\\n".join(sorted(explicit_imports)))
-    print("\\n--")
-    print("\\n".join(sorted(string_imports)))
+    # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
+    # See below for where we explicitly decode.
+    buffer = sys.sydout if sys.version_info[0:2] == (2,7) else sys.stdout.buffer
+    buffer.write("\\n".join(sorted(explicit_imports)).encode("utf8"))
+    buffer.write(b"\\n--\\n")
+    buffer.write("\\n".join(sorted(string_imports)).encode("utf8"))
 """
 
 
@@ -178,7 +181,9 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
             level=LogLevel.DEBUG,
         ),
     )
-    explicit_imports, _, string_imports = process_result.stdout.decode().partition("--")
+    # See above for where we explicitly encoded as utf8. Even though utf8 is the
+    # default for decode(), we make that explicit here for emphasis.
+    explicit_imports, _, string_imports = process_result.stdout.decode("utf8").partition("--")
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(explicit_imports.strip().splitlines()),
         string_imports=FrozenOrderedSet(string_imports.strip().splitlines()),
