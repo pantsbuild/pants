@@ -51,6 +51,8 @@ DONT_SKIP_WHEELS = (
 )
 
 
+# NB: This overrides `pants.ci.toml`.
+DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
 # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
 # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
 MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
@@ -254,6 +256,8 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -328,6 +332,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "steps": [
                 *checkout(),
@@ -404,7 +409,8 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Build wheels and fs_util (Linux)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "timeout-minutes": 70,
+                    "timeout-minutes": 65,
+                    "env": DISABLE_REMOTE_CACHE_ENV,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -423,7 +429,8 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                 "build_wheels_macos": {
                     "name": "Build wheels and fs_util (macOS)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 60,
+                    "timeout-minutes": 65,
+                    "env": DISABLE_REMOTE_CACHE_ENV,
                     "steps": [
                         *checkout(),
                         expose_all_pythons(),
