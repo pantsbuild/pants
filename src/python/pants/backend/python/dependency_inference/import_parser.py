@@ -30,7 +30,7 @@ import sys
 
 # This regex is used to infer imports from strings, e.g.
 #  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){2,}[a-zA-Z_]\\w*$")
+STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){2,}[a-zA-Z_]\\w*$", re.UNICODE)
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts):
