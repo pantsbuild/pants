@@ -108,17 +108,91 @@ jobs:
 
         '
     - name: Run smoke tests
-      run: './pants list ::
+      run: '# ./pants list ::
 
-        ./pants roots
+        # ./pants roots
 
-        ./pants help goals
+        # ./pants help goals
 
-        ./pants help targets
+        # ./pants help targets
 
-        ./pants help subsystems
+        # ./pants help subsystems
 
-        ./pants debug
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
+
+        ./pants --no-process-execution-local-cache --no-pantsd debug
 
         '
     strategy:

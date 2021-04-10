@@ -268,12 +268,49 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     "name": "Run smoke tests",
                     "run": dedent(
                         """\
-                        ./pants list ::
-                        ./pants roots
-                        ./pants help goals
-                        ./pants help targets
-                        ./pants help subsystems
-                        ./pants debug
+                        # ./pants list ::
+                        # ./pants roots
+                        # ./pants help goals
+                        # ./pants help targets
+                        # ./pants help subsystems
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
+                        ./pants --no-process-execution-local-cache --no-pantsd debug
                         """
                     ),
                 },
