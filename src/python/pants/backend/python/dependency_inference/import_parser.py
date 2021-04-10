@@ -30,7 +30,7 @@ import sys
 
 # This regex is used to infer imports from strings, e.g.
 #  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){2,}[a-zA-Z_]\\w*$")
+STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){2,}[a-zA-Z_]\\w*$", re.UNICODE)
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts):
@@ -126,9 +126,12 @@ if __name__ == "__main__":
         explicit_imports.update(visitor.explicit_imports)
         string_imports.update(visitor.string_imports)
 
-    print("\\n".join(sorted(explicit_imports)))
-    print("\\n--")
-    print("\\n".join(sorted(string_imports)))
+    # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
+    # See below for where we explicitly decode.
+    buffer = sys.stdout if sys.version_info[0:2] == (2,7) else sys.stdout.buffer
+    buffer.write("\\n".join(sorted(explicit_imports)).encode("utf8"))
+    buffer.write(b"\\n--\\n")
+    buffer.write("\\n".join(sorted(string_imports)).encode("utf8"))
 """
 
 
@@ -178,7 +181,9 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
             level=LogLevel.DEBUG,
         ),
     )
-    explicit_imports, _, string_imports = process_result.stdout.decode().partition("--")
+    # See above for where we explicitly encoded as utf8. Even though utf8 is the
+    # default for decode(), we make that explicit here for emphasis.
+    explicit_imports, _, string_imports = process_result.stdout.decode("utf8").partition("--")
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(explicit_imports.strip().splitlines()),
         string_imports=FrozenOrderedSet(string_imports.strip().splitlines()),
