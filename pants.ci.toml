@@ -9,8 +9,8 @@ remote_cache_write = true
 # We want to continue to get logs when remote caching errors.
 remote_cache_warnings = "backoff"
 
-[stats]
-log = true
+#[stats]
+#log = true
 
 [test]
 use_coverage = true
