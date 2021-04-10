@@ -118,81 +118,67 @@ jobs:
 
         # ./pants help subsystems
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
-
-        ./pants --no-process-execution-local-cache --no-pantsd debug
+        ./pants lint ::
 
         '
     strategy:
