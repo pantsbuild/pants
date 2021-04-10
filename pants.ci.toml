@@ -7,20 +7,20 @@ dynamic_ui = false
 pantsd = false
 process_execution_local_cache = false
 
-[black]
-skip = true
-
-[flake8]
-skip = true
-
-[isort]
-skip = true
-
-[shfmt]
-skip = true
-
-[docformatter]
-skip = true
+#[black]
+#skip = true
+#
+#[flake8]
+#skip = true
+#
+#[isort]
+#skip = true
+#
+#[shfmt]
+#skip = true
+#
+#[docformatter]
+#skip = true
 
 remote_cache_read = true
 remote_cache_write = true
