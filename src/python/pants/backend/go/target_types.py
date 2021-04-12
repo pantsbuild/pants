@@ -36,6 +36,7 @@ class GoBinaryMainAddress(StringField):
     help = "Address of the main Go package for this binary."
 
 
+# TODO: This should register `OutputPathField` instead of `GoBinaryName`. (And then update build.py.)
 class GoBinary(Target):
     alias = "go_binary"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoBinaryName, GoBinaryMainAddress)
