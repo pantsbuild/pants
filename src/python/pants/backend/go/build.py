@@ -86,12 +86,11 @@ class EnrichGoLangDistributionRequest:
 
 @goal_rule
 async def run_go_build(targets: Targets) -> GoBuildGoal:
-    gets_for_targets = [
+    await MultiGet(
         Get(BuiltGoPackage, BuildGoPackageRequest(BuildGoPackageFieldSet.create(target)))
         for target in targets
         if BuildGoPackageFieldSet.is_applicable(target)
-    ]
-    _ = await MultiGet(gets_for_targets)
+    )
     return GoBuildGoal(exit_code=0)
 
 
