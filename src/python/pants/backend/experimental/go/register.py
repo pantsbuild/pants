@@ -1,8 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.experimental.golang import build, distribution, fmt, gofmt
-from pants.backend.experimental.golang.target_types import GoBinary, GoPackage
+from pants.backend.go import build, distribution, fmt, gofmt
+from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.engine.rules import collect_rules
 
 

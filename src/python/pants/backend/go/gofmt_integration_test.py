@@ -5,9 +5,9 @@ from typing import List, Sequence, Tuple
 
 import pytest
 
-from pants.backend.experimental.golang import fmt, gofmt
-from pants.backend.experimental.golang.gofmt import GofmtFieldSet, GofmtRequest
-from pants.backend.experimental.golang.target_types import GoBinary, GoPackage
+from pants.backend.go import fmt, gofmt
+from pants.backend.go.gofmt import GofmtFieldSet, GofmtRequest
+from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
@@ -103,7 +103,7 @@ def run_gofmt(
     *,
     skip: bool = False,
 ) -> Tuple[Sequence[LintResult], FmtResult]:
-    args = ["--backend-packages=pants.backend.experimental.golang"]
+    args = ["--backend-packages=pants.backend.go"]
     if skip:
         args.append("--gofmt-skip")
     rule_runner.set_options(args)

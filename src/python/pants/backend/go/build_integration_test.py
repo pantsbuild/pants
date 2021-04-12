@@ -5,9 +5,9 @@ from typing import Iterable, List
 
 import pytest
 
-from pants.backend.experimental.golang import build
-from pants.backend.experimental.golang.build import GoBinaryFieldSet
-from pants.backend.experimental.golang.target_types import GoBinary, GoPackage
+from pants.backend.go import build
+from pants.backend.go.build import GoBinaryFieldSet
+from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import external_tool, source_files
@@ -106,7 +106,7 @@ def build_package(
     rule_runner: RuleRunner,
     main_target: Target,
 ) -> BuiltPackage:
-    args = ["--backend-packages=pants.backend.experimental.golang"]
+    args = ["--backend-packages=pants.backend.go"]
     rule_runner.set_options(args)
     rule_runner.add_to_build_file(
         "", f"go_binary(name='bin', binary_name='foo', main='{main_target.address.spec}')\n"

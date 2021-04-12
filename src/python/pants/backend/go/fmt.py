@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Type
 
-from pants.backend.experimental.golang.target_types import GoSources
+from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

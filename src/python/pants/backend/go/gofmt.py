@@ -3,9 +3,9 @@
 import dataclasses
 from dataclasses import dataclass
 
-from pants.backend.experimental.golang.distribution import GoLangDistribution
-from pants.backend.experimental.golang.fmt import GoLangFmtRequest
-from pants.backend.experimental.golang.target_types import GoSources
+from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.fmt import GoLangFmtRequest
+from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool

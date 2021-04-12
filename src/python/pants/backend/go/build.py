@@ -6,13 +6,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Dict, List, Tuple
 
-from pants.backend.experimental.golang.distribution import GoLangDistribution
-from pants.backend.experimental.golang.target_types import (
-    GoBinaryMainAddress,
-    GoBinaryName,
-    GoImportPath,
-    GoSources,
-)
+from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.target_types import GoBinaryMainAddress, GoBinaryName, GoImportPath, GoSources
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
     BuiltPackage,

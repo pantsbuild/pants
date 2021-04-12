@@ -29,7 +29,7 @@ Areas for development:
 
 ```shell
 $ ./pants \
-  --backend-packages='pants.backend.experimental.golang' \
+  --backend-packages='pants.backend.experimental.go' \
   --build-ignore='-["/testprojects/src/go/**"]' \
   package \
   testprojects/src/go/pants_test::
