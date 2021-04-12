@@ -438,7 +438,7 @@ async fn make_tree_from_directory() {
   assert_eq!(child_dir.files.len(), 1);
   assert_eq!(child_dir.directories.len(), 0);
   let file_node = &child_dir.files[0];
-  assert_eq!(file_node.name, "roland");
+  assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
@@ -483,21 +483,21 @@ async fn extract_output_file() {
 
   let file_node = crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
-    RelativePath::new("cats/roland").unwrap(),
+    RelativePath::new("cats/roland.ext").unwrap(),
     &store,
   )
   .await
   .unwrap()
   .unwrap();
 
-  assert_eq!(file_node.name, "roland");
+  assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Extract non-existent files to make sure that Ok(None) is returned.
   let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
-    RelativePath::new("animals").unwrap(),
+    RelativePath::new("animals.ext").unwrap(),
     &store,
   )
   .await
