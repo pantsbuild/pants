@@ -424,6 +424,8 @@ async fn make_tree_from_directory() {
   .unwrap()
   .unwrap();
 
+  // Note that we do not store the `pets/` prefix in the Tree, per the REAPI docs on
+  // `OutputDirectory`.
   let root_dir = tree.root.unwrap();
   assert_eq!(root_dir.files.len(), 0);
   assert_eq!(root_dir.directories.len(), 1);
@@ -492,37 +494,37 @@ async fn extract_output_file() {
   .unwrap()
   .unwrap();
 
+  // Note that the `FileNode` only stores the file name, but we will end up storing the full path
+  // in the final ActionResult.
   assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Extract non-existent files to make sure that Ok(None) is returned.
-  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+  assert!(crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
     RelativePath::new("animals.ext").unwrap(),
     &store,
   )
   .await
-  .unwrap();
-  assert!(file_node_opt.is_none());
-
-  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+  .unwrap()
+  .is_none());
+  assert!(crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
     RelativePath::new("cats").unwrap(),
     &store,
   )
   .await
-  .unwrap();
-  assert!(file_node_opt.is_none());
-
-  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+  .unwrap()
+  .is_none());
+  assert!(crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
     RelativePath::new("cats/xyzzy").unwrap(),
     &store,
   )
   .await
-  .unwrap();
-  assert!(file_node_opt.is_none());
+  .unwrap()
+  .is_none());
 }
 
 #[tokio::test]
@@ -616,6 +618,26 @@ async fn make_action_result_basic() {
 
   let stderr_digest: Digest = action_result.stderr_digest.unwrap().try_into().unwrap();
   assert_eq!(stderr_digest, process_result.stderr_digest);
+
+  assert_eq!(action_result.output_files.len(), 1);
+  assert_eq!(
+    action_result.output_files[0],
+    remexec::OutputFile {
+      digest: Some(TestData::roland().digest().into()),
+      path: "pets/cats/roland.ext".to_owned(),
+      is_executable: false,
+      ..remexec::OutputFile::default()
+    }
+  );
+
+  assert_eq!(action_result.output_directories.len(), 1);
+  assert_eq!(
+    action_result.output_directories[0],
+    remexec::OutputDirectory {
+      path: "pets/cats".to_owned(),
+      tree_digest: Some(TestTree::roland_at_root().digest().into()),
+    }
+  );
 
   let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();
   let expected_digests_set = hashset! {
