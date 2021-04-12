@@ -1486,7 +1486,7 @@ async fn execute_missing_file_errors_if_unknown() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
         action_digest: hashing::Digest::new(
           hashing::Fingerprint::from_hex_string(
-            "d1bd04c0aaa56cf24a22d392d614929e9936da64d23d4e776bdb4b19023fc9c7",
+            "3174d44cc8d68ec5047f2da24a4db150ab0264a9d6558872081585696a98b410",
           )
           .unwrap(),
           144,
@@ -2371,7 +2371,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
 }
 
 pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
-  let argv = owned_string_vec(&["/bin/cat", "roland"]);
+  let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.input_files = TestDirectory::containing_roland().digest();
   process.timeout = one_second();

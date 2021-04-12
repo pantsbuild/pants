@@ -355,12 +355,15 @@ async fn jdk_symlink() {
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let roland = TestData::roland().bytes();
-  std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
-    .expect("Writing temporary file");
+  std::fs::write(
+    preserved_work_tmpdir.path().join("roland.ext"),
+    roland.clone(),
+  )
+  .expect("Writing temporary file");
 
-  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()]);
+  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland.ext".to_owned()]);
   process.timeout = one_second();
-  process.description = "cat roland".to_string();
+  process.description = "cat roland.ext".to_string();
   process.jdk_home = Some(preserved_work_tmpdir.path().to_path_buf());
 
   let result = run_command_locally(process).await.unwrap();
@@ -383,7 +386,7 @@ async fn test_directory_preservation() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
   // from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
@@ -423,7 +426,7 @@ async fn test_directory_preservation() {
   let subdirs = testutil::file::list_dir(&preserved_work_root);
   assert_eq!(subdirs.len(), 1);
 
-  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
+  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland.ext`
   let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
   assert!(&rolands_path.exists());
 
@@ -564,7 +567,7 @@ async fn working_directory() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
   // from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
