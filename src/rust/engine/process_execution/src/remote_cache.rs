@@ -310,7 +310,6 @@ impl CommandRunner {
       };
 
       let digest = require_digest(file_node.digest.as_ref())?;
-
       digests.insert(digest);
 
       action_result.output_files.push({

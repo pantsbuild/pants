@@ -1072,17 +1072,17 @@ async fn materialize_directory() {
     .await
     .expect("Error materializing");
 
-  assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats"]);
+  assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
   assert_eq!(
-    file_contents(&materialize_dir.path().join("treats")),
+    file_contents(&materialize_dir.path().join("treats.ext")),
     catnip.bytes()
   );
   assert_eq!(
     list_dir(&materialize_dir.path().join("cats")),
-    vec!["roland"]
+    vec!["roland.ext"]
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("cats").join("roland")),
+    file_contents(&materialize_dir.path().join("cats").join("roland.ext")),
     roland.bytes()
   );
 }
@@ -1110,17 +1110,20 @@ async fn materialize_directory_executable() {
     .await
     .expect("Error materializing");
 
-  assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
   assert_eq!(
-    file_contents(&materialize_dir.path().join("feed")),
+    list_dir(materialize_dir.path()),
+    vec!["feed.ext", "food.ext"]
+  );
+  assert_eq!(
+    file_contents(&materialize_dir.path().join("feed.ext")),
     catnip.bytes()
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("food")),
+    file_contents(&materialize_dir.path().join("food.ext")),
     catnip.bytes()
   );
-  assert!(is_executable(&materialize_dir.path().join("feed")));
-  assert!(!is_executable(&materialize_dir.path().join("food")));
+  assert!(is_executable(&materialize_dir.path().join("feed.ext")));
+  assert!(!is_executable(&materialize_dir.path().join("food.ext")));
 }
 
 #[tokio::test]
@@ -1171,12 +1174,12 @@ async fn contents_for_directory() {
     file_contents,
     vec![
       FileContent {
-        path: PathBuf::from("cats").join("roland"),
+        path: PathBuf::from("cats").join("roland.ext"),
         content: roland.bytes(),
         is_executable: false,
       },
       FileContent {
-        path: PathBuf::from("treats"),
+        path: PathBuf::from("treats.ext"),
         content: catnip.bytes(),
         is_executable: false,
       },
@@ -1413,7 +1416,7 @@ async fn materialize_directory_metadata_all_local() {
             metadata: local.clone(),
             child_directories: btreemap!{},
             child_files: btreemap!{
-              "roland".to_owned() => local.clone(),
+              "roland.ext".to_owned() => local.clone(),
             },
           }
         },
@@ -1472,7 +1475,7 @@ async fn materialize_directory_metadata_mixed() {
       .get("cats")
       .unwrap()
       .child_files
-      .get("roland")
+      .get("roland.ext")
       .unwrap()
   );
 }
@@ -1494,7 +1497,7 @@ async fn explicitly_overwrites_already_existing_file() {
   }
 
   let dir_to_write_to = tempfile::tempdir().unwrap();
-  let file_path: PathBuf = [dir_to_write_to.path(), Path::new("some_filename")]
+  let file_path: PathBuf = [dir_to_write_to.path(), Path::new("some_filename.ext")]
     .iter()
     .collect();
 
@@ -1504,7 +1507,7 @@ async fn explicitly_overwrites_already_existing_file() {
   assert_eq!(file_contents, b"XXX".to_vec());
 
   let cas_file = TestData::new("abc123");
-  let contents_dir = test_file_with_arbitrary_content("some_filename", &cas_file);
+  let contents_dir = test_file_with_arbitrary_content("some_filename.ext", &cas_file);
   let cas = StubCAS::builder()
     .directory(&contents_dir)
     .file(&cas_file)

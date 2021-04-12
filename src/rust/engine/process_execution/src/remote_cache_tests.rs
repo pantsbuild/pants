@@ -396,9 +396,8 @@ async fn make_tree_from_directory() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /pets/cats/roland. We will then extract varios pieces of it
+  // Prepare the store to contain /pets/cats/roland.ext. We will then extract various pieces of it
   // into Tree protos.
-
   store
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
@@ -438,28 +437,31 @@ async fn make_tree_from_directory() {
   assert_eq!(child_dir.files.len(), 1);
   assert_eq!(child_dir.directories.len(), 0);
   let file_node = &child_dir.files[0];
-  assert_eq!(file_node.name, "roland");
+  assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
-  // Test that extracting a non-existent output directory fails.
-  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-    directory_digest,
-    RelativePath::new("animals").unwrap(),
-    &store,
-  )
-  .await
-  .unwrap();
-  assert!(result.is_none());
-
-  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-    directory_digest,
-    RelativePath::new("pets/xyzzy").unwrap(),
-    &store,
-  )
-  .await
-  .unwrap();
-  assert!(result.is_none());
+  // Test that extracting non-existent output directories fails gracefully.
+  assert!(
+    crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+      directory_digest,
+      RelativePath::new("animals").unwrap(),
+      &store,
+    )
+    .await
+    .unwrap()
+    .is_none()
+  );
+  assert!(
+    crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+      directory_digest,
+      RelativePath::new("pets/xyzzy").unwrap(),
+      &store,
+    )
+    .await
+    .unwrap()
+    .is_none()
+  );
 }
 
 #[tokio::test]
@@ -483,21 +485,21 @@ async fn extract_output_file() {
 
   let file_node = crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
-    RelativePath::new("cats/roland").unwrap(),
+    RelativePath::new("cats/roland.ext").unwrap(),
     &store,
   )
   .await
   .unwrap()
   .unwrap();
 
-  assert_eq!(file_node.name, "roland");
+  assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Extract non-existent files to make sure that Ok(None) is returned.
   let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
     directory_digest,
-    RelativePath::new("animals").unwrap(),
+    RelativePath::new("animals.ext").unwrap(),
     &store,
   )
   .await
@@ -543,7 +545,6 @@ async fn make_action_result_basic() {
   }
 
   WorkunitStore::setup_for_tests();
-
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
@@ -552,22 +553,18 @@ async fn make_action_result_basic() {
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
     .expect("Error saving file bytes");
-
   store
     .store_file_bytes(TestData::robin().bytes(), false)
     .await
     .expect("Error saving file bytes");
-
   store
     .record_directory(&TestDirectory::containing_roland().directory(), true)
     .await
     .expect("Error saving directory");
-
   store
     .record_directory(&TestDirectory::nested().directory(), true)
     .await
     .expect("Error saving directory");
-
   let directory_digest = store
     .record_directory(&TestDirectory::double_nested().directory(), true)
     .await
@@ -593,7 +590,7 @@ async fn make_action_result_basic() {
 
   let command = remexec::Command {
     arguments: vec!["this is a test".into()],
-    output_files: vec!["pets/cats/roland".into()],
+    output_files: vec!["pets/cats/roland.ext".into()],
     output_directories: vec!["pets/cats".into()],
     ..Default::default()
   };
@@ -622,9 +619,9 @@ async fn make_action_result_basic() {
 
   let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();
   let expected_digests_set = hashset! {
-    TestData::roland().digest(),
-    TestData::robin().digest(),
-    TestTree::roland_at_root().digest(),
+    TestData::roland().digest(),  // stdout
+    TestData::robin().digest(),  // stderr
+    TestTree::roland_at_root().digest(),  // tree directory
   };
   assert_eq!(expected_digests_set, actual_digests_set);
 }

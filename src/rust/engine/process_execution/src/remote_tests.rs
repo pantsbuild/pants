@@ -73,7 +73,7 @@ async fn make_execute_request() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
@@ -98,7 +98,7 @@ async fn make_execute_request() {
         value: "value".to_owned(),
       },
     ],
-    output_files: vec!["other/file".to_owned(), "path/to/file".to_owned()],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
     output_directories: vec!["directory/name".to_owned()],
     platform: Some(remexec::Platform::default()),
     ..Default::default()
@@ -108,10 +108,10 @@ async fn make_execute_request() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
+          "c426b29478ec1ddbd872fbfad63ae9151eb9196edcd1a10aa0aab3aa1b48eef8",
         )
         .unwrap(),
-        115,
+        123,
       ))
         .into(),
     ),
@@ -123,7 +123,7 @@ async fn make_execute_request() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "51cda3b6c18ddd47005162010e898b20faf842b3ba1a840d1a619bd962d53192",
+          "08ff4ee93b1f4ecabc2d1c4db2f39fe3d1e5946134bb3c4fd28ebde3adfe5f90",
         )
         .unwrap(),
         140,
@@ -150,7 +150,7 @@ async fn make_execute_request_with_instance_name() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
@@ -175,7 +175,7 @@ async fn make_execute_request_with_instance_name() {
         value: "value".to_owned(),
       },
     ],
-    output_files: vec!["other/file".to_owned(), "path/to/file".to_owned()],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
     output_directories: vec!["directory/name".to_owned()],
     platform: Some(remexec::Platform {
       properties: vec![remexec::platform::Property {
@@ -190,10 +190,10 @@ async fn make_execute_request_with_instance_name() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "ce536af7c6334e325a99507409535d50acf05338d4cbdd031425bdaa55a87d6d",
+          "8b13668dccc1e097765f49d69a3adc16a456473a2989fd3083d34df570a9bbb6",
         )
         .unwrap(),
-        144,
+        152,
       ))
         .into(),
     ),
@@ -206,7 +206,7 @@ async fn make_execute_request_with_instance_name() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "11cc69e6e2376c57a54a42db3d3dd22b2996a1527f976589d2d200623097b5c8",
+          "5e9f36c101d94b3e202e26720109c93cac5a80500aea521ea75f6080cda83fd6",
         )
         .unwrap(),
         141,
@@ -240,7 +240,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
@@ -269,7 +269,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
         value: "value".to_owned(),
       },
     ],
-    output_files: vec!["other/file".to_owned(), "path/to/file".to_owned()],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
     output_directories: vec!["directory/name".to_owned()],
     platform: Some(remexec::Platform::default()),
     ..Default::default()
@@ -282,10 +282,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "09e54a4817a36e164a0e395fac36091fd5b4aac185b8bafa90842ac4aff92a34",
+          "05f44898aa872b31e05dbcf869e3cde7ce4c6323a1eab0be219c7028a0740977",
         )
         .unwrap(),
-        152,
+        160,
       ))
         .into(),
     ),
@@ -297,7 +297,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "dc554a1ed77588e1bac90896dcfeba255f8178ebc01893231415841109216944",
+          "bb29e18376b3b5985191121ca36f4869bbed945b2023c0d599bd63b4eb5ade68",
         )
         .unwrap(),
         141,
@@ -362,7 +362,7 @@ async fn make_execute_request_with_jdk() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "f90182cd453f36577868fc05a605ac84c19882c18bd907ff241923d98a7bca1e",
+          "636ea0e298737fc5587d815b729e366780521958ef0ee89b7b38462d242de72c",
         )
         .unwrap(),
         140,
@@ -438,7 +438,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "190e7b28a9e32be6cb0beaad97d175c6882857991598de3585c91aec183b14b3",
+          "5cba7f37fe2e4c50d07d33a79d21b2bf20476509d1db6ac2b8a7a0281c7c620a",
         )
         .unwrap(),
         141,
@@ -477,7 +477,7 @@ async fn make_execute_request_with_timeout() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
@@ -502,7 +502,7 @@ async fn make_execute_request_with_timeout() {
         value: "value".to_owned(),
       },
     ],
-    output_files: vec!["other/file".to_owned(), "path/to/file".to_owned()],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
     output_directories: vec!["directory/name".to_owned()],
     platform: Some(remexec::Platform::default()),
     ..Default::default()
@@ -512,10 +512,10 @@ async fn make_execute_request_with_timeout() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
+          "c426b29478ec1ddbd872fbfad63ae9151eb9196edcd1a10aa0aab3aa1b48eef8",
         )
         .unwrap(),
-        115,
+        123,
       ))
         .into(),
     ),
@@ -528,7 +528,7 @@ async fn make_execute_request_with_timeout() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "151e4bfce1244eb7ae74ed09d8759088557d9c63fbaaa5fcca662998266f4b09",
+          "b57e5ef4f0e495ac95fe948397ce59fa6783c6b23dd56a49d543aebec1f91099",
         )
         .unwrap(),
         144,
@@ -1486,7 +1486,7 @@ async fn execute_missing_file_errors_if_unknown() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
         action_digest: hashing::Digest::new(
           hashing::Fingerprint::from_hex_string(
-            "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
+            "3174d44cc8d68ec5047f2da24a4db150ab0264a9d6558872081585696a98b410",
           )
           .unwrap(),
           144,
@@ -1553,7 +1553,7 @@ async fn extract_execute_response_success() {
             stdout_raw: wanted_stdout.clone(),
             stderr_raw: wanted_stderr.clone(),
             output_files: vec![remexec::OutputFile {
-              path: "cats/roland".into(),
+              path: "cats/roland.ext".into(),
               digest: Some((&TestData::roland().digest()).into()),
               is_executable: false,
               ..Default::default()
@@ -1846,7 +1846,7 @@ async fn extract_output_files_from_response_one_file() {
     result: Some(remexec::ActionResult {
       exit_code: 0,
       output_files: vec![remexec::OutputFile {
-        path: "roland".into(),
+        path: "roland.ext".into(),
         digest: Some((&TestData::roland().digest()).into()),
         is_executable: false,
         ..Default::default()
@@ -1869,13 +1869,13 @@ async fn extract_output_files_from_response_two_files_not_nested() {
       exit_code: 0,
       output_files: vec![
         remexec::OutputFile {
-          path: "roland".into(),
+          path: "roland.ext".into(),
           digest: Some((&TestData::roland().digest()).into()),
           is_executable: false,
           ..Default::default()
         },
         remexec::OutputFile {
-          path: "treats".into(),
+          path: "treats.ext".into(),
           digest: Some((&TestData::catnip().digest()).into()),
           is_executable: false,
           ..Default::default()
@@ -1899,13 +1899,13 @@ async fn extract_output_files_from_response_two_files_nested() {
       exit_code: 0,
       output_files: vec![
         remexec::OutputFile {
-          path: "cats/roland".into(),
+          path: "cats/roland.ext".into(),
           digest: Some((&TestData::roland().digest()).into()),
           is_executable: false,
           ..Default::default()
         },
         remexec::OutputFile {
-          path: "treats".into(),
+          path: "treats.ext".into(),
           digest: Some((&TestData::catnip().digest()).into()),
           is_executable: false,
           ..Default::default()
@@ -1946,15 +1946,15 @@ async fn extract_output_files_from_response_just_directory() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_directories_and_files() {
-  // /catnip
-  // /pets/cats/roland
-  // /pets/dogs/robin
+  // /treats.ext
+  // /pets/cats/roland.ext
+  // /pets/dogs/robin.ext
 
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
       output_files: vec![remexec::OutputFile {
-        path: "treats".into(),
+        path: "treats.ext".into(),
         digest: Some((&TestData::catnip().digest()).into()),
         ..Default::default()
       }],
@@ -1977,10 +1977,10 @@ async fn extract_output_files_from_response_directories_and_files() {
     extract_output_files_from_response(&execute_response).await,
     Ok(Digest::new(
       Fingerprint::from_hex_string(
-        "639b4b84bb58a9353d49df8122e7987baf038efe54ed035e67910846c865b1e2"
+        "b5e7010d8c5ef77b383fc60ea00bdfb4743dd6fa3983033b50f218ea90124d0d"
       )
       .unwrap(),
-      159
+      163
     ))
   )
 }
@@ -2371,7 +2371,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
 }
 
 pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
-  let argv = owned_string_vec(&["/bin/cat", "roland"]);
+  let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.input_files = TestDirectory::containing_roland().digest();
   process.timeout = one_second();
