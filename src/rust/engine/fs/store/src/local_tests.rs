@@ -308,7 +308,7 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
     .await
     .expect("Error storing");
   store
-    .shrink(80, ShrinkBehavior::Fast)
+    .shrink(84, ShrinkBehavior::Fast)
     .expect("Error shrinking");
   let mut entries = Vec::new();
   entries.push(
@@ -412,13 +412,12 @@ async fn garbage_collect_fail_because_too_many_leases() {
     .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
-
   store
     .store_bytes(EntryType::File, TestData::roland().bytes(), false)
     .await
     .expect("Error storing");
 
-  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
+  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(164));
 
   assert_eq!(
     load_bytes(&store, EntryType::File, forty_chars.digest()).await,
