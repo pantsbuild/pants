@@ -544,7 +544,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 45
+    timeout-minutes: 60
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
