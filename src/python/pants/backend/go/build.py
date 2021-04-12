@@ -31,6 +31,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -76,7 +77,7 @@ class GoBinaryFieldSet(PackageFieldSet):
 
 @dataclass(frozen=True)
 class EnrichedGoLangDistribution:
-    stdlib_packages: Dict[str, str]
+    stdlib_packages: FrozenDict[str, str]
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,7 @@ async def grok_goroot(
     if not packages:
         raise ValueError("Did not find any SDK packages in Go SDK")
 
-    return EnrichedGoLangDistribution(packages)
+    return EnrichedGoLangDistribution(FrozenDict(packages))
 
 
 @rule
