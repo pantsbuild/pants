@@ -25,7 +25,7 @@ from pants.util.strutil import pluralize
 
 class GofmtSubsystem(Subsystem):
     options_scope = "gofmt"
-    help = """Gofmt-specific options."""
+    help = "Gofmt-specific options."
 
     @classmethod
     def register_options(cls, register):

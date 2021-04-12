@@ -39,7 +39,7 @@ _logger = logging.getLogger(__name__)
 
 class GoBuildSubsystem(GoalSubsystem):
     name = "go-build"
-    help = """Compile Go targets that contain source code (i.e., `go_package`)."""
+    help = "Compile Go targets that contain source code (i.e., `go_package`)."
 
 
 class GoBuildGoal(Goal):

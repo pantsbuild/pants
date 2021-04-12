@@ -9,7 +9,7 @@ from pants.engine.rules import collect_rules
 class GoLangDistribution(TemplatedExternalTool):
     options_scope = "golang"
     name = "golang"
-    help = """Official golang distribution."""
+    help = "Official golang distribution."
 
     default_version = "1.15.5"
     default_known_versions = [
