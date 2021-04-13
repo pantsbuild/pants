@@ -1,5 +1,4 @@
 ansicolors==1.1.8
-beautifulsoup4>=4.9,<4.10
 fasteners==0.16
 freezegun==1.1.0
 
