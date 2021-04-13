@@ -193,6 +193,7 @@ lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"
+base_url = "https://staging.app.toolchain.com"
 
 [buildsense]
 enable = false

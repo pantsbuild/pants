@@ -106,6 +106,10 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Dump env
+      run: 'env | grep GITHUB
+
+        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -156,6 +160,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+        - '3.10'
     timeout-minutes: 40
   bootstrap_pants_macos:
     env:
@@ -256,6 +261,10 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Dump env
+      run: 'env | grep GITHUB
+
+        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -278,6 +287,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+        - '3.10'
     timeout-minutes: 40
   build_wheels_linux:
     container: quay.io/pypa/manylinux2014_x86_64:latest
@@ -323,6 +333,10 @@ jobs:
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Dump env
+      run: 'env | grep GITHUB
 
         '
     - env:
@@ -391,6 +405,10 @@ jobs:
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Dump env
+      run: 'env | grep GITHUB
 
         '
     - name: Expose Pythons
@@ -514,6 +532,10 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Dump env
+      run: 'env | grep GITHUB
+
+        '
     - name: Lint
       run: './pants validate ''**''
 
@@ -532,6 +554,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+        - '3.10'
     timeout-minutes: 30
   test_python_linux:
     if: ${{ github.repository_owner == 'pantsbuild' }}
@@ -602,6 +625,10 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Dump env
+      run: 'env | grep GITHUB
+
+        '
     - name: Run Python tests
       run: './pants test ::
 
@@ -616,6 +643,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+        - '3.10'
     timeout-minutes: 60
   test_python_macos:
     env:
@@ -684,6 +712,10 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Dump env
+      run: 'env | grep GITHUB
+
+        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -698,6 +730,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
+        - '3.10'
     timeout-minutes: 40
 name: Pull Request CI
 'on':
