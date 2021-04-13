@@ -1,5 +1,6 @@
 [GLOBAL]
 colors = true
+level = "debug"
 
 remote_cache_read = true
 remote_cache_write = true

@@ -43,6 +43,7 @@ NATIVE_FILES = [
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
+PYTHON310_VERSION = "3.10"
 
 LINUX_VERSION = "ubuntu-20.04"
 MACOS_VERSION = "macos-10.15"
@@ -107,16 +108,26 @@ def checkout() -> Sequence[Step]:
     ]
 
 
-def setup_toolchain_auth() -> Step:
-    return {
-        "name": "Setup toolchain auth",
-        "if": "github.event_name != 'pull_request'",
-        "run": dedent(
-            """\
+def setup_toolchain_auth() -> Sequence[Step]:
+    return [
+        {
+            "name": "Setup toolchain auth",
+            "if": "github.event_name != 'pull_request'",
+            "run": dedent(
+                """\
             echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
             """
-        ),
-    }
+            ),
+        },
+        {
+            "name": "Dump env",
+            "run": dedent(
+                """\
+            env | grep GITHUB
+            """
+            ),
+        },
+    ]
 
 
 def pants_virtualenv_cache() -> Step:
@@ -288,7 +299,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
-                setup_toolchain_auth(),
+                *setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
                     "name": "Validate CI config",
@@ -343,7 +354,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
-                setup_toolchain_auth(),
+                *setup_toolchain_auth(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
@@ -360,7 +371,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
-                setup_toolchain_auth(),
+                *setup_toolchain_auth(),
                 {
                     "name": "Lint",
                     "run": (
@@ -383,7 +394,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
-                setup_toolchain_auth(),
+                *setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 native_binaries_upload(),
                 {
@@ -412,7 +423,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
-                setup_toolchain_auth(),
+                *setup_toolchain_auth(),
                 {
                     "name": "Run Python tests",
                     "run": (
@@ -485,7 +496,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                                 '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
                             ),
                         },
-                        setup_toolchain_auth(),
+                        *setup_toolchain_auth(),
                         *build_steps(is_macos=False),
                         upload_log_artifacts(name="wheels-linux"),
                         deploy_to_s3_step,
@@ -499,7 +510,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
-                        setup_toolchain_auth(),
+                        *setup_toolchain_auth(),
                         expose_all_pythons(),
                         # NB: We only cache Rust, but not `native_engine.so` and the Pants
                         # virtualenv. This is because we must build both these things with Python
@@ -546,7 +557,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "on": ["push", "pull_request"],
-            "jobs": test_workflow_jobs([PYTHON37_VERSION], cron=False),
+            "jobs": test_workflow_jobs([PYTHON37_VERSION, PYTHON310_VERSION], cron=False),
             "env": global_env(),
         },
         Dumper=NoAliasDumper,
