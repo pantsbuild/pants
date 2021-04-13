@@ -71,7 +71,7 @@ class Package:
     def owners(self) -> set[str]:
         client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
         roles = client.package_roles(self.name)
-        return {row[1] for row in roles if row[0] == "Owner"}
+        return {row[1] for row in roles if row[0] == "Owner"}  # type: ignore[union-attr,index]
 
 
 PACKAGES = sorted(
