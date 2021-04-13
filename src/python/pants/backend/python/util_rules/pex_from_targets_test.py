@@ -20,7 +20,7 @@ from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.python.python_setup import ResolveAllConstraintsOption
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.contextutil import environment_as, pushd
+from pants.util.contextutil import pushd
 
 
 @pytest.fixture
@@ -132,11 +132,12 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     # Turn the project dir into a git repo, so it can be cloned.
     foorl_dir = create_project_dir(tmp_path_factory.mktemp("git"), Project("foorl", "9.8.7"))
     with pushd(str(foorl_dir)):
-        with environment_as(GIT_AUTHOR_NAME="dummy", GIT_AUTHOR_EMAIL="dummy@dummy.com"):
-            subprocess.check_call(["git", "init"])
-            subprocess.check_call(["git", "add", "--all"])
-            subprocess.check_call(["git", "commit", "-m", "initial commit"])
-            subprocess.check_call(["git", "branch", "9.8.7"])
+        subprocess.check_call(["git", "init"])
+        subprocess.check_call(["git", "config", "user.name", "dummy"])
+        subprocess.check_call(["git", "config", "user.email", "dummy@dummy.com"])
+        subprocess.check_call(["git", "add", "--all"])
+        subprocess.check_call(["git", "commit", "-m", "initial commit"])
+        subprocess.check_call(["git", "branch", "9.8.7"])
 
     url_req = f"foorl@ git+file:/{foorl_dir}@9.8.7"
 
