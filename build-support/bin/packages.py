@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
 from functools import total_ordering
@@ -19,7 +20,6 @@ from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
-from bs4 import BeautifulSoup
 from common import banner, die, green, travis_section
 from reversion import reversion
 
@@ -69,15 +69,9 @@ class Package:
         return cast(str, json_data["info"]["version"])
 
     def owners(self) -> set[str]:
-        url_content = requests.get(
-            f"https://pypi.org/project/{self.name}/{self.latest_published_version()}/"
-        ).text
-        parser = BeautifulSoup(url_content, "html.parser")
-        owners = {
-            span.find("a", recursive=False).get_text().strip().lower()
-            for span in parser.find_all("span", class_="sidebar-section__maintainer")
-        }
-        return owners
+        client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
+        roles = client.package_roles(self.name)
+        return {row[1] for row in roles if row[0] == "Owner"}
 
 
 PACKAGES = sorted(
