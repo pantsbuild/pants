@@ -1,7 +1,7 @@
 ansicolors==1.1.8
-beautifulsoup4>=4.6.0,<4.7
-fasteners==0.15.0
-freezegun==1.0.0
+beautifulsoup4>=4.9,<4.10
+fasteners==0.16
+freezegun==1.1.0
 
 # Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
 # anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
@@ -18,15 +18,15 @@ humbug==0.1.9
 mypy==0.800
 
 packaging==20.9
-pathspec==0.8.0
+pathspec==0.8.1
 pex==2.1.38
-psutil==5.7.0
+psutil==5.8.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.
 pytest>=6.0.1,<6.3
 PyYAML>=5.4,<5.5
-requests[security]>=2.20.1
-setproctitle==1.2
+requests[security]>=2.25.1
+setproctitle==1.2.2
 setuptools>=50.3.0,<54.0
 toml==0.10.2
 typing-extensions==3.7.4.3
