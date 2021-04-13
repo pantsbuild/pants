@@ -20,6 +20,7 @@ from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.python.python_setup import ResolveAllConstraintsOption
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.contextutil import pushd
 
 
 @pytest.fixture
@@ -39,35 +40,50 @@ class Project:
     version: str
 
 
-def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePath:
-    project_dirs = []
-    for proj in (project, *projects):
-        project_dir = workdir / "projects" / proj.name
-        project_dir.mkdir(parents=True)
-        project_dirs.append(project_dir)
+build_deps = ["setuptools==54.1.2", "wheel==0.36.2"]
 
-        (project_dir / "pyproject.toml").write_text(
-            dedent(
-                """\
-                [build-system]
-                requires = ["setuptools==54.1.2", "wheel==0.36.2"]
-                build-backend = "setuptools.build_meta"
-                """
-            )
+
+def create_project_dir(workdir: Path, project: Project) -> PurePath:
+    project_dir = workdir / "projects" / project.name
+    project_dir.mkdir(parents=True)
+
+    (project_dir / "pyproject.toml").write_text(
+        dedent(
+            f"""\
+            [build-system]
+            requires = {build_deps}
+            build-backend = "setuptools.build_meta"
+            """
         )
-        (project_dir / "setup.cfg").write_text(
-            dedent(
-                f"""\
+    )
+    (project_dir / "setup.cfg").write_text(
+        dedent(
+            f"""\
                 [metadata]
-                name = {proj.name}
-                version = {proj.version}
+                name = {project.name}
+                version = {project.version}
                 """
-            )
         )
+    )
+    return project_dir
+
+
+def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePath:
+    project_dirs = [create_project_dir(workdir, proj) for proj in (project, *projects)]
 
     pex = workdir / "pex"
     subprocess.run(
-        args=[sys.executable, "-m", "pex", *project_dirs, "--include-tools", "-o", pex], check=True
+        args=[
+            sys.executable,
+            "-m",
+            "pex",
+            *project_dirs,
+            *build_deps,
+            "--include-tools",
+            "-o",
+            pex,
+        ],
+        check=True,
     )
 
     find_links = workdir / "find-links"
@@ -113,15 +129,26 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         Project("QUX", "3.4.5"),
     )
 
+    # Turn the project dir into a git repo, so it can be cloned.
+    foorl_dir = create_project_dir(tmp_path_factory.mktemp("git"), Project("foorl", "9.8.7"))
+    with pushd(str(foorl_dir)):
+        subprocess.check_call(["git", "init"])
+        subprocess.check_call(["git", "add", "--all"])
+        subprocess.check_call(["git", "commit", "-m", "initial commit"])
+        subprocess.check_call(["git", "branch", "9.8.7"])
+
+    url_req = f"foorl@ git+file:/{foorl_dir}@9.8.7"
+
     rule_runner.add_to_build_file(
         "",
         dedent(
-            """
+            f"""
             python_requirement_library(name="foo", requirements=["foo-bar>=0.1.2"])
             python_requirement_library(name="bar", requirements=["bar==5.5.5"])
             python_requirement_library(name="baz", requirements=["baz"])
+            python_requirement_library(name="foorl", requirements=["{url_req}"])
             python_library(name="util", sources=[], dependencies=[":foo", ":bar"])
-            python_library(name="app", sources=[], dependencies=[":util", ":baz"])
+            python_library(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
             """
         ),
     )
@@ -135,6 +162,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             bar==5.5.5
             baz==2.2.2
             qux==3.4.5
+            # Note that pip does not allow URL requirements in constraints files,
+            # so there is no mention of foorl here.
         """
         ),
     )
@@ -162,7 +191,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         return rule_runner.request(PexRequest, [request])
 
     pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
-    assert pex_req1.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])
+    assert pex_req1.requirements == PexRequirements(
+        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
+    )
     assert pex_req1.repository_pex is None
 
     pex_req1_direct = get_pex_request(
@@ -172,10 +203,12 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert pex_req1_direct.repository_pex is None
 
     pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
-    assert pex_req2.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])
+    assert pex_req2.requirements == PexRequirements(
+        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
+    )
     assert pex_req2.repository_pex is not None
     repository_pex = pex_req2.repository_pex
-    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"] == requirements(
+    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
 
