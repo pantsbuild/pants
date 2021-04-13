@@ -101,6 +101,9 @@ impl CommandRunner {
   /// output directories to be stored as `Tree` protos that contain all of the `Directory`
   /// protos that constitute the directory tree.)
   ///
+  /// Note that the Tree does not include the directory_path as a prefix, per REAPI. This path
+  /// gets stored on the OutputDirectory proto.
+  ///
   /// If the output directory does not exist, then returns Ok(None).
   pub(crate) async fn make_tree_for_output_directory(
     root_directory_digest: Digest,
@@ -292,7 +295,7 @@ impl CommandRunner {
       action_result
         .output_directories
         .push(remexec::OutputDirectory {
-          path: String::new(),
+          path: output_directory.to_owned(),
           tree_digest: Some(tree_digest.into()),
         });
     }
