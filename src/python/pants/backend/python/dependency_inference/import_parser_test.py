@@ -212,6 +212,8 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
         importlib.import_module(u"dep.from.str_狗")
+
+        b"\\xa0 a non-utf8 string, make sure we ignore it"
         """
     )
     assert_imports_parsed(
