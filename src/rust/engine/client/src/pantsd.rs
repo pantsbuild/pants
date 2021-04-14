@@ -202,7 +202,16 @@ mod test {
       ))
       .arg("-V")
       .stderr(Stdio::inherit());
-    let result = cmd.output().unwrap();
+    let result = cmd
+      .output()
+      .map_err(|e| {
+        format!(
+          "Problem running command {command:?}: {err}",
+          command = cmd,
+          err = e
+        )
+      })
+      .unwrap();
     assert_eq!(Some(0), result.status.code());
     assert_eq!(
       fs::read_to_string(
