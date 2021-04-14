@@ -992,21 +992,24 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> None:
     class ExpectedExtensionsSources(Sources):
-        expected_file_extensions = (".f95", ".f03")
+        expected_file_extensions = (".f95", ".f03", "")
 
     addr = Address("src/fortran", target_name="lib")
-    sources_rule_runner.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
-    sources = ExpectedExtensionsSources(["s.f*"], address=addr)
+    sources_rule_runner.create_files("src/fortran", ["s.f95", "s.f03", "s.f08", "s"])
+
+    def get_sources(srcs: Iterable[str]) -> Tuple[str, ...]:
+        return sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, address=addr))]
+        ).snapshot.files
+
     with pytest.raises(ExecutionError) as exc:
-        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
-    assert "s.f08" in str(exc.value)
+        get_sources(["s.f*"])
+    assert "['src/fortran/s.f08']" in str(exc.value)
     assert str(addr) in str(exc.value)
 
     # Also check that we support valid sources
-    valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
-    assert sources_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(valid_sources)]
-    ).snapshot.files == ("src/fortran/s.f95",)
+    assert get_sources(["s.f95"]) == ("src/fortran/s.f95",)
+    assert get_sources(["s"]) == ("src/fortran/s",)
 
 
 def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
