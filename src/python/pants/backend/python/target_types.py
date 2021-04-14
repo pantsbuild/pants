@@ -47,7 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py", ".pyi")
+    # Note that Python scripts often have no file ending.
+    expected_file_extensions = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
