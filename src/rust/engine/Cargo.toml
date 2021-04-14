@@ -102,7 +102,8 @@ async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
 bytes = "1.0"
 concrete_time = { path = "concrete_time" }
-cpython = "0.5"
+# TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
+cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
 crossbeam-channel = "0.4"
 fnv = "1.0.5"
 fs = { path = "fs" }

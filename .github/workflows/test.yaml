@@ -290,20 +290,24 @@ jobs:
 
         '
     - name: Expose Pythons
-      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin"
+      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
         >> $GITHUB_ENV
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
         ./build-support/bin/release.sh -n
 
         USE_PY38=true ./build-support/bin/release.sh -n
+
+        USE_PY39=true ./build-support/bin/release.sh -n
 
         ./build-support/bin/release.sh -f
 
@@ -379,6 +383,7 @@ jobs:
           '
     - env:
         ARCHFLAGS: -arch x86_64
+        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -386,6 +391,8 @@ jobs:
         ./build-support/bin/release.sh -n
 
         USE_PY38=true ./build-support/bin/release.sh -n
+
+        USE_PY39=true ./build-support/bin/release.sh -n
 
         ./build-support/bin/release.sh -f
 

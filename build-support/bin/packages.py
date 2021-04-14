@@ -431,10 +431,10 @@ def check_prebuilt_wheels(check_dir: str) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 4:
+        if is_cross_platform(local_files) and len(local_files) != 6:
             formatted_local_files = ", ".join(f.name for f in local_files)
             missing_packages.append(
-                f"{package.name} (expected 4 wheels, {{macosx, linux}} x {{cp37m, cp38}}, "
+                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}}, "
                 f"but found {formatted_local_files})"
             )
     if missing_packages:
