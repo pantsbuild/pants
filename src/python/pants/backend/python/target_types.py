@@ -43,7 +43,8 @@ from pants.util.docutil import docs_url
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py", ".pyi")
+    # Note that Python scripts often have no file ending.
+    expected_file_extensions = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
