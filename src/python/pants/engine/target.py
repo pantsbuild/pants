@@ -1241,7 +1241,7 @@ class Sources(StringSequenceField, AsyncFieldMixin):
                     else repr(self.expected_file_extensions[0])
                 )
                 raise InvalidFieldException(
-                    f"The {repr(self.alias)} field in target {self.address} must only contain "
+                    f"The {repr(self.alias)} field in target {self.address} can only contain "
                     f"files that end in {expected}, but it had these files: {sorted(bad_files)}."
                     f"\n\nMaybe create a `resources()` or `files()` target and include it in the "
                     f"`dependencies` field?"
