@@ -304,6 +304,7 @@ async def pex_from_targets(
                         requirements=PexRequirements(all_constraints),
                         interpreter_constraints=interpreter_constraints,
                         platforms=request.platforms,
+                        additional_args=["-vvv"],
                     ),
                 )
     elif (
