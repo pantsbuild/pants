@@ -130,9 +130,9 @@ def pants_virtualenv_cache() -> Step:
 def global_env(*, disable_buildsense: bool = False) -> Env:
     return {
         "PANTS_CONFIG_FILES": (
-            "+['pants.ci.toml']"
-            if not disable_buildsense
-            else "+['pants.ci.toml', 'pants.no-buildsense.toml']"
+            "+['pants.ci.toml', 'pants.no-buildsense.toml']"
+            if disable_buildsense
+            else "+['pants.ci.toml']"
         ),
         "RUST_BACKTRACE": "all",
     }
