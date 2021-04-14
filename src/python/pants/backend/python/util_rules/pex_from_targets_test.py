@@ -201,7 +201,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req1_direct = get_pex_request(
         "constraints1.txt", ResolveAllConstraintsOption.NEVER, direct_deps_only=True
     )
-    assert pex_req1_direct.requirements == PexRequirements(["baz"])
+    assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req1_direct.repository_pex is None
 
     pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
@@ -217,7 +217,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req2_direct = get_pex_request(
         "constraints1.txt", ResolveAllConstraintsOption.ALWAYS, direct_deps_only=True
     )
-    assert pex_req2_direct.requirements == PexRequirements(["baz"])
+    assert pex_req2_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req2_direct.repository_pex == repository_pex
 
     with pytest.raises(ExecutionError) as err:
