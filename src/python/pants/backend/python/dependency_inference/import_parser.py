@@ -82,8 +82,11 @@ class AstVisitor(ast.NodeVisitor):
 # logic.
 if sys.version_info[0:2] == (2,7):
     def visit_Str(self, node):
-        val = node.s.decode("utf-8") if isinstance(node.s, bytes) else node.s
-        self.maybe_add_string_import(val)
+        try:
+            val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
+            self.maybe_add_string_import(val)
+        except UnicodeError:
+            pass
 
     setattr(AstVisitor, 'visit_Str', visit_Str)
 
