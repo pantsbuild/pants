@@ -14,7 +14,6 @@ prost-types = "0.7"
 tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
-build_utils = { path = "../../build_utils" }
 copy_dir = "0.1.2"
 dir-diff = "0.3.1"
 tempfile = "3"
