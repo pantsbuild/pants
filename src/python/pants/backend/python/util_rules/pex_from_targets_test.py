@@ -182,6 +182,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             output_filename="demo.pex",
             internal_only=True,
             direct_deps_only=direct_deps_only,
+            additional_args=["-vvv"],
         )
         if resolve_all:
             args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
