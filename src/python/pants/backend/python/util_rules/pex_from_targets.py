@@ -244,13 +244,25 @@ async def pex_from_targets(
         # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
         # packaging canonicalize for us.
         # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
-        exact_req_projects = {
-            canonicalize_project_name(Requirement.parse(req).project_name) for req in exact_reqs
-        }
+
+        url_reqs = set()  # E.g., 'foobar@ git+https://github.com/foo/bar.git@branch'
+        name_reqs = set()  # E.g., foobar>=1.2.3
+        name_req_projects = set()
+
+        for req_str in exact_reqs:
+            req = Requirement.parse(req_str)
+            if req.url:  # type: ignore[attr-defined]
+                url_reqs.add(req)
+            else:
+                name_reqs.add(req)
+                name_req_projects.add(canonicalize_project_name(req.project_name))
+
         constraint_file_projects = {
             canonicalize_project_name(req.project_name) for req in constraints_file_reqs
         }
-        unconstrained_projects = exact_req_projects - constraint_file_projects
+        # Constraints files must only contain name reqs, not URL reqs (those are already
+        # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.
+        unconstrained_projects = name_req_projects - constraint_file_projects
         if unconstrained_projects:
             constraints_descr = (
                 f"constraints file {constraints_file.path}"
@@ -272,15 +284,27 @@ async def pex_from_targets(
                     "file does not cover all requirements."
                 )
             else:
+                # To get a full set of requirements we must add the URL requirements to the
+                # constraints file, since the latter cannot contain URL requirements.
+                # NB: We can only add the URL requirements we know about here, i.e., those that
+                #  are transitive deps of the targets in play. There may be others in the repo.
+                #  So we may end up creating a few different repository pexes, each with identical
+                #  name requirements but different subsets of URL requirements. Fortunately since
+                #  all these repository pexes will have identical pinned versions of everything,
+                #  this is not a correctness issue, only a performance one.
+                # TODO: Address this as part of providing proper lockfile support. However we
+                #  generate lockfiles, they must be able to include URL requirements.
+                all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
                 repository_pex = await Get(
                     Pex,
                     PexRequest(
                         description=f"Resolving {python_setup.requirement_constraints}",
                         output_filename="repository.pex",
                         internal_only=request.internal_only,
-                        requirements=PexRequirements(str(req) for req in constraints_file_reqs),
+                        requirements=PexRequirements(all_constraints),
                         interpreter_constraints=interpreter_constraints,
                         platforms=request.platforms,
+                        additional_args=["-vvv"],
                     ),
                 )
     elif (
