@@ -1,22 +1,23 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use log::debug;
 use std::env;
 use std::ops::Deref;
 use std::path::PathBuf;
+
+use log::debug;
 
 #[derive(Debug)]
 pub struct BuildRoot(PathBuf);
 
 impl BuildRoot {
-  const SENTINEL_FILES: [&'static str; 3] = ["pants", "BUILDROOT", "BUILD_ROOT"];
+  const SENTINEL_FILES: &'static [&'static str] = &["pants", "BUILDROOT", "BUILD_ROOT"];
 
   pub fn find() -> Result<BuildRoot, String> {
     let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {}", e))?;
     let mut build_root = cwd.clone();
     loop {
-      for sentinel in &Self::SENTINEL_FILES {
+      for sentinel in Self::SENTINEL_FILES {
         let sentinel_path = build_root.join(sentinel);
         if !sentinel_path.exists() {
           continue;
@@ -63,13 +64,15 @@ impl Deref for BuildRoot {
 
 #[cfg(test)]
 mod test {
-  use crate::build_root::BuildRoot;
-  use lazy_static::lazy_static;
   use std::ops::Deref;
   use std::path::{Path, PathBuf};
-  use std::sync::Mutex;
   use std::{env, fs};
+
+  use lazy_static::lazy_static;
+  use parking_lot::Mutex;
   use tempdir::TempDir;
+
+  use crate::build_root::BuildRoot;
 
   struct CurrentDir {
     prior_cwd: Option<PathBuf>,
@@ -124,7 +127,7 @@ mod test {
   #[test]
   fn test_find_cwd() {
     let buildroot = TempDir::new("buildroot").unwrap();
-    let mut cwd_lock = CWD.lock().unwrap();
+    let mut cwd_lock = CWD.lock();
     let cwd = cwd_lock.cd(buildroot.path());
 
     let mut sentinel: Option<PathBuf> = None;
@@ -151,7 +154,7 @@ mod test {
   #[test]
   fn test_find_subdir() {
     let buildroot = TempDir::new("buildroot").unwrap();
-    let mut cwd_lock = CWD.lock().unwrap();
+    let mut cwd_lock = CWD.lock();
     let subdir = cwd_lock.cd(buildroot.path().join("foo").join("bar"));
 
     assert_eq!(subdir.path(), &env::current_dir().unwrap());

@@ -1,9 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::fmt;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fmt, fs};
 
 use libc::pid_t;
 use log::debug;
@@ -178,13 +177,15 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
 
 #[cfg(test)]
 mod test {
-  use crate::build_root::BuildRoot;
-  use crate::pantsd;
   use std::fs;
   use std::net::TcpStream;
   use std::process::{Command, Stdio};
   use std::str::from_utf8;
+
   use tempdir::TempDir;
+
+  use crate::build_root::BuildRoot;
+  use crate::pantsd;
 
   fn launch_pantsd() -> (BuildRoot, TempDir) {
     let build_root = BuildRoot::find()

@@ -42,14 +42,15 @@ use client::options::OptionParser;
 use client::pantsd;
 use client::render_choice;
 
+// TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
 #[derive(AsRefStr, EnumString, EnumVariantNames)]
 #[strum(serialize_all = "snake_case")]
 enum PythonLogLevel {
-  TRACE = 5,
-  DEBUG = 10,
-  INFO = 20,
-  WARN = 30,
-  ERROR = 40,
+  TRACE,
+  DEBUG,
+  INFO,
+  WARN,
+  ERROR,
 }
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
@@ -120,7 +121,7 @@ fn find_pantsd(
     source = option_value.source
   );
   let port = pantsd::probe(&working_dir, &metadata_dir)?;
-  let mut pantsd_settings = client::ConnectionSettings::default(port);
+  let mut pantsd_settings = client::ConnectionSettings::new(port);
   pantsd_settings.timeout_limit = options_parser
     .parse_float(
       &option_id!("pantsd", "timeout", "when", "multiple", "invocations"),

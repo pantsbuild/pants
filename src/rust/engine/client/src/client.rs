@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::io;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -21,7 +22,7 @@ pub struct ConnectionSettings {
 }
 
 impl ConnectionSettings {
-  pub fn default(port: u16) -> ConnectionSettings {
+  pub fn new(port: u16) -> ConnectionSettings {
     ConnectionSettings {
       port,
       timeout_limit: 60.0,
@@ -41,7 +42,7 @@ pub async fn execute_command(
     "PANTSD_RUNTRACKER_CLIENT_START_TIME".to_owned(),
     start
       .duration_since(SystemTime::UNIX_EPOCH)
-      .map_err(|e| format!("Failed to determine current unix time: {err}", err = e))?
+      .map_err(|e| format!("Failed to determine current time: {err}", err = e))?
       .as_secs_f64()
       .to_string(),
   ));
@@ -82,9 +83,12 @@ pub async fn execute_command(
     "Connecting to server at {address:?}...",
     address = &connection_settings.port
   );
-  let stream = TcpStream::connect(("0.0.0.0", connection_settings.port))
-    .await
-    .map_err(|e| format!("Error connecting to pantsd: {err}", err = e))?;
+  let stream = TcpStream::connect(SocketAddrV4::new(
+    Ipv4Addr::LOCALHOST,
+    connection_settings.port,
+  ))
+  .await
+  .map_err(|e| format!("Error connecting to pantsd: {err}", err = e))?;
   let mut child = nails::client::handle_connection(config, stream, cmd, async {
     let (stdin_write, stdin_read) = child_channel::<ChildInput>();
     let _join = tokio::spawn(handle_stdin(stdin_write));

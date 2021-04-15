@@ -356,6 +356,7 @@ dependencies = [
  "log 0.4.14",
  "nails",
  "nix 0.20.0",
+ "parking_lot",
  "peg",
  "remoteprocess",
  "sha2",

@@ -16,10 +16,10 @@ use std::rc::Rc;
 use crate::build_root::BuildRoot;
 use crate::option_id;
 
-use args::Args;
-use config::Config;
-use env::Env;
-use parse::{parse_bool, parse_string_list};
+use self::args::Args;
+use self::config::Config;
+use self::env::Env;
+use self::parse::{parse_bool, parse_string_list};
 
 pub use id::{OptionId, Scope};
 
@@ -36,13 +36,35 @@ pub(crate) struct ListEdit<T> {
   pub items: Vec<T>,
 }
 
+///
+/// A source of option values.
+///
+/// This is currently a subset of the types of options the Pants python option system handles.
+/// Implementations should mimic the behavior of the equivalent python source.
+///
 trait OptionsSource {
+  ///
+  /// Get a display version of the option `id` that most closely matches the syntax used to supply
+  /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
+  /// flag based options and "BOB" in environment variable based options.
+  ///
   fn display(&self, id: &OptionId) -> String {
     format!("{}", id)
   }
 
+  ///
+  /// Get the string option identified by `id` from this source.
+  /// Errors when this source has an option value for `id` but that value is not a string.
+  ///
   fn get_string(&self, id: &OptionId) -> Result<Option<String>, String>;
 
+  ///
+  /// Get the boolean option identified by `id` from this source.
+  /// Errors when this source has an option value for `id` but that value is not a boolean.
+  ///
+  /// The default implementation looks for a string value for `id` and then attempts to parse it as
+  /// a boolean value.
+  ///
   fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
     if let Some(value) = self.get_string(id)? {
       parse_bool(&*self.display(id), &*value).map(Some)
@@ -51,6 +73,13 @@ trait OptionsSource {
     }
   }
 
+  ///
+  /// Get the float option identified by `id` from this source.
+  /// Errors when this source has an option value for `id` but that value is not a float.
+  ///
+  /// The default implementation looks for a string value for `id` and then attempts to parse it as
+  /// a float value.
+  ///
   fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
     if let Some(value) = self.get_string(id)? {
       value.parse().map(Some).map_err(|e| {
@@ -66,6 +95,13 @@ trait OptionsSource {
     }
   }
 
+  ///
+  /// Get the string list option identified by `id` from this source.
+  /// Errors when this source has an option value for `id` but that value is not a string list.
+  ///
+  /// The default implementation looks for a string value for `id` and then attempts to parse it as
+  /// a list edit or series of list edits. See [`parse_string_list`].
+  ///
   fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
     if let Some(value) = self.get_string(id)? {
       parse_string_list(&*self.display(id), &value).map(Some)
@@ -194,20 +230,14 @@ impl OptionParser {
     let mut list_edits = vec![];
     for (_, source) in self.sources.iter() {
       if let Some(edits) = source.get_string_list(id)? {
-        for edit in edits {
-          list_edits.push(edit);
-        }
+        list_edits.extend(edits);
       }
     }
     let mut string_list = default.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     for list_edit in list_edits {
       match list_edit.action {
         ListEditAction::REPLACE => string_list = list_edit.items,
-        ListEditAction::ADD => {
-          for item in list_edit.items {
-            string_list.push(item);
-          }
-        }
+        ListEditAction::ADD => string_list.extend(list_edit.items),
         ListEditAction::REMOVE => {
           let to_remove = list_edit.items.iter().collect::<HashSet<_>>();
           string_list = string_list

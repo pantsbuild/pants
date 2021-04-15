@@ -48,7 +48,7 @@ impl OptionId {
       .collect::<Vec<_>>();
     if name_components.is_empty() {
       return Err(format!(
-        "Cannot create an OptionId with en empty name. Given a scope of {:?}.",
+        "Cannot create an OptionId with an empty name. Given a scope of {:?}.",
         scope
       ));
     }
