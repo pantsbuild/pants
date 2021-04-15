@@ -276,8 +276,7 @@ jobs:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
     - source ${HOME}/.cargo/env
-    - ./build-support/bin/ci.py --githooks --smoke-tests --lint --remote-cache-enabled
-      --python-version 3.7
+    - ./build-support/bin/ci.py --githooks --smoke-tests --lint --python-version 3.7
     stage: Test Pants
   - addons:
       apt:
@@ -325,8 +324,7 @@ jobs:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
     - source ${HOME}/.cargo/env
-    - ./build-support/bin/ci.py --githooks --smoke-tests --lint --remote-cache-enabled
-      --python-version 3.8
+    - ./build-support/bin/ci.py --githooks --smoke-tests --lint --python-version 3.8
     stage: Test Pants (Cron)
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
@@ -446,7 +444,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --integration-tests --remote-cache-enabled --python-version 3.7
+      --unit-tests --integration-tests --python-version 3.7
     stage: Test Pants
   - addons:
       apt:
@@ -497,7 +495,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --integration-tests --remote-cache-enabled --python-version 3.8
+      --unit-tests --integration-tests --python-version 3.8
     stage: Test Pants (Cron)
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
@@ -929,11 +927,6 @@ jobs:
     - mkdir -p dist/deploy/pex/
     - mv dist/pants*.pex dist/deploy/pex/
     stage: Deploy Pants Pex Unstable
-notifications:
-  webhooks:
-    on_start: always
-    urls:
-    - https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/
 stages:
 - if: type != cron
   name: Bootstrap Pants
