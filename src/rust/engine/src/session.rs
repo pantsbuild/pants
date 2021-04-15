@@ -12,7 +12,7 @@ use crate::nodes::{NodeKey, Select};
 use crate::scheduler::Scheduler;
 
 use async_latch::AsyncLatch;
-use futures::future::{AbortHandle, Abortable};
+use futures::future::{self, AbortHandle, Abortable};
 use futures::FutureExt;
 use graph::LastObserved;
 use log::warn;
@@ -79,8 +79,6 @@ struct SessionState {
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
-  // The unique id for this Session: used for metrics gathering purposes.
-  build_id: String,
   // Per-Session values that have been set for this session.
   session_values: Mutex<Value>,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
@@ -98,6 +96,8 @@ struct SessionState {
 /// A cancellable handle to a Session, with an optional associated UI.
 ///
 struct SessionHandle {
+  // The unique id for this Session: used for metrics gathering purposes.
+  build_id: String,
   // Whether or not this Session has been cancelled. If a Session has been cancelled, all work that
   // it started should attempt to exit in an orderly fashion.
   cancelled: AsyncLatch,
@@ -110,6 +110,12 @@ impl SessionHandle {
   /// Cancels this Session.
   ///
   pub fn cancel(&self) {
+    self.cancelled.trigger();
+  }
+}
+
+impl Drop for SessionHandle {
+  fn drop(&mut self) {
     self.cancelled.trigger();
   }
 }
@@ -138,7 +144,7 @@ impl Session {
     build_id: String,
     session_values: Value,
     cancelled: AsyncLatch,
-  ) -> Session {
+  ) -> Result<Session, String> {
     let workunit_store = WorkunitStore::new(!should_render_ui);
     let display = Mutex::new(SessionDisplay::new(
       &workunit_store,
@@ -146,21 +152,24 @@ impl Session {
       should_render_ui,
     ));
 
-    let handle = Arc::new(SessionHandle { cancelled, display });
-    scheduler.core.sessions.add(&handle);
-    Session {
+    let handle = Arc::new(SessionHandle {
+      cancelled,
+      build_id,
+      display,
+    });
+    scheduler.core.sessions.add(&handle)?;
+    Ok(Session {
       handle,
       state: Arc::new(SessionState {
         core: scheduler.core.clone(),
         preceding_graph_size: scheduler.core.graph.len(),
         roots: Mutex::new(HashMap::new()),
         workunit_store,
-        build_id,
         session_values: Mutex::new(session_values),
         run_id: Mutex::new(Uuid::new_v4()),
         workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
-    }
+    })
   }
 
   ///
@@ -170,21 +179,22 @@ impl Session {
   /// Useful when executing background work "on behalf of a Session" which should not be torn down
   /// when a client disconnects.
   ///
-  pub fn isolated_shallow_clone(&self) -> Session {
+  pub fn isolated_shallow_clone(&self, build_id: String) -> Result<Session, String> {
     let display = Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
       false,
     ));
     let handle = Arc::new(SessionHandle {
+      build_id,
       cancelled: AsyncLatch::new(),
       display,
     });
-    self.state.core.sessions.add(&handle);
-    Session {
+    self.state.core.sessions.add(&handle)?;
+    Ok(Session {
       handle,
       state: self.state.clone(),
-    }
+    })
   }
 
   pub fn core(&self) -> &Arc<Core> {
@@ -246,7 +256,7 @@ impl Session {
   }
 
   pub fn build_id(&self) -> &String {
-    &self.state.build_id
+    &self.handle.build_id
   }
 
   pub fn run_id(&self) -> Uuid {
@@ -329,14 +339,18 @@ impl Session {
 pub struct Sessions {
   /// Live sessions. Completed Sessions (i.e., those for which the Weak reference is dead) are
   /// removed from this collection on a best effort when new Sessions are created.
-  sessions: Arc<Mutex<Vec<Weak<SessionHandle>>>>,
+  ///
+  /// If the wrapping Option is None, it is because `fn shutdown` is running, and the associated
+  /// Core/Scheduler are being shut down.
+  sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_abort_handle: AbortHandle,
 }
 
 impl Sessions {
   pub fn new(executor: &Executor) -> Result<Sessions, String> {
-    let sessions: Arc<Mutex<Vec<Weak<SessionHandle>>>> = Arc::default();
+    let sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>> =
+      Arc::new(Mutex::new(Some(Vec::new())));
     let signal_task_abort_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
@@ -346,9 +360,12 @@ impl Sessions {
         async move {
           loop {
             let _ = signal_stream.recv().await;
-            for session in &*sessions.lock() {
-              if let Some(session) = session.upgrade() {
-                session.cancel();
+            let sessions = sessions.lock();
+            if let Some(ref sessions) = *sessions {
+              for session in sessions {
+                if let Some(session) = session.upgrade() {
+                  session.cancel();
+                }
               }
             }
           }
@@ -363,10 +380,43 @@ impl Sessions {
     })
   }
 
-  fn add(&self, session: &Arc<SessionHandle>) {
+  fn add(&self, handle: &Arc<SessionHandle>) -> Result<(), String> {
     let mut sessions = self.sessions.lock();
-    sessions.retain(|weak_session| weak_session.upgrade().is_some());
-    sessions.push(Arc::downgrade(session));
+    if let Some(ref mut sessions) = *sessions {
+      sessions.retain(|weak_handle| weak_handle.upgrade().is_some());
+      sessions.push(Arc::downgrade(handle));
+      Ok(())
+    } else {
+      Err("The scheduler is shutting down: no new sessions may be created.".to_string())
+    }
+  }
+
+  ///
+  /// Shuts down this Sessions instance by waiting for all existing Sessions to exit.
+  ///
+  pub async fn shutdown(&self) {
+    if let Some(sessions) = self.sessions.lock().take() {
+      // Collect clones of the cancellation tokens for each Session, which allows us to watch for
+      // them to have been dropped.
+      let (build_ids, cancellation_latches): (Vec<_>, Vec<_>) = sessions
+        .into_iter()
+        .filter_map(|weak_handle| weak_handle.upgrade())
+        .map(|handle| {
+          let build_id = handle.build_id.clone();
+          let cancelled = handle.cancelled.clone();
+          let cancellation_triggered = async move {
+            cancelled.triggered().await;
+            log::info!("Shutdown completed: {:?}", build_id)
+          };
+          (handle.build_id.clone(), cancellation_triggered)
+        })
+        .unzip();
+
+      if !build_ids.is_empty() {
+        log::info!("Waiting for shutdown of: {:?}", build_ids);
+        future::join_all(cancellation_latches).await;
+      }
+    }
   }
 }
 

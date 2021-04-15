@@ -204,6 +204,9 @@ class PantsDaemon(PantsDaemonProcessManager):
             # We're exiting: join the server to avoid interrupting ongoing runs.
             self._logger.info("Waiting for ongoing runs to complete before exiting...")
             native_engine.nailgun_server_await_shutdown(self._server)
+            # Then shutdown the PantsDaemonCore, which will shut down any live Scheduler.
+            self._logger.info("Waiting for Sessions to complete before exiting...")
+            self._core.shutdown()
             self._logger.info("Exiting pantsd")
 
 

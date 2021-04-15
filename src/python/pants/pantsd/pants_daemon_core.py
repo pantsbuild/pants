@@ -129,3 +129,12 @@ class PantsDaemonCore:
                 self._initialize(options_fingerprint, options_bootstrapper, env)
             assert self._scheduler is not None
             return self._scheduler, self._options_initializer
+
+    def shutdown(self) -> None:
+        with self._lifecycle_lock:
+            if self._services is not None:
+                self._services.shutdown()
+                self._services = None
+            if self._scheduler is not None:
+                self._scheduler.scheduler.shutdown()
+                self._scheduler = None
