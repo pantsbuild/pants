@@ -1012,18 +1012,12 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 
 def test_digest_repr() -> None:
     assert (
-        str(Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1))
+        str(Digest("f" * 64, 1))
         == "Digest('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 1)"
     )
 
 
 def test_digest_equality() -> None:
-    assert Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1) == Digest(
-        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1
-    )
-    assert Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1) != Digest(
-        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1000
-    )
-    assert Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 1) != Digest(
-        "0000000000000000000000000000000000000000000000000000000000000000", 1
-    )
+    assert Digest("f" * 64, 1) == Digest("f" * 64, 1)
+    assert Digest("f" * 64, 1) != Digest("f" * 64, 1000)
+    assert Digest("f" * 64, 1) != Digest("0" * 64, 1)
