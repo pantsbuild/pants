@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -140,9 +139,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         subprocess.check_call(["git", "commit", "-m", "initial commit"])
         subprocess.check_call(["git", "branch", "9.8.7"])
 
-    # This string won't parse as a Requirement if it contains a full path
-    # (i.e., three slashes after the `file:`) so we use a relpath.
-    url_req = f"foorl@ git+file://{os.path.relpath(foorl_dir)}@9.8.7"
+    # This string won't parse as a Requirement if it doesn't contain a netloc,
+    # so we explicitly mention localhost.
+    url_req = f"foorl@ git+file://localhost{foorl_dir.as_posix()}@9.8.7"
 
     rule_runner.add_to_build_file(
         "",
