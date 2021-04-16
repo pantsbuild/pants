@@ -494,7 +494,7 @@ def lint(python_version: PythonVersion) -> Dict:
             *_install_rust(),
             (
                 "./build-support/bin/ci.py --githooks --smoke-tests --lint "
-                f"--remote-cache-enabled --python-version {python_version.decimal}"
+                f"--python-version {python_version.decimal}"
             ),
         ],
     }
@@ -542,7 +542,7 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --remote-cache-enabled "
+            "--unit-tests --integration-tests "
             f"--python-version {python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
@@ -791,12 +791,12 @@ def main() -> None:
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
             "conditions": "v1",
             "env": {"global": GLOBAL_ENV_VARS},
-            "notifications": {
-                "webhooks": {
-                    "on_start": "always",
-                    "urls": ["https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/"],
-                }
-            },
+            # "notifications": {
+            #     "webhooks": {
+            #         "on_start": "always",
+            #         "urls": ["https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/"],
+            #     }
+            # },
             "stages": Stage.all_entries(),
             "deploy": DEPLOY_SETTINGS,
             "jobs": {
