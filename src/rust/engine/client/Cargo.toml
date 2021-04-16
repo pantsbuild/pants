@@ -14,7 +14,7 @@ env_logger = "0.5.4"
 futures = "0.3"
 libc = "0.2"
 log = "0.4"
-nails = "0.12"
+nailgun = { path = "../nailgun" }
 nix = "0.20"
 peg = "0.7"
 remoteprocess = "0.4"

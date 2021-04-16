@@ -83,7 +83,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   let pantsd_settings = find_pantsd(&working_dir, &options_parser)?;
   let env = env::vars().collect::<Vec<(_, _)>>();
   let argv = env::args().collect::<Vec<_>>();
-  client::execute_command(start, pantsd_settings, env, argv, &working_dir).await
+  client::execute_command(start, pantsd_settings, env, argv).await
 }
 
 fn find_pantsd(

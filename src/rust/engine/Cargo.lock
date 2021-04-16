@@ -354,7 +354,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log 0.4.14",
- "nails",
+ "nailgun",
  "nix 0.20.0",
  "parking_lot",
  "peg",
