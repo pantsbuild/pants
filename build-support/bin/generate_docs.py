@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import pkgutil
+import re
 import subprocess
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, Optional, cast
@@ -68,6 +69,14 @@ _markdown_trans = str.maketrans({c: f"\\{c}" for c in "\\`*_"})
 def markdown_safe(s: str) -> str:
     """Escapes special characters in s, so it can be used as a literal string in markdown."""
     return html.escape(s.translate(_markdown_trans), quote=False)
+
+
+_backtick_re = re.compile(r"`([^`]*)`")
+
+
+def html_safe(s: str) -> str:
+    """Escapes special characters in s, so it can be used as a literal string in readme HTML."""
+    return _backtick_re.sub(r"<code>\1</code>", html.escape(s))
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -204,9 +213,11 @@ class ReferenceGenerator:
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
-                field["description"] = markdown_safe(str(field["description"]))
+                # Description is not rendered as markdown, so we don't want to escape
+                # markdown special characters here (or the escapes will be visible).
+                field["description"] = html_safe(str(field["description"]))
             target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
-            target["description"] = markdown_safe(str(target["description"]))
+            target["description"] = html_safe(str(target["description"]))
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 

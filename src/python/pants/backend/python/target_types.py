@@ -566,8 +566,8 @@ class PythonRequirementsField(_RequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
-        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
-        "'bar<=3 ; python_version<'3']."
+        "A sequence of pip-style requirement strings, e.g. `['foo==1.8', "
+        "\"bar<=3 ; python_version<'3'\"]`."
     )
 
 
