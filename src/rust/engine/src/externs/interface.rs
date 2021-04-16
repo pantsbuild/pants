@@ -324,7 +324,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "session_isolated_shallow_clone",
-    py_fn!(py, session_isolated_shallow_clone(a: PySession)),
+    py_fn!(py, session_isolated_shallow_clone(a: PySession, b: String)),
   )?;
 
   m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
@@ -396,6 +396,11 @@ py_module_initializer!(native_engine, |py, m| {
         exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
+  )?;
+  m.add(
+    py,
+    "scheduler_shutdown",
+    py_fn!(py, scheduler_shutdown(a: PyScheduler, b: u64)),
   )?;
 
   m.add(
@@ -627,14 +632,19 @@ py_class!(class PySession |py| {
           session_values: PyObject,
           cancellation_latch: PySessionCancellationLatch,
     ) -> CPyResult<Self> {
-      Self::create_instance(py, Session::new(
+      let session = Session::new(
           scheduler.scheduler(py),
           should_render_ui,
           build_id,
           session_values.into(),
           cancellation_latch.cancelled(py).clone(),
-        )
-      )
+        ).map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?;
+      Self::create_instance(py, session)
+    }
+
+    def cancel(&self) -> PyUnitResult {
+        self.session(py).cancel();
+        Ok(None)
     }
 });
 
@@ -1188,6 +1198,18 @@ fn scheduler_metrics(
   })
 }
 
+fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler, timeout_secs: u64) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    py.allow_threads(|| {
+      scheduler
+        .core
+        .executor
+        .block_on(scheduler.core.shutdown(Duration::from_secs(timeout_secs)));
+    })
+  });
+  Ok(None)
+}
+
 fn all_counter_names(_: Python) -> CPyResult<Vec<String>> {
   Ok(Metric::all_metrics())
 }
@@ -1427,9 +1449,16 @@ fn session_record_test_observation(
   })
 }
 
-fn session_isolated_shallow_clone(py: Python, session_ptr: PySession) -> CPyResult<PySession> {
+fn session_isolated_shallow_clone(
+  py: Python,
+  session_ptr: PySession,
+  build_id: String,
+) -> CPyResult<PySession> {
   with_session(py, session_ptr, |session| {
-    PySession::create_instance(py, session.isolated_shallow_clone())
+    let session_clone = session
+      .isolated_shallow_clone(build_id)
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    PySession::create_instance(py, session_clone)
   })
 }
 

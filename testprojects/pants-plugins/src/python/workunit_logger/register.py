@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -41,8 +42,7 @@ class WorkunitsLogger(WorkunitsCallback):
 
     @property
     def can_finish_async(self) -> bool:
-        # We'd like to synchronously fail the run on the final call if need be.
-        return False
+        return True
 
     def __call__(
         self,
@@ -55,6 +55,8 @@ class WorkunitsLogger(WorkunitsCallback):
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)
             if finished and context.run_tracker.has_ended():
+                # Sleep a little while to ensure that we're finishing asynchronously.
+                time.sleep(2)
                 print(FINISHED_SUCCESSFULLY, file=dest)
 
 

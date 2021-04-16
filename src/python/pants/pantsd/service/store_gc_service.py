@@ -84,3 +84,4 @@ class StoreGCService(PantsService):
             except Exception as e:
                 self._logger.critical(f"GC failed: {e!r}")
                 self.terminate()
+        self._scheduler_session.cancel()
