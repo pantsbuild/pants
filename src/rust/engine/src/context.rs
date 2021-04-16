@@ -416,10 +416,12 @@ impl Core {
   ///
   /// Shuts down this Core.
   ///
-  pub async fn shutdown(&self) {
+  pub async fn shutdown(&self, timeout: Duration) {
     // Shutdown the Sessions, which will prevent new work from starting and then await any ongoing
     // work.
-    self.sessions.shutdown().await;
+    if let Err(msg) = self.sessions.shutdown(timeout).await {
+      log::warn!("During shutdown: {}", msg);
+    }
     // Then clear the Graph to ensure that drop handlers run (particular for running processes).
     self.graph.clear();
   }

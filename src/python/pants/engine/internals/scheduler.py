@@ -311,8 +311,8 @@ class Scheduler:
             ),
         )
 
-    def shutdown(self) -> None:
-        native_engine.scheduler_shutdown(self.py_scheduler)
+    def shutdown(self, timeout_secs: int = 60) -> None:
+        native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
 
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):

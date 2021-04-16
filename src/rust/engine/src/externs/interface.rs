@@ -401,7 +401,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "scheduler_shutdown",
-    py_fn!(py, scheduler_shutdown(a: PyScheduler)),
+    py_fn!(py, scheduler_shutdown(a: PyScheduler, b: u64)),
   )?;
 
   m.add(
@@ -1199,10 +1199,13 @@ fn scheduler_metrics(
   })
 }
 
-fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler, timeout_secs: u64) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     py.allow_threads(|| {
-      scheduler.core.executor.block_on(scheduler.core.shutdown());
+      scheduler
+        .core
+        .executor
+        .block_on(scheduler.core.shutdown(Duration::from_secs(timeout_secs)));
     })
   });
   Ok(None)

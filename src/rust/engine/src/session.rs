@@ -394,7 +394,9 @@ impl Sessions {
   ///
   /// Shuts down this Sessions instance by waiting for all existing Sessions to exit.
   ///
-  pub async fn shutdown(&self) {
+  /// Waits at most `timeout` for Sessions to complete.
+  ///
+  pub async fn shutdown(&self, timeout: Duration) -> Result<(), String> {
     if let Some(sessions) = self.sessions.lock().take() {
       // Collect clones of the cancellation tokens for each Session, which allows us to watch for
       // them to have been dropped.
@@ -414,9 +416,12 @@ impl Sessions {
 
       if !build_ids.is_empty() {
         log::info!("Waiting for shutdown of: {:?}", build_ids);
-        future::join_all(cancellation_latches).await;
+        tokio::time::timeout(timeout, future::join_all(cancellation_latches))
+          .await
+          .map_err(|_| format!("Some Sessions did not shutdown within {:?}.", timeout))?;
       }
     }
+    Ok(())
   }
 }
 
