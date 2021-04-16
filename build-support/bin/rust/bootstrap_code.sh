@@ -31,16 +31,12 @@ readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
+readonly NATIVE_ENGINE_TARGET="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 
-function _build_native_engine() {
+function _build_native_code() {
   # NB: See Cargo.toml with regard to the `extension-module` feature.
-  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-}
-
-function _build_native_client() {
-  "${REPO_ROOT}/cargo" build ${MODE_FLAG} -p client || die
-  echo "${NATIVE_ROOT}/target/${MODE}/pants"
+  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine -p client || die
 }
 
 function bootstrap_native_code() {
@@ -65,19 +61,16 @@ function bootstrap_native_code() {
   if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_CLIENT_PATH}" || \
     "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
 
-    echo "Building native engine"
-    local -r native_engine="$(_build_native_engine)"
+    echo "Building native code"
+    _build_native_code
 
     # If bootstrapping the native engine fails, don't attempt to run pants afterwards.
-    if [[ ! -f "${native_engine}" ]]; then
+    if [[ ! -f "${NATIVE_ENGINE_TARGET}" ]]; then
       die "Failed to build native engine."
     fi
 
-    echo "Building native client"
-    local -r native_client="$(_build_native_client)"
-
     # If bootstrapping the native client fails, don't attempt to run pants afterwards.
-    if [[ ! -f "${native_client}" ]]; then
+    if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
       die "Failed to build native client."
     fi
 
@@ -88,8 +81,8 @@ function bootstrap_native_code() {
     # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
     #  process from being killed when recompiling.
     rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_PATH}"
-    cp "${native_engine}" "${NATIVE_ENGINE_RESOURCE}"
-    cp "${native_client}" "${NATIVE_CLIENT_PATH}"
+    cp "${NATIVE_ENGINE_TARGET}" "${NATIVE_ENGINE_RESOURCE}"
+    cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
 
     # Create the accompanying metadata file.
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
