@@ -8,13 +8,12 @@ import logging
 import os
 import platform
 import socket
-import sys
 import time
 import uuid
 from collections import OrderedDict
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -45,7 +44,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 class RunTracker:
     """Tracks and times the execution of a single Pants run."""
 
-    def __init__(self, options: Options):
+    def __init__(self, args: Tuple[str, ...], options: Options):
         """
         :API: public
         """
@@ -59,6 +58,7 @@ class RunTracker:
         millis = int((run_timestamp * 1000) % 1000)
         self.run_id = f"pants_run_{str_time}_{millis}_{run_uuid}"
 
+        self._args = args
         self._all_options = options
         info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
         self._run_info: Dict[str, Any] = {}
@@ -88,7 +88,7 @@ class RunTracker:
         self._run_start_time = run_start_time
 
         datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
-        cmd_line = " ".join(["pants"] + sys.argv[1:])
+        cmd_line = " ".join(("pants",) + self._args[1:])
 
         self._run_info.update(
             {

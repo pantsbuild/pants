@@ -21,7 +21,8 @@ from pants.version import VERSION
 def test_run_tracker_timing_output(**kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            run_tracker = RunTracker(create_options_bootstrapper([]).bootstrap_options)
+            ob = create_options_bootstrapper([])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
             run_tracker.start(run_start_time=time.time(), specs=["::"])
             frozen_time = kwargs["frozen_time"]
             frozen_time.tick(delta=datetime.timedelta(seconds=1))
@@ -40,9 +41,11 @@ def test_run_tracker_timing_output(**kwargs) -> None:
 def test_run_information(exit_code, expected, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            run_tracker = RunTracker(create_options_bootstrapper([]).bootstrap_options)
+            spec = "test/example.py"
+            ob = create_options_bootstrapper(["list", spec])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
 
-            specs = ["src/python/pants/goal/run_tracker_test.py"]
+            specs = [spec]
             run_tracker.start(run_start_time=time.time(), specs=specs)
 
             run_information = run_tracker.run_information()
@@ -58,10 +61,8 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
             assert run_information["timestamp"] == 1578657601.0
             assert run_information["user"] == getpass.getuser()
             assert run_information["version"] == VERSION
-            assert re.match("pants.*run_tracker_test.py", run_information["cmd_line"])
-            assert run_information["specs_from_command_line"] == [
-                "src/python/pants/goal/run_tracker_test.py"
-            ]
+            assert re.match(f"pants.*{spec}", run_information["cmd_line"])
+            assert run_information["specs_from_command_line"] == [spec]
 
             frozen_time = kwargs["frozen_time"]
             frozen_time.tick(delta=datetime.timedelta(seconds=1))
@@ -75,9 +76,10 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
 def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            opts = create_options_bootstrapper([]).bootstrap_options
+            ob = create_options_bootstrapper([])
+            opts = ob.bootstrap_options
             monkeypatch.setattr(opts, "_goals", ["test", "customgoal", "lint"])
-            run_tracker = RunTracker(opts)
+            run_tracker = RunTracker(ob.args, opts)
             run_tracker.start(run_start_time=time.time(), specs=[])
             kwargs["frozen_time"].tick(delta=datetime.timedelta(seconds=1))
             run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE)
@@ -113,8 +115,8 @@ def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
 def test_anonymous_telemetry_with_no_repo_id() -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            opts = create_options_bootstrapper([]).bootstrap_options
-            run_tracker = RunTracker(opts)
+            ob = create_options_bootstrapper([])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
             run_tracker.start(run_start_time=time.time(), specs=[])
             run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE)
             repo_id = ""
