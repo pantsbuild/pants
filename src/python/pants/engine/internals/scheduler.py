@@ -311,6 +311,9 @@ class Scheduler:
             ),
         )
 
+    def shutdown(self, timeout_secs: int = 60) -> None:
+        native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
+
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
     pass
@@ -339,9 +342,10 @@ class SchedulerSession:
     def py_session(self) -> PySession:
         return self._py_session
 
-    def isolated_shallow_clone(self) -> SchedulerSession:
+    def isolated_shallow_clone(self, build_id: str) -> SchedulerSession:
         return SchedulerSession(
-            self._scheduler, native_engine.session_isolated_shallow_clone(self._py_session)
+            self._scheduler,
+            native_engine.session_isolated_shallow_clone(self._py_session, build_id),
         )
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
@@ -613,6 +617,9 @@ class SchedulerSession:
 
     def record_test_observation(self, value: int) -> None:
         native_engine.session_record_test_observation(self.py_scheduler, self.py_session, value)
+
+    def cancel(self) -> None:
+        self.py_session.cancel()
 
 
 def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
