@@ -95,7 +95,7 @@ peg::parser! {
             }
 
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
-            = list_edits() / list_replace() / implicit_add()
+            = implicit_add() / list_replace() / list_edits()
     }
 }
 
