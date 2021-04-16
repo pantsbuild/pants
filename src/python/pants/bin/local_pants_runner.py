@@ -115,7 +115,7 @@ class LocalPantsRunner:
             options_bootstrapper, env, raise_=True
         )
 
-        run_tracker = RunTracker(options)
+        run_tracker = RunTracker(options_bootstrapper.args, options)
         union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
