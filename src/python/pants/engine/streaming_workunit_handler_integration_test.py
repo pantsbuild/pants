@@ -32,14 +32,19 @@ def run(args: List[str], success: bool = True) -> Tuple[PantsResult, str | None]
     with setup_tmpdir({}) as tmpdir:
         dest = os.path.join(tmpdir, "dest.log")
         pants_run = run_pants(args, config=workunit_logger_config(dest))
-        log_content = maybe_read_file(dest)
         if success:
             pants_run.assert_success()
-            assert log_content
-            assert FINISHED_SUCCESSFULLY in log_content
+            confirm_eventual_success(dest)
         else:
             pants_run.assert_failure()
-        return pants_run, log_content
+        return pants_run, maybe_read_file(dest)
+
+
+def confirm_eventual_success(log_dest: str) -> None:
+    for _ in attempts("The log should eventually show that the SWH shut down."):
+        content = maybe_read_file(log_dest)
+        if content and FINISHED_SUCCESSFULLY in content:
+            break
 
 
 def test_list() -> None:
@@ -61,7 +66,9 @@ def test_ctrl_c() -> None:
         os.kill(client_pid, signal.SIGINT)
 
         # Confirm that finish is still called (even though it may be backgrounded in the server).
-        for _ in attempts("The log should eventually show that the SWH shut down."):
-            content = maybe_read_file(dest)
-            if content and FINISHED_SUCCESSFULLY in content:
-                break
+        confirm_eventual_success(dest)
+
+
+def test_restart() -> None:
+    # Will trigger a restart
+    run(["--pantsd-max-memory-usage=1", "roots"])

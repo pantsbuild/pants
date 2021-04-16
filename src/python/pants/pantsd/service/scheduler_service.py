@@ -155,3 +155,4 @@ class SchedulerService(PantsService):
                 # Watcher failed for some reason
                 self._logger.critical(f"The scheduler was invalidated: {e!r}")
                 self.terminate()
+        self._scheduler_session.cancel()
