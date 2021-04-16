@@ -201,7 +201,9 @@ class PantsDaemon(PantsDaemonProcessManager):
             while self._core.is_valid():
                 time.sleep(self.JOIN_TIMEOUT_SECONDS)
 
-            # We're exiting: join the server to avoid interrupting ongoing runs.
+            # We're exiting: purge our metadata to prevent new connections, then join the server
+            # to avoid interrupting ongoing runs.
+            self.purge_metadata(force=True)
             self._logger.info("Waiting for ongoing runs to complete before exiting...")
             native_engine.nailgun_server_await_shutdown(self._server)
             # Then shutdown the PantsDaemonCore, which will shut down any live Scheduler.
