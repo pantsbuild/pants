@@ -109,6 +109,10 @@ impl Config {
 }
 
 impl OptionsSource for Config {
+  fn display(&self, id: &OptionId) -> String {
+    format!("{}", id)
+  }
+
   fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
     if let Some(value) = self.get_value(id) {
       if let Some(string) = value.as_str() {

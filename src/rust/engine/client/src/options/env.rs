@@ -6,6 +6,8 @@ use std::env;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::OptionsSource;
+use crate::options::parse::{parse_bool, parse_string_list};
+use crate::options::ListEdit;
 
 #[derive(Debug)]
 pub(crate) struct Env {
@@ -49,5 +51,21 @@ impl OptionsSource for Env {
       }
     }
     Ok(None)
+  }
+
+  fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
+    if let Some(value) = self.get_string(id)? {
+      parse_bool(&*self.display(id), &*value).map(Some)
+    } else {
+      Ok(None)
+    }
+  }
+
+  fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
+    if let Some(value) = self.get_string(id)? {
+      parse_string_list(&*self.display(id), &value).map(Some)
+    } else {
+      Ok(None)
+    }
   }
 }

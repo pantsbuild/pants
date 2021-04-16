@@ -13,15 +13,12 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::rc::Rc;
 
-use crate::build_root::BuildRoot;
-use crate::option_id;
-
 use self::args::Args;
 use self::config::Config;
 use self::env::Env;
-use self::parse::{parse_bool, parse_string_list};
-
-pub use id::{OptionId, Scope};
+pub use self::id::{OptionId, Scope};
+use crate::build_root::BuildRoot;
+use crate::option_id;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ListEditAction {
@@ -48,9 +45,7 @@ trait OptionsSource {
   /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
   /// flag based options and "BOB" in environment variable based options.
   ///
-  fn display(&self, id: &OptionId) -> String {
-    format!("{}", id)
-  }
+  fn display(&self, id: &OptionId) -> String;
 
   ///
   /// Get the string option identified by `id` from this source.
@@ -62,16 +57,7 @@ trait OptionsSource {
   /// Get the boolean option identified by `id` from this source.
   /// Errors when this source has an option value for `id` but that value is not a boolean.
   ///
-  /// The default implementation looks for a string value for `id` and then attempts to parse it as
-  /// a boolean value.
-  ///
-  fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
-    if let Some(value) = self.get_string(id)? {
-      parse_bool(&*self.display(id), &*value).map(Some)
-    } else {
-      Ok(None)
-    }
-  }
+  fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String>;
 
   ///
   /// Get the float option identified by `id` from this source.
@@ -99,16 +85,7 @@ trait OptionsSource {
   /// Get the string list option identified by `id` from this source.
   /// Errors when this source has an option value for `id` but that value is not a string list.
   ///
-  /// The default implementation looks for a string value for `id` and then attempts to parse it as
-  /// a list edit or series of list edits. See [`parse_string_list`].
-  ///
-  fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-    if let Some(value) = self.get_string(id)? {
-      parse_string_list(&*self.display(id), &value).map(Some)
-    } else {
-      Ok(None)
-    }
-  }
+  fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String>;
 }
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
