@@ -96,7 +96,7 @@ def make_target(
     package: Optional[str] = None,
     name: str = "target",
     interpreter_constraints: Optional[str] = None,
-    dependencies: Optional[List[str]] = None
+    dependencies: Optional[List[str]] = None,
 ) -> Target:
     if not package:
         package = PACKAGE
