@@ -49,7 +49,7 @@ class MyPyFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class MyPyPartition:
-    field_set_addresses: FrozenOrderedSet[Address]
+    root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
     interpreter_constraints: PexInterpreterConstraints
     python_version_already_configured: bool
@@ -159,17 +159,19 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     plugin_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
     )
-    typechecked_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
+    closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
+    roots_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets))
 
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
-            (addr for addr in partition.field_set_addresses),
+            (tgt.address for tgt in partition.root_targets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,
         ),
     )
+
     # TODO(John Sirois): Scope the extra requirements to the partition.
     #  Right now we just use a global set of extra requirements and these might not be compatible
     #  with all partitions. See: https://github.com/pantsbuild/pants/issues/11556
@@ -197,25 +199,25 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
 
     (
         plugin_sources,
-        typechecked_sources,
+        closure_sources,
+        roots_sources,
         mypy_pex,
         requirements_pex,
         mypy_extra_requirements_pex,
         config_files,
     ) = await MultiGet(
         plugin_sources_get,
-        typechecked_sources_get,
+        closure_sources_get,
+        roots_sources_get,
         mypy_pex_get,
         requirements_pex_get,
         mypy_extra_requirements_pex_get,
         config_files_get,
     )
 
-    typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
+    typechecked_srcs_snapshot = roots_sources.source_files.snapshot
     file_list_path = "__files.txt"
-    python_files = "\n".join(
-        determine_python_files(typechecked_sources.source_files.snapshot.files)
-    )
+    python_files = "\n".join(determine_python_files(roots_sources.source_files.snapshot.files))
     file_list_digest_request = Get(
         Digest,
         CreateDigest([FileContent(file_list_path, python_files.encode())]),
@@ -241,7 +243,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             [
                 file_list_digest,
                 plugin_sources.source_files.snapshot.digest,
-                typechecked_srcs_snapshot.digest,
+                closure_sources.source_files.snapshot.digest,
                 typechecked_venv_pex.digest,
                 config_files.snapshot.digest,
             ]
@@ -249,10 +251,11 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     )
 
     all_used_source_roots = sorted(
-        set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
+        set(itertools.chain(plugin_sources.source_roots, closure_sources.source_roots))
     )
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
+        "MYPYPATH": ":".join(all_used_source_roots),
     }
 
     result = await Get(
@@ -315,10 +318,10 @@ async def mypy_typecheck(
     for interpreter_constraints, all_transitive_targets in sorted(
         interpreter_constraints_to_transitive_targets.items()
     ):
-        combined_roots: OrderedSet[Address] = OrderedSet()
+        combined_roots: OrderedSet[Target] = OrderedSet()
         combined_closure: OrderedSet[Target] = OrderedSet()
         for transitive_targets in all_transitive_targets:
-            combined_roots.update(tgt.address for tgt in transitive_targets.roots)
+            combined_roots.update(transitive_targets.roots)
             combined_closure.update(transitive_targets.closure)
         partitions.append(
             MyPyPartition(
