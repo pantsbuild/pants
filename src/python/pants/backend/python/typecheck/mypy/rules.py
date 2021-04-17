@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule

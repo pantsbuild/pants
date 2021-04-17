@@ -859,7 +859,7 @@ def test_run_mypy_only_on_specified_files(rule_runner: RuleRunner) -> None:
     )
 
     # create a library that does NOT pass mypy checks
-    bad_target = make_target(
+    make_target(
         rule_runner=rule_runner,
         source_files=[BAD_SOURCE],
         name="bad",
