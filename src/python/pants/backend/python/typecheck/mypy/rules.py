@@ -25,6 +25,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
@@ -160,7 +161,9 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
     )
     closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
-    roots_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets))
+    roots_sources_get = Get(
+        SourceFiles, SourceFilesRequest(tgt.get(PythonSources) for tgt in partition.root_targets)
+    )
 
     requirements_pex_get = Get(
         Pex,
@@ -215,12 +218,11 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         config_files_get,
     )
 
-    typechecked_srcs_snapshot = roots_sources.source_files.snapshot
+    python_files = determine_python_files(roots_sources.snapshot.files)
     file_list_path = "__files.txt"
-    python_files = "\n".join(determine_python_files(roots_sources.source_files.snapshot.files))
     file_list_digest_request = Get(
         Digest,
-        CreateDigest([FileContent(file_list_path, python_files.encode())]),
+        CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())]),
     )
 
     typechecked_venv_pex_request = Get(
@@ -270,7 +272,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             ),
             input_digest=merged_input_files,
             extra_env=env,
-            description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
+            description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
