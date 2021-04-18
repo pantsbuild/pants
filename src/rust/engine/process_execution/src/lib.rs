@@ -409,9 +409,9 @@ impl From<ExecutedActionMetadata> for ProcessResultMetadata {
   }
 }
 
-impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
-  fn into(self) -> ExecutedActionMetadata {
-    let (total_start, total_end) = match self.total_elapsed {
+impl From<ProcessResultMetadata> for ExecutedActionMetadata {
+  fn from(metadata: ProcessResultMetadata) -> ExecutedActionMetadata {
+    let (total_start, total_end) = match metadata.total_elapsed {
       Some(elapsed) => {
         // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
         // only care about accurately preserving the duration.

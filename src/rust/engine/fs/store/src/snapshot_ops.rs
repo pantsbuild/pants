@@ -397,7 +397,7 @@ impl IntermediateGlobbedFilesAndDirectories {
         let directory_node = cur_dir_directories.get(&directory_path).unwrap();
 
         // TODO(#9967): Figure out how to consume the existing glob matching logic that works on
-        // `VFS` instances!
+        // `Vfs` instances!
         match &path_glob {
           RestrictedPathGlob::Wildcard { wildcard } => {
             // NB: We interpret globs such that the *only* way to have a glob match the contents of

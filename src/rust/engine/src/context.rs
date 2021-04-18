@@ -401,7 +401,7 @@ impl Core {
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(&build_root, ignorer, executor)
-        .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
+        .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,

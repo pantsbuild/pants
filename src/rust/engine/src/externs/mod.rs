@@ -324,7 +324,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         let get = g
           .cast_as::<PyGeneratorResponseGet>(py)
           .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
-        Ok(Get::new(py, get)?)
+        Get::new(py, get)
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))

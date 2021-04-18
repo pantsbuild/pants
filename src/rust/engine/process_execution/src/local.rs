@@ -651,7 +651,7 @@ fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
   working_directory: &Option<RelativePath>,
   argv: &[String],
-  workdir_path: &PathBuf,
+  workdir_path: &Path,
 ) -> Result<(), String> {
   let mut env_var_strings: Vec<String> = vec![];
   for (key, value) in env.iter() {

@@ -491,16 +491,14 @@ impl CommandRunner {
             ));
           };
 
-          return Ok(
-            populate_fallible_execution_result(
-              self.store.clone(),
-              action_result,
-              self.platform,
-              false,
-            )
-            .await
-            .map_err(ExecutionError::Fatal)?,
-          );
+          return populate_fallible_execution_result(
+            self.store.clone(),
+            action_result,
+            self.platform,
+            false,
+          )
+          .await
+          .map_err(ExecutionError::Fatal);
         }
 
         rpc_status

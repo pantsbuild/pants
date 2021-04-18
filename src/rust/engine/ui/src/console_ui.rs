@@ -44,7 +44,6 @@ pub struct ConsoleUI {
   local_parallelism: usize,
   // While the UI is running, there will be an Instance present.
   instance: Option<Instance>,
-  teardown_in_progress: bool,
   teardown_mpsc: (mpsc::Sender<()>, mpsc::Receiver<()>),
 }
 
@@ -54,7 +53,6 @@ impl ConsoleUI {
       workunit_store,
       local_parallelism,
       instance: None,
-      teardown_in_progress: false,
       teardown_mpsc: mpsc::channel(),
     }
   }
@@ -207,7 +205,6 @@ impl ConsoleUI {
   pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
     if let Some(instance) = self.instance.take() {
       let sender = self.teardown_mpsc.0.clone();
-      self.teardown_in_progress = true;
       // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
       // direct access to the Console.
       instance

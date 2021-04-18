@@ -1063,19 +1063,11 @@ impl<R: Rule> Builder<R> {
       // Finally, return a new graph with all deleted data discarded.
       Ok(graph.filter_map(
         |_node_id, node| {
-          if let Some(node) = node.inner() {
-            Some((node.node.clone(), node.in_set.clone()))
-          } else {
-            None
-          }
+          node
+            .inner()
+            .map(|node| (node.node.clone(), node.in_set.clone()))
         },
-        |_edge_id, edge| {
-          if let Some(edge) = edge.inner() {
-            Some(*edge)
-          } else {
-            None
-          }
-        },
+        |_edge_id, edge| edge.inner().copied(),
       ))
     } else {
       // Render the most specific errors.
@@ -1163,11 +1155,9 @@ impl<R: Rule> Builder<R> {
 
     let subgraph = graph.filter_map(
       |node_id, node| {
-        if let Some(errors) = errored.get(&node_id) {
-          Some(format!("{}:\n{}", node, errors.join("\n")))
-        } else {
-          None
-        }
+        errored
+          .get(&node_id)
+          .map(|errors| format!("{}:\n{}", node, errors.join("\n")))
       },
       |_, edge_weight| Some(edge_weight.clone()),
     );

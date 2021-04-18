@@ -8,7 +8,7 @@ use std::sync::atomic;
 use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
 
-use crate::core::{Key, Value, FNV};
+use crate::core::{Fnv, Key, Value};
 use crate::externs;
 
 ///
@@ -41,8 +41,8 @@ use crate::externs;
 ///
 #[derive(Default)]
 pub struct Interns {
-  forward_keys: Mutex<HashMap<InternKey, Key, FNV>>,
-  reverse_keys: RwLock<HashMap<Key, Value, FNV>>,
+  forward_keys: Mutex<HashMap<InternKey, Key, Fnv>>,
+  reverse_keys: RwLock<HashMap<Key, Value, Fnv>>,
   id_generator: atomic::AtomicU64,
 }
 

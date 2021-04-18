@@ -17,7 +17,7 @@ use parking_lot::Mutex;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathStat, Stat, StrictGlobMatching,
-  VFS,
+  Vfs,
 };
 
 lazy_static! {
@@ -350,7 +350,7 @@ impl PreparedPathGlobs {
 }
 
 #[async_trait]
-pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
+pub trait GlobMatching<E: Display + Send + Sync + 'static>: Vfs<E> {
   ///
   /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
   /// in None if the PathStat represents a broken Link.
@@ -380,14 +380,14 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
   }
 }
 
-impl<E: Display + Send + Sync + 'static, T: VFS<E>> GlobMatching<E> for T {}
+impl<E: Display + Send + Sync + 'static, T: Vfs<E>> GlobMatching<E> for T {}
 
 // NB: This trait exists because `expand_single()` (and its return type) should be private, but
 // traits don't allow specifying private methods (and we don't want to use a top-level `fn` because
 // it's much more awkward than just specifying `&self`).
 // The methods of `GlobMatching` are forwarded to methods here.
 #[async_trait]
-trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
+trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
   async fn directory_listing(
     &self,
     canonical_dir: Dir,
@@ -444,7 +444,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     )
     .await?;
     // See the note above.
-    Ok(path_stats.into_iter().filter_map(|pso| pso).collect())
+    Ok(path_stats.into_iter().flatten().collect())
   }
 
   async fn expand_globs(
@@ -686,4 +686,4 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
   }
 }
 
-impl<E: Display + Send + Sync + 'static, T: VFS<E>> GlobMatchingImplementation<E> for T {}
+impl<E: Display + Send + Sync + 'static, T: Vfs<E>> GlobMatchingImplementation<E> for T {}

@@ -819,8 +819,7 @@ impl Store {
   ) -> BoxFuture<'static, Result<HashMap<Digest, EntryType>, String>> {
     self
       .walk(digest, |_, _, digest, directory| {
-        let mut digest_types = Vec::new();
-        digest_types.push((digest, EntryType::Directory));
+        let mut digest_types = vec![(digest, EntryType::Directory)];
         for file in &directory.files {
           let file_digest = try_future!(require_digest(file.digest.as_ref()));
           digest_types.push((file_digest, EntryType::File));
