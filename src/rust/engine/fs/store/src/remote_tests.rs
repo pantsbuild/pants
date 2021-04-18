@@ -67,7 +67,8 @@ async fn load_file_grpc_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
@@ -83,7 +84,8 @@ async fn load_directory_grpc_error() {
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
@@ -182,7 +184,9 @@ async fn write_file_multiple_chunks() {
   for size in write_message_sizes.iter() {
     assert!(
       size <= &(10 * 1024),
-      format!("Size {} should have been <= {}", size, 10 * 1024)
+      "Size {} should have been <= {}",
+      size,
+      10 * 1024
     );
   }
 }
@@ -216,7 +220,8 @@ async fn write_file_errors() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -238,7 +243,8 @@ async fn write_connection_error() {
     .expect_err("Want error");
   assert!(
     error.contains("dns error: failed to lookup address information"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -290,7 +296,8 @@ async fn list_missing_digests_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
