@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.49.0"
+channel = "beta-2021-04-07"
 components = [
   "cargo",
   "clippy",

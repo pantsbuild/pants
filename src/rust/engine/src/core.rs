@@ -15,7 +15,7 @@ use cpython::{
 };
 use smallvec::SmallVec;
 
-pub type FNV = hash::BuildHasherDefault<FnvHasher>;
+pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
 
 ///
 /// Params represent a TypeId->Key map.

@@ -662,7 +662,7 @@ impl PosixFS {
 }
 
 #[async_trait]
-impl VFS<io::Error> for Arc<PosixFS> {
+impl Vfs<io::Error> for Arc<PosixFS> {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
     PosixFS::read_link(self, link).await
   }
@@ -719,7 +719,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
 #[async_trait]
-pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
+pub trait Vfs<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
   fn is_ignored(&self, stat: &Stat) -> bool;

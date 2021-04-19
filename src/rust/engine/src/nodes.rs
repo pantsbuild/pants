@@ -26,7 +26,7 @@ use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
@@ -45,7 +45,7 @@ use workunit_store::{
 pub type NodeResult<T> = Result<T, Failure>;
 
 #[async_trait]
-impl VFS<Failure> for Context {
+impl Vfs<Failure> for Context {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
     Ok(self.get(ReadLink(link.clone())).await?.0)
   }

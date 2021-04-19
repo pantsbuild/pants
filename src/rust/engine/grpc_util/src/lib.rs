@@ -63,7 +63,7 @@ pub fn create_tls_config(root_ca_certs: Option<Vec<u8>>) -> Result<ClientConfig,
   // Must set HTTP/2 as ALPN protocol otherwise cannot connect over TLS to gRPC servers.
   // Unfortunately, this is not a default value and, moreover, Tonic does not provide
   // any helper function to encapsulate this knowledge.
-  tls_config.set_protocols(&[Vec::from(&"h2"[..])]);
+  tls_config.set_protocols(&[Vec::from("h2")]);
 
   // Add the root store.
   match root_ca_certs {

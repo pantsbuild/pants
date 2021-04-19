@@ -210,11 +210,10 @@ async fn main() {
     Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
   let store = match (&args.server, &args.cas_server) {
     (_, Some(cas_server)) => {
-      let root_ca_certs = if let Some(ref path) = args.cas_root_ca_cert_file {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+      let root_ca_certs = args
+        .cas_root_ca_cert_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
       let mut headers = BTreeMap::new();
       if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
@@ -256,11 +255,9 @@ async fn main() {
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
-      let root_ca_certs = if let Some(path) = args.execution_root_ca_cert_file {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+      let root_ca_certs = args
+        .execution_root_ca_cert_file
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =

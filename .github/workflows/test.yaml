@@ -56,7 +56,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.49.0-*
+        path: '~/.rustup/toolchains/beta-2021-04-07-*
 
           ~/.rustup/update-hashes
 
@@ -184,7 +184,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.49.0-*
+        path: '~/.rustup/toolchains/beta-2021-04-07-*
 
           ~/.rustup/update-hashes
 
@@ -359,7 +359,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.49.0-*
+        path: '~/.rustup/toolchains/beta-2021-04-07-*
 
           ~/.rustup/update-hashes
 

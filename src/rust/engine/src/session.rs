@@ -153,8 +153,8 @@ impl Session {
     ));
 
     let handle = Arc::new(SessionHandle {
-      cancelled,
       build_id,
+      cancelled,
       display,
     });
     scheduler.core.sessions.add(&handle)?;

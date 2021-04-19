@@ -122,8 +122,8 @@ enum Node {
 
 #[derive(Clone, Copy, Debug)]
 pub enum BRFSEvent {
-  INIT,
-  DESTROY,
+  Init,
+  Destroy,
 }
 
 struct BuildResultFS {
@@ -413,14 +413,14 @@ impl BuildResultFS {
 //  ... created on demand and cached for the lifetime of the program.
 impl fuse::Filesystem for BuildResultFS {
   fn init(&mut self, _req: &fuse::Request) -> Result<(), libc::c_int> {
-    self.sender.send(BRFSEvent::INIT).map_err(|_| 1)
+    self.sender.send(BRFSEvent::Init).map_err(|_| 1)
   }
 
   fn destroy(&mut self, _req: &fuse::Request) {
     self
       .sender
-      .send(BRFSEvent::DESTROY)
-      .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::DESTROY, err))
+      .send(BRFSEvent::Destroy)
+      .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::Destroy, err))
   }
 
   // Used to answer stat calls
@@ -708,11 +708,9 @@ async fn main() {
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
 
-  let root_ca_certs = if let Some(path) = args.value_of("root-ca-cert-file") {
-    Some(std::fs::read(path).expect("Error reading root CA certs file"))
-  } else {
-    None
-  };
+  let root_ca_certs = args
+    .value_of("root-ca-cert-file")
+    .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
   let mut headers = BTreeMap::new();
   if let Some(oauth_path) = args.value_of("oauth-bearer-token-file") {
@@ -753,8 +751,8 @@ async fn main() {
 
   #[derive(Clone, Copy, Debug)]
   enum Sig {
-    INT,
-    TERM,
+    Int,
+    Term,
     Unmount,
   }
 
@@ -768,8 +766,8 @@ async fn main() {
     .map(move |_| Some(sig))
   }
 
-  let sigint = install_handler(SignalKind::interrupt, Sig::INT);
-  let sigterm = install_handler(SignalKind::terminate, Sig::TERM);
+  let sigint = install_handler(SignalKind::interrupt, Sig::Int);
+  let sigterm = install_handler(SignalKind::terminate, Sig::Term);
 
   match mount(mount_path, store, runtime.clone()) {
     Err(err) => {
@@ -781,8 +779,8 @@ async fn main() {
     }
     Ok((_, receiver)) => {
       match receiver.recv().unwrap() {
-        BRFSEvent::INIT => debug!("Store {} mounted at {}", store_path, mount_path),
-        BRFSEvent::DESTROY => {
+        BRFSEvent::Init => debug!("Store {} mounted at {}", store_path, mount_path),
+        BRFSEvent::Destroy => {
           warn!("Externally unmounted before we could mount.");
           return;
         }
@@ -792,8 +790,8 @@ async fn main() {
         // N.B.: In practice recv always errs and we exercise the or branch. It seems the sender
         // side thread always exits (which drops our BuildResultFS) before we get a chance to
         // complete the read.
-        match receiver.recv().unwrap_or(BRFSEvent::DESTROY) {
-          BRFSEvent::DESTROY => Some(Sig::Unmount),
+        match receiver.recv().unwrap_or(BRFSEvent::Destroy) {
+          BRFSEvent::Destroy => Some(Sig::Unmount),
           event => {
             warn!("Received unexpected event {:?}", event);
             None
