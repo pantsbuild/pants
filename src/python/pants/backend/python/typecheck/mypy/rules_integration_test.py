@@ -731,7 +731,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
     # We want to ensure we don't accidentally check the source plugin itself.
-    assert "(checked 2 source files)" in result.stdout
+    assert "(checked 1 source file)" in result.stdout
 
     # We also want to ensure that running MyPy on the plugin itself still works.
     plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
