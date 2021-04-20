@@ -436,8 +436,8 @@ impl ShardedLmdb {
         let (env, db, _) = store.get(&fingerprint);
         let ro_txn = env
           .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {}", err));
-        ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
+          .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
+        match ro_txn.get(db, &effective_key) {
           Ok(bytes) => f(bytes).map(Some),
           Err(lmdb::Error::NotFound) => Ok(None),
           Err(err) => Err(format!(
@@ -445,7 +445,7 @@ impl ShardedLmdb {
             effective_key.to_hex(),
             err,
           )),
-        })
+        }
       })
       .await
   }

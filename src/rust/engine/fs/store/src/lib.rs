@@ -545,16 +545,23 @@ impl Store {
             let remote = remote.clone();
 
             async move {
-              let executor = local.executor().clone();
-              let maybe_upload = local
+              // We need to copy the bytes into memory so that they may be used safely in an async
+              // future. While this unfortunately increases memory consumption, we prioritize
+              // being able to run `remote.store_bytes()` as async.
+              //
+              // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
+              // that used `Executor.block_on`, which avoided the clone but was blocking.
+              let maybe_bytes = local
                 .load_bytes_with(entry_type, digest, move |bytes| {
-                  // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
-                  executor.block_on(remote.store_bytes(bytes))
+                  Bytes::copy_from_slice(bytes)
                 })
                 .await?;
-              match maybe_upload {
-                Some(res) => res,
-                None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
+              match maybe_bytes {
+                Some(bytes) => remote.store_bytes(&bytes).await,
+                None => Err(format!(
+                  "Failed to upload digest {:?}: Not found in local store",
+                  digest
+                )),
               }
             }
           })
