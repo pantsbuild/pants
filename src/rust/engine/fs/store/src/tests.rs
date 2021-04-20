@@ -783,7 +783,7 @@ async fn upload_missing_file_in_directory() {
   assert_eq!(
     error,
     format!(
-      "Failed to upload digest {:?}: Not found",
+      "Failed to upload digest {:?}: Not found in local store",
       TestData::roland().digest()
     ),
     "Bad error message"
