@@ -626,7 +626,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             """\
             python_requirement_library(
                 name='mypy',
-                requirements=['mypy==0.800'],
+                requirements=['mypy==0.812'],
             )
 
             python_requirement_library(

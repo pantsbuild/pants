@@ -14,7 +14,7 @@ humbug==0.1.9
 #     .value_history.ranked_values[-1].value
 #   '
 #
-mypy==0.800
+mypy==0.812
 
 packaging==20.9
 pathspec==0.8.1
