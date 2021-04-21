@@ -24,6 +24,8 @@ import requests
 from common import banner, die, green, travis_section
 from reversion import reversion
 
+from pants.util.strutil import strip_prefix
+
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
 # -----------------------------------------------------------------------------------------------
@@ -294,6 +296,31 @@ def create_twine_venv() -> None:
     subprocess.run([CONSTANTS.twine_venv_dir / "bin/pip", "install", "--quiet", "twine"])
 
 
+@contextmanager
+def download_pex_bin() -> Iterator[Path]:
+    """Download PEX and return the path to the binary."""
+    try:
+        pex_version = next(
+            strip_prefix(ln, "pex==").rstrip()
+            for ln in Path("3rdparty/python/requirements.txt").read_text().splitlines()
+            if ln.startswith("pex==")
+        )
+    except (FileNotFoundError, StopIteration) as exc:
+        die(
+            "Could not find a requirement starting with `pex==` in "
+            f"3rdparty/python/requirements.txt: {repr(exc)}"
+        )
+
+    with TemporaryDirectory() as tempdir:
+        resp = requests.get(
+            f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
+        )
+        resp.raise_for_status()
+        result = Path(tempdir, "pex")
+        result.write_bytes(resp.content)
+        yield result
+
+
 # -----------------------------------------------------------------------------------------------
 # Build artifacts
 # -----------------------------------------------------------------------------------------------
@@ -415,6 +442,71 @@ def build_fs_util() -> None:
             dest_dir,
         )
         green(f"Built fs_util at {dest_dir / 'fs_util'}.")
+
+
+# TODO: We should be using `./pants package` and `pex_binary` for this...If Pants is lacking in
+#  capabilities, we should improve Pants. When porting, using `runtime_package_dependencies` to do
+#  the validation.
+def build_pex(fetch: bool) -> None:
+    if fetch:
+        extra_pex_args = [
+            f"--platform={plat}-{abi}"
+            for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+            for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
+        ]
+        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
+        banner(f"Building {pex_name} by fetching wheels.")
+    else:
+        extra_pex_args = [f"--python={sys.executable}"]
+        plat = os.uname()[0].lower()
+        py = f"cp{''.join(map(str, sys.version_info[:2]))}"
+        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.{plat}-{py}.pex"
+        banner(f"Building {pex_name} by building wheels.")
+
+    if CONSTANTS.deploy_dir.exists():
+        shutil.rmtree(CONSTANTS.deploy_dir)
+    CONSTANTS.deploy_dir.mkdir(parents=True)
+
+    if fetch:
+        fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
+        check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+    else:
+        build_pants_wheels()
+        build_3rdparty_wheels()
+
+    dest = Path("dist") / pex_name
+    with download_pex_bin() as pex_bin:
+        subprocess.run(
+            [
+                sys.executable,
+                str(pex_bin),
+                "-o",
+                str(dest),
+                "--no-build",
+                "--no-pypi",
+                "--disable-cache",
+                "-f",
+                str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+                "-f",
+                str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
+                "--no-strip-pex-env",
+                "--console-script=pants",
+                "--unzip",
+                *extra_pex_args,
+                f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
+            ],
+            check=True,
+        )
+
+    if os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE":
+        stable_dest = CONSTANTS.deploy_dir / "pex" / f"pants.{CONSTANTS.pants_stable_version}.pex"
+        stable_dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.rename(stable_dest)
+        dest = stable_dest
+    green(f"Built {dest}")
+
+    subprocess.run([sys.executable, str(dest), "--version"], check=True)
+    green(f"Validated {dest}")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -713,20 +805,18 @@ def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
-
     subparsers.add_parser("publish")
     subparsers.add_parser("dry-run-install")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-pants-wheels")
     subparsers.add_parser("build-3rdparty-wheels")
     subparsers.add_parser("build-fs-util")
+    subparsers.add_parser("build-local-pex")
+    subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
-
-    parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
-    parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
-
+    subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     return parser
 
 
@@ -744,6 +834,10 @@ def main() -> None:
         build_3rdparty_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
+    if args.command == "build-local-pex":
+        build_pex(fetch=False)
+    if args.command == "build-universal-pex":
+        build_pex(fetch=True)
     if args.command == "list-owners":
         list_owners()
     if args.command == "list-packages":
@@ -752,9 +846,8 @@ def main() -> None:
         list_prebuilt_wheels()
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
-            dest = args.wheels_dest or tempdir
-            fetch_prebuilt_wheels(dest)
-            check_prebuilt_wheels_present(dest)
+            fetch_prebuilt_wheels(tempdir)
+            check_prebuilt_wheels_present(tempdir)
 
 
 if __name__ == "__main__":
