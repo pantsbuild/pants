@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import venv
 import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -129,6 +130,10 @@ class _Constants:
     def pants_unstable_version(self) -> str:
         return f"{self.pants_stable_version}+git{self._head_sha[:8]}"
 
+    @property
+    def python_version(self) -> str:
+        return ".".join(map(str, sys.version_info[:2]))
+
 
 CONSTANTS = _Constants()
 
@@ -183,13 +188,26 @@ def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
     return not all(wheel.name.endswith("-none-any.whl") for wheel in wheel_paths)
 
 
+@contextmanager
+def create_tmp_venv() -> Iterator[str]:
+    """Create a venv and return the path to it.
+
+    Note that the venv is not sourced. You should run Path(tempdir, "bin/pip") and Path(tempdir,
+    "bin/python") directly.
+    """
+    with TemporaryDirectory() as tempdir:
+        venv.create(tempdir, with_pip=True, clear=True, symlinks=True)
+        subprocess.run([Path(tempdir, "bin/pip"), "install", "wheel"], check=True)
+        yield tempdir
+
+
 # -----------------------------------------------------------------------------------------------
 # Script commands
 # -----------------------------------------------------------------------------------------------
 
 
 def build_pants_wheels() -> None:
-    banner("Building Pants wheels")
+    banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
     version = CONSTANTS.pants_unstable_version
 
     destination = CONSTANTS.deploy_pants_wheel_dir / version
@@ -236,6 +254,40 @@ def build_pants_wheels() -> None:
                     shutil.copy2(wheel, destination)
 
     green(f"Wrote Pants wheels to {destination}.")
+
+
+def build_3rdparty_wheels() -> None:
+    banner(f"Building 3rdparty wheels with Python {CONSTANTS.python_version}")
+    dest = CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version
+    pkg_tgts = [pkg.target for pkg in PACKAGES]
+    with create_tmp_venv() as venv_tmpdir:
+        deps = (
+            subprocess.run(
+                [
+                    "./pants",
+                    "--concurrent",
+                    "--no-dynamic-ui",
+                    "dependencies",
+                    "--transitive",
+                    "--type=3rdparty",
+                    *pkg_tgts,
+                ],
+                stdout=subprocess.PIPE,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+            .splitlines()
+        )
+        if not deps:
+            raise AssertionError(
+                f"No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies` "
+                "broken?"
+            )
+        subprocess.run(
+            [Path(venv_tmpdir, "bin/pip"), "wheel", f"--wheel-dir={dest}", *deps],
+            check=True,
+        )
 
 
 def build_fs_util() -> None:
@@ -488,6 +540,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("build-pants-wheels")
+    subparsers.add_parser("build-3rdparty-wheels")
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
@@ -514,6 +567,8 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "build-pants-wheels":
         build_pants_wheels()
+    if args.command == "build-3rdparty-wheels":
+        build_3rdparty_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
     if args.command == "check-release-prereqs":

@@ -44,12 +44,9 @@ if [[ "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" && "${py_majo
 fi
 
 # This influences what setuptools is run with, which determines the interpreter used for building
-# `pantsbuild.pants`.
+# `pantsbuild.pants`. It also influences what package.py is run with, which determines which Python is used to create
+# a temporary venv to build 3rdparty wheels.
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
-
-function run_local_pants() {
-  "${ROOT}/pants" "$@"
-}
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
@@ -97,7 +94,7 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    ./pants --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
+    ./pants run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 
@@ -120,14 +117,6 @@ function pkg_testutil_install_test() {
   pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" &&
     python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
 }
-
-#
-# End of package declarations.
-#
-
-REQUIREMENTS_3RDPARTY_FILES=(
-  "3rdparty/python/requirements.txt"
-)
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
@@ -155,26 +144,6 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_plugins.releases',\
       ]" \
     "$@"
-}
-
-function build_3rdparty_packages() {
-  # Builds whls for 3rdparty dependencies of pants.
-  local version=$1
-
-  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
-
-  local req_args=()
-  for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
-    req_args=("${req_args[@]}" -r "${ROOT}/$req_file")
-  done
-
-  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[*]}"
-  activate_tmp_venv
-
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
-
-  deactivate
-  end_travis_section
 }
 
 function activate_tmp_venv() {
@@ -256,7 +225,7 @@ function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
   local VERSION="${PANTS_UNSTABLE_VERSION}"
   run_packages_script build-pants-wheels &&
-    build_3rdparty_packages "${VERSION}" &&
+    run_packages_script build-3rdparty-wheels &&
     install_and_test_packages "${VERSION}" \
       --only-binary=:all: \
       -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
@@ -333,7 +302,7 @@ function build_pex() {
     run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   else
     run_packages_script build-pants-wheels
-    build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
+    run-packages-script build-3rdparty-wheels
   fi
 
   local requirements=()
