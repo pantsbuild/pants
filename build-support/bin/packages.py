@@ -79,16 +79,6 @@ def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
 
 
 def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
-    subprocess.run(
-        [
-            venv_dir / "bin/pip",
-            "install",
-            *_pip_args(extra_pip_args),
-            f"pantsbuild.pants=={version}",
-        ],
-        check=True,
-    )
-
     def run_venv_pants(args: list[str]) -> str:
         # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
         # backend plugins so when we execute it at the repo build root, the root pants.toml will
@@ -121,11 +111,20 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
             .strip()
         )
 
+    subprocess.run(
+        [
+            venv_dir / "bin/pip",
+            "install",
+            *_pip_args(extra_pip_args),
+            f"pantsbuild.pants=={version}",
+        ],
+        check=True,
+    )
     run_venv_pants(["list", "src::"])
     outputted_version = run_venv_pants(["--version"])
     if outputted_version != version:
         die(
-            f"Installed version of Pants ({outputted_version}) not match requested "
+            f"Installed version of Pants ({outputted_version}) did not match requested "
             f"version ({version})!"
         )
 
@@ -228,7 +227,7 @@ def get_pypi_config(section: str, option: str) -> str:
     config = ConfigParser()
     config.read(os.path.expanduser("~/.pypirc"))
     if not config.has_option(section, option):
-        raise ValueError(f"Your ~/.pypirc must define a {option} option in the {section} section")
+        die(f"Your ~/.pypirc must define a {option} option in the {section} section")
     return config.get(section, option)
 
 
@@ -338,7 +337,7 @@ def build_pants_wheels() -> None:
             # should be safe because it is not possible to build native wheels for another
             # platform.
             if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
-                raise ValueError(
+                die(
                     f"Found multiple wheels for {package} in the `dist/` folder, but was "
                     f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
                 )
@@ -379,7 +378,7 @@ def build_3rdparty_wheels() -> None:
             .splitlines()
         )
         if not deps:
-            raise AssertionError(
+            die(
                 f"No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies` "
                 "broken?"
             )
