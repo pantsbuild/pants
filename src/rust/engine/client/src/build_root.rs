@@ -87,7 +87,7 @@ mod test {
       }
     }
 
-    fn cd<P: AsRef<Path>>(&mut self, path: P) -> CurrentDir {
+    fn cd<P: AsRef<Path>>(&self, path: P) -> CurrentDir {
       let cwd = path.as_ref();
       fs::create_dir_all(cwd).unwrap();
       env::set_current_dir(cwd).unwrap();
@@ -127,7 +127,7 @@ mod test {
   #[test]
   fn test_find_cwd() {
     let buildroot = TempDir::new("buildroot").unwrap();
-    let mut cwd_lock = CWD.lock();
+    let cwd_lock = CWD.lock();
     let cwd = cwd_lock.cd(buildroot.path());
 
     let mut sentinel: Option<PathBuf> = None;
@@ -154,7 +154,7 @@ mod test {
   #[test]
   fn test_find_subdir() {
     let buildroot = TempDir::new("buildroot").unwrap();
-    let mut cwd_lock = CWD.lock();
+    let cwd_lock = CWD.lock();
     let subdir = cwd_lock.cd(buildroot.path().join("foo").join("bar"));
 
     assert_eq!(subdir.path(), &env::current_dir().unwrap());
