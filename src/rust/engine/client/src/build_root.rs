@@ -15,7 +15,11 @@ impl BuildRoot {
 
   pub fn find() -> Result<BuildRoot, String> {
     let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {}", e))?;
-    let mut build_root = cwd.clone();
+    Self::find_from(&cwd)
+  }
+
+  pub(crate) fn find_from(start: &PathBuf) -> Result<BuildRoot, String> {
+    let mut build_root = start.clone();
     loop {
       for sentinel in Self::SENTINEL_FILES {
         let sentinel_path = build_root.join(sentinel);
@@ -33,7 +37,7 @@ impl BuildRoot {
         })?;
         if sentinel_path_metadata.is_file() {
           let root = BuildRoot(build_root);
-          debug!("Found {:?} starting search from {}.", root, cwd.display());
+          debug!("Found {:?} starting search from {}.", root, start.display());
           return Ok(root);
         }
       }
@@ -46,7 +50,7 @@ impl BuildRoot {
           by looking for at least one file from {sentinel_files} in the cwd and its ancestors. If \
           you have none of these files, you can create an empty file in your build root.\
           ",
-          cwd = cwd.display(),
+          cwd = start.display(),
           sentinel_files = Self::SENTINEL_FILES.join(", ")
         ))?
         .into();
