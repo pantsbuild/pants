@@ -32,12 +32,11 @@ from reversion import reversion
 @total_ordering
 class Package:
     def __init__(
-        self,
-        name: str,
-        target: str,
+        self, name: str, target: str, validate: callable[[str, str, list[str]], None]
     ) -> None:
         self.name = name
         self.target = target
+        self.validate = validate
 
     def __lt__(self, other):
         return self.name < other.name
@@ -75,12 +74,95 @@ class Package:
         return {row[1] for row in roles if row[0] == "Owner"}  # type: ignore[union-attr,index]
 
 
+def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
+    return (*extra_pip_args, "--quiet", "--no-cache-dir")
+
+
+def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
+    subprocess.run(
+        [
+            venv_dir / "bin/pip",
+            "install",
+            *_pip_args(extra_pip_args),
+            f"pantsbuild.pants=={version}",
+        ],
+        check=True,
+    )
+
+    def run_venv_pants(args: list[str]) -> str:
+        # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
+        # backend plugins so when we execute it at the repo build root, the root pants.toml will
+        # ask it to load internal backend packages and their dependencies which it doesn't have,
+        # and it'll fail. To solve that problem, we load the internal backend package dependencies
+        # into the pantsbuild.pants venv.
+        return (
+            subprocess.run(
+                [
+                    venv_dir / "bin/pants",
+                    "--no-verify-config",
+                    "--no-remote-cache-read",
+                    "--no-remote-cache-write",
+                    "--no-pantsd",
+                    "--pythonpath=['pants-plugins']",
+                    (
+                        "--backend-packages=["
+                        "'pants.backend.awslambda.python', "
+                        "'pants.backend.python', "
+                        "'pants.backend.shell', "
+                        "'internal_plugins.releases'"
+                        "]"
+                    ),
+                    *args,
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+            )
+            .stdout.decode()
+            .strip()
+        )
+
+    run_venv_pants(["list", "src::"])
+    outputted_version = run_venv_pants(["--version"])
+    if outputted_version != version:
+        die(
+            f"Installed version of Pants ({outputted_version}) not match requested "
+            f"version ({version})!"
+        )
+
+
+def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
+    subprocess.run(
+        [
+            venv_dir / "bin/pip",
+            "install",
+            *_pip_args(extra_pip_args),
+            f"pantsbuild.pants.testutil=={version}",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            venv_dir / "bin/python",
+            "-c",
+            (
+                "import pants.testutil.option_util, pants.testutil.rule_runner, "
+                "pants.testutil.pants_integration_test"
+            ),
+        ],
+        check=True,
+    )
+
+
 PACKAGES = sorted(
     {
         # NB: This a native wheel. We expect a distinct wheel for each Python version and each
         # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged"),
-        Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg),
+        Package(
+            "pantsbuild.pants.testutil",
+            "src/python/pants/testutil:testutil_wheel",
+            validate_testutil_pkg,
+        ),
     }
 )
 
@@ -193,7 +275,7 @@ def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
 
 
 @contextmanager
-def create_tmp_venv() -> Iterator[str]:
+def create_tmp_venv() -> Iterator[Path]:
     """Create a venv and return the path to it.
 
     Note that the venv is not sourced. You should run Path(tempdir, "bin/pip") and Path(tempdir,
@@ -201,8 +283,8 @@ def create_tmp_venv() -> Iterator[str]:
     """
     with TemporaryDirectory() as tempdir:
         venv.create(tempdir, with_pip=True, clear=True, symlinks=True)
-        subprocess.run([Path(tempdir, "bin/pip"), "install", "wheel"], check=True)
-        yield tempdir
+        subprocess.run([Path(tempdir, "bin/pip"), "install", "--quiet", "wheel"], check=True)
+        yield Path(tempdir)
 
 
 def create_twine_venv() -> None:
@@ -210,7 +292,7 @@ def create_twine_venv() -> None:
     if CONSTANTS.twine_venv_dir.exists():
         shutil.rmtree(CONSTANTS.twine_venv_dir)
     venv.create(CONSTANTS.twine_venv_dir, with_pip=True, clear=True, symlinks=True)
-    subprocess.run([Path(CONSTANTS.twine_venv_dir, "bin/pip"), "install", "twine"])
+    subprocess.run([CONSTANTS.twine_venv_dir / "bin/pip", "install", "--quiet", "twine"])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -222,8 +304,8 @@ def build_pants_wheels() -> None:
     banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
     version = CONSTANTS.pants_unstable_version
 
-    destination = CONSTANTS.deploy_pants_wheel_dir / version
-    destination.mkdir(parents=True, exist_ok=True)
+    dest = CONSTANTS.deploy_pants_wheel_dir / version
+    dest.mkdir(parents=True, exist_ok=True)
 
     args = (
         "./pants",
@@ -261,11 +343,16 @@ def build_pants_wheels() -> None:
                     f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
                 )
             for wheel in found_wheels:
-                if not (destination / wheel.name).exists():
+                if not (dest / wheel.name).exists():
                     # We use `copy2` to preserve metadata.
-                    shutil.copy2(wheel, destination)
+                    shutil.copy2(wheel, dest)
 
-    green(f"Wrote Pants wheels to {destination}.")
+    green(f"Wrote Pants wheels to {dest}.")
+
+    banner(f"Validating Pants wheels for {CONSTANTS.python_version}.")
+    create_twine_venv()
+    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", dest / "*.whl"], check=True)
+    green(f"Validated Pants wheels for {CONSTANTS.python_version}.")
 
 
 def build_3rdparty_wheels() -> None:
@@ -346,7 +433,7 @@ def publish() -> None:
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-    check_prebuilt_wheels(CONSTANTS.deploy_dir)
+    check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
     # Release.
     create_twine_venv()
@@ -485,6 +572,43 @@ def tag_release() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
+# Test release & dry run
+# -----------------------------------------------------------------------------------------------
+
+
+def dry_run_install() -> None:
+    banner("Performing a dry run release")
+    build_pants_wheels()
+    build_3rdparty_wheels()
+    install_and_test_packages(
+        CONSTANTS.pants_unstable_version,
+        extra_pip_args=[
+            "--only-binary=:all:",
+            "-f",
+            CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version,
+            "-f",
+            CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version,
+        ],
+    )
+    banner("Dry run release succeeded")
+
+
+def test_release() -> None:
+    banner("Installing and testing the latest released packages")
+    install_and_test_packages(CONSTANTS.pants_stable_version)
+    banner("Successfully installed and tested the latest released packages")
+
+
+def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
+    with create_tmp_venv() as venv_tmpdir:
+        for pkg in PACKAGES:
+            pip_req = f"{pkg.name}=={version}"
+            banner(f"Installing and testing {pip_req}")
+            pkg.validate(version, venv_tmpdir, extra_pip_args or [])
+            green(f"Tests succeeded for {pip_req}")
+
+
+# -----------------------------------------------------------------------------------------------
 # Release introspection
 # -----------------------------------------------------------------------------------------------
 
@@ -560,7 +684,7 @@ def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
         dest.write_bytes(response.content)
 
 
-def check_prebuilt_wheels(check_dir: str | Path) -> None:
+def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
     for package in PACKAGES:
@@ -592,6 +716,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("publish")
+    subparsers.add_parser("dry-run-install")
+    subparsers.add_parser("test-release")
     subparsers.add_parser("build-pants-wheels")
     subparsers.add_parser("build-3rdparty-wheels")
     subparsers.add_parser("build-fs-util")
@@ -609,6 +735,10 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
+    if args.command == "dry-run-install":
+        dry_run_install()
+    if args.command == "test-release":
+        test_release()
     if args.command == "build-pants-wheels":
         build_pants_wheels()
     if args.command == "build-3rdparty-wheels":
@@ -625,7 +755,7 @@ def main() -> None:
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir
             fetch_prebuilt_wheels(dest)
-            check_prebuilt_wheels(dest)
+            check_prebuilt_wheels_present(dest)
 
 
 if __name__ == "__main__":
