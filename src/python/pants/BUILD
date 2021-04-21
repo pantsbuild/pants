@@ -44,6 +44,11 @@ resources(
 )
 
 python_library(
+  name='conftest',
+  sources=['conftest.py'],
+)
+
+python_library(
   name='version',
   sources=['version.py'],
   dependencies = [
