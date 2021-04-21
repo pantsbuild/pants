@@ -269,8 +269,6 @@ impl ByteStore {
   /// blocking, this accepts a function that views a slice rather than returning a clone of the
   /// data. The upshot is that the database is able to provide slices directly into shared memory.
   ///
-  /// The provided function is guaranteed to be called in a context where it is safe to block.
-  ///
   pub async fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
@@ -280,10 +278,7 @@ impl ByteStore {
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging
       // snapshots) to work without needing to first store the empty snapshot.
-      //
-      // To maintain the guarantee that the given function is called in a blocking context, we
-      // spawn it as a task.
-      return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
+      return Ok(Some(f(&[])));
     }
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -296,15 +291,23 @@ impl ByteStore {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
-    };
-
-    dbs?.load_bytes_with(digest.hash, move |bytes| {
+    }?;
+    dbs
+      .load_bytes_with(digest.hash, move |bytes| {
         if bytes.len() == digest.size_bytes {
-            Ok(f(bytes))
+          Ok(f(bytes))
         } else {
-            Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
+          Err(format!(
+            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                sha256! Underlying bytes: {:?}",
+            digest,
+            bytes.len(),
+            bytes
+          ))
         }
-    }).await
+      })
+      .await
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
