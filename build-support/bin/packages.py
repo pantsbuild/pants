@@ -477,7 +477,7 @@ def check_pgp() -> None:
     if not key:
         die("You must set up a PGP key. See https://www.pantsbuild.org/docs/release-process.")
     print("Found the following key for release signing:\n")
-    subprocess.run([get_pgp_program_name(), "-k", key])
+    subprocess.run([get_pgp_program_name(), "-k", key], check=True)
     key_confirmation = input("\nIs this the correct key? [Y/n]: ")
     if key_confirmation and key_confirmation.lower() != "y":
         die(
@@ -577,7 +577,7 @@ def tag_release() -> None:
 
 
 def dry_run_install() -> None:
-    banner("Performing a dry run release")
+    banner(f"Performing a dry run release with {CONSTANTS.python_version}")
     build_pants_wheels()
     build_3rdparty_wheels()
     install_and_test_packages(
@@ -590,7 +590,7 @@ def dry_run_install() -> None:
             str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
         ],
     )
-    banner("Dry run release succeeded")
+    banner(f"Dry run release succeeded with {CONSTANTS.python_version}")
 
 
 def test_release() -> None:
