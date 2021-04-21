@@ -345,7 +345,7 @@ function build_pex() {
     -o "${dest}" \
     --no-strip-pex-env \
     --script=pants \
-    --venv \
+    --unzip \
     "${distribution_target_flags[@]}" \
     "${requirements[@]}"
 
