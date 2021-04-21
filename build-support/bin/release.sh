@@ -6,18 +6,6 @@ set -e
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-function safe_curl() {
-  real_curl="$(command -v curl)"
-  set +e
-  "${real_curl}" --fail -SL "$@"
-  exit_code=$?
-  set -e
-  if [[ "${exit_code}" -ne 0 ]]; then
-    echo >&2 "Curl failed with args: $*"
-    exit 1
-  fi
-}
-
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
@@ -44,12 +32,9 @@ if [[ "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" && "${py_majo
 fi
 
 # This influences what setuptools is run with, which determines the interpreter used for building
-# `pantsbuild.pants`.
+# `pantsbuild.pants`. It also influences what package.py is run with, which determines which Python is used to create
+# a temporary venv to build 3rdparty wheels.
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
-
-function run_local_pants() {
-  "${ROOT}/pants" "$@"
-}
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
@@ -66,6 +51,25 @@ readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
 readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}"
 readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
+
+function run_packages_script() {
+  (
+    cd "${ROOT}"
+    ./pants run "${ROOT}/build-support/bin/packages.py" -- "$@"
+  )
+}
+
+function safe_curl() {
+  real_curl="$(command -v curl)"
+  set +e
+  "${real_curl}" --fail -SL "$@"
+  exit_code=$?
+  set -e
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo >&2 "Curl failed with args: $*"
+    exit 1
+  fi
+}
 
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
@@ -92,194 +96,6 @@ function run_pex() {
     safe_curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     "${PY}" "${pex}" "$@"
   )
-}
-
-function run_packages_script() {
-  (
-    cd "${ROOT}"
-    ./pants --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
-  )
-}
-
-function pkg_pants_install_test() {
-  local version=$1
-  shift
-  local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" ||
-    die "pip install of pantsbuild.pants failed!"
-  execute_packaged_pants_with_internal_backends list src:: ||
-    die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --version 2> /dev/null)" == \
-  "${version}" ]] || die "Installed version of pants does not match requested version!"
-}
-
-function pkg_testutil_install_test() {
-  local version=$1
-  shift
-  local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" &&
-    python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
-}
-
-#
-# End of package declarations.
-#
-
-REQUIREMENTS_3RDPARTY_FILES=(
-  "3rdparty/python/requirements.txt"
-)
-
-# When we do (dry-run) testing, we need to run the packaged pants.
-# It doesn't have internal backend plugins so when we execute it
-# at the repo build root, the root pants.toml will ask it to load
-# internal backend packages and their dependencies which it doesn't have,
-# and it'll fail. To solve that problem, we load the internal backend package
-# dependencies into the pantsbuild.pants venv.
-#
-# TODO: Starting and stopping pantsd repeatedly here works fine, but because the
-# created venvs are located within the buildroot, pantsd will fingerprint them on
-# startup. Production usecases should generally not experience this cost, because
-# either pexes or venvs (as created by the `pants` script that we distribute) are
-# created outside of the buildroot.
-function execute_packaged_pants_with_internal_backends() {
-  pants \
-    --no-verify-config \
-    --no-remote-cache-read \
-    --no-remote-cache-write \
-    --no-pantsd \
-    --pythonpath="['pants-plugins']" \
-    --backend-packages="[\
-        'pants.backend.awslambda.python',\
-        'pants.backend.python',\
-        'pants.backend.shell',\
-        'internal_plugins.releases',\
-      ]" \
-    "$@"
-}
-
-function build_3rdparty_packages() {
-  # Builds whls for 3rdparty dependencies of pants.
-  local version=$1
-
-  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
-
-  local req_args=()
-  for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
-    req_args=("${req_args[@]}" -r "${ROOT}/$req_file")
-  done
-
-  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[*]}"
-  activate_tmp_venv
-
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
-
-  deactivate
-  end_travis_section
-}
-
-function activate_tmp_venv() {
-  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
-  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
-  # shellcheck source=/dev/null
-  VENV_DIR=$(mktemp -d -t pants.XXXXX) &&
-    "${PY}" -m venv "${VENV_DIR}" &&
-    "${VENV_DIR}/bin/pip" install wheel &&
-    source "${VENV_DIR}/bin/activate"
-}
-
-function pre_install() {
-  start_travis_section "SetupVenv" "Setting up virtualenv"
-  activate_tmp_venv
-  end_travis_section
-}
-
-function post_install() {
-  # this assume pre_install is called and a new temp venv activation has been done.
-  if [[ "${pause_after_venv_creation}" == "true" ]]; then
-    cat << EOM
-
-If you want to poke around with the new version of pants that has been built
-and installed in a temporary virtualenv, fire up another shell window and type:
-
-  source ${VENV_DIR}/bin/activate
-  cd ${ROOT}
-
-From there, you can run 'pants' (not './pants') to do some testing.
-
-When you're done testing, press enter to continue.
-EOM
-    read -r
-  fi
-  deactivate
-}
-
-function install_and_test_packages() {
-  local VERSION=$1
-  shift
-  local PIP_ARGS=(
-    "${VERSION}"
-    "$@"
-    --quiet
-    # Prefer remote or `--find-links` packages to cache contents.
-    --no-cache-dir
-  )
-
-  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
-
-  start_travis_section "wheel_check" "Validating ${VERSION} pantsbuild.pants wheels"
-  activate_twine
-  twine check "${PANTS_PYTHON_REPOS_REPOS}"/*.whl || die "Failed to validate wheels."
-  deactivate
-  end_travis_section
-
-  pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
-
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  packages=(
-    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
-  ) || die "Failed to list packages!"
-
-  for package in "${packages[@]}"; do
-    start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
-    # shellcheck disable=SC2086
-    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" ||
-      die "Failed to install and test package ${package}-${VERSION}!"
-    end_travis_section
-  done
-  unset PANTS_PYTHON_REPOS_REPOS
-
-  post_install || die "Failed to deactivate virtual env while testing ${NAME}-${VERSION}!"
-}
-
-function dry_run_install() {
-  # Build a complete set of whls, and then ensure that we can install pants using only whls.
-  local VERSION="${PANTS_UNSTABLE_VERSION}"
-  run_packages_script build-pants-wheels &&
-    build_3rdparty_packages "${VERSION}" &&
-    install_and_test_packages "${VERSION}" \
-      --only-binary=:all: \
-      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
-}
-
-function get_pgp_keyid() {
-  git config --get user.signingkey
-}
-
-function get_pgp_program() {
-  git config --get gpg.program || echo "gpg"
-}
-
-function activate_twine() {
-  local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
-
-  rm -rf "${venv_dir}"
-  "${PY}" -m venv "${venv_dir}"
-  # While the `activate` script is in a fixed location, it might not exist on the user's machine as
-  # we gitignore the venv. So, we tell Shellcheck to ignore the file.
-  # shellcheck source=/dev/null
-  source "${venv_dir}/bin/activate"
-  pip install twine
 }
 
 function execute_pex() {
@@ -333,7 +149,7 @@ function build_pex() {
     run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   else
     run_packages_script build-pants-wheels
-    build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
+    run-packages-script build-3rdparty-wheels
   fi
 
   local requirements=()
@@ -357,30 +173,14 @@ function build_pex() {
   banner "Successfully built ${dest}"
 }
 
-function publish_packages() {
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
-
-  start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
-  run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}" --reversion
-
-  activate_twine
-  trap deactivate RETURN
-  twine upload --sign "--sign-with=$(get_pgp_program)" "--identity=$(get_pgp_keyid)" \
-    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
-
-  end_travis_section
-}
-
-_OPTS="dhnftlowepq"
+_OPTS="hnftlowepq"
 
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPI.  Credentials are needed for this as described in the"
   echo "release docs: https://www.pantsbuild.org/docs/releases"
   echo
-  echo "Usage: $0 [-d] (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
-  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
+  echo "Usage: $0 (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
@@ -409,7 +209,6 @@ function usage() {
 while getopts ":${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
-    d) debug="true" ;;
     n) dry_run="true" ;;
     f)
       run_packages_script build-fs-util
@@ -444,29 +243,12 @@ while getopts ":${_OPTS}" opt; do
   esac
 done
 
-if [[ "${debug}" == "true" ]]; then
-  set -x
-  pause_after_venv_creation="true"
-fi
-
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
 elif [[ "${dry_run}" == "true" ]]; then
-  banner "Performing a dry run release"
-  (
-    dry_run_install &&
-      banner "Dry run release succeeded"
-  ) || die "Dry run release failed."
+  (run_packages_script dry-run-install) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
-  banner "Installing and testing the latest released packages"
-  (
-    install_and_test_packages "${PANTS_STABLE_VERSION}" &&
-      banner "Successfully installed and tested the latest released packages"
-  ) || die "Failed to install and test the latest released packages."
+  (run_packages_script test-release) || die "Failed to install and test the latest released packages."
 else
-  banner "Releasing packages to PyPI"
-  (
-    run_packages_script check-release-prereqs && publish_packages &&
-      run_packages_script post-publish && banner "Successfully released packages to PyPI"
-  ) || die "Failed to release packages to PyPI."
+  (run_packages_script publish) || die "Failed to release packages to PyPI."
 fi
