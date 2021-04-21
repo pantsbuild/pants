@@ -54,7 +54,7 @@ class Package:
     def __repr__(self):
         return f"Package<name={self.name}>"
 
-    def find_locally(self, *, version: str, search_dir: str) -> list[Path]:
+    def find_locally(self, *, version: str, search_dir: str | Path) -> list[Path]:
         return list(Path(search_dir).rglob(f"{self.name}-{version}-*.whl"))
 
     def exists_on_pypi(self) -> bool:  # type: ignore[return]
@@ -131,6 +131,10 @@ class _Constants:
         return f"{self.pants_stable_version}+git{self._head_sha[:8]}"
 
     @property
+    def twine_venv_dir(self) -> Path:
+        return Path.cwd() / "build-support" / "twine-deps.venv"
+
+    @property
     def python_version(self) -> str:
         return ".".join(map(str, sys.version_info[:2]))
 
@@ -201,8 +205,16 @@ def create_tmp_venv() -> Iterator[str]:
         yield tempdir
 
 
+def create_twine_venv() -> None:
+    """Create a venv at CONSTANTS.twine_venv_dir and install Twine."""
+    if CONSTANTS.twine_venv_dir.exists():
+        shutil.rmtree(CONSTANTS.twine_venv_dir)
+    venv.create(CONSTANTS.twine_venv_dir, with_pip=True, clear=True, symlinks=True)
+    subprocess.run([Path(CONSTANTS.twine_venv_dir, "bin/pip"), "install", "twine"])
+
+
 # -----------------------------------------------------------------------------------------------
-# Script commands
+# Build artifacts
 # -----------------------------------------------------------------------------------------------
 
 
@@ -319,6 +331,38 @@ def build_fs_util() -> None:
         green(f"Built fs_util at {dest_dir / 'fs_util'}.")
 
 
+# -----------------------------------------------------------------------------------------------
+# Publish
+# -----------------------------------------------------------------------------------------------
+
+
+def publish() -> None:
+    banner("Releasing packages to PyPI and GitHub")
+    # Check prereqs.
+    check_clean_git_branch()
+    check_pgp()
+    check_ownership({get_pypi_config("server-login", "username")})
+    # Fetch and validate prebuild wheels.
+    if CONSTANTS.deploy_pants_wheel_dir.exists():
+        shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
+    fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
+    check_prebuilt_wheels(CONSTANTS.deploy_dir)
+    reversion_prebuilt_wheels()
+    # Release.
+    create_twine_venv()
+    subprocess.run(
+        [
+            CONSTANTS.twine_venv_dir / "bin/twine",
+            "--sign",
+            f"--sign-with={get_pgp_program_name()}",
+            f"--identity={get_pgp_key_id()}",
+        ],
+        check=True,
+    )
+    tag_release()
+    banner("Successfully released packages to PyPI and GitHub")
+
+
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
     git_status = (
@@ -400,11 +444,49 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
         )
 
 
-def check_release_prereqs() -> None:
-    check_clean_git_branch()
-    check_pgp()
-    me = get_pypi_config("server-login", "username")
-    check_ownership({me})
+def reversion_prebuilt_wheels() -> None:
+    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We build on
+    # Centos7, so use manylinux2014.
+    source_platform = "linux_x86_64"
+    dest_platform = "manylinux2014_x86_64"
+    unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
+    for whl in unstable_wheel_dir.glob(f"*{source_platform}.whl"):
+        whl.rename(str(whl).replace(source_platform, dest_platform))
+
+    # Now, reversion to use the STABLE_VERSION.
+    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
+    for whl in unstable_wheel_dir.glob("*.whl"):
+        reversion(
+            whl_file=str(whl),
+            dest_dir=str(stable_wheel_dir),
+            target_version=CONSTANTS.pants_stable_version,
+            extra_globs=["pants/VERSION"],
+        )
+
+
+def tag_release() -> None:
+    tag_name = f"release_{CONSTANTS.pants_stable_version}"
+    subprocess.run(
+        [
+            "git",
+            "tag",
+            "-f",
+            f"--local-user={get_pgp_key_id()}",
+            "-m",
+            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
+            tag_name,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Release introspection
+# -----------------------------------------------------------------------------------------------
 
 
 def list_owners() -> None:
@@ -455,8 +537,13 @@ def list_prebuilt_wheels() -> None:
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Fetch and check prebuilt wheels
+# -----------------------------------------------------------------------------------------------
+
+
 # TODO: possibly parallelize through httpx and asyncio.
-def fetch_prebuilt_wheels(destination_dir: str) -> None:
+def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
     session = requests.Session()
@@ -473,7 +560,7 @@ def fetch_prebuilt_wheels(destination_dir: str) -> None:
         dest.write_bytes(response.content)
 
 
-def check_prebuilt_wheels(check_dir: str) -> None:
+def check_prebuilt_wheels(check_dir: str | Path) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
     for package in PACKAGES:
@@ -495,99 +582,50 @@ def check_prebuilt_wheels(check_dir: str) -> None:
     green(f"All {len(PACKAGES)} pantsbuild.pants packages were fetched and are valid.")
 
 
-def reversion_prebuilt_wheels() -> None:
-    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We build on
-    # Centos7, so use manylinux2014.
-    source_platform = "linux_x86_64"
-    dest_platform = "manylinux2014_x86_64"
-    unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
-    for whl in unstable_wheel_dir.glob(f"*{source_platform}.whl"):
-        whl.rename(str(whl).replace(source_platform, dest_platform))
-
-    # Now, reversion to use the STABLE_VERSION.
-    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
-    for whl in unstable_wheel_dir.glob("*.whl"):
-        reversion(
-            whl_file=str(whl),
-            dest_dir=str(stable_wheel_dir),
-            target_version=CONSTANTS.pants_stable_version,
-            extra_globs=["pants/VERSION"],
-        )
-
-
-def tag_release() -> None:
-    tag_name = f"release_{CONSTANTS.pants_stable_version}"
-    subprocess.run(
-        [
-            "git",
-            "tag",
-            "-f",
-            f"--local-user={get_pgp_key_id()}",
-            "-m",
-            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
-            tag_name,
-        ],
-        check=True,
-    )
-    subprocess.run(
-        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
-    )
+# -----------------------------------------------------------------------------------------------
+# main()
+# -----------------------------------------------------------------------------------------------
 
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
+    subparsers.add_parser("publish")
     subparsers.add_parser("build-pants-wheels")
     subparsers.add_parser("build-3rdparty-wheels")
     subparsers.add_parser("build-fs-util")
-    subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
-    # TODO: replace this with `publish-packages` once release.sh is ported.
-    subparsers.add_parser("post-publish")
 
     parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
-    parser_fetch_prebuilt_wheels.add_argument(
-        "--reversion",
-        action="store_true",
-        help=(
-            "Adjust the fetched wheels to be manylinux and to use STABLE_VERSION instead of "
-            "UNSTABLE_VERSION."
-        ),
-    )
 
     return parser
 
 
 def main() -> None:
     args = create_parser().parse_args()
+    if args.command == "publish":
+        publish()
     if args.command == "build-pants-wheels":
         build_pants_wheels()
     if args.command == "build-3rdparty-wheels":
         build_3rdparty_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
-    if args.command == "check-release-prereqs":
-        check_release_prereqs()
     if args.command == "list-owners":
         list_owners()
     if args.command == "list-packages":
         list_packages()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "post-publish":
-        tag_release()
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir
             fetch_prebuilt_wheels(dest)
             check_prebuilt_wheels(dest)
-            if args.reversion:
-                reversion_prebuilt_wheels()
 
 
 if __name__ == "__main__":

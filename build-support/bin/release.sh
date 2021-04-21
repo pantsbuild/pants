@@ -231,14 +231,6 @@ function dry_run_install() {
       -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
-function get_pgp_keyid() {
-  git config --get user.signingkey
-}
-
-function get_pgp_program() {
-  git config --get gpg.program || echo "gpg"
-}
-
 function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
@@ -326,21 +318,6 @@ function build_pex() {
   banner "Successfully built ${dest}"
 }
 
-function publish_packages() {
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
-
-  start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
-  run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}" --reversion
-
-  activate_twine
-  trap deactivate RETURN
-  twine upload --sign "--sign-with=$(get_pgp_program)" "--identity=$(get_pgp_keyid)" \
-    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
-
-  end_travis_section
-}
-
 _OPTS="dhnftlowepq"
 
 function usage() {
@@ -422,10 +399,7 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release"
-  (
-    dry_run_install &&
-      banner "Dry run release succeeded"
-  ) || die "Dry run release failed."
+  (dry_run_install && banner "Dry run release succeeded") || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages"
   (
@@ -433,9 +407,5 @@ elif [[ "${test_release}" == "true" ]]; then
       banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
-  banner "Releasing packages to PyPI"
-  (
-    run_packages_script check-release-prereqs && publish_packages &&
-      run_packages_script post-publish && banner "Successfully released packages to PyPI"
-  ) || die "Failed to release packages to PyPI."
+  (run_packages_script publish) || die "Failed to release packages to PyPI."
 fi
