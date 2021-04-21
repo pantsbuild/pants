@@ -171,6 +171,7 @@ extra_env_vars = [
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
+config = "build-support/coverage/coveragerc"
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
