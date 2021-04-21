@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Iterable, Iterator, NamedTuple, cast
+from typing import Callable, Iterable, Iterator, NamedTuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
@@ -32,7 +32,7 @@ from reversion import reversion
 @total_ordering
 class Package:
     def __init__(
-        self, name: str, target: str, validate: callable[[str, str, list[str]], None]
+        self, name: str, target: str, validate: Callable[[str, Path, list[str]], None]
     ) -> None:
         self.name = name
         self.target = target
@@ -585,9 +585,9 @@ def dry_run_install() -> None:
         extra_pip_args=[
             "--only-binary=:all:",
             "-f",
-            CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version,
+            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
             "-f",
-            CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version,
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
         ],
     )
     banner("Dry run release succeeded")
