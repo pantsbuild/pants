@@ -11,7 +11,7 @@ freezegun==1.1.0
 humbug==0.1.9
 idna==2.10
 iniconfig==1.1.1
-mypy==0.800
+mypy==0.812
 mypy-extensions==0.4.3
 packaging==20.9
 pex==2.1.38
