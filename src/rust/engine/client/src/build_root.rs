@@ -3,7 +3,7 @@
 
 use std::env;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::debug;
 
@@ -18,8 +18,8 @@ impl BuildRoot {
     Self::find_from(&cwd)
   }
 
-  pub(crate) fn find_from(start: &PathBuf) -> Result<BuildRoot, String> {
-    let mut build_root = start.clone();
+  pub(crate) fn find_from(start: &Path) -> Result<BuildRoot, String> {
+    let mut build_root = start;
     loop {
       for sentinel in Self::SENTINEL_FILES {
         let sentinel_path = build_root.join(sentinel);
@@ -36,24 +36,21 @@ impl BuildRoot {
           )
         })?;
         if sentinel_path_metadata.is_file() {
-          let root = BuildRoot(build_root);
+          let root = BuildRoot(build_root.to_path_buf());
           debug!("Found {:?} starting search from {}.", root, start.display());
           return Ok(root);
         }
       }
 
-      build_root = build_root
-        .parent()
-        .ok_or(format!(
-          "\
+      build_root = build_root.parent().ok_or(format!(
+        "\
           No build root detected for the current directory of {cwd}. Pants detects the build root \
           by looking for at least one file from {sentinel_files} in the cwd and its ancestors. If \
           you have none of these files, you can create an empty file in your build root.\
           ",
-          cwd = start.display(),
-          sentinel_files = Self::SENTINEL_FILES.join(", ")
-        ))?
-        .into();
+        cwd = start.display(),
+        sentinel_files = Self::SENTINEL_FILES.join(", ")
+      ))?;
     }
   }
 }

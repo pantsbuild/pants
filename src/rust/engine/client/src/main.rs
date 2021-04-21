@@ -29,7 +29,7 @@
 
 use std::convert::AsRef;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::SystemTime;
 
@@ -46,11 +46,11 @@ use client::render_choice;
 #[derive(AsRefStr, EnumString, EnumVariantNames)]
 #[strum(serialize_all = "snake_case")]
 enum PythonLogLevel {
-  TRACE,
-  DEBUG,
-  INFO,
-  WARN,
-  ERROR,
+  Trace,
+  Debug,
+  Info,
+  Warn,
+  Error,
 }
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
@@ -66,7 +66,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
 
   let level_option = option_id!(-'l', "level");
   let log_level_option_value =
-    options_parser.parse_string(&level_option, PythonLogLevel::INFO.as_ref())?;
+    options_parser.parse_string(&level_option, PythonLogLevel::Info.as_ref())?;
   let level = PythonLogLevel::from_str(&log_level_option_value.value).map_err(|_| {
     format!(
       "Not a valid log level {level} from {option_source:?}. Should be one of {levels}.",
@@ -87,7 +87,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
 }
 
 fn find_pantsd(
-  working_dir: &PathBuf,
+  working_dir: &Path,
   options_parser: &OptionParser,
 ) -> Result<client::ConnectionSettings, String> {
   let pants_subprocessdir = option_id!("pants", "subprocessdir");

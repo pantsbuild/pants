@@ -6,21 +6,21 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Scope {
-  GLOBAL,
+  Global,
   Scope(String),
 }
 
 impl Scope {
   pub fn named(name: &str) -> Scope {
     match name {
-      "GLOBAL" => Scope::GLOBAL,
+      "GLOBAL" => Scope::Global,
       scope => Scope::Scope(scope.to_owned()),
     }
   }
 
   pub fn name(&self) -> &str {
     match self {
-      Scope::GLOBAL => "GLOBAL",
+      Scope::Global => "GLOBAL",
       Scope::Scope(scope) => scope.as_str(),
     }
   }
@@ -78,7 +78,7 @@ macro_rules! option_id {
     };
     (-$switch:literal, $($name_component:literal),+) => {
         $crate::options::OptionId::new(
-            $crate::options::Scope::GLOBAL,
+            $crate::options::Scope::Global,
             [$($name_component),+].iter(),
             Some($switch)
         ).expect("Creating an OptionId via macro should ensure at least one name component")
@@ -92,7 +92,7 @@ macro_rules! option_id {
     };
     ($($name_component:literal),+) => {
         $crate::options::OptionId::new(
-            $crate::options::Scope::GLOBAL,
+            $crate::options::Scope::Global,
             [$($name_component),+].iter(),
             None
         ).expect("Creating an OptionId via macro should ensure at least one name component")

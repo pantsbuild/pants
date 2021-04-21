@@ -175,19 +175,19 @@ impl OptionsSource for Config {
           }
           if let Some(add) = sub_table.get("add") {
             list_edits.push(ListEdit {
-              action: ListEditAction::ADD,
+              action: ListEditAction::Add,
               items: Self::extract_string_list(&*format!("{}.add", option_name), &add)?,
             })
           }
           if let Some(remove) = sub_table.get("remove") {
             list_edits.push(ListEdit {
-              action: ListEditAction::REMOVE,
+              action: ListEditAction::Remove,
               items: Self::extract_string_list(&*format!("{}.remove", option_name), &remove)?,
             })
           }
         } else {
           list_edits.push(ListEdit {
-            action: ListEditAction::REPLACE,
+            action: ListEditAction::Replace,
             items: Self::extract_string_list(&*option_name, value)?,
           });
         }

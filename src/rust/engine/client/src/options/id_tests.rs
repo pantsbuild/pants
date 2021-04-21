@@ -8,7 +8,7 @@ use crate::options::id::{OptionId, Scope};
 fn test_option_id_global_switch() {
   let option_id = option_id!(-'x', "bar", "baz");
   assert_eq!(
-    OptionId::new(Scope::GLOBAL, ["bar", "baz"].iter(), Some('x')).unwrap(),
+    OptionId::new(Scope::Global, ["bar", "baz"].iter(), Some('x')).unwrap(),
     option_id
   );
   assert_eq!("GLOBAL", option_id.scope());
@@ -18,7 +18,7 @@ fn test_option_id_global_switch() {
 fn test_option_id_global() {
   let option_id = option_id!("bar", "baz");
   assert_eq!(
-    OptionId::new(Scope::GLOBAL, ["bar", "baz"].iter(), None).unwrap(),
+    OptionId::new(Scope::Global, ["bar", "baz"].iter(), None).unwrap(),
     option_id
   );
   assert_eq!("GLOBAL", option_id.scope());

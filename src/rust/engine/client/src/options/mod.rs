@@ -26,9 +26,9 @@ use crate::option_id;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ListEditAction {
-  REPLACE,
-  ADD,
-  REMOVE,
+  Replace,
+  Add,
+  Remove,
 }
 
 #[derive(Debug)]
@@ -94,10 +94,10 @@ trait OptionsSource {
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Source {
-  FLAG,
-  ENV,
-  CONFIG,
-  DEFAULT,
+  Flag,
+  Env,
+  Config,
+  Default,
 }
 
 #[derive(Debug)]
@@ -121,8 +121,8 @@ pub struct OptionParser {
 impl OptionParser {
   pub fn new() -> Result<OptionParser, String> {
     let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-    sources.insert(Source::ENV, Rc::new(Env::capture()));
-    sources.insert(Source::FLAG, Rc::new(Args::argv()));
+    sources.insert(Source::Env, Rc::new(Env::capture()));
+    sources.insert(Source::Flag, Rc::new(Args::argv()));
     let mut parser = OptionParser {
       sources: sources.clone(),
     };
@@ -141,7 +141,7 @@ impl OptionParser {
       ],
     )?;
     let mut config = Config::merged(&repo_config_files)?;
-    sources.insert(Source::CONFIG, Rc::new(config.clone()));
+    sources.insert(Source::Config, Rc::new(config.clone()));
     parser = OptionParser {
       sources: sources.clone(),
     };
@@ -158,7 +158,7 @@ impl OptionParser {
         }
       }
     }
-    sources.insert(Source::CONFIG, Rc::new(config));
+    sources.insert(Source::Config, Rc::new(config));
     Ok(OptionParser { sources })
   }
 
@@ -172,7 +172,7 @@ impl OptionParser {
       }
     }
     Ok(OptionValue {
-      source: Source::DEFAULT,
+      source: Source::Default,
       value: default,
     })
   }
@@ -187,7 +187,7 @@ impl OptionParser {
       }
     }
     Ok(OptionValue {
-      source: Source::DEFAULT,
+      source: Source::Default,
       value: default,
     })
   }
@@ -202,7 +202,7 @@ impl OptionParser {
       }
     }
     Ok(OptionValue {
-      source: Source::DEFAULT,
+      source: Source::Default,
       value: default.to_string(),
     })
   }
@@ -217,9 +217,9 @@ impl OptionParser {
     let mut string_list = default.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     for list_edit in list_edits {
       match list_edit.action {
-        ListEditAction::REPLACE => string_list = list_edit.items,
-        ListEditAction::ADD => string_list.extend(list_edit.items),
-        ListEditAction::REMOVE => {
+        ListEditAction::Replace => string_list = list_edit.items,
+        ListEditAction::Add => string_list.extend(list_edit.items),
+        ListEditAction::Remove => {
           let to_remove = list_edit.items.iter().collect::<HashSet<_>>();
           string_list = string_list
             .iter()

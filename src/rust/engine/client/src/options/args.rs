@@ -14,8 +14,8 @@ pub(crate) struct Args {
 }
 
 enum Negate {
-  TRUE,
-  FALSE,
+  True,
+  False,
 }
 
 impl Args {
@@ -29,11 +29,11 @@ impl Args {
     format!(
       "--{}{}{}",
       match negate {
-        Negate::FALSE => "",
-        Negate::TRUE => "no-",
+        Negate::False => "",
+        Negate::True => "no-",
       },
       match &id.0 {
-        Scope::GLOBAL => "".to_string(),
+        Scope::Global => "".to_string(),
         Scope::Scope(scope) => format!("{}-", scope.to_ascii_lowercase()),
       },
       id.name("-", NameTransform::ToLower)
@@ -55,7 +55,7 @@ impl Args {
 
 impl OptionsSource for Args {
   fn display(&self, id: &OptionId) -> String {
-    Self::arg_name(id, Negate::FALSE)
+    Self::arg_name(id, Negate::False)
   }
 
   fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
@@ -69,16 +69,16 @@ impl OptionsSource for Args {
         }
       }
     }
-    self.find_string(&Self::arg_name(id, Negate::FALSE))
+    self.find_string(&Self::arg_name(id, Negate::False))
   }
 
   fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
-    let arg_name = Self::arg_name(id, Negate::FALSE);
+    let arg_name = Self::arg_name(id, Negate::False);
     match self.find_string(&arg_name)? {
       Some(s) if s.as_str() == "" => Ok(Some(true)),
       Some(ref value) => parse_bool(&arg_name, value).map(Some),
       None => {
-        let no_arg_name = Self::arg_name(id, Negate::TRUE);
+        let no_arg_name = Self::arg_name(id, Negate::True);
         match self.find_string(&no_arg_name)? {
           Some(s) if s.as_str() == "" => Ok(Some(false)),
           Some(ref value) => parse_bool(&no_arg_name, value)
@@ -91,7 +91,7 @@ impl OptionsSource for Args {
   }
 
   fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-    let arg_name = Self::arg_name(id, Negate::FALSE);
+    let arg_name = Self::arg_name(id, Negate::False);
     let mut edits = vec![];
     for arg in &self.args {
       let mut components = arg.as_str().splitn(2, '=');

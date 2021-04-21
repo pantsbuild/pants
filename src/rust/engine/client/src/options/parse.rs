@@ -37,10 +37,10 @@ peg::parser! {
             = "\\" c:$([_]) { c.chars().next().unwrap() }
 
         rule add() -> ListEditAction
-            = "+" { ListEditAction::ADD }
+            = "+" { ListEditAction::Add }
 
         rule remove() -> ListEditAction
-            = "-" { ListEditAction::REMOVE }
+            = "-" { ListEditAction::Remove }
 
         rule action() -> ListEditAction
             = quiet!{ action:(add() / remove()) { action } }
@@ -86,12 +86,12 @@ peg::parser! {
 
         rule list_replace() -> Vec<ListEdit<String>>
             = items:items() {
-                vec![ListEdit { action: ListEditAction::REPLACE, items }]
+                vec![ListEdit { action: ListEditAction::Replace, items }]
             }
 
         rule implicit_add() -> Vec<ListEdit<String>>
             = !(whitespace() / add() / remove() / tuple_start() / list_start()) item:$([_]+) {
-                vec![ListEdit { action: ListEditAction::ADD, items: vec![item.to_owned()] }]
+                vec![ListEdit { action: ListEditAction::Add, items: vec![item.to_owned()] }]
             }
 
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>

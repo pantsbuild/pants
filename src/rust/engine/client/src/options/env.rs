@@ -28,7 +28,7 @@ impl Env {
       id.0.name().to_ascii_uppercase(),
       name
     )];
-    if id.0 == Scope::GLOBAL {
+    if id.0 == Scope::Global {
       names.push(format!("PANTS_{}", name));
     }
     if name.starts_with("PANTS_") {
