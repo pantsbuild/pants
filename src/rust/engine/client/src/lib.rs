@@ -28,9 +28,15 @@
 #![allow(clippy::mutex_atomic)]
 
 mod build_root;
+#[cfg(test)]
+mod build_root_tests;
+
 mod client;
 pub mod options;
+
 pub mod pantsd;
+#[cfg(test)]
+mod pantsd_tests;
 
 pub use crate::client::{execute_command, ConnectionSettings};
 

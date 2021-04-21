@@ -4,7 +4,11 @@
 mod args;
 mod config;
 mod env;
+
 mod id;
+#[cfg(test)]
+mod id_tests;
+
 mod parse;
 
 use std::collections::{BTreeMap, HashSet};
