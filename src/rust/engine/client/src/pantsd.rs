@@ -7,6 +7,7 @@ use std::{fmt, fs};
 use libc::pid_t;
 use log::debug;
 use sha2::{Digest, Sha256};
+use sysinfo::{ProcessExt, System, SystemExt};
 
 pub(crate) struct Metadata {
   metadata_dir: PathBuf,
@@ -138,54 +139,8 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
 
   // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
   // wrapped).
-  check_process_name(pantsd_metadata).and(Ok(port))
-}
-
-#[cfg(target_os = "linux")]
-fn check_process_name(pantsd_metadata: Metadata) -> Result<(), String> {
-  let pid = pantsd_metadata.pid()?;
-  let pantsd_process = remoteprocess::Process::new(pid).map_err(|e| {
-    format!(
-      "Failed to read process information for pantsd at pid {pid}: {err}",
-      pid = pid,
-      err = e
-    )
-  })?;
-  let expected_process_name_prefix = pantsd_metadata.process_name()?;
-  let actual_command_line = pantsd_process.cmdline().map_err(|e| {
-    format!(
-      "Failed to determine the process name for the running process at pid {pid}: {err}",
-      pid = pid,
-      err = e
-    )
-  })?;
-  let actual_argv0 = actual_command_line.get(0).ok_or_else(|| {
-    format!(
-      "The command line for pantsd at pid {pid} was unexpectedly empty.",
-      pid = pid
-    )
-  })?;
-  // It appears the the daemon only records a prefix of the process name, so we just check that.
-  if actual_argv0.starts_with(&expected_process_name_prefix) {
-    Ok(())
-  } else {
-    Err(format!(
-      "\
-      The process with pid {pid} is not pantsd. Expected a process name matching {expected_name} \
-      but is {actual_name}.\
-      ",
-      pid = pid,
-      expected_name = expected_process_name_prefix,
-      actual_name = actual_argv0
-    ))
-  }
-}
-
-#[cfg(target_os = "macos")]
-fn check_process_name(pantsd_metadata: Metadata) -> Result<(), String> {
-  use sysinfo::{ProcessExt, SystemExt};
-  let pid = pantsd_metadata.pid()?;
-  let system = sysinfo::System::new();
+  let mut system = System::new();
+  system.refresh_process(pid);
   if let Some(process) = system.get_process(pid) {
     let actual_command_line = process.cmd();
     if actual_command_line.is_empty() {
@@ -198,7 +153,7 @@ fn check_process_name(pantsd_metadata: Metadata) -> Result<(), String> {
     let actual_argv0 = &actual_command_line[0];
     // It appears the the daemon only records a prefix of the process name, so we just check that.
     if actual_argv0.starts_with(&expected_process_name_prefix) {
-      Ok(())
+      Ok(port)
     } else {
       Err(format!(
         "\
