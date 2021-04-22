@@ -79,6 +79,24 @@ function bootstrap_native_code() {
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
     echo "engine_version: ${engine_version_calculated}" > "${metadata_file}"
     echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
-    mv "${metadata_file}" "${NATIVE_ENGINE_RESOURCE_METADATA}"
+
+    # Here we set up a file lock via bash tricks to avoid concurrent `mv` failing.
+    if {
+      set -C # Set noclobber temporarily to ensure file creation via `>` is atomic and exclusive.
+      echo 2> /dev/null "$$" > "${NATIVE_ENGINE_RESOURCE_METADATA}.lock"
+    }; then
+      # N.B.: We want the NATIVE_ENGINE_RESOURCE_METADATA env var to be expanded now.
+      # See: https://github.com/koalaman/shellcheck/wiki/SC2064
+      #
+      # shellcheck disable=SC2064
+      trap "rm -f ${NATIVE_ENGINE_RESOURCE_METADATA}.lock" RETURN
+      mv "${metadata_file}" "${NATIVE_ENGINE_RESOURCE_METADATA}"
+    else
+      local -r locked_by="$(
+        cat "${NATIVE_ENGINE_RESOURCE_METADATA}.lock" 2 > /dev/null || echo "<unknown>"
+      )"
+      echo >&2 "Process $$ yielding to concurrent bootstrap by pid ${locked_by}."
+    fi
+    set +C
   fi
 }
