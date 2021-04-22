@@ -99,12 +99,40 @@ peg::parser! {
     }
 }
 
+mod err {
+  pub(crate) struct ParseError {
+    template: String,
+  }
+
+  impl ParseError {
+    pub(super) fn new<S: AsRef<str>>(template: S) -> ParseError {
+      let template_ref = template.as_ref();
+      assert!(
+        template_ref.contains("{name}"),
+        "\
+        Expected the template to contain at least one `{{name}}` placeholder, but found none: \
+        {template}.\
+        ",
+        template = template_ref
+      );
+      ParseError {
+        template: template_ref.to_owned(),
+      }
+    }
+
+    pub(crate) fn render<S: AsRef<str>>(&self, name: S) -> String {
+      self.template.replace("{name}", name.as_ref())
+    }
+  }
+}
+
+pub(crate) use err::ParseError;
+
 fn format_parse_error(
-  id: &str,
   type_id: &str,
   value: &str,
   parse_error: peg::error::ParseError<peg::str::LineCol>,
-) -> String {
+) -> ParseError {
   let value_with_marker = value
     .split('\n')
     .enumerate()
@@ -123,30 +151,32 @@ fn format_parse_error(
     })
     .collect::<Vec<_>>()
     .join("\n");
-  format!(
-    "Problem parsing {} {} value:\n{}\nExpected {} at line {} column {}",
-    id,
-    type_id,
-    value_with_marker,
-    render_choice(parse_error.expected.tokens().collect::<Vec<_>>().as_slice())
+  ParseError::new(format!(
+    "\
+    Problem parsing {{name}} {type_id} value:\n{value_with_marker}\nExpected {choices} at \
+    line {line} column {column}\
+    ",
+    type_id = type_id,
+    value_with_marker = value_with_marker,
+    choices = render_choice(parse_error.expected.tokens().collect::<Vec<_>>().as_slice())
       .unwrap_or_else(|| "nothing".to_owned()),
-    parse_error.location.line,
-    parse_error.location.column,
-  )
+    line = parse_error.location.line,
+    column = parse_error.location.column,
+  ))
 }
 
-pub(crate) fn parse_string_list(name: &str, value: &str) -> Result<Vec<ListEdit<String>>, String> {
+pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
   option_value_parser::string_list_edits(&value)
-    .map_err(|e| format_parse_error(name, "string list", &*value, e))
+    .map_err(|e| format_parse_error("string list", value, e))
 }
 
-pub(crate) fn parse_bool(name: &str, value: &str) -> Result<bool, String> {
+pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
   match value.to_lowercase().as_str() {
     "true" => Ok(true),
     "false" => Ok(false),
-    _ => Err(format!(
-      "Got '{}' for {}. Expected 'true' or 'false'.",
-      value, name
-    )),
+    _ => Err(ParseError::new(format!(
+      "Got '{value}' for {{name}}. Expected 'true' or 'false'.",
+      value = value
+    ))),
   }
 }

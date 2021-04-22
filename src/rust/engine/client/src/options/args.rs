@@ -76,14 +76,15 @@ impl OptionsSource for Args {
     let arg_name = Self::arg_name(id, Negate::False);
     match self.find_string(&arg_name)? {
       Some(s) if s.as_str() == "" => Ok(Some(true)),
-      Some(ref value) => parse_bool(&arg_name, value).map(Some),
+      Some(ref value) => parse_bool(value).map(Some).map_err(|e| e.render(arg_name)),
       None => {
         let no_arg_name = Self::arg_name(id, Negate::True);
         match self.find_string(&no_arg_name)? {
           Some(s) if s.as_str() == "" => Ok(Some(false)),
-          Some(ref value) => parse_bool(&no_arg_name, value)
+          Some(ref value) => parse_bool(value)
             .map(|value| !value)
-            .map(Some),
+            .map(Some)
+            .map_err(|e| e.render(no_arg_name)),
           None => Ok(None),
         }
       }
@@ -103,7 +104,7 @@ impl OptionsSource for Args {
               name = name
             )
           })?;
-          edits.extend(parse_string_list(name, value)?)
+          edits.extend(parse_string_list(value).map_err(|e| e.render(name))?)
         }
       }
     }

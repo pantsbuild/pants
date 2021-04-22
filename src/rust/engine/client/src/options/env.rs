@@ -55,7 +55,9 @@ impl OptionsSource for Env {
 
   fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
     if let Some(value) = self.get_string(id)? {
-      parse_bool(&*self.display(id), &*value).map(Some)
+      parse_bool(&*value)
+        .map(Some)
+        .map_err(|e| e.render(self.display(id)))
     } else {
       Ok(None)
     }
@@ -63,7 +65,9 @@ impl OptionsSource for Env {
 
   fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
     if let Some(value) = self.get_string(id)? {
-      parse_string_list(&*self.display(id), &value).map(Some)
+      parse_string_list(&value)
+        .map(Some)
+        .map_err(|e| e.render(self.display(id)))
     } else {
       Ok(None)
     }
