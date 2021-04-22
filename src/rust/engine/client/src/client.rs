@@ -51,7 +51,7 @@ pub async fn execute_command(
   ];
   let mut tty_settings = Vec::with_capacity(raw_io_fds.len());
   for raw_fd in &raw_io_fds {
-    match termios::Termios::from_fd(*raw_fd) {
+    match nix::sys::termios::tcgetattr(*raw_fd) {
       Ok(termios) => tty_settings.push((raw_fd, termios)),
       Err(err) => debug!(
         "Failed to save terminal attributes for file descriptor {fd}: {err}",
@@ -78,7 +78,9 @@ pub async fn execute_command(
 
   let nailgun_result = nailgun::client_execute(connection_settings.port, command, args, env).await;
   for (raw_fd, termios) in tty_settings {
-    if let Err(err) = termios::tcsetattr(*raw_fd, termios::TCSADRAIN, &termios) {
+    if let Err(err) =
+      nix::sys::termios::tcsetattr(*raw_fd, nix::sys::termios::SetArg::TCSADRAIN, &termios)
+    {
       debug!(
         "Failed to restore terminal attributes for file descriptor {fd}: {err}",
         fd = raw_fd,
