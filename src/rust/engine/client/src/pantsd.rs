@@ -7,7 +7,7 @@ use std::{fmt, fs};
 use libc::pid_t;
 use log::debug;
 use sha2::{Digest, Sha256};
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::{ProcessExt, ProcessStatus, System, SystemExt};
 
 pub(crate) struct Metadata {
   metadata_dir: PathBuf,
@@ -121,54 +121,51 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   // are useful.
   let port = pantsd_metadata.port()?;
 
-  // Check that the recorded pid is a live process.
-  // TODO(John Sirois): This does not check for zombie status like the psutil-based Python
-  //  implementation does.
   let pid = pantsd_metadata.pid()?;
-  nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).map_err(|e| {
-    format!(
-      "\
-      The last pid for the pantsd controlling {working_dir} was {pid} but it's no longer running: \
-      {err}\
-      ",
-      working_dir = working_dir.display(),
-      pid = pid,
-      err = e
-    )
-  })?;
-
-  // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
-  // wrapped).
   let mut system = System::new();
   system.refresh_process(pid);
-  if let Some(process) = system.get_process(pid) {
-    let actual_command_line = process.cmd();
-    if actual_command_line.is_empty() {
+  // Check that the recorded pid is a live process.
+  match system.get_process(pid) {
+    None => {
       return Err(format!(
-        "The command line for pantsd at pid {pid} was unexpectedly empty.",
-        pid = pid
-      ));
-    }
-    let expected_process_name_prefix = pantsd_metadata.process_name()?;
-    let actual_argv0 = &actual_command_line[0];
-    // It appears the the daemon only records a prefix of the process name, so we just check that.
-    if actual_argv0.starts_with(&expected_process_name_prefix) {
-      Ok(port)
-    } else {
-      Err(format!(
         "\
-      The process with pid {pid} is not pantsd. Expected a process name matching {expected_name} \
-      but is {actual_name}.\
-      ",
+        The last pid for the pantsd controlling {working_dir} was {pid} but it no longer appears \
+        to be running.\
+        ",
+        working_dir = working_dir.display(),
         pid = pid,
-        expected_name = expected_process_name_prefix,
-        actual_name = actual_argv0
       ))
     }
-  } else {
-    return Err(format!(
-      "Failed to read process information for pantsd at pid {pid}.",
-      pid = pid
-    ));
+    Some(process) => {
+      // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
+      // wrapped).
+      if std::mem::discriminant(&ProcessStatus::Zombie) == std::mem::discriminant(&process.status())
+      {
+        return Err(format!("The pantsd at pid {pid} is a zombie.", pid = pid));
+      }
+      let actual_command_line = process.cmd();
+      if actual_command_line.is_empty() {
+        return Err(format!(
+          "The command line for pantsd at pid {pid} was unexpectedly empty.",
+          pid = pid
+        ));
+      }
+      let expected_process_name_prefix = pantsd_metadata.process_name()?;
+      let actual_argv0 = &actual_command_line[0];
+      // It appears the the daemon only records a prefix of the process name, so we just check that.
+      if actual_argv0.starts_with(&expected_process_name_prefix) {
+        Ok(port)
+      } else {
+        Err(format!(
+          "\
+          The process with pid {pid} is not pantsd. Expected a process name matching \
+          {expected_name} but is {actual_name}.\
+          ",
+          pid = pid,
+          expected_name = expected_process_name_prefix,
+          actual_name = actual_argv0
+        ))
+      }
+    }
   }
 }
