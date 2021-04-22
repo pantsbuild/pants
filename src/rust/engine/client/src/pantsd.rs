@@ -138,6 +138,12 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
 
   // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
   // wrapped).
+  check_process_name(pantsd_metadata).and(Ok(port))
+}
+
+#[cfg(target_os = "linux")]
+fn check_process_name(pantsd_metadata: Metadata) -> Result<(), String> {
+  let pid = pantsd_metadata.pid()?;
   let pantsd_process = remoteprocess::Process::new(pid).map_err(|e| {
     format!(
       "Failed to read process information for pantsd at pid {pid}: {err}",
@@ -161,7 +167,7 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   })?;
   // It appears the the daemon only records a prefix of the process name, so we just check that.
   if actual_argv0.starts_with(&expected_process_name_prefix) {
-    Ok(port)
+    Ok(())
   } else {
     Err(format!(
       "\
@@ -172,5 +178,42 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
       expected_name = expected_process_name_prefix,
       actual_name = actual_argv0
     ))
+  }
+}
+
+#[cfg(target_os = "macos")]
+fn check_process_name(pantsd_metadata: Metadata) -> Result<(), String> {
+  use sysinfo::{ProcessExt, SystemExt};
+  let pid = pantsd_metadata.pid()?;
+  let system = sysinfo::System::new();
+  if let Some(process) = system.get_process(pid) {
+    let actual_command_line = process.cmd();
+    if actual_command_line.is_empty() {
+      return Err(format!(
+        "The command line for pantsd at pid {pid} was unexpectedly empty.",
+        pid = pid
+      ));
+    }
+    let expected_process_name_prefix = pantsd_metadata.process_name()?;
+    let actual_argv0 = &actual_command_line[0];
+    // It appears the the daemon only records a prefix of the process name, so we just check that.
+    if actual_argv0.starts_with(&expected_process_name_prefix) {
+      Ok(())
+    } else {
+      Err(format!(
+        "\
+      The process with pid {pid} is not pantsd. Expected a process name matching {expected_name} \
+      but is {actual_name}.\
+      ",
+        pid = pid,
+        expected_name = expected_process_name_prefix,
+        actual_name = actual_argv0
+      ))
+    }
+  } else {
+    return Err(format!(
+      "Failed to read process information for pantsd at pid {pid}.",
+      pid = pid
+    ));
   }
 }
