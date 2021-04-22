@@ -143,15 +143,15 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
       {
         return Err(format!("The pantsd at pid {pid} is a zombie.", pid = pid));
       }
-      let actual_command_line = process.cmd();
-      if actual_command_line.is_empty() {
-        return Err(format!(
-          "The command line for pantsd at pid {pid} was unexpectedly empty.",
-          pid = pid
-        ));
-      }
       let expected_process_name_prefix = pantsd_metadata.process_name()?;
-      let actual_argv0 = &actual_command_line[0];
+      let actual_argv0 = {
+        let actual_command_line = process.cmd();
+        if actual_command_line.is_empty() {
+          process.name()
+        } else {
+          &actual_command_line[0]
+        }
+      };
       // It appears the the daemon only records a prefix of the process name, so we just check that.
       if actual_argv0.starts_with(&expected_process_name_prefix) {
         Ok(port)
