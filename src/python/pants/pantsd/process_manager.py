@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import signal
@@ -331,9 +333,14 @@ class ProcessManager:
         pid = os.getpid() if pid is None else pid
         self.write_metadata_by_name(self.PID_KEY, str(pid))
 
+    def _get_process_name(self, process: psutil.Process | None = None) -> str:
+        proc = process or self._as_process()
+        cmdline = proc.cmdline()
+        return cast(str, cmdline[0] if cmdline else proc.name())
+
     def write_process_name(self, process_name: Optional[str] = None):
         """Write the current process's name."""
-        process_name = process_name or self._as_process().name()
+        process_name = process_name or self._get_process_name()
         self.write_metadata_by_name(self.PROCESS_NAME_KEY, process_name)
 
     def write_socket(self, socket_info: int):
@@ -382,7 +389,7 @@ class ProcessManager:
                 (process.status() == psutil.STATUS_ZOMBIE)
                 or
                 # Check for stale pids.
-                (self.process_name and self.process_name != process.name())
+                (self.process_name and self.process_name != self._get_process_name(process))
                 or
                 # Extended checking.
                 (extended_check and not extended_check(process))
