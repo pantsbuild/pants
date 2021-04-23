@@ -93,15 +93,12 @@ def make_target(
     package: Optional[str] = None,
     name: str = "target",
     interpreter_constraints: Optional[str] = None,
-    dependencies: Optional[List[str]] = None,
 ) -> Target:
     if not package:
         package = PACKAGE
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     source_globs = [PurePath(source_file.path).name for source_file in source_files]
-    if not dependencies:
-        dependencies = []
     rule_runner.add_to_build_file(
         f"{package}",
         dedent(
@@ -109,7 +106,6 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
-                dependencies={dependencies},
                 interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
@@ -731,13 +727,13 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
     # We want to ensure we don't accidentally check the source plugin itself.
-    assert "(checked 1 source file)" in result.stdout
+    assert "(checked 2 source files)" in result.stdout
 
     # We also want to ensure that running MyPy on the plugin itself still works.
     plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
-    assert "Success: no issues found in 2 source files" in result.stdout
+    assert "Success: no issues found in 7 source files" in result.stdout
 
 
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
@@ -844,26 +840,3 @@ def test_warn_if_python_version_configured(caplog) -> None:
             "`--python-version` in the `--mypy-args` option."
         ),
     )
-
-
-def test_run_mypy_only_on_specified_files(rule_runner: RuleRunner) -> None:
-    # create a library that passes all mypy checks
-    good_target = make_target(
-        rule_runner=rule_runner,
-        source_files=[GOOD_SOURCE],
-        name="good",
-        dependencies=[":bad"],
-    )
-
-    # create a library that does NOT pass mypy checks
-    make_target(
-        rule_runner=rule_runner,
-        source_files=[BAD_SOURCE],
-        name="bad",
-    )
-
-    result = run_mypy(rule_runner, [good_target])
-
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
