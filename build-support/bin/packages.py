@@ -530,10 +530,12 @@ def publish() -> None:
     create_twine_venv()
     subprocess.run(
         [
-            CONSTANTS.twine_venv_dir / "bin/twine",
+            str(CONSTANTS.twine_venv_dir / "bin/twine"),
+            "upload",
             "--sign",
             f"--sign-with={get_pgp_program_name()}",
             f"--identity={get_pgp_key_id()}",
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],
         check=True,
     )
