@@ -245,7 +245,9 @@ def get_git_branch() -> str:
 
 def get_pgp_key_id() -> str:
     return (
-        subprocess.run(["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE)
+        subprocess.run(
+            ["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE, check=False
+        )
         .stdout.decode()
         .strip()
     )
@@ -253,7 +255,9 @@ def get_pgp_key_id() -> str:
 
 def get_pgp_program_name() -> str:
     configured_name = (
-        subprocess.run(["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE)
+        subprocess.run(
+            ["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE, check=False
+        )
         .stdout.decode()
         .strip()
     )
@@ -293,7 +297,9 @@ def create_twine_venv() -> None:
     if CONSTANTS.twine_venv_dir.exists():
         shutil.rmtree(CONSTANTS.twine_venv_dir)
     venv.create(CONSTANTS.twine_venv_dir, with_pip=True, clear=True, symlinks=True)
-    subprocess.run([CONSTANTS.twine_venv_dir / "bin/pip", "install", "--quiet", "twine"])
+    subprocess.run(
+        [CONSTANTS.twine_venv_dir / "bin/pip", "install", "--quiet", "twine"], check=True
+    )
 
 
 @contextmanager
@@ -535,6 +541,7 @@ def publish() -> None:
             "--sign",
             f"--sign-with={get_pgp_program_name()}",
             f"--identity={get_pgp_key_id()}",
+            "--skip-existing",  # Makes the upload idempotent.
             str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],
         check=True,
