@@ -16,7 +16,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *repl_rules(),
             *python_repl.rules(),
@@ -25,20 +25,22 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[PythonLibrary, ProtobufLibrary],
     )
-
-
-def setup_sources(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("src/python", "protobuf_library(name='proto')\n")
-    rule_runner.add_to_build_file("src/python", "python_library(dependencies=[':proto'])\n")
-    rule_runner.create_file("src/python/foo.proto", 'syntax = "proto3";message Foo {}')
-    rule_runner.create_file("src/python/lib.py", "from foo import Foo\nclass SomeClass:\n  pass\n")
+    rule_runner.write_files(
+        {
+            "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
+            "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
+            "src/python/BUILD": (
+                "protobuf_library(name='proto')\npython_library(dependencies=[':proto'])"
+            ),
+        }
+    )
+    return rule_runner
 
 
 def test_repl_with_targets(rule_runner: RuleRunner) -> None:
     # TODO(#9108): Expand `mock_console` to allow for providing input for the repl to verify
     # that, e.g., the generated protobuf code is available. Right now this test prepares for
     # that by including generated code, but cannot actually verify it.
-    setup_sources(rule_runner)
     with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,
@@ -53,7 +55,6 @@ def test_repl_with_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_repl_ipython(rule_runner: RuleRunner) -> None:
-    setup_sources(rule_runner)
     with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,
@@ -68,7 +69,6 @@ def test_repl_ipython(rule_runner: RuleRunner) -> None:
 
 
 def test_repl_bogus_repl_name(rule_runner: RuleRunner) -> None:
-    setup_sources(rule_runner)
     with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,

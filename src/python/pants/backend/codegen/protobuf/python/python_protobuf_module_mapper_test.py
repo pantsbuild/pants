@@ -30,24 +30,22 @@ def rule_runner() -> RuleRunner:
 
 def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--source-root-patterns=['root1', 'root2', 'root3']"])
-
-    # Two proto files belonging to the same target. We should use two file addresses.
-    rule_runner.create_files("root1/protos", ["f1.proto", "f2.proto"])
-    rule_runner.add_to_build_file("root1/protos", "protobuf_library()")
-
-    # These protos would result in the same module name, so neither should be used.
-    rule_runner.create_file("root1/two_owners/f.proto")
-    rule_runner.add_to_build_file("root1/two_owners", "protobuf_library()")
-    rule_runner.create_file("root2/two_owners/f.proto")
-    rule_runner.add_to_build_file("root2/two_owners", "protobuf_library()")
-
-    # A file with grpc. This also uses the `python_source_root` mechanism, which should be
-    # irrelevant to the module mapping because we strip source roots.
-    rule_runner.create_file("root1/tests/f.proto")
-    rule_runner.add_to_build_file(
-        "root1/tests", "protobuf_library(grpc=True, python_source_root='root3')"
+    rule_runner.write_files(
+        {
+            "root1/protos/f1.proto": "",
+            "root1/protos/f2.proto": "",
+            "root1/protos/BUILD": "protobuf_library()",
+            # These protos would result in the same module name, so neither should be used.
+            "root1/two_owners/f.proto": "",
+            "root1/two_owners/BUILD": "protobuf_library()",
+            "root2/two_owners/f.proto": "",
+            "root2/two_owners/BUILD": "protobuf_library()",
+            # A file with grpc. This also uses the `python_source_root` mechanism, which should be
+            # irrelevant to the module mapping because we strip source roots.
+            "root1/tests/f.proto": "",
+            "root1/tests/BUILD": "protobuf_library(grpc=True, python_source_root='root3')",
+        }
     )
-
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
     assert result == FirstPartyPythonMappingImpl(
         mapping=FrozenDict(

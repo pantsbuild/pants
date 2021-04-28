@@ -341,7 +341,7 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
-    def write_files(self, files: Mapping[str, str]) -> None:
+    def write_files(self, files: Mapping[str | PurePath, str]) -> None:
         """Write the files to the build root.
 
         :API: public
