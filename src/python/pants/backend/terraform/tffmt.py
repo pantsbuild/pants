@@ -114,10 +114,10 @@ async def setup_terraform_fmt(setup_request: SetupRequest, terraform: TerraformT
         args = [
             "./terraform",
             "fmt",
-            "-check" if setup_request.check_only else None,
-            directory,
         ]
-        args = [arg for arg in args if arg]
+        if setup_request.check_only:
+            args.append("-check")
+        args.append(directory)
 
         process = Process(
             argv=args,
@@ -167,14 +167,14 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
     # Merge all of the outputs into a single output.
     output_digest = await Get(Digest, MergeDigests(r.output_digest for r in results))
 
-    result = FmtResult(
+    fmt_result = FmtResult(
         input=setup.original_digest,
         output=output_digest,
         stdout=stdout_content,
         stderr=stderr_content,
         formatter_name="tffmt",
     )
-    return result
+    return fmt_result
 
 
 @rule(desc="Lint with `terraform fmt`", level=LogLevel.DEBUG)
