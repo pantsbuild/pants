@@ -310,7 +310,7 @@ class RuleRunner:
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
-        self._invalidate_for(relpath)
+        self._invalidate_for(str(relpath))
         return path
 
     def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
