@@ -26,11 +26,11 @@ class TerraformFmtRequest(StyleRequest):
 
 @rule
 async def format_terraform_targets(
-    go_fmt_targets: TerraformFmtTargets, union_membership: UnionMembership
+    terraform_fmt_targets: TerraformFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[TerraformSources] for target in go_fmt_targets.targets),
+        SourceFilesRequest(target[TerraformSources] for target in terraform_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
@@ -45,7 +45,7 @@ async def format_terraform_targets(
             fmt_request_type(
                 (
                     fmt_request_type.field_set_type.create(target)
-                    for target in go_fmt_targets.targets
+                    for target in terraform_fmt_targets.targets
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),
