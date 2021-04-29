@@ -7,7 +7,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
-from logging import Formatter, LogRecord, StreamHandler
+from logging import BASIC_FORMAT, Formatter, LogRecord, PercentStyle, StreamHandler
 from pathlib import PurePath
 from typing import Dict, Iterator, cast
 
@@ -40,8 +40,15 @@ class _ExceptionFormatter(Formatter):
     """Uses the `--print-stacktrace` option to decide whether to render stacktraces."""
 
     def __init__(self, print_stacktrace: bool):
+
         super().__init__(None)
         self.print_stacktrace = print_stacktrace
+        self._debug_style = PercentStyle(fmt=BASIC_FORMAT)
+
+    def formatMessage(self, record):
+        if record.levelname in {"DEBUG", "TRACE"}:
+            return self._debug_style.format(record)
+        return super().formatMessage(record)
 
     def formatException(self, exc_info):
         if self.print_stacktrace:
