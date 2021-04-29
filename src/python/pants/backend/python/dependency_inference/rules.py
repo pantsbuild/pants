@@ -139,19 +139,11 @@ async def infer_python_dependencies_via_imports(
             ParsePythonImportsRequest(
                 request.sources_field,
                 PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+                string_imports=python_infer_subsystem.string_imports,
             ),
         ),
     )
-
-    relevant_imports = tuple(
-        imp
-        for imp in (
-            detected_imports.all_imports
-            if python_infer_subsystem.string_imports
-            else detected_imports.explicit_imports
-        )
-        if imp not in combined_stdlib
-    )
+    relevant_imports = detected_imports - combined_stdlib
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModule(imported_module))
