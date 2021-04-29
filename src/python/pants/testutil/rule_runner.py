@@ -310,7 +310,7 @@ class RuleRunner:
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
-        self._invalidate_for(relpath)
+        self._invalidate_for(str(relpath))
         return path
 
     def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
@@ -341,7 +341,7 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
-    def write_files(self, files: Mapping[str, str]) -> None:
+    def write_files(self, files: Mapping[str | PurePath, str]) -> None:
         """Write the files to the build root.
 
         :API: public

@@ -51,7 +51,7 @@ def mock_sources_field(
         sources.source_files if include_sources else [],
         address=Address(sources.source_root, target_name="lib"),
     )
-    rule_runner.create_files(path=sources.source_root, files=sources.source_files)
+    rule_runner.write_files({PurePath(sources.source_root, f): "" for f in sources.source_files})
     return sources_field
 
 

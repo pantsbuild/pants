@@ -25,16 +25,19 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[],
     )
-    for path in [
-        "src/sh/foo/f.sh",
-        "src/sh/foo/bar/baz1.sh",
-        "src/sh/foo/bar/baz1_test.sh",
-        "src/sh/foo/bar/baz2.sh",
-        "src/sh/foo/bar/baz2_test.sh",
-        "src/sh/foo/bar/baz3.sh",
-    ]:
-        rule_runner.create_file(path)
-
+    rule_runner.write_files(
+        {
+            f"src/sh/foo/{fp}": ""
+            for fp in (
+                "f.sh",
+                "bar/baz1.sh",
+                "bar/baz1_test.sh",
+                "bar/baz2.sh",
+                "bar/baz2_test.sh",
+                "bar/baz3.sh",
+            )
+        }
+    )
     pts = rule_runner.request(
         PutativeTargets,
         [

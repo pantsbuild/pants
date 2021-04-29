@@ -34,17 +34,20 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[],
     )
-    for path in [
-        "src/python/foo/__init__.py",
-        "src/python/foo/bar/__init__.py",
-        "src/python/foo/bar/baz1.py",
-        "src/python/foo/bar/baz1_test.py",
-        "src/python/foo/bar/baz2.py",
-        "src/python/foo/bar/baz2_test.py",
-        "src/python/foo/bar/baz3.py",
-    ]:
-        rule_runner.create_file(path)
-
+    rule_runner.write_files(
+        {
+            f"src/python/foo/{fp}": ""
+            for fp in (
+                "__init__.py",
+                "bar/__init__.py",
+                "bar/baz1.py",
+                "bar/baz1_test.py",
+                "bar/baz2.py",
+                "bar/baz2_test.py",
+                "bar/baz3.py",
+            )
+        }
+    )
     pts = rule_runner.request(
         PutativeTargets,
         [

@@ -51,7 +51,7 @@ def assert_imports_parsed(
     files = {"project/BUILD": "python_library(sources=['**/*.py'])"}
     if content is not None:
         files[filename] = content
-    rule_runner.write_files(files)
+    rule_runner.write_files(files)  # type: ignore[arg-type]
     tgt = rule_runner.get_target(Address("project"))
     imports = rule_runner.request(
         ParsedPythonImports,
