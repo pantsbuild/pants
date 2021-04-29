@@ -433,7 +433,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if kwargs.get("type") == bool:
+            if Parser.is_bool(kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
