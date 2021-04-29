@@ -603,7 +603,7 @@ def test_sequence_field() -> None:
 
         @classmethod
         def compute_value(
-            cls, raw_value: Optional[Iterable[CustomObject]], *, address: Address
+            cls, raw_value: Optional[Iterable[CustomObject]], address: Address
         ) -> Optional[Tuple[CustomObject, ...]]:
             return super().compute_value(raw_value, address)
 
