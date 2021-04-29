@@ -30,7 +30,7 @@ def assert_rule_match(
         if expected_match.endswith("/"):
             rule_runner.create_dir(expected_match)
         else:
-            rule_runner.create_file(expected_match)
+            rule_runner.write_files({expected_match: ""})
     snapshot = rule_runner.request(Snapshot, [PathGlobs([glob])])
     if should_match:
         assert sorted(paths) == sorted(snapshot.files)
