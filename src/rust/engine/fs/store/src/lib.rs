@@ -648,13 +648,12 @@ impl Store {
     let result = self
       .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
       .await?;
-    if result.is_some() {
-      Ok(())
-    } else {
-      Err(format!(
-        "File {:?} did not exist in the store.",
-        file_digest
-      ))
+    match result {
+      Some(_) => Ok(()),
+      None => {
+        log::debug!("Missing file digest from remote store: {:?}", file_digest);
+        Err("File did not exist in the remote store.".to_owned())
+      }
     }
   }
 
