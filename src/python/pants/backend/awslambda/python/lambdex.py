@@ -11,5 +11,5 @@ class Lambdex(PythonToolBase):
 
     default_version = "lambdex==0.1.4"
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.5"]
+    default_interpreter_constraints = ["CPython>=3.6"]
     default_main = ConsoleScript("lambdex")
