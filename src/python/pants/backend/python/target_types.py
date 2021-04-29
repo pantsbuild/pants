@@ -358,6 +358,7 @@ class PexBinary(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        InterpreterConstraintsField,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,
