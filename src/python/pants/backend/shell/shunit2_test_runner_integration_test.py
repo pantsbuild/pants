@@ -224,13 +224,13 @@ def test_determine_shell_runner(rule_runner: RuleRunner) -> None:
 
     # If `shell` field is not set, read the shebang.
     result = rule_runner.request(
-        Shunit2Runner, [Shunit2RunnerRequest(addr, fc, Shunit2ShellField(None, address=addr))]
+        Shunit2Runner, [Shunit2RunnerRequest(addr, fc, Shunit2ShellField(None, addr))]
     )
     assert result.shell == Shunit2Shell.sh
 
     # The `shell` field overrides the shebang.
     result = rule_runner.request(
-        Shunit2Runner, [Shunit2RunnerRequest(addr, fc, Shunit2ShellField("bash", address=addr))]
+        Shunit2Runner, [Shunit2RunnerRequest(addr, fc, Shunit2ShellField("bash", addr))]
     )
     assert result.shell == Shunit2Shell.bash
 
@@ -240,7 +240,7 @@ def test_determine_shell_runner(rule_runner: RuleRunner) -> None:
             Shunit2Runner,
             [
                 Shunit2RunnerRequest(
-                    addr, FileContent("tests.sh", b""), Shunit2ShellField(None, address=addr)
+                    addr, FileContent("tests.sh", b""), Shunit2ShellField(None, addr)
                 )
             ],
         )

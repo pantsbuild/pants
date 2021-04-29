@@ -54,10 +54,10 @@ from pants.util.frozendict import FrozenDict
 
 def test_timeout_validation() -> None:
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, address=Address("", target_name="tests"))
+        PythonTestsTimeout(-100, Address("", target_name="tests"))
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, address=Address("", target_name="tests"))
-    assert PythonTestsTimeout(5, address=Address("", target_name="tests")).value == 5
+        PythonTestsTimeout(0, Address("", target_name="tests"))
+    assert PythonTestsTimeout(5, Address("", target_name="tests")).value == 5
 
 
 def test_timeout_calculation() -> None:
@@ -69,7 +69,7 @@ def test_timeout_calculation() -> None:
         global_max: Optional[int] = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, address=Address("", target_name="tests"))
+        field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -97,7 +97,7 @@ def test_timeout_calculation() -> None:
     ),
 )
 def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
-    field = PexEntryPointField(entry_point, address=Address("project/dir"))
+    field = PexEntryPointField(entry_point, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
 
@@ -105,15 +105,15 @@ def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
     addr = Address("src/python/project")
 
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField(" ", address=addr)
+        PexEntryPointField(" ", addr)
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField("modue:func:who_knows_what_this_is", address=addr)
+        PexEntryPointField("modue:func:who_knows_what_this_is", addr)
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField(":func", address=addr)
+        PexEntryPointField(":func", addr)
 
     ep = "custom.entry_point:"
     with caplog.at_level(logging.WARNING):
-        assert EntryPoint("custom.entry_point") == PexEntryPointField(ep, address=addr).value
+        assert EntryPoint("custom.entry_point") == PexEntryPointField(ep, addr).value
 
     assert len(caplog.record_tuples) == 1
     _, levelno, message = caplog.record_tuples[0]
@@ -134,7 +134,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
-        ep_field = PexEntryPointField(entry_point, address=addr)
+        ep_field = PexEntryPointField(entry_point, addr)
         result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
 
@@ -294,20 +294,20 @@ def test_requirements_and_constraints_fields(field: type[Field]) -> None:
     )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
-    assert field(raw_value, address=Address("demo")).value == parsed_value
+    assert field(raw_value, Address("demo")).value == parsed_value
 
     # Macros can pass pre-parsed Requirement objects.
-    assert field(parsed_value, address=Address("demo")).value == parsed_value
+    assert field(parsed_value, Address("demo")).value == parsed_value
 
     # Reject invalid types.
     with pytest.raises(InvalidFieldTypeException):
-        field("sneaky_str", address=Address("demo"))
+        field("sneaky_str", Address("demo"))
     with pytest.raises(InvalidFieldTypeException):
-        field([1, 2], address=Address("demo"))
+        field([1, 2], Address("demo"))
 
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["not valid! === 3.1"], address=Address("demo"))
+        field(["not valid! === 3.1"], Address("demo"))
     assert (
         f"Invalid requirement 'not valid! === 3.1' in the '{field.alias}' field for the "
         "target demo:"
@@ -315,7 +315,7 @@ def test_requirements_and_constraints_fields(field: type[Field]) -> None:
 
     # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo"))
+        field(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 
@@ -382,5 +382,5 @@ def test_module_mapping_field(
 ) -> None:
     merged = dict(DEFAULT_MODULE_MAPPING)
     merged.update(expected)
-    actual_value = ModuleMappingField(raw_value, address=Address("", target_name="tests")).value
+    actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
     assert actual_value == FrozenDict(merged)

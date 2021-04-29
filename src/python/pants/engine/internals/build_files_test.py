@@ -196,7 +196,7 @@ def test_build_file_address() -> None:
     rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
 
     def assert_bfa_resolved(address: Address) -> None:
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
+        expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
         bfa = rule_runner.request(BuildFileAddress, [address])
         assert bfa == expected_bfa
 

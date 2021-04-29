@@ -57,7 +57,7 @@ def create_target(
 ) -> Target:
     rule_runner.write_files({os.path.join(parent_directory, f): "" for f in files})
     address = Address(parent_directory, target_name="target")
-    return target_cls({Sources.alias: files}, address=address)
+    return target_cls({Sources.alias: files}, address)
 
 
 def get_stripped_sources(
@@ -218,8 +218,8 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
         }
     )
     targets = [
-        ProtobufLibrary({}, address=Address("src/protobuf/dir")),
-        ProtobufLibrary({}, address=Address("src/protobuf/other_dir")),
+        ProtobufLibrary({}, Address("src/protobuf/dir")),
+        ProtobufLibrary({}, Address("src/protobuf/other_dir")),
     ]
     backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
 

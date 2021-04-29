@@ -68,7 +68,7 @@ def run_goal(
 
 def test_no_filters_provided() -> None:
     # `filter` behaves like `list` when there are no specified filters.
-    targets = [MockTarget({}, address=Address("", target_name=name)) for name in ("t3", "t2", "t1")]
+    targets = [MockTarget({}, Address("", target_name=name)) for name in ("t3", "t2", "t1")]
     assert run_goal(targets) == dedent(
         """\
         //:t1
@@ -87,10 +87,8 @@ def test_filter_by_target_type() -> None:
         alias = "smalltalk"
         core_fields = ()
 
-    fortran_targets = [Fortran({}, address=Address("", target_name=name)) for name in ("f1", "f2")]
-    smalltalk_targets = [
-        Smalltalk({}, address=Address("", target_name=name)) for name in ("s1", "s2")
-    ]
+    fortran_targets = [Fortran({}, Address("", target_name=name)) for name in ("f1", "f2")]
+    smalltalk_targets = [Smalltalk({}, Address("", target_name=name)) for name in ("s1", "s2")]
     targets = [*fortran_targets, *smalltalk_targets]
 
     assert run_goal(targets, target_type=["fortran"]).strip() == "//:f1\n//:f2"
@@ -115,7 +113,7 @@ def test_filter_by_target_type() -> None:
 
 def test_filter_by_address_regex() -> None:
     targets = [
-        MockTarget({}, address=addr)
+        MockTarget({}, addr)
         for addr in (
             Address("dir1", target_name="lib"),
             Address("dir2", target_name="lib"),
@@ -137,10 +135,10 @@ def test_filter_by_address_regex() -> None:
 
 def test_filter_by_tag_regex() -> None:
     targets = [
-        MockTarget({"tags": ["tag1"]}, address=Address("", target_name="t1")),
-        MockTarget({"tags": ["tag2"]}, address=Address("", target_name="t2")),
-        MockTarget({"tags": ["tag1", "tag2"]}, address=Address("", target_name="both")),
-        MockTarget({}, address=Address("", target_name="no_tags")),
+        MockTarget({"tags": ["tag1"]}, Address("", target_name="t1")),
+        MockTarget({"tags": ["tag2"]}, Address("", target_name="t2")),
+        MockTarget({"tags": ["tag1", "tag2"]}, Address("", target_name="both")),
+        MockTarget({}, Address("", target_name="no_tags")),
     ]
     assert run_goal(targets, tag_regex=[r"t.?g2$"]).strip() == "//:both\n//:t2"
     assert run_goal(targets, tag_regex=["+tag1"]).strip() == "//:both\n//:t1"
@@ -157,8 +155,8 @@ def test_filter_by_tag_regex() -> None:
 
 def test_filter_by_granularity() -> None:
     targets = [
-        MockTarget({}, address=Address("p1")),
-        MockTarget({}, address=Address("p1", relative_file_path="file.txt")),
+        MockTarget({}, Address("p1")),
+        MockTarget({}, Address("p1", relative_file_path="file.txt")),
     ]
     assert run_goal(targets, granularity=TargetGranularity.all_targets).strip() == "p1\np1/file.txt"
     assert run_goal(targets, granularity=TargetGranularity.build_targets).strip() == "p1"
