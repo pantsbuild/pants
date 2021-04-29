@@ -206,7 +206,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 package dir;
                 """
             ),
-            "src/protobuf/dir/BUILD": "python_library()",
+            "src/protobuf/dir/BUILD": "protobuf_library()",
             "src/protobuf/other_dir/f.proto": dedent(
                 """\
                 syntax = "proto2";
@@ -214,7 +214,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 package other_dir;
                 """
             ),
-            "src/protobuf/other_dir/BUILD": "python_library()",
+            "src/protobuf/other_dir/BUILD": "protobuf_library(python_source_root='src/python')",
         }
     )
     targets = [
