@@ -8,6 +8,7 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -44,8 +45,8 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must end in the "
@@ -170,8 +171,8 @@ class PythonAwsLambdaRuntime(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must be of the form pythonX.Y, "
@@ -190,6 +191,7 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        InterpreterConstraintsField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,

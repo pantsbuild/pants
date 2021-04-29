@@ -48,20 +48,20 @@ def rule_runner() -> RuleRunner:
 )
 def test_to_interpreter_version(runtime: str, expected_major: int, expected_minor: int) -> None:
     assert (expected_major, expected_minor) == PythonAwsLambdaRuntime(
-        runtime, address=Address("", target_name="t")
+        runtime, Address("", target_name="t")
     ).to_interpreter_version()
 
 
 @pytest.mark.parametrize("invalid_runtime", ("python88.99", "fooobar"))
 def test_runtime_validation(invalid_runtime: str) -> None:
     with pytest.raises(InvalidFieldException):
-        PythonAwsLambdaRuntime(invalid_runtime, address=Address("", target_name="t"))
+        PythonAwsLambdaRuntime(invalid_runtime, Address("", target_name="t"))
 
 
 @pytest.mark.parametrize("invalid_handler", ("path.to.lambda", "lambda.py"))
 def test_handler_validation(invalid_handler: str) -> None:
     with pytest.raises(InvalidFieldException):
-        PythonAwsLambdaHandlerField(invalid_handler, address=Address("", target_name="t"))
+        PythonAwsLambdaHandlerField(invalid_handler, Address("", target_name="t"))
 
 
 @pytest.mark.parametrize(
@@ -69,7 +69,7 @@ def test_handler_validation(invalid_handler: str) -> None:
     (("path.to.module:func", []), ("lambda.py:func", ["project/dir/lambda.py"])),
 )
 def test_handler_filespec(handler: str, expected: List[str]) -> None:
-    field = PythonAwsLambdaHandlerField(handler, address=Address("project/dir"))
+    field = PythonAwsLambdaHandlerField(handler, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
 
@@ -78,7 +78,7 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/lambda.py")
         rule_runner.create_file("src/python/project/f2.py")
-        field = PythonAwsLambdaHandlerField(handler, address=addr)
+        field = PythonAwsLambdaHandlerField(handler, addr)
         result = rule_runner.request(
             ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest(field)]
         )

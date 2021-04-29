@@ -146,7 +146,7 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
 def make_target(
     address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
 ) -> Target:
-    return target_cls({}, address=address or Address("", target_name="tests"))
+    return target_cls({}, address or Address("", target_name="tests"))
 
 
 def run_fmt_rule(

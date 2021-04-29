@@ -113,7 +113,7 @@ class InvalidRequest(MockTypecheckRequest):
 def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address=address)
+    return MockTarget({}, address)
 
 
 def run_typecheck_rule(

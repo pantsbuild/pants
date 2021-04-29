@@ -114,7 +114,7 @@ def rule_runner() -> RuleRunner:
 
 
 def make_target(address: Optional[Address] = None) -> Target:
-    return MockTarget({}, address=address or Address("", target_name="tests"))
+    return MockTarget({}, address or Address("", target_name="tests"))
 
 
 def run_lint_rule(

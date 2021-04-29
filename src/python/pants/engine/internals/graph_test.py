@@ -418,9 +418,7 @@ def test_resolve_generated_subtarget() -> None:
     rule_runner.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
     generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
     generated_target = rule_runner.get_target(generated_target_address)
-    assert generated_target == MockTarget(
-        {Sources.alias: ["f1.txt"]}, address=generated_target_address
-    )
+    assert generated_target == MockTarget({Sources.alias: ["f1.txt"]}, generated_target_address)
 
 
 def test_resolve_specs_snapshot() -> None:
@@ -713,7 +711,7 @@ def test_find_valid_field_sets(caplog) -> None:
             """
         ),
     )
-    valid_tgt = FortranTarget({}, address=Address("", target_name="valid"))
+    valid_tgt = FortranTarget({}, Address("", target_name="valid"))
     valid_spec = AddressLiteralSpec("", "valid")
     invalid_spec = AddressLiteralSpec("", "invalid")
 
@@ -815,7 +813,7 @@ def test_no_applicable_targets_exception() -> None:
         in str(exc)
     )
 
-    invalid_tgt = Tgt3({}, address=Address("blah"))
+    invalid_tgt = Tgt3({}, Address("blah"))
     exc = NoApplicableTargetsException(
         [invalid_tgt],
         Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("foo.ext")])),
@@ -888,7 +886,7 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
-    sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
+    sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], addr)
     hydrated_sources = sources_rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(sources)]
     )
@@ -916,7 +914,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     addr = Address("", target_name="lib")
     sources_rule_runner.create_files("", files=["f1.f95"])
 
-    valid_sources = SourcesSubclass(["*"], address=addr)
+    valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
@@ -924,7 +922,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
-    invalid_sources = Sources(["*"], address=addr)
+    invalid_sources = Sources(["*"], addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
@@ -936,7 +934,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
     sources_rule_runner.create_files("", files=["f1.f95"])
-    sources = Sources(["non_existent.f95"], address=Address("", target_name="lib"))
+    sources = Sources(["non_existent.f95"], Address("", target_name="lib"))
     with pytest.raises(ExecutionError) as exc:
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
     assert "Unmatched glob" in str(exc.value)
@@ -953,7 +951,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     # be matched. This is intentional to ensure that we use `any` glob conjunction rather
     # than the normal `all` conjunction.
     sources_rule_runner.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
-    sources = DefaultSources(None, address=addr)
+    sources = DefaultSources(None, addr)
     assert set(sources.value or ()) == set(DefaultSources.default)
 
     hydrated_sources = sources_rule_runner.request(
@@ -971,7 +969,7 @@ def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> No
 
     def get_sources(srcs: Iterable[str]) -> Tuple[str, ...]:
         return sources_rule_runner.request(
-            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, address=addr))]
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, addr))]
         ).snapshot.files
 
     with pytest.raises(ExecutionError) as exc:
@@ -998,9 +996,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         return sources_rule_runner.request(
             HydratedSources,
             [
-                HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name="example"))
-                ),
+                HydrateSourcesRequest(sources_cls(sources, Address("", target_name="example"))),
             ],
         )
 
@@ -1084,7 +1080,7 @@ def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
 
 def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
-    protocol_sources = AvroSources(["*.avro"], address=addr)
+    protocol_sources = AvroSources(["*.avro"], addr)
     assert (
         protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
         is True
@@ -1123,7 +1119,7 @@ def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> 
     class CustomAvroSources(AvroSources):
         pass
 
-    protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+    protocol_sources = CustomAvroSources(["*.avro"], addr)
     assert (
         protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
         is True
@@ -1145,7 +1141,7 @@ def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> No
     class AdaSources(Sources):
         pass
 
-    protocol_sources = AvroSources(["*.avro"], address=addr)
+    protocol_sources = AvroSources(["*.avro"], addr)
     assert protocol_sources.can_generate(AdaSources, codegen_rule_runner.union_membership) is False
     generated = codegen_rule_runner.request(
         HydratedSources,
@@ -1418,7 +1414,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
         provided_deps = ["//:provided"]
         if injected:
             provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, address=Address("", target_name="target"))
+        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
         result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
         assert result == Addresses(sorted([*injected, Address("", target_name="provided")]))
 

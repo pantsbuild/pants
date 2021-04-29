@@ -108,7 +108,7 @@ def rule_runner() -> RuleRunner:
 def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address=address)
+    return MockTarget({}, address)
 
 
 def run_test_rule(
