@@ -184,23 +184,13 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
-class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Because the `sources` field will be removed from `python_awslambda` targets, it no longer "
-        "makes sense to also have an `interpreter_constraints` field. Instead, set the "
-        "`interpreter_constraints` field on the `python_library` target containing the lambda's "
-        "handler code."
-    )
-
-
 class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonAwsLambdaSources,
-        DeprecatedAwsLambdaInterpreterConstraints,
         OutputPathField,
+        InterpreterConstraintsField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,

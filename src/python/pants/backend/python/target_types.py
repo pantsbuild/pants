@@ -236,23 +236,13 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
-class DeprecatedPexBinaryInterpreterConstraints(InterpreterConstraintsField):
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Because the `sources` field will be removed from `pex_binary` targets, it no longer makes "
-        "sense to also have an `interpreter_constraints` field. Instead, set the "
-        "`interpreter_constraints` field on the `python_library` target containing the binary's "
-        "entry point."
-    )
-
-
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        DeprecatedPexBinaryInterpreterConstraints,
         DeprecatedPexBinarySources,
+        InterpreterConstraintsField,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,
