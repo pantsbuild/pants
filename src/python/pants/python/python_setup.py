@@ -112,10 +112,14 @@ class PythonSetup(Subsystem):
             choices=(*(raco.value for raco in ResolveAllConstraintsOption), True, False),
             type=ResolveAllConstraintsOption.parse,
             help=(
-                "If enabled, and the requirements of the code being operated on are a subset of "
-                "the constraints file, then the entire constraints file will be used instead of "
-                "the subset. If disabled, or any requirement of the code being operated on is not "
-                "in the constraints file, each subset will be independently resolved as needed."
+                "If enabled, when resolving requirements, Pants will first resolve your entire "
+                "constraints file as a single global resolve. Then, if the code uses a subset of "
+                "your constraints file, Pants will extract the relevant requirements from that "
+                "global resolve so that only what's actually needed gets used. If disabled, Pants "
+                "will not use a global resolve and will resolve each subset of your requirements "
+                "independently."
+                "\n\nUsually this option should be enabled because it can result in far fewer "
+                "resolves."
                 "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
