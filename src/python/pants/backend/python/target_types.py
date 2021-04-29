@@ -200,8 +200,8 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     value: EntryPoint
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> EntryPoint:
-        value = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> EntryPoint:
+        value = super().compute_value(raw_value, address)
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         try:
@@ -259,11 +259,11 @@ class PexInheritPathField(StringField):
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], *, address: Address
+        cls, raw_value: Optional[Union[str, bool]], address: Address
     ) -> Optional[str]:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
-        return super().compute_value(raw_value, address=address)
+        return super().compute_value(raw_value, address)
 
 
 class PexZipSafeField(BoolField):
@@ -419,8 +419,8 @@ class PythonTestsTimeout(IntField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "
@@ -525,9 +525,9 @@ class _RequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Tuple[Requirement, ...]:
-        value = super().compute_value(raw_value, address=address)
+        value = super().compute_value(raw_value, address)
         if value is None:
             return ()
         invalid_type_error = InvalidFieldTypeException(
@@ -584,9 +584,9 @@ class ModuleMappingField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        provided_mapping = super().compute_value(raw_value, address=address)
+        provided_mapping = super().compute_value(raw_value, address)
         return FrozenDict({**DEFAULT_MODULE_MAPPING, **(provided_mapping or {})})
 
 
@@ -676,10 +676,8 @@ class PythonProvidesField(ScalarField, ProvidesField):
     )
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[PythonArtifact], *, address: Address
-    ) -> PythonArtifact:
-        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+        return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
 class SetupPyCommandsField(StringSequenceField):

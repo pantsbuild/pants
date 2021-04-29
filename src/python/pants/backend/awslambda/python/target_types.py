@@ -45,8 +45,8 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must end in the "
@@ -171,8 +171,8 @@ class PythonAwsLambdaRuntime(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must be of the form pythonX.Y, "

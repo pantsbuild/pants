@@ -118,16 +118,16 @@ class Field:
     required: ClassVar[bool] = False
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[Optional[str]] = None
-    deprecated_removal_hint: ClassVar[Optional[str]] = None
+    deprecated_removal_version: ClassVar[str | None] = None
+    deprecated_removal_hint: ClassVar[str | None] = None
 
     @final
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         self._check_deprecated(raw_value, address)
-        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
+        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any optional validation and/or hydration here. For example, you may want
@@ -226,8 +226,8 @@ class AsyncFieldMixin(Field):
     """
 
     @final  # type: ignore[misc]
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        super().__init__(raw_value, address=address)
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
+        super().__init__(raw_value, address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
         self._unfreeze_instance()  # type: ignore[attr-defined]
@@ -276,28 +276,28 @@ class Target:
 
     # Subclasses must define these
     alias: ClassVar[str]
-    core_fields: ClassVar[Tuple[Type[Field], ...]]
+    core_fields: ClassVar[tuple[type[Field], ...]]
     help: ClassVar[str]
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[Optional[str]] = None
-    deprecated_removal_hint: ClassVar[Optional[str]] = None
+    deprecated_removal_version: ClassVar[str | None] = None
+    deprecated_removal_hint: ClassVar[str | None] = None
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: Tuple[Type[Field], ...]
-    field_values: FrozenDict[Type[Field], Field]
+    plugin_fields: tuple[type[Field], ...]
+    field_values: FrozenDict[type[Field], Field]
 
     @final
     def __init__(
         self,
-        unhydrated_values: Dict[str, Any],
-        *,
+        unhydrated_values: dict[str, Any],
         address: Address,
+        *,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
-        union_membership: Optional[UnionMembership] = None,
+        union_membership: UnionMembership | None = None,
     ) -> None:
         if self.deprecated_removal_version and not address.is_file_target:
             if not self.deprecated_removal_hint:
@@ -326,10 +326,10 @@ class Target:
                     f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
-            field_values[field_type] = field_type(value, address=address)
+            field_values[field_type] = field_type(value, address)
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
-            field_values[field_type] = field_type(raw_value=None, address=address)
+            field_values[field_type] = field_type(None, address)
         self.field_values = FrozenDict(
             sorted(
                 field_values.items(),
@@ -339,12 +339,12 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> Tuple[Type[Field], ...]:
+    def field_types(self) -> tuple[type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
     @final
     @memoized_classproperty
-    def _plugin_field_cls(cls) -> Type:
+    def _plugin_field_cls(cls) -> type:
         # NB: We ensure that each Target subtype has its own `PluginField` class so that
         # registering a plugin field doesn't leak across target types.
 
@@ -462,7 +462,7 @@ class Target:
         result = self._maybe_get(field)
         if result is not None:
             return result
-        return field(raw_value=default_raw_value, address=self.address)
+        return field(default_raw_value, self.address)
 
     @final
     @classmethod
@@ -743,7 +743,7 @@ def generate_subtarget(
     target_cls = type(build_target)
     return target_cls(
         generated_target_fields,
-        address=generate_subtarget_address(build_target.address, full_file_name=full_file_name),
+        generate_subtarget_address(build_target.address, full_file_name=full_file_name),
         union_membership=union_membership,
     )
 
@@ -1020,8 +1020,8 @@ class ScalarField(Generic[T], Field):
     default: ClassVar[Optional[T]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> Optional[T]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> Optional[T]:
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
             raise InvalidFieldTypeException(
                 address,
@@ -1047,8 +1047,8 @@ class BoolField(Field):
     default: ClassVar[Optional[bool]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
                 address,
@@ -1064,8 +1064,8 @@ class IntField(ScalarField[int]):
     expected_type_description = "an integer"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        return super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        return super().compute_value(raw_value, address)
 
 
 class FloatField(ScalarField[float]):
@@ -1073,8 +1073,8 @@ class FloatField(ScalarField[float]):
     expected_type_description = "a float"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[float], *, address: Address) -> Optional[float]:
-        return super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[float], address: Address) -> Optional[float]:
+        return super().compute_value(raw_value, address)
 
 
 class StringField(ScalarField[str]):
@@ -1089,8 +1089,8 @@ class StringField(ScalarField[str]):
     valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
             valid_choices = set(
                 cls.valid_choices
@@ -1130,9 +1130,9 @@ class SequenceField(Generic[T], Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], *, address: Address
+        cls, raw_value: Optional[Iterable[Any]], address: Address
     ) -> Optional[Tuple[T, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         try:
@@ -1153,9 +1153,9 @@ class StringSequenceField(SequenceField[str]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address=address)
+        return super().compute_value(raw_value, address)
 
 
 class DictStringToStringField(Field):
@@ -1164,9 +1164,9 @@ class DictStringToStringField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, str]], *, address: Address
+        cls, raw_value: Optional[Dict[str, str]], address: Address
     ) -> Optional[FrozenDict[str, str]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         invalid_type_exception = InvalidFieldTypeException(
@@ -1185,9 +1185,9 @@ class DictStringToStringSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
     ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         invalid_type_exception = InvalidFieldTypeException(

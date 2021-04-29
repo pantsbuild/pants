@@ -54,9 +54,7 @@ def run_goal(
 def test_list_normal() -> None:
     # Note that these are unsorted.
     target_names = ("t3", "t2", "t1")
-    stdout, _ = run_goal(
-        [MockTarget({}, address=Address("", target_name=name)) for name in target_names]
-    )
+    stdout, _ = run_goal([MockTarget({}, Address("", target_name=name)) for name in target_names])
     assert stdout == dedent(
         """\
         //:t1
@@ -76,9 +74,9 @@ def test_list_documented() -> None:
         [
             MockTarget(
                 {DescriptionField.alias: "Description of a target.\n\tThis target is the best."},
-                address=Address("", target_name="described"),
+                Address("", target_name="described"),
             ),
-            MockTarget({}, address=Address("", target_name="not_described")),
+            MockTarget({}, Address("", target_name="not_described")),
         ],
         show_documented=True,
     )
@@ -94,10 +92,8 @@ def test_list_documented() -> None:
 def test_list_provides() -> None:
     sample_artifact = PythonArtifact(name="project.demo")
     targets = [
-        MockTarget(
-            {ProvidesField.alias: sample_artifact}, address=Address("", target_name="provided")
-        ),
-        MockTarget({}, address=Address("", target_name="not_provided")),
+        MockTarget({ProvidesField.alias: sample_artifact}, Address("", target_name="provided")),
+        MockTarget({}, Address("", target_name="not_provided")),
     ]
     stdout, _ = run_goal(targets, show_provides=True)
     assert stdout.strip() == f"//:provided {sample_artifact}"

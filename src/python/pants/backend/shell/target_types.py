@@ -86,8 +86,8 @@ class Shunit2TestsTimeout(IntField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "

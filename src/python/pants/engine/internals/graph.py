@@ -138,7 +138,7 @@ async def resolve_target(
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
+    target = target_type(target_adaptor.kwargs, address, union_membership=union_membership)
     return WrappedTarget(target)
 
 
