@@ -13,8 +13,11 @@ from typing import Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.environment import Environment
 from pants.option.custom_types import file_option, target_option
+from pants.option.errors import BooleanConversionError
+from pants.option.parser import Parser
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -37,6 +40,21 @@ class ResolveAllConstraintsOption(Enum):
     NONDEPLOYABLES = "nondeployables"
     # Always use the entire constraints file.
     ALWAYS = "always"
+
+    @classmethod
+    def parse(cls, value: bool | str) -> bool:
+        try:
+            return Parser.ensure_bool(value)
+        except BooleanConversionError:
+            enum_value = cls(value)
+            bool_value = enum_value is not cls.NEVER
+            deprecated_conditional(
+                lambda: True,
+                removal_version="2.6.0.dev0",
+                entity_description="python-setup resolve_all_constraints non boolean values",
+                hint_message=f"Instead of {enum_value.value!r} use {bool_value!r}.",
+            )
+            return bool_value
 
 
 class PythonSetup(Subsystem):
@@ -90,19 +108,18 @@ class PythonSetup(Subsystem):
         register(
             "--resolve-all-constraints",
             advanced=True,
-            default=ResolveAllConstraintsOption.NONDEPLOYABLES,
-            type=ResolveAllConstraintsOption,
+            default=True,
+            choices=(*(raco.value for raco in ResolveAllConstraintsOption), True, False),
+            type=ResolveAllConstraintsOption.parse,
             help=(
-                "If set, and the requirements of the code being operated on are a subset of the "
-                "constraints file, then the entire constraints file will be used instead of the "
-                "subset. If unset, or any requirement of the code being operated on is not in the "
-                "constraints file, each subset will be independently resolved as needed, which is "
-                "more correct - work is only invalidated if a requirement it actually depends on "
-                "changes - but also a lot slower, due to the extra resolving. "
-                "\n\n* `never` will always use proper subsets, regardless of the goal being "
-                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
-                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
-                "a single resolve."
+                "If enabled, when resolving requirements, Pants will first resolve your entire "
+                "constraints file as a single global resolve. Then, if the code uses a subset of "
+                "your constraints file, Pants will extract the relevant requirements from that "
+                "global resolve so that only what's actually needed gets used. If disabled, Pants "
+                "will not use a global resolve and will resolve each subset of your requirements "
+                "independently."
+                "\n\nUsually this option should be enabled because it can result in far fewer "
+                "resolves."
                 "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
@@ -162,8 +179,8 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.requirement_constraints_target)
 
     @property
-    def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
-        return cast(ResolveAllConstraintsOption, self.options.resolve_all_constraints)
+    def resolve_all_constraints(self) -> bool:
+        return cast(bool, self.options.resolve_all_constraints)
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")

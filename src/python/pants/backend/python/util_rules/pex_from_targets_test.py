@@ -1,13 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import List, Optional, cast
+from typing import List, cast
 
 import pytest
 from _pytest.tmpdir import TempPathFactory
@@ -18,7 +20,6 @@ from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.python.python_setup import ResolveAllConstraintsOption
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.contextutil import pushd
 
@@ -173,8 +174,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     def get_pex_request(
-        constraints_file: Optional[str],
-        resolve_all: Optional[ResolveAllConstraintsOption],
+        constraints_file: str | None,
+        resolve_all_constraints: bool | None,
         *,
         direct_deps_only: bool = False,
     ) -> PexRequest:
@@ -185,8 +186,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             internal_only=True,
             direct_deps_only=direct_deps_only,
         )
-        if resolve_all:
-            args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
+        if resolve_all_constraints is not None:
+            args.append(f"--python-setup-resolve-all-constraints={resolve_all_constraints!r}")
         if constraints_file:
             args.append(f"--python-setup-requirement-constraints={constraints_file}")
         args.append("--python-repos-indexes=[]")
@@ -194,19 +195,19 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         rule_runner.set_options(args, env_inherit={"PATH"})
         return rule_runner.request(PexRequest, [request])
 
-    pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
+    pex_req1 = get_pex_request("constraints1.txt", resolve_all_constraints=False)
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
     assert pex_req1.repository_pex is None
 
     pex_req1_direct = get_pex_request(
-        "constraints1.txt", ResolveAllConstraintsOption.NEVER, direct_deps_only=True
+        "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
     )
     assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req1_direct.repository_pex is None
 
-    pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
+    pex_req2 = get_pex_request("constraints1.txt", resolve_all_constraints=True)
     assert pex_req2.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
@@ -217,20 +218,20 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     pex_req2_direct = get_pex_request(
-        "constraints1.txt", ResolveAllConstraintsOption.ALWAYS, direct_deps_only=True
+        "constraints1.txt", resolve_all_constraints=True, direct_deps_only=True
     )
     assert pex_req2_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req2_direct.repository_pex == repository_pex
 
     with pytest.raises(ExecutionError) as err:
-        get_pex_request(None, ResolveAllConstraintsOption.ALWAYS)
+        get_pex_request(None, resolve_all_constraints=True)
     assert len(err.value.wrapped_exceptions) == 1
     assert isinstance(err.value.wrapped_exceptions[0], ValueError)
     assert (
-        "[python-setup].resolve_all_constraints is set to always, so "
+        "[python-setup].resolve_all_constraints is enabled, so "
         "either [python-setup].requirement_constraints or "
         "[python-setup].requirement_constraints_target must also be provided."
     ) in str(err.value)
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
-    get_pex_request(None, None)
+    get_pex_request(None, resolve_all_constraints=None)
