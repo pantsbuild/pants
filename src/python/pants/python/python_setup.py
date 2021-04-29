@@ -112,16 +112,10 @@ class PythonSetup(Subsystem):
             choices=(*(raco.value for raco in ResolveAllConstraintsOption), True, False),
             type=ResolveAllConstraintsOption.parse,
             help=(
-                "If set, and the requirements of the code being operated on are a subset of the "
-                "constraints file, then the entire constraints file will be used instead of the "
-                "subset. If unset, or any requirement of the code being operated on is not in the "
-                "constraints file, each subset will be independently resolved as needed, which is "
-                "more correct - work is only invalidated if a requirement it actually depends on "
-                "changes - but also a lot slower, due to the extra resolving. "
-                "\n\n* `never` will always use proper subsets, regardless of the goal being "
-                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
-                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
-                "a single resolve."
+                "If enabled, and the requirements of the code being operated on are a subset of "
+                "the constraints file, then the entire constraints file will be used instead of "
+                "the subset. If disabled, or any requirement of the code being operated on is not "
+                "in the constraints file, each subset will be independently resolved as needed."
                 "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
