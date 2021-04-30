@@ -8,6 +8,6 @@ python_tests(name="tests", sources=['*_test.py', '!*_integration_test.py'])
 python_tests(
   name="integration",
   sources=["*_integration_test.py"],
-  dependencies=['testprojects/src/python:hello_directory', '//:pyproject'],
+  dependencies=['testprojects/src/python:hello_directory'],
   timeout=240,
 )

@@ -238,6 +238,7 @@ async def setup_pytest_for_target(
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
         coverage_args = [
             "--cov-report=",  # Turn off output.
+            f"--cov-config={coverage_config.path}",
             *itertools.chain.from_iterable(["--cov", cov_path] for cov_path in cov_paths),
         ]
 

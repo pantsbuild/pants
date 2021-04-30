@@ -9,4 +9,3 @@ files(name='build_root', sources=["BUILD_ROOT"])
 
 files(name='gitignore', sources=['.gitignore'])
 files(name='pants_toml', sources=['pants.toml'])
-files(name='pyproject', sources=['pyproject.toml'])

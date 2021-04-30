@@ -38,6 +38,8 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
+            # TODO: When updating pytest-cov to 2.12+, update the help message for
+            #  `[coverage-py].config` to not mention installing TOML.
             default=["pytest-cov>=2.10.1,<2.12"],
             help=(
                 "Requirement strings for any plugins or additional requirements you'd like to use."
