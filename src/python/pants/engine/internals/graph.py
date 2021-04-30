@@ -420,7 +420,7 @@ def _log_or_raise_unmatched_owners(
         )
     msg = (
         f"{prefix} See {bracketed_docs_url('targets')} for more information on target definitions."
-        f"\n\nMaybe run `./pants tailor` to autogenerate your BUILD files? See "
+        f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
         f"{bracketed_docs_url('create-initial-build-files')}.{option_msg}"
     )
 
