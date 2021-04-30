@@ -62,17 +62,16 @@ class MyPyRequest(TypecheckRequest):
 
 def generate_argv(
     mypy: MyPy,
-    *,
     typechecked_venv_pex: VenvPex,
+    *,
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={typechecked_venv_pex.python.argv0}"]
+    args = [f"--python-executable={typechecked_venv_pex.python.argv0}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
         args.append(f"--python-version={python_version}")
-    args.extend(mypy.args)
     args.append(f"@{file_list_path}")
     return tuple(args)
 
@@ -266,7 +265,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             mypy_pex,
             argv=generate_argv(
                 mypy,
-                typechecked_venv_pex=typechecked_venv_pex,
+                typechecked_venv_pex,
                 file_list_path=file_list_path,
                 python_version=python_version,
             ),

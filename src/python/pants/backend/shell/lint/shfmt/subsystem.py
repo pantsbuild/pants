@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import cast
+import os.path
+from typing import Iterable, cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -64,10 +65,11 @@ class Shfmt(TemplatedExternalTool):
     def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://editorconfig.org/#file-location for how config files are discovered.
+        candidates = (os.path.join(d, ".editorconfig") for d in ("", *dirs))
         return ConfigFilesRequest(
             specified=cast("str | None", self.options.config),
-            check_content={".editorconfig": b"[*.sh]"},
+            check_content={fp: b"[*.sh]" for fp in candidates},
             option_name=f"[{self.options_scope}].config",
         )

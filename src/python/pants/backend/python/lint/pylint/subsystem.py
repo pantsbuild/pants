@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import List, cast
+import os.path
+from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -43,7 +44,7 @@ class Pylint(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to `pylintrc` or alternative Pylint config file",
+            help="Path to `pylintrc` or alternative Pylint config file.",
         )
         register(
             "--source-plugins",
@@ -71,18 +72,19 @@ class Pylint(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> List[str]:
-        return cast(List[str], self.options.args)
+    def args(self) -> tuple[str, ...]:
+        return tuple(self.options.args)
 
     @property
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to http://pylint.pycqa.org/en/latest/user_guide/run.html#command-line-options for
+        # how config files are discovered.
         return ConfigFilesRequest(
             specified=self.config,
-            check_existence=["pylintrc", ".pylinrc"],
+            check_existence=[".pylinrc", *(os.path.join(d, "pylintrc") for d in ("", *dirs))],
             check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
             option_name=f"[{self.options_scope}].config",
         )

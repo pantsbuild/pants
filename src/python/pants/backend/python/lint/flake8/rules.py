@@ -45,8 +45,8 @@ class Flake8Partition:
     interpreter_constraints: PexInterpreterConstraints
 
 
-def generate_args(
-    *, source_files: SourceFiles, flake8: Flake8, report_file_name: Optional[str]
+def generate_argv(
+    source_files: SourceFiles, flake8: Flake8, *, report_file_name: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if flake8.config:
@@ -90,9 +90,7 @@ async def flake8_lint_partition(
         FallibleProcessResult,
         VenvPexProcess(
             flake8_pex,
-            argv=generate_args(
-                source_files=source_files, flake8=flake8, report_file_name=report_file_name
-            ),
+            argv=generate_argv(source_files, flake8, report_file_name=report_file_name),
             input_digest=input_digest,
             output_files=(report_file_name,) if report_file_name else None,
             description=f"Run Flake8 on {pluralize(len(partition.field_sets), 'file')}.",

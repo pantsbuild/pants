@@ -140,7 +140,10 @@ class CoverageSubsystem(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to `.coveragerc` or alternative coverage config file",
+            help=(
+                "Path to `.coveragerc` config file. Pants does not yet support alternative formats "
+                "like `setup.cfg` and `pyproject.toml`."
+            ),
         )
 
     @property
@@ -161,10 +164,17 @@ class CoverageSubsystem(PythonToolBase):
 
     @property
     def config_request(self) -> ConfigFilesRequest:
+        # Refer to https://coverage.readthedocs.io/en/stable/config.html.
         return ConfigFilesRequest(
             specified=self.config,
             check_existence=[".coveragerc"],
-            check_content={"setup.cfg": b"[coverage:"},
+            # TODO: Support alternative config formats. Perhaps we start validating the user has
+            #  set the correct config and we stop trying to manually set it.
+            # check_content={
+            #     "setup.cfg": b"[coverage:",
+            #     "tox.ini": "[coverage:]",
+            #     "pyproject.toml": "[tool.coverage]"
+            # },
             option_name=f"[{self.options_scope}].config",
         )
 
@@ -193,7 +203,8 @@ def _validate_and_update_config(
     relative_files_str = run_section.get("relative_files", "True")
     if relative_files_str.lower() != "true":
         raise ValueError(
-            f"relative_files under the 'run' section must be set to True. config file: {config_path}"
+            "relative_files under the 'run' section must be set to True in the config "
+            f"file {config_path}"
         )
     coverage_config.set("run", "relative_files", "True")
     omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]

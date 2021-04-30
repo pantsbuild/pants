@@ -58,15 +58,19 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
             enable_codegen=True,
         ),
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shellcheck.config_request)
 
     download_shellcheck_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
     )
 
-    direct_sources, dependency_sources, downloaded_shellcheck, config_files = await MultiGet(
-        direct_sources_get, dependency_sources_get, download_shellcheck_get, config_files_get
+    direct_sources, dependency_sources, downloaded_shellcheck = await MultiGet(
+        direct_sources_get, dependency_sources_get, download_shellcheck_get
     )
+
+    config_files = await Get(
+        ConfigFiles, ConfigFilesRequest, shellcheck.config_request(direct_sources.snapshot.dirs)
+    )
+
     input_digest = await Get(
         Digest,
         MergeDigests(

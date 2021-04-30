@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
+
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -11,7 +13,7 @@ from pants.option.custom_types import file_option, shell_str
 
 class Bandit(PythonToolBase):
     options_scope = "bandit"
-    help = """A tool for finding security issues in Python code (https://bandit.readthedocs.io)."""
+    help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     default_version = "bandit>=1.6.2,<1.7"
     # `setuptools<45` is for Python 2 support. `stevedore` is because the 3.0 release breaks Bandit.
@@ -41,7 +43,7 @@ class Bandit(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to a Bandit YAML config file",
+            help="Path to a Bandit YAML config file.",
         )
 
     @property
@@ -49,14 +51,15 @@ class Bandit(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     @property
     def config_request(self) -> ConfigFilesRequest:
-        # Note that there are no default locations for Bandit config files.
+        # Refer to https://bandit.readthedocs.io/en/latest/config.html. Note that there are no
+        # default locations for Bandit config files.
         return ConfigFilesRequest(specified=self.config, option_name=f"{self.options_scope}.config")
