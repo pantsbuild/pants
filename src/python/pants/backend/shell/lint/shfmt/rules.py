@@ -49,20 +49,20 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(Platform.current)
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shfmt.config_request)
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-
-    downloaded_shfmt, config_files, source_files = await MultiGet(
-        download_shfmt_get, config_files_get, source_files_get
-    )
+    downloaded_shfmt, source_files = await MultiGet(download_shfmt_get, source_files_get)
 
     source_files_snapshot = (
         source_files.snapshot
         if setup_request.request.prior_formatter_result is None
         else setup_request.request.prior_formatter_result
+    )
+
+    config_files = await Get(
+        ConfigFiles, ConfigFilesRequest, shfmt.config_request(source_files_snapshot.dirs)
     )
 
     input_digest = await Get(

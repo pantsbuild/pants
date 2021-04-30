@@ -53,7 +53,7 @@ class Setup:
     original_digest: Digest
 
 
-def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, black: Black, *, check_only: bool) -> Tuple[str, ...]:
     args = []
     if check_only:
         args.append("--check")
@@ -97,21 +97,21 @@ async def setup_black(
         ),
     )
 
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, black.config_request)
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, black_pex, config_files = await MultiGet(
-        source_files_get, black_pex_get, config_files_get
-    )
+    source_files, black_pex = await MultiGet(source_files_get, black_pex_get)
     source_files_snapshot = (
         source_files.snapshot
         if setup_request.request.prior_formatter_result is None
         else setup_request.request.prior_formatter_result
     )
 
+    config_files = await Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(source_files_snapshot.dirs)
+    )
     input_digest = await Get(
         Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
     )
@@ -120,9 +120,7 @@ async def setup_black(
         Process,
         VenvPexProcess(
             black_pex,
-            argv=generate_args(
-                source_files=source_files, black=black, check_only=setup_request.check_only
-            ),
+            argv=generate_argv(source_files, black, check_only=setup_request.check_only),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=f"Run Black on {pluralize(len(setup_request.request.field_sets), 'file')}.",

@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import cast
+import os.path
+from typing import Iterable, cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -66,10 +67,15 @@ class Shellcheck(TemplatedExternalTool):
     def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://www.mankier.com/1/shellcheck#RC_Files for how config files are
+        # discovered.
+        candidates = []
+        for d in ("", *dirs):
+            candidates.append(os.path.join(d, ".shellcheckrc"))
+            candidates.append(os.path.join(d, "shellcheckrc"))
         return ConfigFilesRequest(
             specified=cast("str | None", self.options.config),
-            check_existence=[".shellcheckrc", "shellcheckrc"],
+            check_existence=candidates,
             option_name=f"[{self.options_scope}].config",
         )

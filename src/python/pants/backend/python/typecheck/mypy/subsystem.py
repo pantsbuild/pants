@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple, cast
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -67,7 +67,7 @@ class MyPy(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
@@ -76,11 +76,12 @@ class MyPy(PythonToolBase):
 
     @property
     def config_request(self) -> ConfigFilesRequest:
+        # Refer to https://mypy.readthedocs.io/en/stable/config_file.html.
         return ConfigFilesRequest(
             specified=self.config,
             check_existence=["mypy.ini", ".mypy.ini"],
             check_content={"setup.cfg": b"[mypy"},
-            option_name="[mypy].config",
+            option_name=f"{self.options_scope}.config",
         )
 
     @property
