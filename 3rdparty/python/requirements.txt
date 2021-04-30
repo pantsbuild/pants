@@ -18,7 +18,7 @@ mypy==0.812
 
 packaging==20.9
 pathspec==0.8.1
-pex==2.1.41
+pex==2.1.42
 psutil==5.8.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import traceback
+import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -79,7 +80,19 @@ class Parser:
     """
 
     @staticmethod
-    def _ensure_bool(val: bool | str) -> bool:
+    def is_bool(kwargs: Mapping[str, Any]) -> bool:
+        type_arg = kwargs.get("type")
+        if type_arg is None:
+            return False
+        if type_arg is bool:
+            return True
+        try:
+            return typing.get_type_hints(type_arg).get("return") is bool
+        except TypeError:
+            return False
+
+    @staticmethod
+    def ensure_bool(val: bool | str) -> bool:
         if isinstance(val, bool):
             return val
         if isinstance(val, str):
@@ -95,7 +108,7 @@ class Parser:
     def _invert(cls, s: bool | str | None) -> bool | None:
         if s is None:
             return None
-        b = cls._ensure_bool(s)
+        b = cls.ensure_bool(s)
         return not b
 
     @classmethod
@@ -235,7 +248,7 @@ class Parser:
             # specified as a command-line flag, so we don't spam users with deprecated option values
             # specified in config, which isn't something they control.
             implicit_value = kwargs.get("implicit_value")
-            if implicit_value is None and kwargs.get("type") == bool:
+            if implicit_value is None and self.is_bool(kwargs):
                 implicit_value = True  # Allows --foo to mean --foo=true.
 
             flag_vals: list[int | float | bool | str] = []
@@ -253,7 +266,7 @@ class Parser:
             for arg in args:
                 # If the user specified --no-foo on the cmd line, treat it as if the user specified
                 # --foo, but with the inverse value.
-                if kwargs.get("type") == bool:
+                if self.is_bool(kwargs):
                     inverse_arg = self._inverse_arg(arg)
                     if inverse_arg in flag_value_map:
                         flag_value_map[arg] = [self._invert(v) for v in flag_value_map[inverse_arg]]
@@ -386,13 +399,13 @@ class Parser:
             dest = self.parse_dest(*args, **kwargs)
             self._check_deprecated(dest, kwargs, print_warning=False)
 
-        if kwargs.get("type") == bool:
+        if self.is_bool(kwargs):
             default = kwargs.get("default")
             if default is None:
                 # Unless a tri-state bool is explicitly opted into with the `UnsetBool` default value,
                 # boolean options always have an implicit boolean-typed default. We make that default
                 # explicit here.
-                kwargs["default"] = not self._ensure_bool(kwargs.get("implicit_value", True))
+                kwargs["default"] = not self.ensure_bool(kwargs.get("implicit_value", True))
             elif default is UnsetBool:
                 kwargs["default"] = None
 
@@ -560,7 +573,7 @@ class Parser:
         if val_str is None:
             return None
         if type_arg == bool:
-            return self._ensure_bool(val_str)
+            return self.ensure_bool(val_str)
         try:
             if type_arg == list:
                 return ListValueComponent.create(val_str, member_type=member_type)

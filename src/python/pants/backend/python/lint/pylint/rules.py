@@ -93,7 +93,7 @@ class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
 
 
-def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
@@ -133,7 +133,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         ),
     )
 
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, pylint.config_request)
     prepare_plugin_sources_get = Get(
         StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets)
     )
@@ -147,27 +146,30 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     (
         pylint_pex,
         requirements_pex,
-        config_files,
         prepared_plugin_sources,
         prepared_python_sources,
         field_set_sources,
     ) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
-        config_files_get,
         prepare_plugin_sources_get,
         prepare_python_sources_get,
         field_set_sources_get,
     )
 
-    pylint_runner_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="pylint_runner.pex",
-            interpreter_constraints=partition.interpreter_constraints,
-            main=pylint.main,
-            internal_only=True,
-            pex_path=[pylint_pex, requirements_pex],
+    pylint_runner_pex, config_files = await MultiGet(
+        Get(
+            VenvPex,
+            PexRequest(
+                output_filename="pylint_runner.pex",
+                interpreter_constraints=partition.interpreter_constraints,
+                main=pylint.main,
+                internal_only=True,
+                pex_path=[pylint_pex, requirements_pex],
+            ),
+        ),
+        Get(
+            ConfigFiles, ConfigFilesRequest, pylint.config_request(field_set_sources.snapshot.dirs)
         ),
     )
 
@@ -204,7 +206,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         FallibleProcessResult,
         VenvPexProcess(
             pylint_runner_pex,
-            argv=generate_args(source_files=field_set_sources, pylint=pylint),
+            argv=generate_argv(field_set_sources, pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
             description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",

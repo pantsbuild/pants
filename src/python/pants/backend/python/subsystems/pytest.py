@@ -1,7 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
+
+import os.path
+from typing import Iterable, cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import file_option, shell_str
@@ -107,7 +110,7 @@ class PyTest(Subsystem):
             ),
         )
 
-    def get_requirement_strings(self) -> Tuple[str, ...]:
+    def get_requirement_strings(self) -> tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
         return (self.options.version, *self.options.pytest_plugins)
 
@@ -116,26 +119,27 @@ class PyTest(Subsystem):
         return cast(bool, self.options.timeouts)
 
     @property
-    def timeout_default(self) -> Optional[int]:
-        return cast(Optional[int], self.options.timeout_default)
+    def timeout_default(self) -> int | None:
+        return cast("int | None", self.options.timeout_default)
 
     @property
-    def timeout_maximum(self) -> Optional[int]:
-        return cast(Optional[int], self.options.timeout_maximum)
+    def timeout_maximum(self) -> int | None:
+        return cast("int | None", self.options.timeout_maximum)
 
-    @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for how
+        # config files are discovered.
+        check_existence = []
+        check_content = {}
+        for d in ("", *dirs):
+            check_existence.append(os.path.join(d, "pytest.ini"))
+            check_content[os.path.join(d, "pyproject.toml")] = b"[tool.pytest.ini_options]"
+            check_content[os.path.join(d, "tox.ini")] = b"[pytest]"
+            check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
-            specified=self.config,
-            check_existence=["pytest.ini"],
-            check_content={
-                "pyproject.toml": b"[tool.pytest.ini_options]",
-                "tox.ini": b"[pytest]",
-                "setup.cfg": b"[tool:pytest]",
-            },
+            specified=cast("str | None", self.options.config),
+            check_existence=check_existence,
+            check_content=check_content,
             option_name=f"[{self.options_scope}].config",
         )

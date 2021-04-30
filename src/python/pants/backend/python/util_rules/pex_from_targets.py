@@ -42,7 +42,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -274,10 +274,7 @@ async def pex_from_targets(
                 f"requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
-            python_setup.resolve_all_constraints == ResolveAllConstraintsOption.NONDEPLOYABLES
-            and request.internal_only
-        ):
+        if python_setup.resolve_all_constraints:
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring `[python_setup].resolve_all_constraints` option because constraints "
@@ -308,13 +305,12 @@ async def pex_from_targets(
                     ),
                 )
     elif (
-        python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER
+        python_setup.resolve_all_constraints
         and python_setup.resolve_all_constraints_was_set_explicitly()
     ):
         raise ValueError(
-            "[python-setup].resolve_all_constraints is set to "
-            f"{python_setup.resolve_all_constraints.value}, so "
-            "either [python-setup].requirement_constraints or "
+            "[python-setup].resolve_all_constraints is enabled, so either "
+            "[python-setup].requirement_constraints or "
             "[python-setup].requirement_constraints_target must also be provided."
         )
 

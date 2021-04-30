@@ -72,7 +72,6 @@ root_patterns = [
 
 [python-setup]
 requirement_constraints = "3rdparty/python/constraints.txt"
-resolve_all_constraints = "nondeployables"
 interpreter_constraints = [">=3.7,<3.10"]
 
 [black]

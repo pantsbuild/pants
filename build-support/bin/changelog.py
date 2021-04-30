@@ -9,6 +9,10 @@ import subprocess
 from textwrap import dedent
 from typing import List
 
+from common import die
+
+from pants.version import MAJOR_MINOR
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Prepare the changelog for a release.")
@@ -27,11 +31,25 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def relevant_shas(prior: str) -> List[str]:
+def determine_release_branch(new_version: str) -> str:
+    new_version_major_minor = ".".join(new_version.split(".")[:2])
+    release_branch = (
+        "main" if new_version_major_minor == MAJOR_MINOR else f"{new_version_major_minor}.x"
+    )
+    branch_confirmation = input(
+        f"Have you recently pulled from upstream on the branch `{release_branch}`? "
+        "This is needed to ensure the changelog is exhaustive. [Y/n]"
+    )
+    if branch_confirmation and branch_confirmation.lower() != "y":
+        die(f"Please checkout to the branch `{release_branch}` and pull from upstream. ")
+    return release_branch
+
+
+def relevant_shas(prior: str, release_branch: str) -> List[str]:
     prior_tag = f"release_{prior}"
     return (
         subprocess.run(
-            ["git", "log", "--format=format:%H", "HEAD", f"^{prior_tag}"],
+            ["git", "log", "--format=format:%H", release_branch, f"^{prior_tag}"],
             check=True,
             stdout=subprocess.PIPE,
         )
@@ -105,8 +123,10 @@ def instructions(new_version: str) -> str:
 
 def main() -> None:
     args = create_parser().parse_args()
+    release_branch = determine_release_branch(args.new)
+
     print(instructions(args.new))
-    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior)]
+    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, release_branch)]
     print("\n\n".join(entries))
 
 

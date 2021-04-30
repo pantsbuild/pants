@@ -149,8 +149,6 @@ async def setup_pytest_for_target(
         ),
     )
 
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, pytest.config_request)
-
     extra_output_directory_digest_get = Get(Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)]))
 
     prepared_sources_get = Get(
@@ -184,18 +182,16 @@ async def setup_pytest_for_target(
         requirements_pex,
         prepared_sources,
         field_set_source_files,
-        config_files,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
-        config_files_get,
         extra_output_directory_digest_get,
     )
 
-    pytest_runner_pex = await Get(
+    pytest_runner_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="pytest_runner.pex",
@@ -205,6 +201,12 @@ async def setup_pytest_for_target(
             pex_path=[pytest_pex, requirements_pex],
         ),
     )
+    config_files_get = Get(
+        ConfigFiles,
+        ConfigFilesRequest,
+        pytest.config_request(field_set_source_files.snapshot.dirs),
+    )
+    pytest_runner_pex, config_files = await MultiGet(pytest_runner_pex_get, config_files_get)
 
     input_digest = await Get(
         Digest,

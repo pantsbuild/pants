@@ -1,7 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
+
+import os.path
+from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -46,7 +49,7 @@ class Black(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to Black's pyproject.toml config file",
+            help="Path to a TOML config file understood by Black.",
         )
 
     @property
@@ -54,17 +57,19 @@ class Black(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://github.com/psf/black#where-black-looks-for-the-file for how Black
+        # discovers config.
+        candidates = {os.path.join(d, "pyproject.toml"): b"[tool.black]" for d in ("", *dirs)}
         return ConfigFilesRequest(
             specified=self.config,
-            check_content={"pyproject.toml": b"[tool.black]"},
+            check_content=candidates,
             option_name=f"[{self.options_scope}].config",
         )

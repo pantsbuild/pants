@@ -45,8 +45,8 @@ class BanditPartition:
     interpreter_constraints: PexInterpreterConstraints
 
 
-def generate_args(
-    *, source_files: SourceFiles, bandit: Bandit, report_file_name: Optional[str]
+def generate_argv(
+    source_files: SourceFiles, bandit: Bandit, *, report_file_name: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
@@ -92,9 +92,7 @@ async def bandit_lint_partition(
         FallibleProcessResult,
         VenvPexProcess(
             bandit_pex,
-            argv=generate_args(
-                source_files=source_files, bandit=bandit, report_file_name=report_file_name
-            ),
+            argv=generate_argv(source_files, bandit, report_file_name=report_file_name),
             input_digest=input_digest,
             description=f"Run Bandit on {pluralize(len(partition.field_sets), 'file')}.",
             output_files=(report_file_name,) if report_file_name else None,

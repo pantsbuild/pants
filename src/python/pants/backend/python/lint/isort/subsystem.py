@@ -1,7 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
+from __future__ import annotations
+
+import os.path
+from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -53,18 +56,31 @@ class Isort(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Tuple[str, ...]:
+    def config(self) -> tuple[str, ...]:
         return tuple(self.options.config)
 
-    @property
-    def config_request(self) -> ConfigFilesRequest:
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://pycqa.github.io/isort/docs/configuration/config_files/.
+        check_existence = []
+        check_content = {}
+        for d in ("", *dirs):
+            check_existence.append(os.path.join(d, ".isort.cfg"))
+            check_content.update(
+                {
+                    os.path.join(d, "pyproject.toml"): b"[tool.isort]",
+                    os.path.join(d, "setup.cfg"): b"[isort]",
+                    os.path.join(d, "tox.ini"): b"[isort]",
+                    os.path.join(d, ".editorconfig"): b"[*.py]",
+                }
+            )
+
         return ConfigFilesRequest(
             specified=self.config,
-            check_existence=[".isort.cfg"],
-            check_content={"pyproject.toml": b"[tool.isort]"},
+            check_existence=check_existence,
+            check_content=check_content,
             option_name=f"[{self.options_scope}].config",
         )

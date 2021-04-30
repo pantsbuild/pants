@@ -1,7 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
+
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -43,7 +45,7 @@ class Flake8(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to `.flake8` or alternative Flake8 config file",
+            help="Path to `.flake8` or alternative Flake8 config file.",
         )
 
     @property
@@ -51,15 +53,17 @@ class Flake8(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     @property
     def config_request(self) -> ConfigFilesRequest:
+        # See https://flake8.pycqa.org/en/latest/user/configuration.html#configuration-locations
+        # for how Flake8 discovers config files.
         return ConfigFilesRequest(
             specified=self.config,
             check_existence=["flake8", ".flake8"],
