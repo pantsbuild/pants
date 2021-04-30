@@ -14,9 +14,14 @@ exclude = '''
 )/
 '''
 
-
 [tool.isort]
 profile = "black"
 line_length = 100
 color_output = true
 known_first_party = ["internal_plugins", "pants", "pants_test"]
+
+[tool.coverage.report]
+# We inject this file at test time (see src/python/pants/conftest.py), and so
+# coverage will gather stats for it, but it doesn't correspond to a real source file,
+# so reporting will fail, unless we omit it here.
+omit = ["src/python/pants/__init__.py"]

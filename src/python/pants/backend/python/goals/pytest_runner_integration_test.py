@@ -12,7 +12,7 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
-from pants.backend.python.goals.coverage_py import create_coverage_config
+from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -35,7 +35,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            create_coverage_config,
+            create_or_update_coverage_config,
             *pytest_runner.rules(),
             *pex_from_targets.rules(),
             *dependency_inference_rules.rules(),
