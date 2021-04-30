@@ -27,15 +27,16 @@ def resolve_config(path: str | None, content: str | None) -> str:
     resolved_config: list[str] = []
 
     def mock_find_existing_config(request: ConfigFilesRequest) -> ConfigFiles:
-        snapshot = (
-            EMPTY_SNAPSHOT
-            if not request.specified
-            else RuleRunner().make_snapshot_of_empty_files([path])
-        )
+        if request.specified:
+            assert path is not None
+            snapshot = RuleRunner().make_snapshot_of_empty_files([path])
+        else:
+            snapshot = EMPTY_SNAPSHOT
         return ConfigFiles(snapshot)
 
     def mock_read_existing_config(_: Digest) -> DigestContents:
         # This shouldn't be called if no config file provided.
+        assert path is not None
         assert content is not None
         return DigestContents([FileContent(path, content.encode())])
 

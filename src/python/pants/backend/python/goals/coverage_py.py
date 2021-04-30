@@ -232,7 +232,8 @@ def _update_config(fc: FileContent) -> FileContent:
         coverage = tool.setdefault("coverage", {})
         run = coverage.setdefault("run", {})
         run["relative_files"] = True
-        run["omit"] = [*run.get("omit", []), "pytest.pex/*"]
+        if "pytest.pex/*" not in run.get("omit", []):
+            run["omit"] = [*run.get("omit", []), "pytest.pex/*"]
         return FileContent(fc.path, toml.dumps(all_config).encode())
 
     cp = configparser.ConfigParser()
@@ -301,9 +302,7 @@ class MergedCoverageData:
 
 @rule(desc="Merge Pytest coverage data", level=LogLevel.DEBUG)
 async def merge_coverage_data(
-    data_collection: PytestCoverageDataCollection,
-    coverage_setup: CoverageSetup,
-    coverage_config: CoverageConfig,
+    data_collection: PytestCoverageDataCollection, coverage_setup: CoverageSetup
 ) -> MergedCoverageData:
     if len(data_collection) == 1:
         return MergedCoverageData(data_collection[0].digest)
@@ -318,7 +317,7 @@ async def merge_coverage_data(
         ProcessResult,
         VenvPexProcess(
             coverage_setup.pex,
-            argv=("combine", f"--rcfile={coverage_config.path}", *prefixes),
+            argv=("combine", *prefixes),
             input_digest=input_digest,
             output_files=(".coverage",),
             description=f"Merge {len(prefixes)} Pytest coverage reports.",
