@@ -1,12 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import List, Optional
 
-import pytest
-
-from pants.backend.python.goals.coverage_py import CoverageSubsystem, create_coverage_config
+from pants.backend.python.goals.coverage_py import (
+    CoverageSubsystem,
+    create_or_update_coverage_config,
+)
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -20,29 +22,27 @@ from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
-def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
-    coverage = create_subsystem(CoverageSubsystem, config="some_file" if coverage_config else None)
-    resolved_config: List[str] = []
+def resolve_config(path: str | None, content: str | None) -> str:
+    coverage_subsystem = create_subsystem(CoverageSubsystem, config=path)
+    resolved_config: list[str] = []
 
     def mock_find_existing_config(request: ConfigFilesRequest) -> ConfigFiles:
         snapshot = (
             EMPTY_SNAPSHOT
             if not request.specified
-            else RuleRunner().make_snapshot_of_empty_files([".coveragerc"])
+            else RuleRunner().make_snapshot_of_empty_files([path])
         )
         return ConfigFiles(snapshot)
 
     def mock_read_existing_config(_: Digest) -> DigestContents:
         # This shouldn't be called if no config file provided.
-        assert coverage_config is not None
-        return DigestContents(
-            [FileContent(path="/dev/null/prelude", content=coverage_config.encode())]
-        )
+        assert content is not None
+        return DigestContents([FileContent(path, content.encode())])
 
     def mock_create_final_config(request: CreateDigest) -> Digest:
         assert len(request) == 1
-        assert request[0].path == ".coveragerc"
         assert isinstance(request[0], FileContent)
+        assert request[0].path == path if path is not None else ".coveragerc"
         assert request[0].is_executable is False
         resolved_config.append(request[0].content.decode())
         return EMPTY_DIGEST
@@ -55,58 +55,66 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
         MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_create_final_config),
     ]
 
-    result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)
-    assert result.digest.fingerprint == EMPTY_DIGEST.fingerprint
+    result = run_rule_with_mocks(
+        create_or_update_coverage_config, rule_args=[coverage_subsystem], mock_gets=mock_gets
+    )
+    assert result.digest == EMPTY_DIGEST
     assert len(resolved_config) == 1
     return resolved_config[0]
 
 
-def test_default_no_config() -> None:
-    resolved_config = run_create_coverage_config_rule(coverage_config=None)
-    assert resolved_config == dedent(
+def test_no_config() -> None:
+    assert resolve_config(None, None) == dedent(
         """\
-            [run]
-            relative_files = True
-            omit = 
-            \tpytest.pex/*
+        [run]
+        relative_files = True
+        omit = 
+        \tpytest.pex/*
 
         """  # noqa: W291
     )
 
 
-def test_simple_config() -> None:
-    config = dedent(
-        """
-      [run]
-      branch = False
-      relative_files = True
-      jerry = HELLO
-      """
-    )
-    resolved_config = run_create_coverage_config_rule(coverage_config=config)
-    assert resolved_config == dedent(
-        """\
-            [run]
-            branch = False
-            relative_files = True
-            jerry = HELLO
-            omit = 
-            \tpytest.pex/*
+def test_no_run_section() -> None:
+    assert (
+        resolve_config(
+            "pyproject.toml",
+            dedent(
+                """\
+                [tool.coverage.report]
+                ignore_errors = true
 
-            """  # noqa: W291
-    )
+                [tool.isort]
+                foo = "bar"
+                """
+            ),
+        )
+        == dedent(
+            """\
+            [tool.isort]
+            foo = "bar"
 
+            [tool.coverage.report]
+            ignore_errors = true
 
-def test_config_no_run_section() -> None:
-    config = dedent(
-        """
-      [report]
-      ignore_errors = True
-      """
+            [tool.coverage.run]
+            relative_files = true
+            omit = [ "pytest.pex/*",]
+            """
+        )
     )
-    resolved_config = run_create_coverage_config_rule(coverage_config=config)
-    assert resolved_config == dedent(
-        """\
+    assert (
+        resolve_config(
+            ".coveragerc",
+            dedent(
+                """\
+                [report]
+                ignore_errors: True
+                """
+            ),
+        )
+        == dedent(
+            """\
             [report]
             ignore_errors = True
 
@@ -116,41 +124,102 @@ def test_config_no_run_section() -> None:
             \tpytest.pex/*
 
             """  # noqa: W291
+        )
     )
+    assert (
+        resolve_config(
+            "setup.cfg",
+            dedent(
+                """\
+                [coverage:report]
+                ignore_errors: True
+                """
+            ),
+        )
+        == dedent(
+            """\
+            [coverage:report]
+            ignore_errors = True
 
-
-def test_append_omits() -> None:
-    config = dedent(
-        """
-      [run]
-      omit =
-        jerry/seinfeld/*.py
-        # I find tinsel distracting
-        festivus/tinsel/*.py
-      """
-    )
-    resolved_config = run_create_coverage_config_rule(coverage_config=config)
-    assert resolved_config == dedent(
-        """\
-            [run]
-            omit = 
-            \tjerry/seinfeld/*.py
-            \tfestivus/tinsel/*.py
-            \tpytest.pex/*
+            [coverage:run]
             relative_files = True
+            omit = 
+            \tpytest.pex/*
 
             """  # noqa: W291
+        )
     )
 
 
-def test_invalid_relative_files_setting() -> None:
-    config = dedent(
-        """
-      [run]
-      relative_files = False
-      """
+def test_update_run_section() -> None:
+    assert (
+        resolve_config(
+            "pyproject.toml",
+            dedent(
+                """\
+                [tool.coverage.run]
+                relative_files = false
+                omit = ["e1"]
+                foo = "bar"
+                """
+            ),
+        )
+        == dedent(
+            """\
+            [tool.coverage.run]
+            relative_files = true
+            omit = [ "e1", "pytest.pex/*",]
+            foo = "bar"
+            """
+        )
     )
-    with pytest.raises(
-        ValueError, match="relative_files under the 'run' section must be set to True"
-    ):
-        run_create_coverage_config_rule(coverage_config=config)
+    assert (
+        resolve_config(
+            ".coveragerc",
+            dedent(
+                """\
+                [run]
+                relative_files: False
+                omit:
+                  e1
+                foo: bar
+                """
+            ),
+        )
+        == dedent(
+            """\
+            [run]
+            relative_files = True
+            omit = 
+            \te1
+            \tpytest.pex/*
+            foo = bar
+
+            """  # noqa: W291
+        )
+    )
+    assert (
+        resolve_config(
+            "setup.cfg",
+            dedent(
+                """\
+                [coverage:run]
+                relative_files: False
+                omit:
+                  e1
+                foo: bar
+                """
+            ),
+        )
+        == dedent(
+            """\
+            [coverage:run]
+            relative_files = True
+            omit = 
+            \te1
+            \tpytest.pex/*
+            foo = bar
+
+            """  # noqa: W291
+        )
+    )
