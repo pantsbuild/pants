@@ -50,7 +50,7 @@ class ConfigFilesRequest:
         self,
         *,
         specified: str | Iterable[str] | None = None,
-        specified_option_name: str = None,
+        specified_option_name: str | None = None,
         discovery: bool = False,
         check_existence: Iterable[str] = (),
         check_content: Mapping[str, bytes] = FrozenDict(),
