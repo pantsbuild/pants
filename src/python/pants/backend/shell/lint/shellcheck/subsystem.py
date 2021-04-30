@@ -9,7 +9,7 @@ from typing import Iterable, cast
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import file_option, shell_str
+from pants.option.custom_types import shell_str
 
 
 class Shellcheck(TemplatedExternalTool):
@@ -47,7 +47,8 @@ class Shellcheck(TemplatedExternalTool):
         )
         register(
             "--config-discovery",
-            type=file_option,
+            type=bool,
+            default=True,
             advanced=True,
             help=(
                 "If true, Pants will include all relevant `.shellcheckrc` and `shellcheckrc` files "
