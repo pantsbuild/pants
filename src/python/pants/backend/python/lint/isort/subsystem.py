@@ -45,10 +45,23 @@ class Isort(PythonToolBase):
         )
         register(
             "--config",
+            # TODO: Figure out how to deprecate this being a list in favor of a single string.
+            #  Thanks to config autodiscovery, this option should only be used because you want
+            #  Pants to explicitly set `--settings`, which only works w/ 1 config file.
+            #  isort 4 users should instead use autodiscovery to support multiple config files.
+            #  Deprecating this could be tricky, but should be possible thanks to the implicit
+            #  add syntax.
+            #
+            #  When deprecating, also deprecate the user manually setting `--settings` with
+            #  `[isort].args`.
             type=list,
             member_type=file_option,
             advanced=True,
-            help="Path to `isort.cfg` or alternative isort config file(s).",
+            help=(
+                "Path to `isort.cfg` or alternative isort config file(s).\n\n"
+                "If using isort 5+ and you specify only 1 config file, Pants will configure "
+                "isort's argv to point to your config file."
+            ),
         )
 
     @property
