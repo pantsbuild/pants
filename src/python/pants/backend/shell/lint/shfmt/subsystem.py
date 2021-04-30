@@ -9,7 +9,7 @@ from typing import Iterable, cast
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import file_option, shell_str
+from pants.option.custom_types import shell_str
 
 
 class Shfmt(TemplatedExternalTool):
@@ -43,13 +43,13 @@ class Shfmt(TemplatedExternalTool):
             help="Arguments to pass directly to shfmt, e.g. `--shfmt-args='-i 2'`.'",
         )
         register(
-            "--config",
-            type=file_option,
+            "--config-discovery",
+            type=bool,
+            default=True,
             advanced=True,
             help=(
-                "Path to `.editorconfig` file.\n\nBecause shfmt does not have a config file "
-                "option, you must locate this file somewhere shfmt can auto-discover it, usually "
-                "in your build root. See https://editorconfig.org."
+                "If true, Pants will include all relevant `.editorconfig` files during runs. "
+                "See https://editorconfig.org."
             ),
         )
 
@@ -69,7 +69,6 @@ class Shfmt(TemplatedExternalTool):
         # Refer to https://editorconfig.org/#file-location for how config files are discovered.
         candidates = (os.path.join(d, ".editorconfig") for d in ("", *dirs))
         return ConfigFilesRequest(
-            specified=cast("str | None", self.options.config),
+            discovery=cast(bool, self.options.config_discovery),
             check_content={fp: b"[*.sh]" for fp in candidates},
-            option_name=f"[{self.options_scope}].config",
         )

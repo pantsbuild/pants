@@ -45,8 +45,26 @@ class MyPy(PythonToolBase):
         register(
             "--config",
             type=file_option,
+            default=None,
             advanced=True,
-            help="Path to `mypy.ini` or alternative MyPy config file",
+            help=(
+                "Path to a config file understood by MyPy "
+                "(https://mypy.readthedocs.io/en/stable/config_file.html).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during "
+                "runs (`mypy.ini`, `.mypy.ini`, and `setup.cfg`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
         )
         register(
             "--source-plugins",
@@ -79,9 +97,10 @@ class MyPy(PythonToolBase):
         # Refer to https://mypy.readthedocs.io/en/stable/config_file.html.
         return ConfigFilesRequest(
             specified=self.config,
+            specified_option_name=f"{self.options_scope}.config",
+            discovery=cast(bool, self.options.config_discovery),
             check_existence=["mypy.ini", ".mypy.ini"],
             check_content={"setup.cfg": b"[mypy"},
-            option_name=f"{self.options_scope}.config",
         )
 
     @property

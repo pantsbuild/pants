@@ -46,13 +46,13 @@ class Shellcheck(TemplatedExternalTool):
             ),
         )
         register(
-            "--config",
+            "--config-discovery",
             type=file_option,
             advanced=True,
             help=(
-                "Path to `.shellcheckrc` file.\n\nBecause Shellcheck does not have a config file "
-                "option, you must locate this file somewhere Shellcheck can auto-discover it, "
-                "usually in your build root. See https://www.mankier.com/1/shellcheck#RC_Files."
+                "If true, Pants will include all relevant `.shellcheckrc` and `shellcheckrc` files "
+                "during runs. See https://www.mankier.com/1/shellcheck#RC_Files for where these "
+                "can be located."
             ),
         )
 
@@ -75,7 +75,5 @@ class Shellcheck(TemplatedExternalTool):
             candidates.append(os.path.join(d, ".shellcheckrc"))
             candidates.append(os.path.join(d, "shellcheckrc"))
         return ConfigFilesRequest(
-            specified=cast("str | None", self.options.config),
-            check_existence=candidates,
-            option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery), check_existence=candidates
         )

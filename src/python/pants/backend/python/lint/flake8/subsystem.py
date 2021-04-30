@@ -45,7 +45,24 @@ class Flake8(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to `.flake8` or alternative Flake8 config file.",
+            help=(
+                "Path to an INI config file understood by Flake8 "
+                "(https://flake8.pycqa.org/en/latest/user/configuration.html).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during "
+                "runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
         )
 
     @property
@@ -66,7 +83,8 @@ class Flake8(PythonToolBase):
         # for how Flake8 discovers config files.
         return ConfigFilesRequest(
             specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
             check_existence=["flake8", ".flake8"],
             check_content={"setup.cfg": b"[flake8]", "tox.ini": b"[flake8]"},
-            option_name=f"[{self.options_scope}].config",
         )

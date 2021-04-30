@@ -117,18 +117,20 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    (["pyproject.toml", []], ["custom_config.toml", ["--black-config=custom_config.toml"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
-            "pyproject.toml": "[tool.black]\nskip-string-normalization = 'true'\n",
             "BUILD": "python_library(name='t')",
+            config_path: "[tool.black]\nskip-string-normalization = 'true'\n",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(
-        rule_runner, [tgt], extra_args=["--black-config=pyproject.toml"]
-    )
+    lint_results, fmt_result = run_black(rule_runner, [tgt], extra_args=extra_args)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
@@ -137,7 +139,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(

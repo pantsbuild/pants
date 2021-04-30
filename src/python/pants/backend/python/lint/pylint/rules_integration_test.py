@@ -149,19 +149,23 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    (["pylintrc", []], ["custom_config.ini", ["--pylint-config=custom_config.ini"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": BAD_FILE,
             f"{PACKAGE}/BUILD": "python_library()",
-            "pylintrc": "[pylint]\ndisable = C0103",
+            config_path: "[pylint]\ndisable = C0103",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt, extra_args=["--pylint-config=pylintrc"])
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--pylint-args='--disable=C0103'"])

@@ -212,7 +212,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -234,7 +234,7 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
 
 
-def test_respects_config(rule_runner: RuleRunner) -> None:
+def test_config_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "pytest.ini": dedent(
@@ -253,7 +253,7 @@ def test_respects_config(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-config=pytest.ini"])
+    result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
     assert "All good!" in result.stdout and "Captured" not in result.stdout
 

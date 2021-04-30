@@ -43,7 +43,10 @@ class Bandit(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to a Bandit YAML config file.",
+            help=(
+                "Path to a Bandit YAML config file "
+                "(https://bandit.readthedocs.io/en/latest/config.html)."
+            ),
         )
 
     @property
@@ -62,4 +65,6 @@ class Bandit(PythonToolBase):
     def config_request(self) -> ConfigFilesRequest:
         # Refer to https://bandit.readthedocs.io/en/latest/config.html. Note that there are no
         # default locations for Bandit config files.
-        return ConfigFilesRequest(specified=self.config, option_name=f"{self.options_scope}.config")
+        return ConfigFilesRequest(
+            specified=self.config, specified_option_name=f"{self.options_scope}.config"
+        )

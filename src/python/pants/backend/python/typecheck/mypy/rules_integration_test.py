@@ -129,7 +129,7 @@ def run_mypy(
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
-    additional_args: Optional[List[str]] = None,
+    extra_args: Optional[List[str]] = None,
 ) -> Sequence[TypecheckResult]:
     args = list(GLOBAL_ARGS)
     if config:
@@ -139,8 +139,8 @@ def run_mypy(
         args.append(f"--mypy-args='{passthrough_args}'")
     if skip:
         args.append("--mypy-skip")
-    if additional_args:
-        args.extend(additional_args)
+    if extra_args:
+        args.extend(extra_args)
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
         TypecheckResults,
@@ -188,15 +188,26 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "checked 2 source files" in result[0].stdout
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
-    result = run_mypy(rule_runner, [target], config="[mypy]\ndisallow_any_expr = True\n")
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    ([".mypy.ini", []], ["custom_config.ini", ["--mypy-config=custom_config.ini"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": NEEDS_CONFIG_SOURCE.content.decode(),
+            f"{PACKAGE}/BUILD": "python_library()",
+            config_path: "[mypy]\ndisallow_any_expr = True\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/needs_config.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:4" in result[0].stdout
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
     result = run_mypy(rule_runner, [target], passthrough_args="--disallow-any-expr")
     assert len(result) == 1
@@ -292,10 +303,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [package_tgt],
         config=config_content,
-        additional_args=[
-            "--mypy-extra-requirements=django-stubs==1.5.0",
-            "--mypy-version=mypy==0.770",
-        ],
+        extra_args=["--mypy-extra-requirements=django-stubs==1.5.0", "--mypy-version=mypy==0.770"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -580,7 +588,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(PACKAGE, "python_library()")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
     result = run_mypy(
-        rule_runner, [tgt], additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+        rule_runner, [tgt], extra_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -609,7 +617,7 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
         ),
     )
     tgt = rule_runner.get_target(Address("", target_name="lib"))
-    result = run_mypy(rule_runner, [tgt], additional_args=["--mypy-version=mypy==0.782"])
+    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-version=mypy==0.782"])
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout
@@ -718,7 +726,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         result = run_mypy(
             rule_runner,
             [tgt],
-            additional_args=[
+            extra_args=[
                 "--mypy-source-plugins=['pants-plugins/plugins']",
                 "--source-root-patterns=['pants-plugins', 'src/python']",
             ],
@@ -800,7 +808,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        additional_args=[
+        extra_args=[
             "--backend-packages=pants.backend.codegen.protobuf.python",
             "--python-protobuf-mypy-plugin",
         ],
