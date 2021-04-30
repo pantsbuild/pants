@@ -118,18 +118,20 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "path,extra_args",
+    ((".isort.cfg", ["--isort-config=.isort.cfg"]), ("custom.ini", ["--isort-config=custom.ini"])),
+)
+def test_config_file(rule_runner: RuleRunner, path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
-            "BUILD": "python_library(name='t')",
-            ".isort.cfg": "[settings]\ncombine_as_imports=True\n",
+            "BUILD": "python_library(name='t', interpreter_constraints=['==3.9.*'])",
+            path: "[isort]\ncombine_as_imports=True\n",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_isort(
-        rule_runner, [tgt], extra_args=["--isort-config=.isort.cfg"]
-    )
+    lint_results, fmt_result = run_isort(rule_runner, [tgt], extra_args=extra_args)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "f.py Imports are incorrectly sorted" in lint_results[0].stderr
@@ -138,7 +140,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(

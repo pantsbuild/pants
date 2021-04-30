@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
 )
@@ -51,12 +52,27 @@ class Setup:
     original_digest: Digest
 
 
-def generate_argv(source_files: SourceFiles, isort: Isort, *, check_only: bool) -> Tuple[str, ...]:
-    # NB: isort auto-discovers config files. There is no way to hardcode them via command line
-    # flags. So long as the files are in the Pex's input files, isort will use the config.
+def generate_argv(
+    source_files: SourceFiles, isort: Isort, *, is_isort5: bool, check_only: bool
+) -> Tuple[str, ...]:
     args = [*isort.args]
     if check_only:
         args.append("--check-only")
+    if is_isort5 and len(isort.config) == 1:
+        explicitly_configured_config_args = [
+            arg
+            for arg in isort.args
+            if (
+                arg.startswith("--sp")
+                or arg.startswith("--settings-path")
+                or arg.startswith("--settings-file")
+                or arg.startswith("--settings")
+            )
+        ]
+        # TODO: Deprecate manually setting this option, but wait until we deprecate
+        #  `[isort].config` to be a string rather than list[str] option.
+        if not explicitly_configured_config_args:
+            args.append(f"--settings={isort.config[0]}")
     args.extend(source_files.files)
     return tuple(args)
 
@@ -89,6 +105,15 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         ConfigFiles, ConfigFilesRequest, isort.config_request(source_files_snapshot.dirs)
     )
 
+    # Isort 5+ changes how config files are handled. Determine which semantics we should use.
+    is_isort5 = False
+    if isort.config:
+        isort_info = await Get(PexResolveInfo, VenvPex, isort_pex)
+        is_isort5 = any(
+            dist_info.project_name == "isort" and dist_info.version.major >= 5
+            for dist_info in isort_info
+        )
+
     input_digest = await Get(
         Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
     )
@@ -97,7 +122,9 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         Process,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(source_files, isort, check_only=setup_request.check_only),
+            argv=generate_argv(
+                source_files, isort, is_isort5=is_isort5, check_only=setup_request.check_only
+            ),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
