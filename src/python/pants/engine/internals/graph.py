@@ -401,24 +401,33 @@ def _log_or_raise_unmatched_owners(
     owners_not_found_behavior: OwnersNotFoundBehavior,
     ignore_option: Optional[str] = None,
 ) -> None:
-    msgs = []
-    if ignore_option:
-        option_msg = f"\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
-    else:
-        option_msg = ""
-    for file_path in file_paths:
-        msgs.append(
-            f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
-            f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-            f"field includes `{file_path}`. See {bracketed_docs_url('targets')} for more "
-            f"information on target definitions.{option_msg}"
+    option_msg = (
+        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
+        if ignore_option
+        else ""
+    )
+    if len(file_paths) == 1:
+        prefix = (
+            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
+            f"Please check that there is a BUILD file in the parent directory "
+            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
         )
+    else:
+        prefix = (
+            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
+            f"Please check that there are BUILD files in each file's parent directory with a "
+            f"target whose `sources` field includes the file."
+        )
+    msg = (
+        f"{prefix} See {bracketed_docs_url('targets')} for more information on target definitions."
+        f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
+        f"{bracketed_docs_url('create-initial-build-files')}.{option_msg}"
+    )
 
     if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-        for msg in msgs:
-            logger.warning(msg)
+        logger.warning(msg)
     else:
-        raise ResolveError("\n\n".join(msgs))
+        raise ResolveError(msg)
 
 
 @rule
