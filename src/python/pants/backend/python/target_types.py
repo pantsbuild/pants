@@ -639,23 +639,6 @@ class PythonRequirementsFile(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `_python_constraints` target
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonRequirementConstraintsField(_RequirementSequenceField):
-    alias = "constraints"
-    required = True
-    help = "A list of pip-style requirement strings, e.g. `my_dist==4.2.1`."
-
-
-class PythonRequirementConstraints(Target):
-    alias = "_python_constraints"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraintsField)
-    help = "A private helper target for inlined requirements constraints, used by macros."
-
-
-# -----------------------------------------------------------------------------------------------
 # `python_distribution` target
 # -----------------------------------------------------------------------------------------------
 

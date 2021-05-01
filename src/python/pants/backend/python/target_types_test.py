@@ -24,7 +24,6 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonDistributionDependencies,
     PythonLibrary,
-    PythonRequirementConstraintsField,
     PythonRequirementLibrary,
     PythonRequirementsField,
     PythonTestsTimeout,
@@ -42,7 +41,6 @@ from pants.backend.python.target_types_rules import (
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
-    Field,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -285,8 +283,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert not caplog.records
 
 
-@pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])
-def test_requirements_and_constraints_fields(field: type[Field]) -> None:
+def test_requirements_field() -> None:
     raw_value = (
         "argparse==1.2.1",
         "configparser ; python_version<'3'",
@@ -294,28 +291,28 @@ def test_requirements_and_constraints_fields(field: type[Field]) -> None:
     )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
-    assert field(raw_value, Address("demo")).value == parsed_value
+    assert PythonRequirementsField(raw_value, Address("demo")).value == parsed_value
 
     # Macros can pass pre-parsed Requirement objects.
-    assert field(parsed_value, Address("demo")).value == parsed_value
+    assert PythonRequirementsField(parsed_value, Address("demo")).value == parsed_value
 
     # Reject invalid types.
     with pytest.raises(InvalidFieldTypeException):
-        field("sneaky_str", Address("demo"))
+        PythonRequirementsField("sneaky_str", Address("demo"))
     with pytest.raises(InvalidFieldTypeException):
-        field([1, 2], Address("demo"))
+        PythonRequirementsField([1, 2], Address("demo"))
 
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["not valid! === 3.1"], Address("demo"))
+        PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{field.alias}' field for the "
-        "target demo:"
+        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
+        f"field for the target demo:"
     ) in str(exc.value)
 
     # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
+        PythonRequirementsField(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 
