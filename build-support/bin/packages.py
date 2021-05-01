@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import sleep
 from typing import Callable, Iterable, Iterator, NamedTuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
@@ -29,6 +30,90 @@ from pants.util.strutil import strip_prefix
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
 # -----------------------------------------------------------------------------------------------
+
+_known_packages = [
+    # The packages we currently publish.
+    "pantsbuild.pants",
+    "pantsbuild.pants.testutil",
+    # Legacy/deprecated packages that we no longer publish, but still want to verify settings for.
+    "pantsbuild.pants.contrib.android",
+    "pantsbuild.pants.contrib.avro",
+    "pantsbuild.pants.contrib.awslambda-python",
+    "pantsbuild.pants.contrib.buildgen",
+    "pantsbuild.pants.contrib.codeanalysis",
+    "pantsbuild.pants.contrib.confluence",
+    "pantsbuild.pants.contrib.cpp",
+    "pantsbuild.pants.contrib.errorprone",
+    "pantsbuild.pants.contrib.findbugs",
+    "pantsbuild.pants.contrib.go",
+    "pantsbuild.pants.contrib.googlejavaformat",
+    "pantsbuild.pants.contrib.haskell",
+    "pantsbuild.pants.contrib.jax-ws",
+    "pantsbuild.pants.contrib.mypy",
+    "pantsbuild.pants.contrib.node",
+    "pantsbuild.pants.contrib.python.checks",
+    "pantsbuild.pants.contrib.python.checks.checker",
+    "pantsbuild.pants.contrib.scalajs",
+    "pantsbuild.pants.contrib.scrooge",
+    "pantsbuild.pants.contrib.spindle",
+    "pantsbuild.pants.contrib.thrifty",
+    "pantsbuild.pants.testinfra",
+]
+
+_expected_owners = {"benjyw", "John.Sirois", "stuhood"}
+
+_expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengyi"}
+
+
+class PackageAccessValidator:
+    @classmethod
+    def validate_all(cls):
+        instance = cls()
+        for pkg_name in _known_packages:
+            instance.validate_package_access(pkg_name)
+
+    def __init__(self):
+        self._client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
+
+    @property
+    def client(self):
+        # The PyPI XML-RPC API requires at least 1 second between requests, or it rejects them
+        # with HTTPTooManyRequests.
+        sleep(1.0)
+        return self._client
+
+    @staticmethod
+    def validate_role_sets(role: str, actual: set[str], expected: set[str]) -> str:
+        err_msg = ""
+        if actual != expected:
+            expected_not_actual = sorted(expected - actual)
+            actual_not_expected = sorted(actual - expected)
+            if expected_not_actual:
+                err_msg += f"Missing expected {role}s: {','.join(expected_not_actual)}."
+            if actual_not_expected:
+                err_msg += f"Found unexpected {role}s: {','.join(actual_not_expected)}"
+        return err_msg
+
+    def validate_package_access(self, pkg_name: str) -> None:
+        actual_owners = set()
+        actual_maintainers = set()
+        for role_assignment in self.client.package_roles(pkg_name):
+            role, username = role_assignment
+            if role == "Owner":
+                actual_owners.add(username)
+            elif role == "Maintainer":
+                actual_maintainers.add(username)
+            else:
+                raise ValueError(f"Unrecognized role {role} for user {username}")
+
+        err_msg = ""
+        err_msg += self.validate_role_sets("owner", actual_owners, _expected_owners)
+        err_msg += self.validate_role_sets("maintainer", actual_maintainers, _expected_maintainers)
+
+        if err_msg:
+            die(f"Role discrepancies for {pkg_name}: {err_msg}")
+
+        print(f"Roles for package {pkg_name} as expected.")
 
 
 @total_ordering
@@ -71,9 +156,12 @@ class Package:
         return cast(str, json_data["info"]["version"])
 
     def owners(self) -> set[str]:
+        def can_publish(role: str) -> bool:
+            return role in {"Owner", "Maintainer"}
+
         client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
         roles = client.package_roles(self.name)
-        return {row[1] for row in roles if row[0] == "Owner"}  # type: ignore[union-attr,index]
+        return {row[1] for row in roles if can_publish(row[0])}  # type: ignore[union-attr,index]
 
 
 def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
@@ -525,13 +613,15 @@ def publish() -> None:
     # Check prereqs.
     check_clean_git_branch()
     check_pgp()
-    check_ownership({get_pypi_config("server-login", "username")})
-    # Fetch and validate prebuild wheels.
+    check_roles()
+
+    # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
     check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
+
     # Release.
     create_twine_venv()
     subprocess.run(
@@ -586,49 +676,18 @@ def check_pgp() -> None:
         )
 
 
-def check_ownership(users, minimum_owner_count: int = 3) -> None:
-    minimum_owner_count = max(len(users), minimum_owner_count)
-    banner(f"Checking package ownership for {len(PACKAGES)} packages")
-    users = {user.lower() for user in users}
-    insufficient = set()
-    unowned: dict[str, set[Package]] = dict()
-
-    def check(i: int, pkg: Package) -> None:
-        banner(
-            f"[{i}/{len(PACKAGES)}] checking ownership for {pkg}: > {minimum_owner_count} "
-            f"releasers including {', '.join(users)}"
-        )
-        if not pkg.exists_on_pypi():
-            print(f"The {pkg.name} package is new! There are no owners yet.")
-            return
-
-        owners = pkg.owners()
-        if len(owners) <= minimum_owner_count:
-            insufficient.add(pkg)
-
-        difference = users.difference(owners)
-        for d in difference:
-            unowned.setdefault(d, set()).add(pkg)
-
-    for i, package in enumerate(PACKAGES):
-        check(i, package)
-
-    if unowned:
-        for user, unowned_packages in sorted(unowned.items()):
-            formatted_unowned = "\n".join(package.name for package in PACKAGES)
-            print(
-                f"PyPI account {user} needs to be added as an owner for the following "
-                f"packages:\n{formatted_unowned}",
-                file=sys.stderr,
-            )
-        raise SystemExit()
-
-    if insufficient:
-        insufficient_packages = "\n".join(package.name for package in insufficient)
-        die(
-            f"The following packages have fewer than {minimum_owner_count} owners but should be "
-            f"setup for all releasers:\n{insufficient_packages}",
-        )
+def check_roles() -> None:
+    # Check that the packages we plan to publish are correctly owned.
+    banner("Checking current user.")
+    username = get_pypi_config("server-login", "username")
+    if username not in _expected_owners and username not in _expected_maintainers:
+        die(f"User {username} not authorized to publish.")
+    banner("Checking package roles.")
+    validator = PackageAccessValidator()
+    for pkg in PACKAGES:
+        if pkg.name not in _known_packages:
+            die(f"Unknown package {pkg}")
+        validator.validate_package_access(pkg.name)
 
 
 def reversion_prebuilt_wheels() -> None:
@@ -713,13 +772,11 @@ def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None 
 # -----------------------------------------------------------------------------------------------
 
 
-def list_owners() -> None:
-    for package in PACKAGES:
-        if not package.exists_on_pypi():
-            print(f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr)
-            continue
-        formatted_owners = "\n".join(sorted(package.owners()))
-        print(f"Owners of {package.name}:\n{formatted_owners}\n")
+def validate_roles() -> None:
+    # Validate that ownership sets are exactly what we expect, even for legacy packages
+    # that we no longer publish.  Effectively we're using release time as an opportunity
+    # to do wider security validation than is strictly necessary just for releasing.
+    PackageAccessValidator.validate_all()
 
 
 def list_packages() -> None:
@@ -822,7 +879,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
-    subparsers.add_parser("list-owners")
+    subparsers.add_parser("validate-roles")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
     subparsers.add_parser("fetch-and-check-prebuilt-wheels")
@@ -847,8 +904,8 @@ def main() -> None:
         build_pex(fetch=False)
     if args.command == "build-universal-pex":
         build_pex(fetch=True)
-    if args.command == "list-owners":
-        list_owners()
+    if args.command == "validate-roles":
+        validate_roles()
     if args.command == "list-packages":
         list_packages()
     if args.command == "list-prebuilt-wheels":
