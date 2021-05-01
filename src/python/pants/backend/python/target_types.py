@@ -18,6 +18,7 @@ from pants.backend.python.dependency_inference.default_module_mapping import DEF
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -33,7 +34,6 @@ from pants.engine.target import (
     ScalarField,
     SecondaryOwnerMixin,
     Sources,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -399,18 +399,6 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonRuntimePackageDependencies(SpecialCasedDependencies):
-    alias = "runtime_package_dependencies"
-    help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
-    )
-
-
 class PythonTestsTimeout(IntField):
     alias = "timeout"
     help = (
@@ -450,8 +438,8 @@ class PythonTests(Target):
         InterpreterConstraintsField,
         PythonTestsSources,
         PythonTestsDependencies,
-        PythonRuntimePackageDependencies,
         PythonTestsTimeout,
+        RuntimePackageDependenciesField,
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
