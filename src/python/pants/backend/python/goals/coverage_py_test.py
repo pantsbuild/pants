@@ -23,7 +23,7 @@ from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
 def resolve_config(path: str | None, content: str | None) -> str:
-    coverage_subsystem = create_subsystem(CoverageSubsystem, config=path)
+    coverage_subsystem = create_subsystem(CoverageSubsystem, config=path, config_discovery=True)
     resolved_config: list[str] = []
 
     def mock_find_existing_config(request: ConfigFilesRequest) -> ConfigFiles:

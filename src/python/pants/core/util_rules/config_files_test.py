@@ -13,62 +13,47 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            *config_files.rules(),
-            QueryRule(ConfigFiles, [ConfigFilesRequest]),
-        ],
-    )
+    return RuleRunner(rules=[*config_files.rules(), QueryRule(ConfigFiles, [ConfigFilesRequest])])
 
 
 def test_resolve_if_specified(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"c1": "", "c2": ""})
 
-    def resolve(specified: list[str]) -> ConfigFiles:
+    def resolve(specified: list[str]) -> tuple[str, ...]:
         return rule_runner.request(
-            ConfigFiles, [ConfigFilesRequest(specified=specified, option_name="[subsystem].config")]
-        )
+            ConfigFiles,
+            [ConfigFilesRequest(specified=specified, specified_option_name="[subsystem].config")],
+        ).snapshot.files
 
-    assert resolve(["c1", "c2"]).snapshot.files == ("c1", "c2")
-    assert resolve(["c1"]).snapshot.files == ("c1",)
+    assert resolve(["c1", "c2"]) == ("c1", "c2")
+    assert resolve(["c1"]) == ("c1",)
     with pytest.raises(ExecutionError) as exc:
         resolve(["fake"])
     assert "fake" in str(exc.value)
 
 
-def test_warn_if_not_specified(rule_runner: RuleRunner, caplog) -> None:
+def test_discover_config(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"c1": "", "c2": "", "c3": "foo", "c4": "bar"})
 
-    def warn(existence: list[str], content: dict[str, bytes]) -> None:
-        caplog.clear()
-        rule_runner.request(
+    def discover(
+        existence: list[str], content: dict[str, bytes], *, specified: str | None = None
+    ) -> tuple[str, ...]:
+        return rule_runner.request(
             ConfigFiles,
             [
                 ConfigFilesRequest(
-                    specified=None,
+                    specified=specified,
+                    specified_option_name="foo",
+                    discovery=True,
                     check_existence=existence,
                     check_content=content,
-                    option_name="[subsystem].config",
                 )
             ],
-        )
+        ).snapshot.files
 
-    warn(["c1", "fake"], {"c3": b"foo", "c4": b"bad"})
-    assert len(caplog.records) == 1
-    assert (
-        "The option `[subsystem].config` is not configured, but Pants detected relevant config "
-        "files at ['c1', 'c3']."
-    ) in caplog.text
-
-    warn(["c1"], {})
-    assert len(caplog.records) == 1
-    assert (
-        "The option `[subsystem].config` is not configured, but Pants detected a relevant config "
-        "file at c1."
-    ) in caplog.text
-
-    warn([], {})
-    assert not caplog.records
-
-    warn(["fake"], {"c4": b"bad"})
-    assert not caplog.records
+    assert discover(["c1", "fake"], {"c3": b"foo", "c4": b"bad"}) == ("c1", "c3")
+    assert discover(["c1"], {}) == ("c1",)
+    assert discover([], {}) == ()
+    assert discover(["fake"], {"c4": b"bad"}) == ()
+    # Explicitly specifying turns off auto-discovery.
+    assert discover(["c1"], {}, specified="c2") == ("c2",)

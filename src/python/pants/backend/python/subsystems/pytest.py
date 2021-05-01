@@ -83,7 +83,10 @@ class PyTest(Subsystem):
             type=str,
             default="xunit2",
             advanced=True,
-            help="The format of the generated XML file. See https://docs.pytest.org/en/latest/reference.html#confval-junit_family.",
+            help=(
+                "The format of the generated XML file. See "
+                "https://docs.pytest.org/en/latest/reference.html#confval-junit_family."
+            ),
         )
         register(
             "--execution-slot-var",
@@ -100,15 +103,23 @@ class PyTest(Subsystem):
             type=file_option,
             default=None,
             advanced=True,
+            help="Path to pytest.ini or alternative Pytest config file.",
+            removal_version="2.6.0.dev0",
+            removal_hint=(
+                "Pants now auto-discovers config files, so there is no need to set "
+                "`[pytest].config` if `[pytest].config_discovery` is enabled (the default)."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
             help=(
-                "Path to pytest.ini or alternative Pytest config file.\n\n"
-                "Pytest will attempt to auto-discover the config file,"
-                "meaning that it should typically be an ancestor of your"
-                "tests, such as in the build root.\n\nPants will not automatically"
-                " set --rootdir for you to force Pytest to pick up your config "
-                "file, but you can manually set --rootdir in [pytest].args.\n\n"
-                "Refer to https://docs.pytest.org/en/stable/customize.html#"
-                "initialization-determining-rootdir-and-configfile."
+                "If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`) "
+                "during runs. See "
+                "https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where "
+                "config files should be located for Pytest to discover them."
             ),
         )
 
@@ -141,7 +152,8 @@ class PyTest(Subsystem):
 
         return ConfigFilesRequest(
             specified=cast("str | None", self.options.config),
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
             check_existence=check_existence,
             check_content=check_content,
-            option_name=f"[{self.options_scope}].config",
         )

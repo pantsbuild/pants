@@ -134,19 +134,23 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert batched_py3_result.stdout.strip() == ""
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    ([".flake8", []], ["custom_config.ini", ["--flake8-config=custom_config.ini"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
             "BUILD": "python_library(name='t')",
-            ".flake8": "[flake8]\nignore = F401\n",
+            config_path: "[flake8]\nignore = F401\n",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    assert_success(rule_runner, tgt, extra_args=["--flake8-config=.flake8"])
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--flake8-args='--ignore=F401'"])

@@ -49,7 +49,23 @@ class Black(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to a TOML config file understood by Black.",
+            help=(
+                "Path to a TOML config file understood by Black "
+                "(https://github.com/psf/black#configuration-format).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant pyproject.toml config files during runs."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
         )
 
     @property
@@ -70,6 +86,7 @@ class Black(PythonToolBase):
         candidates = {os.path.join(d, "pyproject.toml"): b"[tool.black]" for d in ("", *dirs)}
         return ConfigFilesRequest(
             specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
             check_content=candidates,
-            option_name=f"[{self.options_scope}].config",
         )

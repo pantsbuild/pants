@@ -119,8 +119,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "path,extra_args",
-    ((".isort.cfg", ["--isort-config=.isort.cfg"]), ("custom.ini", ["--isort-config=custom.ini"])),
+    "path,extra_args", ((".isort.cfg", []), ("custom.ini", ["--isort-config=custom.ini"]))
 )
 def test_config_file(rule_runner: RuleRunner, path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(

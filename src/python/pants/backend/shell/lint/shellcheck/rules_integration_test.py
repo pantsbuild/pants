@@ -89,15 +89,28 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "In bad.sh line 1:" in result[0].stdout
 
 
-def test_respects_config(rule_runner: RuleRunner) -> None:
+def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')", ".shellcheckrc": "disable=SC2148"}
+        {
+            "a/f.sh": BAD_FILE,
+            "a/BUILD": "shell_library()",
+            "a/.shellcheckrc": "disable=SC2148",
+            "b/f.sh": BAD_FILE,
+            "b/BUILD": "shell_library()",
+        }
     )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    assert_success(rule_runner, tgt, extra_args=["--shellcheck-config=.shellcheckrc"])
+    tgts = [
+        rule_runner.get_target(Address("a", relative_file_path="f.sh")),
+        rule_runner.get_target(Address("b", relative_file_path="f.sh")),
+    ]
+    result = run_shellcheck(rule_runner, tgts)
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "a/f.sh" not in result[0].stdout
+    assert "In b/f.sh line 1:" in result[0].stdout
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     assert_success(rule_runner, tgt, extra_args=["--shellcheck-args=-e SC2148"])

@@ -58,9 +58,24 @@ class Isort(PythonToolBase):
             member_type=file_option,
             advanced=True,
             help=(
-                "Path to `isort.cfg` or alternative isort config file(s).\n\n"
+                "Path to config file understood by isort "
+                "(https://pycqa.github.io/isort/docs/configuration/config_files/).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location.\n\n"
                 "If using isort 5+ and you specify only 1 config file, Pants will configure "
                 "isort's argv to point to your config file."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during "
+                "runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
             ),
         )
 
@@ -93,7 +108,8 @@ class Isort(PythonToolBase):
 
         return ConfigFilesRequest(
             specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
             check_existence=check_existence,
             check_content=check_content,
-            option_name=f"[{self.options_scope}].config",
         )
