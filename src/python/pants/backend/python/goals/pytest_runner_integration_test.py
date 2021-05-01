@@ -21,7 +21,12 @@ from pants.backend.python.target_types import (
     PythonTests,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestResult,
+    build_runtime_package_dependencies,
+    get_filtered_environment,
+)
 from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -35,6 +40,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            build_runtime_package_dependencies,
             create_or_update_coverage_config,
             *pytest_runner.rules(),
             *pex_from_targets.rules(),
@@ -405,7 +411,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
                 import subprocess
 
                 def test_embedded_binary():
-                    assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
+                    assert b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
 
                     # Ensure that we didn't accidentally pull in the binary's sources. This is a
                     # special type of dependency that should not be included with the rest of the
