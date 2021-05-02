@@ -8,7 +8,8 @@ https://flake8.pycqa.org/en/latest/.
 """
 
 from pants.backend.python.lint.flake8 import rules as flake8_rules
+from pants.backend.python.lint.flake8 import skip_field
 
 
 def rules():
-    return flake8_rules.rules()
+    return (*flake8_rules.rules(), *skip_field.rules())
