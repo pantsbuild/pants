@@ -1020,7 +1020,7 @@ class SentinelField(Field):
 
     help = "A private field only used as a marker."
     value: None
-    default: None
+    default: ClassVar[None] = None
 
     @classmethod
     def compute_value(cls, raw_value: None, address: Address) -> None:
