@@ -783,14 +783,23 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
+    You can optionally set the class property `unconditional_opt_out` and/or implement the
+    classmethod `conditional_opt_out` so that targets have a mechanism to not match with the
+    FieldSet even if they have the `required_fields` registered.
+
     For example:
 
         @dataclass(frozen=True)
         class FortranTestFieldSet(FieldSet):
             required_fields = (FortranSources,)
+            unconditional_opt_out = AlwaysSkipFortranTestsSentinelField
 
             sources: FortranSources
             fortran_version: FortranVersion
+
+            @classmethod
+            def conditional_opt_out(cls, tgt: Target) -> bool:
+                return tgt.get(MaybeSkipFortranTestsField).value is True
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
@@ -807,25 +816,38 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     """
 
     required_fields: ClassVar[tuple[type[Field], ...]]
+    unconditional_opt_out: ClassVar[type[Field] | None] = None
 
     address: Address
+
+    @classmethod
+    def conditional_opt_out(cls, tgt: Target) -> bool:
+        """If `True` is returned, the target will not match with the field set, even if it has the
+        FieldSet's `required_fields`."""
+        return False
 
     @final
     @classmethod
     def is_applicable(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
+        if cls.unconditional_opt_out is not None and tgt.has_field(cls.unconditional_opt_out):
+            return False
+        return tgt.has_fields(cls.required_fields) and not cls.conditional_opt_out(tgt)
 
     @final
     @classmethod
     def applicable_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+        cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
     ) -> tuple[type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
+        def is_applicable(tgt_type: type[Target]) -> bool:
+            if cls.unconditional_opt_out is not None and tgt_type.class_has_field(
+                cls.unconditional_opt_out, union_membership
+            ):
+                return False
+            return tgt_type.class_has_fields(cls.required_fields, union_membership)
 
+        return tuple(filter(is_applicable, target_types))
+
+    @final
     @classmethod
     def create(cls: type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
@@ -987,6 +1009,22 @@ class UnrecognizedTargetTypeException(Exception):
 # -----------------------------------------------------------------------------------------------
 
 T = TypeVar("T")
+
+
+class SentinelField(Field):
+    """A field used only as a marker type and not meant to be set in BUILD files.
+
+    The `alias` class property should start with `_` so that the field does not show up with the
+    help system.
+    """
+
+    help = "A private field only used as a marker."
+    value: None
+    default: None
+
+    @classmethod
+    def compute_value(cls, raw_value: None, address: Address) -> None:
+        return None
 
 
 class ScalarField(Generic[T], Field):
