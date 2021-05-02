@@ -1037,7 +1037,7 @@ class BoolField(Field):
     default: ClassVar[bool]
 
     @classmethod
-    def compute_value(cls, raw_value: bool, address: Address) -> bool:
+    def compute_value(cls, raw_value: bool, address: Address) -> bool:  # type: ignore[override]
         value_or_default = super().compute_value(raw_value, address)
         if not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
