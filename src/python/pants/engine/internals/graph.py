@@ -42,6 +42,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
