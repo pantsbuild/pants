@@ -1029,28 +1029,32 @@ class ScalarField(Generic[T], Field):
 class BoolField(Field):
     """A field whose value is a boolean.
 
-    If subclasses do not set the class property `required = True` or `default`, the value will
-    default to None. This can be useful to represent three states: unspecified, False, and True.
-
-        class ZipSafe(BoolField):
-            alias = "zip_safe"
-            default = True
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
     """
 
-    value: Optional[bool]
-    default: ClassVar[Optional[bool]] = None
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool:
+        value_or_default = super().compute_value(raw_value, address)
+        if not isinstance(value_or_default, bool):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type="a boolean"
+            )
+        return value_or_default
+
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type = bool
+    expected_type_description = "a boolean or None"
 
     @classmethod
     def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is not None and not isinstance(value_or_default, bool):
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="a boolean",
-            )
-        return value_or_default
+        return super().compute_value(raw_value, address)
 
 
 class IntField(ScalarField[int]):
