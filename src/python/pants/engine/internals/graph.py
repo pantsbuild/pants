@@ -42,7 +42,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
@@ -1022,12 +1021,9 @@ async def find_valid_field_sets_for_target_roots(
 
 @rule
 def find_valid_field_sets(
-    request: FieldSetsPerTargetRequest,
-    union_membership: UnionMembership,
+    request: FieldSetsPerTargetRequest, union_membership: UnionMembership
 ) -> FieldSetsPerTarget:
-    field_set_types: Iterable[Type[FieldSet]] = union_membership.union_rules[
-        request.field_set_superclass
-    ]
+    field_set_types = union_membership.get(request.field_set_superclass)
     return FieldSetsPerTarget(
         (
             field_set_type.create(target)

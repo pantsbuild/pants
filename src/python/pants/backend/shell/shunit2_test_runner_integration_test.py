@@ -8,6 +8,10 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python.goals import package_pex_binary
+from pants.backend.python.target_types import PexBinary, PythonLibrary
+from pants.backend.python.target_types_rules import rules as python_target_type_rules
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell import shunit2_test_runner
 from pants.backend.shell.shunit2_test_runner import (
     Shunit2FieldSet,
@@ -20,7 +24,12 @@ from pants.backend.shell.target_types import (
     Shunit2ShellField,
     Shunit2Tests,
 )
-from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestResult,
+    build_runtime_package_dependencies,
+    get_filtered_environment,
+)
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
@@ -36,12 +45,16 @@ def rule_runner() -> RuleRunner:
         rules=[
             *shunit2_test_runner.rules(),
             *source_files.rules(),
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *python_target_type_rules(),
+            build_runtime_package_dependencies,
             get_filtered_environment,
             QueryRule(TestResult, [Shunit2FieldSet]),
             QueryRule(TestDebugRequest, [Shunit2FieldSet]),
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
-        target_types=[ShellLibrary, Shunit2Tests],
+        target_types=[ShellLibrary, Shunit2Tests, PythonLibrary, PexBinary],
     )
 
 
@@ -69,7 +82,7 @@ def run_shunit2(
             *(extra_args or ()),
         ],
         env=env,
-        env_inherit={"PATH"},
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     inputs = [Shunit2FieldSet.create(test_target)]
     test_result = rule_runner.request(TestResult, inputs)
@@ -213,6 +226,36 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         extra_args=['--test-extra-env-vars=["SOME_VAR=some_value", "OTHER_VAR"]'],
         env={"OTHER_VAR": "other_value"},
     )
+    assert result.exit_code == 0
+    assert "Ran 1 test.\n\nOK" in result.stdout
+
+
+def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/main.py": "",
+            "src/py/BUILD": dedent(
+                """\
+                python_library()
+                pex_binary(name='main', entry_point='main.py')
+                """
+            ),
+            "tests.sh": dedent(
+                """\
+                #!/usr/bin/bash
+
+                testArchive() {
+                    assertTrue "[[ -f src.py/main.pex ]]"
+                    # Ensure the pex's dependencies are not included, only the final result.
+                    assertFalse "[[ -f src/py/main.py ]]"
+                }
+                """
+            ),
+            "BUILD": "shunit2_tests(name='t', runtime_package_dependencies=['src/py:main'])",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
+    result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
     assert "Ran 1 test.\n\nOK" in result.stdout
 
