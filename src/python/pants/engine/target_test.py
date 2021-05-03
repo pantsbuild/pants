@@ -24,7 +24,6 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     RequiredFieldMissingException,
     ScalarField,
-    SentinelField,
     SequenceField,
     Sources,
     StringField,
