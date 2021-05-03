@@ -9,8 +9,7 @@ from pants.backend.go.lint.fmt import GoLangFmtRequest
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import external_tool
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -122,6 +121,6 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
 def rules():
     return [
         *collect_rules(),
-        *external_tool.rules(),
         UnionRule(GoLangFmtRequest, GofmtRequest),
+        UnionRule(LintRequest, GofmtRequest),
     ]
