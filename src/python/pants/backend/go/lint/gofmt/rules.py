@@ -1,14 +1,15 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import dataclasses
 from dataclasses import dataclass
 
 from pants.backend.go.distribution import GoLangDistribution
-from pants.backend.go.fmt import GoLangFmtRequest
+from pants.backend.go.lint.fmt import GoLangFmtRequest
+from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import external_tool
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -18,27 +19,8 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
-
-
-class GofmtSubsystem(Subsystem):
-    options_scope = "gofmt"
-    help = "Gofmt-specific options."
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=(
-                f"Don't use gofmt when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`."
-            ),
-        )
 
 
 @dataclass(frozen=True)
@@ -139,6 +121,6 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
 def rules():
     return [
         *collect_rules(),
-        *external_tool.rules(),
         UnionRule(GoLangFmtRequest, GofmtRequest),
+        UnionRule(LintRequest, GofmtRequest),
     ]
