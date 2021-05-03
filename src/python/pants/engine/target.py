@@ -791,14 +791,13 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         @dataclass(frozen=True)
         class FortranTestFieldSet(FieldSet):
             required_fields = (FortranSources,)
-            unconditional_opt_out = AlwaysSkipFortranTestsSentinelField
 
             sources: FortranSources
             fortran_version: FortranVersion
 
             @classmethod
             def conditional_opt_out(cls, tgt: Target) -> bool:
-                return tgt.get(MaybeSkipFortranTestsField).value is True
+                return tgt.get(MaybeSkipFortranTestsField).value
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
@@ -1009,22 +1008,6 @@ class UnrecognizedTargetTypeException(Exception):
 # -----------------------------------------------------------------------------------------------
 
 T = TypeVar("T")
-
-
-class SentinelField(Field):
-    """A field used only as a marker type and not meant to be set in BUILD files.
-
-    The `alias` class property should start with `_` so that the field does not show up with the
-    help system.
-    """
-
-    help = "A private field only used as a marker."
-    value: None
-    default: ClassVar[None] = None
-
-    @classmethod
-    def compute_value(cls, raw_value: None, address: Address) -> None:
-        return None
 
 
 class ScalarField(Generic[T], Field):
