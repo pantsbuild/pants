@@ -3,7 +3,8 @@
 
 from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
+from pants.backend.go.lint.gofmt import skip_field
 
 
 def rules():
-    return [*fmt.rules(), *gofmt_rules()]
+    return [*fmt.rules(), *gofmt_rules(), *skip_field.rules()]
