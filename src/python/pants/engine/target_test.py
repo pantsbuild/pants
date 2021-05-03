@@ -483,54 +483,96 @@ def test_generate_subtarget() -> None:
 
 
 def test_field_set() -> None:
-    class UnrelatedField(StringField):
-        alias = "unrelated_field"
+    class RequiredField(StringField):
+        alias = "required_field"
         default = "default"
-        value: str
 
-    class UnrelatedTarget(Target):
-        alias = "unrelated_target"
-        core_fields = (UnrelatedField,)
+    class OptionalField(StringField):
+        alias = "optional_field"
+        default = "default"
+
+    class OptOutField(BoolField):
+        alias = "opt_out_field"
+        default = False
+
+    class TargetWithRequired(Target):
+        alias = "tgt_w_required"
+        # It has the required field registered, but not the optional field.
+        core_fields = (RequiredField,)
+
+    class TargetWithoutRequired(Target):
+        alias = "tgt_wo_required"
+        # It has the optional field registered, but not the required field.
+        core_fields = (OptionalField,)
 
     class NoFieldsTarget(Target):
-        alias = "no_fields_target"
+        alias = "no_fields_tgt"
         core_fields = ()
 
-    @dataclass(frozen=True)
-    class FortranFieldSet(FieldSet):
-        required_fields = (FortranVersion,)
-
-        version: FortranVersion
-        unrelated_field: UnrelatedField
+    class OptOutTarget(Target):
+        alias = "conditional_opt_out_tgt"
+        core_fields = (RequiredField, OptOutField)
 
     @dataclass(frozen=True)
-    class UnrelatedFieldSet(FieldSet):
+    class RequiredFieldSet(FieldSet):
+        required_fields = (RequiredField,)
+
+        required: RequiredField
+        optional: OptionalField
+
+        @classmethod
+        def opt_out(cls, tgt: Target) -> bool:
+            return tgt.get(OptOutField).value is True
+
+    @dataclass(frozen=True)
+    class OptionalFieldSet(FieldSet):
         required_fields = ()
 
-        unrelated_field: UnrelatedField
+        optional: OptionalField
 
-    fortran_addr = Address("", target_name="fortran")
-    fortran_tgt = FortranTarget({}, fortran_addr)
-    unrelated_addr = Address("", target_name="unrelated")
-    unrelated_tgt = UnrelatedTarget({UnrelatedField.alias: "configured"}, unrelated_addr)
+        @classmethod
+        def opt_out(cls, tgt: Target) -> bool:
+            return tgt.get(OptOutField).value is True
+
+    required_addr = Address("", target_name="required")
+    required_tgt = TargetWithRequired({RequiredField.alias: "configured"}, required_addr)
+    optional_addr = Address("", target_name="unrelated")
+    optional_tgt = TargetWithoutRequired({OptionalField.alias: "configured"}, optional_addr)
     no_fields_addr = Address("", target_name="no_fields")
     no_fields_tgt = NoFieldsTarget({}, no_fields_addr)
+    opt_out_addr = Address("", target_name="conditional")
+    opt_out_tgt = OptOutTarget(
+        {RequiredField.alias: "configured", OptOutField.alias: True}, opt_out_addr
+    )
 
-    assert FortranFieldSet.is_applicable(fortran_tgt) is True
-    assert FortranFieldSet.is_applicable(unrelated_tgt) is False
-    assert FortranFieldSet.is_applicable(no_fields_tgt) is False
-    # When no fields are required, every target is applicable.
-    for tgt in [fortran_tgt, unrelated_tgt, no_fields_tgt]:
-        assert UnrelatedFieldSet.is_applicable(tgt) is True
+    assert RequiredFieldSet.is_applicable(required_tgt) is True
+    for tgt in [optional_tgt, no_fields_tgt, opt_out_tgt]:
+        assert RequiredFieldSet.is_applicable(tgt) is False
 
-    valid_fortran_field_set = FortranFieldSet.create(fortran_tgt)
-    assert valid_fortran_field_set.address == fortran_addr
-    assert valid_fortran_field_set.unrelated_field.value == UnrelatedField.default
+    # When no fields are required, every target is applicable _unless_ it has been opted out of.
+    for tgt in [required_tgt, optional_tgt, no_fields_tgt]:
+        assert OptionalFieldSet.is_applicable(tgt) is True
+    assert OptionalFieldSet.is_applicable(opt_out_tgt) is False
+
+    required_fs = RequiredFieldSet.create(required_tgt)
+    assert required_fs.address == required_addr
+    assert required_fs.required.value == "configured"
+    assert required_fs.optional.value == OptionalField.default
+    assert isinstance(required_fs.required_fields, tuple)
+
     with pytest.raises(KeyError):
-        FortranFieldSet.create(unrelated_tgt)
+        RequiredFieldSet.create(optional_tgt)
 
-    assert UnrelatedFieldSet.create(unrelated_tgt).unrelated_field.value == "configured"
-    assert UnrelatedFieldSet.create(no_fields_tgt).unrelated_field.value == UnrelatedField.default
+    # It is possible to create a target that should be opted out of; the caller must call
+    # `.is_applicable()` first.
+    unconditional_opt_out_fs = RequiredFieldSet.create(opt_out_tgt)
+    assert unconditional_opt_out_fs.address == opt_out_addr
+    assert unconditional_opt_out_fs.required.value == "configured"
+    assert unconditional_opt_out_fs.optional.value == OptionalField.default
+    assert isinstance(required_fs.required_fields, tuple)
+
+    assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
+    assert OptionalFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
 
 
 # -----------------------------------------------------------------------------------------------
