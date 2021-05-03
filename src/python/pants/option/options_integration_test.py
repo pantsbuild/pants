@@ -90,7 +90,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
 
         config["GLOBAL"]["ignore_warnings"] = [  # type: ignore[index]
             unmatched_glob_warning,
-            "$regex$DeprecationWarning: DEPRECATED: option 'de.+ted'",
+            "$regex$DEPRECATED: option 'de.+ted'",
         ]
         ignore_result = run_pants(["filedeps", f"{tmpdir}:t"], config=config, use_pantsd=use_pantsd)
         ignore_result.assert_success()
