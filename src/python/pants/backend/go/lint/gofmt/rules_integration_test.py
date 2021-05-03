@@ -5,8 +5,8 @@ from typing import List, Sequence, Tuple
 
 import pytest
 
-from pants.backend.go.gofmt import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint import fmt
+from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.core.goals.fmt import FmtResult
