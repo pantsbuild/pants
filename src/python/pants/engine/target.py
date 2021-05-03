@@ -783,9 +783,8 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set the class property `unconditional_opt_out` and/or implement the
-    classmethod `conditional_opt_out` so that targets have a mechanism to not match with the
-    FieldSet even if they have the `required_fields` registered.
+    You can optionally set implement the classmethod `conditional_opt_out` so that targets have a
+    mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
 
@@ -816,36 +815,37 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     """
 
     required_fields: ClassVar[tuple[type[Field], ...]]
-    unconditional_opt_out: ClassVar[type[Field] | None] = None
 
     address: Address
 
     @classmethod
-    def conditional_opt_out(cls, tgt: Target) -> bool:
-        """If `True` is returned, the target will not match with the field set, even if it has the
-        FieldSet's `required_fields`."""
+    def opt_out(cls, tgt: Target) -> bool:
+        """If `True`, the target will not match with the field set, even if it has the FieldSet's
+        `required_fields`.
+
+        Note: this method is not intended to categorically opt out a target type from a
+        FieldSet, i.e. to always opt out based solely on the target type. While it is possible to
+        do, some error messages will incorrectly suggest that that target is compatible with the
+        FieldSet. Instead, if you need this feature, please ask us to implement it. See
+        https://github.com/pantsbuild/pants/pull/12002 for discussion.
+        """
         return False
 
     @final
     @classmethod
     def is_applicable(cls, tgt: Target) -> bool:
-        if cls.unconditional_opt_out is not None and tgt.has_field(cls.unconditional_opt_out):
-            return False
-        return tgt.has_fields(cls.required_fields) and not cls.conditional_opt_out(tgt)
+        return tgt.has_fields(cls.required_fields) and not cls.opt_out(tgt)
 
     @final
     @classmethod
     def applicable_target_types(
         cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
     ) -> tuple[type[Target], ...]:
-        def is_applicable(tgt_type: type[Target]) -> bool:
-            if cls.unconditional_opt_out is not None and tgt_type.class_has_field(
-                cls.unconditional_opt_out, union_membership
-            ):
-                return False
-            return tgt_type.class_has_fields(cls.required_fields, union_membership)
-
-        return tuple(filter(is_applicable, target_types))
+        return tuple(
+            tgt_type
+            for tgt_type in target_types
+            if tgt_type.class_has_fields(cls.required_fields, union_membership)
+        )
 
     @final
     @classmethod

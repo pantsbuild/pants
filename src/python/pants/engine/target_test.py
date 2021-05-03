@@ -492,11 +492,8 @@ def test_field_set() -> None:
         alias = "optional_field"
         default = "default"
 
-    class UnconditionalOptOutField(SentinelField):
-        alias = "unconditional_opt_out_field"
-
-    class ConditionalOptOutField(BoolField):
-        alias = "conditional_opt_out_field"
+    class OptOutField(BoolField):
+        alias = "opt_out_field"
         default = False
 
     class TargetWithRequired(Target):
@@ -513,37 +510,30 @@ def test_field_set() -> None:
         alias = "no_fields_tgt"
         core_fields = ()
 
-    class UnconditionalOptOutTarget(Target):
-        alias = "unconditional_opt_out_tgt"
-        # Even though this has the required field, it should be always opted out of.
-        core_fields = (RequiredField, UnconditionalOptOutField)
-
-    class ConditionalOptOutTarget(Target):
+    class OptOutTarget(Target):
         alias = "conditional_opt_out_tgt"
-        core_fields = (RequiredField, ConditionalOptOutField)
+        core_fields = (RequiredField, OptOutField)
 
     @dataclass(frozen=True)
     class RequiredFieldSet(FieldSet):
         required_fields = (RequiredField,)
-        unconditional_opt_out = UnconditionalOptOutField
 
         required: RequiredField
         optional: OptionalField
 
         @classmethod
-        def conditional_opt_out(cls, tgt: Target) -> bool:
-            return tgt.get(ConditionalOptOutField).value is True
+        def opt_out(cls, tgt: Target) -> bool:
+            return tgt.get(OptOutField).value is True
 
     @dataclass(frozen=True)
     class OptionalFieldSet(FieldSet):
         required_fields = ()
-        unconditional_opt_out = UnconditionalOptOutField
 
         optional: OptionalField
 
         @classmethod
-        def conditional_opt_out(cls, tgt: Target) -> bool:
-            return tgt.get(ConditionalOptOutField).value is True
+        def opt_out(cls, tgt: Target) -> bool:
+            return tgt.get(OptOutField).value is True
 
     required_addr = Address("", target_name="required")
     required_tgt = TargetWithRequired({RequiredField.alias: "configured"}, required_addr)
@@ -551,32 +541,24 @@ def test_field_set() -> None:
     optional_tgt = TargetWithoutRequired({OptionalField.alias: "configured"}, optional_addr)
     no_fields_addr = Address("", target_name="no_fields")
     no_fields_tgt = NoFieldsTarget({}, no_fields_addr)
-    unconditional_opt_out_addr = Address("", target_name="unconditional")
-    unconditional_opt_out_tgt = UnconditionalOptOutTarget(
-        {RequiredField.alias: "configured"}, unconditional_opt_out_addr
-    )
-    conditional_opt_out_addr = Address("", target_name="conditional")
-    conditional_opt_out_tgt = ConditionalOptOutTarget(
-        {RequiredField.alias: "configured", ConditionalOptOutField.alias: True},
-        conditional_opt_out_addr,
+    opt_out_addr = Address("", target_name="conditional")
+    opt_out_tgt = OptOutTarget(
+        {RequiredField.alias: "configured", OptOutField.alias: True}, opt_out_addr
     )
 
     assert RequiredFieldSet.is_applicable(required_tgt) is True
-    for tgt in [optional_tgt, no_fields_tgt, unconditional_opt_out_tgt, conditional_opt_out_tgt]:
+    for tgt in [optional_tgt, no_fields_tgt, opt_out_tgt]:
         assert RequiredFieldSet.is_applicable(tgt) is False
 
     # When no fields are required, every target is applicable _unless_ it has been opted out of.
     for tgt in [required_tgt, optional_tgt, no_fields_tgt]:
         assert OptionalFieldSet.is_applicable(tgt) is True
-    for tgt in [unconditional_opt_out_tgt, conditional_opt_out_tgt]:
-        assert OptionalFieldSet.is_applicable(tgt) is False
+    assert OptionalFieldSet.is_applicable(opt_out_tgt) is False
 
     required_fs = RequiredFieldSet.create(required_tgt)
     assert required_fs.address == required_addr
     assert required_fs.required.value == "configured"
     assert required_fs.optional.value == OptionalField.default
-    # Ensure our dataclass magic didn't mess up these class properties.
-    assert required_fs.unconditional_opt_out is UnconditionalOptOutField
     assert isinstance(required_fs.required_fields, tuple)
 
     with pytest.raises(KeyError):
@@ -584,11 +566,10 @@ def test_field_set() -> None:
 
     # It is possible to create a target that should be opted out of; the caller must call
     # `.is_applicable()` first.
-    unconditional_opt_out_fs = RequiredFieldSet.create(unconditional_opt_out_tgt)
-    assert unconditional_opt_out_fs.address == unconditional_opt_out_addr
+    unconditional_opt_out_fs = RequiredFieldSet.create(opt_out_tgt)
+    assert unconditional_opt_out_fs.address == opt_out_addr
     assert unconditional_opt_out_fs.required.value == "configured"
     assert unconditional_opt_out_fs.optional.value == OptionalField.default
-    assert required_fs.unconditional_opt_out is UnconditionalOptOutField
     assert isinstance(required_fs.required_fields, tuple)
 
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
