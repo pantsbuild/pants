@@ -167,7 +167,6 @@ def deprecated_conditional(
     :param removal_version: The pants version which will remove the deprecated functionality.
     :param entity_description: A description of the deprecated entity.
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
-    :param stacklevel: How far up in the stack do we go to find the calling fn to report
     :raises DeprecationApplicationError if the deprecation is applied improperly.
     """
     validate_deprecation_semver(removal_version, "removal version")
@@ -242,7 +241,6 @@ def deprecated_module(
     :param removal_version: The pantsbuild.pants version which will remove the deprecated
                             function.
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
-    :param stacklevel: The stacklevel to pass to warnings.warn.
     """
     warn_or_error(
         removal_version,
