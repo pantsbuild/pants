@@ -783,7 +783,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set implement the classmethod `conditional_opt_out` so that targets have a
+    You can optionally set implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
@@ -796,7 +796,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             fortran_version: FortranVersion
 
             @classmethod
-            def conditional_opt_out(cls, tgt: Target) -> bool:
+            def opt_out(cls, tgt: Target) -> bool:
                 return tgt.get(MaybeSkipFortranTestsField).value
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`

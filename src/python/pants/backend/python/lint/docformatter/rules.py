@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
@@ -21,7 +22,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -32,6 +33,10 @@ class DocformatterFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipDocformatterField).value
 
 
 class DocformatterRequest(PythonFmtRequest, LintRequest):

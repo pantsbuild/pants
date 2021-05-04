@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
@@ -20,7 +21,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
@@ -33,6 +34,10 @@ class BanditFieldSet(FieldSet):
 
     sources: PythonSources
     interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipBanditField).value
 
 
 class BanditRequest(LintRequest):

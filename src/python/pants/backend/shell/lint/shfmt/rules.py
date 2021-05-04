@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 
 from pants.backend.shell.lint.shell_fmt import ShellFmtRequest
+from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSources
 from pants.core.goals.fmt import FmtResult
@@ -15,7 +16,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -26,6 +27,10 @@ class ShfmtFieldSet(FieldSet):
     required_fields = (ShellSources,)
 
     sources: ShellSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipShfmtField).value
 
 
 class ShfmtRequest(ShellFmtRequest, LintRequest):

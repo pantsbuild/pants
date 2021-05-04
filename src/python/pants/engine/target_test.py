@@ -510,7 +510,7 @@ def test_field_set() -> None:
         core_fields = ()
 
     class OptOutTarget(Target):
-        alias = "conditional_opt_out_tgt"
+        alias = "opt_out_tgt"
         core_fields = (RequiredField, OptOutField)
 
     @dataclass(frozen=True)
@@ -565,10 +565,10 @@ def test_field_set() -> None:
 
     # It is possible to create a target that should be opted out of; the caller must call
     # `.is_applicable()` first.
-    unconditional_opt_out_fs = RequiredFieldSet.create(opt_out_tgt)
-    assert unconditional_opt_out_fs.address == opt_out_addr
-    assert unconditional_opt_out_fs.required.value == "configured"
-    assert unconditional_opt_out_fs.optional.value == OptionalField.default
+    opt_out_fs = RequiredFieldSet.create(opt_out_tgt)
+    assert opt_out_fs.address == opt_out_addr
+    assert opt_out_fs.required.value == "configured"
+    assert opt_out_fs.optional.value == OptionalField.default
     assert isinstance(required_fs.required_fields, tuple)
 
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"

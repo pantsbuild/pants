@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.lint.fmt import GoLangFmtRequest
+from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
@@ -17,7 +18,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -28,6 +29,10 @@ class GofmtFieldSet(FieldSet):
     required_fields = (GoSources,)
 
     sources: GoSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipGofmtField).value
 
 
 class GofmtRequest(GoLangFmtRequest):
