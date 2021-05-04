@@ -596,3 +596,71 @@ class BaseZincCompileIntegrationTest:
             "examples/src/scala/org/pantsbuild/example/hello/exe", extra_args=extra_args
         ):
             pass
+
+    def test_differing_platforms(self):
+        with temporary_dir() as cache_dir, self.temporary_workdir() as workdir, temporary_dir(
+            root_dir=get_buildroot()
+        ) as src_dir:
+
+            config = {
+                "cache.compile.rsc": {"write_to": [cache_dir], "read_from": [cache_dir]},
+                "jvm-platform": {
+                    "platforms": {
+                        "six": {"source": "6", "target": "6"},
+                        "seven": {"source": "7", "target": "7"},
+                    },
+                    "default_platform": "six",
+                },
+            }
+
+            srcfile = os.path.join(src_dir, "org", "pantsbuild", "cachetest", "A.java")
+            buildfile = os.path.join(src_dir, "org", "pantsbuild", "cachetest", "BUILD")
+
+            self.create_file(
+                srcfile,
+                dedent(
+                    """
+                    package org.pantsbuild.cachetest;
+                    class A {
+                      public static void main(String[] args) {
+                        System.out.println("hello");
+                      }
+                    }
+                    """
+                ),
+            )
+            self.create_file(
+                buildfile,
+                dedent(
+                    """
+                    java_library(name='a',
+                                 sources=['A.java'])
+                    jvm_binary(name='bin',
+                               main='org.pantsbuild.cachetest.A',
+                               dependencies=[':a'])
+                    """
+                ),
+            )
+
+            cachetest_bin_spec = os.path.join(
+                os.path.basename(src_dir), "org", "pantsbuild", "cachetest:bin"
+            )
+            cachetest_spec = cachetest_bin_spec
+
+            # Cache values A.class
+            self.run_run(cachetest_spec, config, workdir)
+
+            self.create_file(
+                buildfile,
+                dedent(
+                    """
+                    java_library(name='a',
+                                 platform='seven',
+                                 sources=['A.java'])
+                    jvm_binary(name='bin',
+                               main='org.pantsbuild.cachetest.A',
+                               dependencies=[':a'])
+                    """
+                ),
+            )
+            self.run_run(cachetest_bin_spec, config, workdir)

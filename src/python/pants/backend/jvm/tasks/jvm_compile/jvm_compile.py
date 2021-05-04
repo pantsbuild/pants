@@ -1120,6 +1120,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             underlying_libs = self._underlying.find_libs(names)
             return [self._rehome(l) for l in underlying_libs]
 
+        def generate_javac_args(self, *args):
+            return self._underlying.generate_javac_args(*args)
+
         def find_libs_path_globs(self, names):
             path_globs = []
             filenames = []
@@ -1150,12 +1153,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         def _rehome(self, l):
             return os.path.join(self._home, self._unroot_lib_path(l))
 
-    def _get_jvm_distribution(self):
-        # TODO We may want to use different jvm distributions depending on what
-        # java version the target expects to be compiled against.
-        # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
-        #      different jdks in remote builds.
-        local_distribution = self._local_jvm_distribution()
+    def _get_jvm_distribution(self, settings=None):
+        local_distribution = self._local_jvm_distribution(settings)
         return match(
             self.execution_strategy,
             {
