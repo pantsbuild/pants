@@ -434,7 +434,6 @@ class Parser:
                 deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
                 deprecation_start_version=kwargs.get("deprecation_start_version", None),
                 hint=kwargs.get("removal_hint", None),
-                stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
                 print_warning=print_warning,
             )
 

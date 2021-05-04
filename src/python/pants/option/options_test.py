@@ -7,7 +7,6 @@ import json
 import os
 import shlex
 import unittest.mock
-import warnings
 from enum import Enum
 from functools import partial
 from textwrap import dedent
@@ -41,12 +40,12 @@ from pants.option.errors import (
     Shadowing,
 )
 from pants.option.global_options import GlobalOptions
-from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.subsystem import Subsystem
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 
@@ -76,13 +75,14 @@ def create_options(
     *,
     env: dict[str, str] | None = None,
     config: dict[str, dict[str, Any]] | None = None,
+    extra_scope_infos: list[ScopeInfo] | None = None,
 ) -> Options:
     options = Options.create(
         env=env or {},
         config=Config.load_file_contents(
             [FileContent("pants.toml", toml.dumps(config or {}).encode())]
         ),
-        known_scope_infos=[ScopeInfo(scope) for scope in scopes],
+        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
         args=["./pants", *(args or ())],
     )
     register_fn(options)
@@ -224,6 +224,268 @@ def test_bool_invalid_value(val: Any) -> None:
         create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
 
 
+# ----------------------------------------------------------------------------------------
+# Deprecations.
+# ----------------------------------------------------------------------------------------
+
+
+def test_deprecated_options(caplog) -> None:
+    def register(opts: Options) -> None:
+        opts.register(
+            GLOBAL_SCOPE, "--old1", removal_version="999.99.9.dev0", removal_hint="Stop it."
+        )
+        opts.register(
+            GLOBAL_SCOPE,
+            "--bool1",
+            type=bool,
+            removal_version="999.99.9.dev0",
+            removal_hint="¡Basta!",
+        )
+        opts.register("scope", "--valid")
+        opts.register(
+            "scope", "--old2", removal_version="999.99.9.dev0", removal_hint="Stop with the scope."
+        )
+        opts.register(
+            "scope",
+            "--bool2",
+            type=bool,
+            removal_version="999.99.9.dev0",
+            removal_hint="¡Basta but scoped!",
+        )
+
+    def assert_deprecated(
+        scope: str,
+        opt: str,
+        args: list[str],
+        *,
+        expected: str | bool,
+        env: dict[str, str] | None = None,
+        config: dict[str, dict[str, str]] | None = None,
+    ) -> None:
+        caplog.clear()
+        opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
+        assert opts.for_scope(scope)[opt] == expected
+        assert len(caplog.records) == 1
+        assert "will be removed in version" in caplog.text
+        assert opt in caplog.text
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", ["--old1=x"], expected="x")
+    assert_deprecated(GLOBAL_SCOPE, "bool1", ["--bool1"], expected=True)
+    assert_deprecated(GLOBAL_SCOPE, "bool1", ["--no-bool1"], expected=False)
+    assert_deprecated("scope", "old2", ["scope", "--old2=x"], expected="x")
+    assert_deprecated("scope", "old2", ["--scope-old2=x"], expected="x")
+    assert_deprecated("scope", "bool2", ["scope", "--bool2"], expected=True)
+    assert_deprecated("scope", "bool2", ["scope", "--no-bool2"], expected=False)
+    assert_deprecated("scope", "bool2", ["--scope-bool2"], expected=True)
+    assert_deprecated("scope", "bool2", ["--no-scope-bool2"], expected=False)
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", [], env={"PANTS_GLOBAL_OLD1": "x"}, expected="x")
+    assert_deprecated("scope", "old2", [], env={"PANTS_SCOPE_OLD2": "x"}, expected="x")
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", [], config={"GLOBAL": {"old1": "x"}}, expected="x")
+    assert_deprecated("scope", "old2", [], config={"scope": {"old2": "x"}}, expected="x")
+
+    # Make sure the warnings don't come out for regular options.
+    caplog.clear()
+    assert (
+        create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"])
+        .for_scope("scope")
+        .valid
+        == "x"
+    )
+    assert not caplog.records
+
+
+def test_deprecated_options_error() -> None:
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--expired", removal_version="0.0.1.dev0")
+
+    with pytest.raises(CodeRemovedError):
+        create_options([GLOBAL_SCOPE], register, [])
+
+
+@unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
+def test_deprecated_options_start_version(caplog) -> None:
+    def register(opts: Options) -> None:
+        opts.register(
+            GLOBAL_SCOPE,
+            "--delayed",
+            removal_version="999.99.9.dev0",
+            deprecation_start_version="500.0.0.dev0",
+        )
+        opts.register(
+            GLOBAL_SCOPE,
+            "--past-start",
+            removal_version="999.99.9.dev0",
+            deprecation_start_version=_FAKE_CUR_VERSION,
+        )
+
+    caplog.clear()
+    assert (
+        create_options([GLOBAL_SCOPE], register, ["--delayed=x"]).for_global_scope().delayed == "x"
+    )
+    assert not caplog.records
+
+    assert (
+        create_options([GLOBAL_SCOPE], register, ["--past-start=x"]).for_global_scope().past_start
+        == "x"
+    )
+    assert len(caplog.records) == 1
+    assert "will be removed in version" in caplog.text
+    assert "past_start" in caplog.text
+
+
+def test_scope_deprecation(caplog) -> None:
+    # This test demonstrates that two different new scopes can deprecate the same
+    # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+    class Subsystem1(Subsystem):
+        options_scope = "new1"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+        @classmethod
+        def register_options(cls, register):
+            super().register_options(register)
+            register("--foo")
+            register("--bar")
+            register("--baz")
+
+    class Subsystem2(Subsystem):
+        options_scope = "new2"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+        @classmethod
+        def register_options(cls, register):
+            super().register_options(register)
+            register("--qux")
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--foo")
+        opts.register(Subsystem1.options_scope, "--bar")
+        opts.register(Subsystem1.options_scope, "--baz")
+        opts.register(Subsystem2.options_scope, "--qux")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        ["--new1-baz=vv"],
+        extra_scope_infos=[Subsystem1.get_scope_info(), Subsystem2.get_scope_info()],
+        config={
+            Subsystem1.options_scope: {"foo": "xx"},
+            Subsystem1.deprecated_options_scope: {
+                "foo": "yy",
+                "bar": "zz",
+                "baz": "ww",
+                "qux": "uu",
+            },
+        },
+    )
+
+    caplog.clear()
+    vals1 = opts.for_scope(Subsystem1.options_scope)
+    assert len(caplog.records) == 1
+    assert Subsystem1.deprecated_options_scope in caplog.text
+    assert "foo" in caplog.text
+    # Deprecated scope takes precedence at equal rank, but new scope takes precedence at higher
+    # rank.
+    assert vals1.foo == "yy"
+    assert vals1.bar == "zz"
+    assert vals1.baz == "vv"
+
+    caplog.clear()
+    vals2 = opts.for_scope(Subsystem2.options_scope)
+    assert len(caplog.records) == 1
+    assert Subsystem1.deprecated_options_scope in caplog.text
+    assert "qux" in caplog.text
+    assert vals2.qux == "uu"
+
+
+def test_scope_deprecation_parent(caplog) -> None:
+    # This test demonstrates that a scope can mark itself as deprecating a subscope of
+    # another scope.
+    class Subsystem1(Subsystem):
+        options_scope = "test"
+
+    class Subsystem2(Subsystem):
+        options_scope = "lint"
+        deprecated_options_scope = "test.a-bit-linty"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--bar")
+        opts.register(Subsystem2.options_scope, "--foo")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        ["--test-a-bit-linty-foo=vv"],
+        extra_scope_infos=[Subsystem1.get_scope_info(), Subsystem2.get_scope_info()],
+    )
+
+    # NB: Order matters here because Subsystems are typically registered in sorted order.
+    Subsystem2.register_options_on_scope(opts)
+    Subsystem1.register_options_on_scope(opts)
+
+    caplog.clear()
+    assert opts.for_scope(Subsystem2.options_scope).foo == "vv"
+    assert len(caplog.records) == 1
+    assert "test.a-bit-linty" in caplog.text
+
+
+def test_scope_deprecation_default_config_section(caplog) -> None:
+    # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
+    class Subsystem1(Subsystem):
+        options_scope = "new"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--foo")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        [],
+        extra_scope_infos=[Subsystem1.get_scope_info()],
+        config={"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}},
+    )
+    caplog.clear()
+    assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
+    assert not caplog.records
+
+
+def test_scope_deprecation_dependency(caplog) -> None:
+    # Test that a dependency scope can be deprecated.
+    class Subsystem1(Subsystem):
+        options_scope = "scope"
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--foo")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        ["--scope-sub-foo=vv"],
+        extra_scope_infos=[
+            Subsystem1.get_scope_info(),
+            # A deprecated, scoped dependency on `Subsystem1`. This
+            # imitates the construction of Subsystem.known_scope_infos.
+            ScopeInfo(
+                Subsystem1.subscope("sub"),
+                Subsystem1,
+                removal_version="9999.9.9.dev0",
+                removal_hint="Sayonara!",
+            ),
+        ],
+    )
+
+    caplog.clear()
+    assert opts.for_scope(Subsystem1.subscope("sub")).foo == "vv"
+    assert len(caplog.records) == 1
+    assert Subsystem1.subscope("sub") in caplog.text
+
+
 class OptionsTest(unittest.TestCase):
     @staticmethod
     def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
@@ -326,37 +588,6 @@ class OptionsTest(unittest.TestCase):
         register_global("--a", type=int, recursive=True)
         register_global("--b", type=int, recursive=True)
 
-        # Deprecated global options
-        register_global(
-            "--global-crufty",
-            removal_version="999.99.9.dev0",
-            removal_hint="use a less crufty global option",
-        )
-        register_global(
-            "--global-crufty-boolean",
-            type=bool,
-            removal_version="999.99.9.dev0",
-            removal_hint="say no to crufty global options",
-        )
-        register_global(
-            "--global-delayed-deprecated-option",
-            removal_version="999.99.9.dev0",
-            deprecation_start_version="500.0.0.dev0",
-        )
-        register_global(
-            "--global-delayed-but-already-passed-deprecated-option",
-            removal_version="999.99.9.dev0",
-            deprecation_start_version=_FAKE_CUR_VERSION,
-        )
-
-        # Test that an option past the `removal_version` fails at option registration time.
-        with self.assertRaises(CodeRemovedError):
-            register_global(
-                "--global-crufty-expired",
-                removal_version="0.0.1.dev0",
-                removal_hint="use a less crufty global option",
-            )
-
         # Mutual Exclusive options
         register_global("--mutex-foo", mutually_exclusive_group="mutex")
         register_global("--mutex-bar", mutually_exclusive_group="mutex")
@@ -367,22 +598,6 @@ class OptionsTest(unittest.TestCase):
 
         # For the design doc example test.
         options.register("compile", "--c", type=int)
-
-        # Test deprecated options with a scope
-        options.register("stale", "--still-good")
-        options.register(
-            "stale",
-            "--crufty",
-            removal_version="999.99.9.dev0",
-            removal_hint="use a less crufty stale scoped option",
-        )
-        options.register(
-            "stale",
-            "--crufty-boolean",
-            type=bool,
-            removal_version="999.99.9.dev0",
-            removal_hint="say no to crufty, stale scoped options",
-        )
 
         # Test mutual exclusive options with a scope
         options.register("stale", "--mutex-a", mutually_exclusive_group="scope_mutex")
@@ -1104,110 +1319,6 @@ class OptionsTest(unittest.TestCase):
             "'--some_enum' in scope 'enum-opt'"
         ) in str(exc.value)
 
-    def test_deprecated_options(self) -> None:
-        def assert_deprecation_triggered(
-            *,
-            flags: str = "",
-            option: str,
-            expected: str | bool,
-            scope: str | None = None,
-            env: dict[str, str] | None = None,
-            config: dict[str, dict[str, str]] | None = None,
-        ) -> None:
-            warnings.simplefilter("always")
-            with pytest.warns(DeprecationWarning) as record:
-                options = self._parse(flags=flags, env=env, config=config)
-                scoped_options = (
-                    options.for_global_scope() if not scope else options.for_scope(scope)
-                )
-
-            assert getattr(scoped_options, option) == expected
-            assert len(record) == 1
-            assert "will be removed in version" in str(record[0].message)
-            assert option in str(record[0].message)
-
-        assert_deprecation_triggered(
-            flags="--global-crufty=crufty1",
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            flags="--global-crufty-boolean",
-            option="global_crufty_boolean",
-            expected=True,
-        )
-        assert_deprecation_triggered(
-            flags="--no-global-crufty-boolean",
-            option="global_crufty_boolean",
-            expected=False,
-        )
-        assert_deprecation_triggered(
-            flags="stale --crufty=stale_and_crufty",
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        assert_scoped_boolean_deprecation = partial(
-            assert_deprecation_triggered, scope="stale", option="crufty_boolean"
-        )
-        assert_scoped_boolean_deprecation(flags="stale --crufty-boolean", expected=True)
-        assert_scoped_boolean_deprecation(flags="stale --no-crufty-boolean", expected=False)
-        assert_scoped_boolean_deprecation(flags="--stale-crufty-boolean", expected=True)
-        assert_scoped_boolean_deprecation(flags="--no-stale-crufty-boolean", expected=False)
-
-        assert_deprecation_triggered(
-            env={"PANTS_GLOBAL_CRUFTY": "crufty1"},
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            env={"PANTS_STALE_CRUFTY": "stale_and_crufty"},
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        assert_deprecation_triggered(
-            config={"GLOBAL": {"global_crufty": "crufty1"}},
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            config={"stale": {"crufty": "stale_and_crufty"}},
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        # Make sure the warnings don't come out for regular options.
-        with pytest.warns(None) as record:
-            self._parse(flags="stale --pants-foo stale --still-good")
-        assert len(record) == 0
-
-    @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
-    def test_delayed_deprecated_option(self) -> None:
-        warnings.simplefilter("always")
-        with pytest.warns(None) as record:
-            delayed_deprecation_option_value = (
-                self._parse(flags="--global-delayed-deprecated-option=xxx")
-                .for_global_scope()
-                .global_delayed_deprecated_option
-            )
-            assert delayed_deprecation_option_value == "xxx"
-            assert len(record) == 0
-
-        with pytest.warns(DeprecationWarning) as record:
-            delayed_passed_option_value = (
-                self._parse(flags="--global-delayed-but-already-passed-deprecated-option=xxx")
-                .for_global_scope()
-                .global_delayed_but_already_passed_deprecated_option
-            )
-            assert delayed_passed_option_value == "xxx"
-            assert len(record) == 1
-            assert "will be removed in version" in str(record[0].message)
-            assert "global_delayed_but_already_passed_deprecated_option" in str(record[0].message)
-
     def test_mutually_exclusive_options(self) -> None:
         """Ensure error is raised when mutual exclusive options are given together."""
 
@@ -1583,181 +1694,6 @@ class OptionsTest(unittest.TestCase):
         # This test spot-checks that enum types can be serialized.
         options = self._parse(flags="enum-opt --some-enum=another-value")
         json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=CoercingEncoder)
-
-    def test_scope_deprecation(self) -> None:
-        # Note: This test demonstrates that two different new scopes can deprecate the same
-        # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "new-scope1"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        class DummyOptionable2(Optionable):
-            options_scope = "new-scope2"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(
-                {
-                    "GLOBAL": {"inherited": "aa"},
-                    DummyOptionable1.options_scope: {"foo": "xx"},
-                    DummyOptionable1.deprecated_options_scope: {
-                        "foo": "yy",
-                        "bar": "zz",
-                        "baz": "ww",
-                        "qux": "uu",
-                    },
-                }
-            ),
-            known_scope_infos=[
-                global_scope(),
-                DummyOptionable1.get_scope_info(),
-                DummyOptionable2.get_scope_info(),
-            ],
-            args=shlex.split("./pants --new-scope1-baz=vv"),
-        )
-
-        options.register(GLOBAL_SCOPE, "--inherited")
-        options.register(DummyOptionable1.options_scope, "--foo")
-        options.register(DummyOptionable1.options_scope, "--bar")
-        options.register(DummyOptionable1.options_scope, "--baz")
-        options.register(DummyOptionable2.options_scope, "--qux")
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals1 = options.for_scope(DummyOptionable1.options_scope)
-
-        # Check that we got a warning, but not for the inherited option.
-        assert len(record) == 1
-        assert "inherited" not in str(record[0].message)
-
-        # Check values.
-        # Deprecated scope takes precedence at equal rank.
-        self.assertEqual("yy", vals1.foo)
-        self.assertEqual("zz", vals1.bar)
-        # New scope takes precedence at higher rank.
-        self.assertEqual("vv", vals1.baz)
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals2 = options.for_scope(DummyOptionable2.options_scope)
-
-        # Check that we got a warning.
-        assert len(record) == 1
-        assert "inherited" not in str(record[0].message)
-
-        # Check values.
-        self.assertEqual("uu", vals2.qux)
-
-    def test_scope_deprecation_parent(self) -> None:
-        # Note: This test demonstrates that a scope can mark itself as deprecating a subscope of
-        # another scope.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "test"
-
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register("--bar")
-
-        class DummyOptionable2(Optionable):
-            options_scope = "lint"
-            deprecated_options_scope = "test.a-bit-linty"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register("--foo")
-
-        known_scope_infos = (
-            [global_scope()]
-            + list(DummyOptionable1.known_scope_infos())
-            + list(DummyOptionable2.known_scope_infos())
-        )
-
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=known_scope_infos,
-            args=shlex.split("./pants --test-a-bit-linty-foo=vv"),
-        )
-
-        # NB: Order matters here, because Optionables are typically registered in sorted order.
-        DummyOptionable2.register_options_on_scope(options)
-        DummyOptionable1.register_options_on_scope(options)
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals = options.for_scope(DummyOptionable2.options_scope)
-
-        # Check that we got a warning, but also the correct value.
-        assert len(record) == 1
-        assert vals.foo == "vv"
-
-    def test_scope_deprecation_defaults(self) -> None:
-        # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "new-scope1"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(
-                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"}}
-            ),
-            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info()],
-            args=shlex.split("./pants"),
-        )
-
-        options.register(DummyOptionable1.options_scope, "--foo")
-
-        with pytest.warns(None) as record:
-            vals1 = options.for_scope(DummyOptionable1.options_scope)
-
-        # Check that we got no warnings and that the actual scope took precedence.
-        assert len(record) == 0
-        assert vals1.foo == "xx"
-
-    def test_scope_dependency_deprecation(self) -> None:
-        # Test that a dependency scope can be deprecated.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "scope"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[
-                global_scope(),
-                DummyOptionable1.get_scope_info(),
-                # A deprecated, scoped dependency on `DummyOptionable1`. This
-                # imitates the construction of Subsystem.known_scope_infos.
-                ScopeInfo(
-                    DummyOptionable1.subscope("sub"),
-                    DummyOptionable1,
-                    removal_version="9999.9.9.dev0",
-                    removal_hint="Sayonara!",
-                ),
-            ],
-            args=shlex.split("./pants --scope-sub-foo=vv"),
-        )
-
-        options.register(DummyOptionable1.options_scope, "--foo")
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals1 = options.for_scope(DummyOptionable1.subscope("sub"))
-
-        # Check that we got a warning, but also the correct value.
-        assert len(record) == 1
-        assert vals1.foo == "vv"
 
     def test_list_of_enum_single_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum=another-value")
