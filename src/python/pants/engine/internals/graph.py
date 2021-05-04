@@ -930,7 +930,7 @@ class NoApplicableTargetsException(Exception):
             target_type
             for field_set_type in field_set_types
             for target_type in field_set_type.applicable_target_types(
-                registered_target_types.types, union_membership=union_membership
+                registered_target_types.types, union_membership
             )
         }
         return cls(

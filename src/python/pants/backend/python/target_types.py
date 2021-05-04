@@ -37,6 +37,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TriBoolField,
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
@@ -269,7 +270,6 @@ class PexInheritPathField(StringField):
 class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
-    value: bool
     help = (
         "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
         "not zip safe, it will be written to disk prior to execution. You may need to mark "
@@ -280,7 +280,6 @@ class PexZipSafeField(BoolField):
 class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
-    value: bool
     help = (
         "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
         "can use less memory in RAM-constrained environments."
@@ -290,7 +289,6 @@ class PexAlwaysWriteCacheField(BoolField):
 class PexIgnoreErrorsField(BoolField):
     alias = "ignore_errors"
     default = False
-    value: bool
     help = "Should PEX ignore when it cannot resolve dependencies?"
 
 
@@ -304,7 +302,7 @@ class PexShebangField(StringField):
     )
 
 
-class PexEmitWarningsField(BoolField):
+class PexEmitWarningsField(TriBoolField):
     alias = "emit_warnings"
     help = (
         "Whether or not to emit PEX warnings at runtime.\n\nThe default is determined by the "
@@ -345,7 +343,6 @@ class PexExecutionModeField(StringField):
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
-    value: bool
     help = (
         "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included, the "
         "generated PEX file can be executed with `PEX_TOOLS=1 <pex file> --help` to gain access "

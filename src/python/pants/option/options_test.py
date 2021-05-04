@@ -8,11 +8,10 @@ import os
 import shlex
 import unittest.mock
 import warnings
-from collections import defaultdict
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Any, Dict, List, cast
+from typing import Any, Callable, Dict, List, cast
 
 import pytest
 import toml
@@ -21,6 +20,7 @@ from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
 from pants.base.hash_utils import CoercingEncoder
+from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
 from pants.option.errors import (
@@ -45,7 +45,6 @@ from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
-from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
@@ -70,114 +69,159 @@ def subsystem(scope: str) -> ScopeInfo:
     return ScopeInfo(scope)
 
 
-class _FakeOptionValues:
-    def __init__(self, option_values):
-        self._option_values = option_values
-
-    def __iter__(self):
-        return iter(self._option_values.keys())
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def get(self, key, default=None):
-        if hasattr(self, key):
-            return getattr(self, key, default)
-        return default
-
-    def __getattr__(self, key):
-        try:
-            value = self._option_values[key]
-        except KeyError:
-            # Instead of letting KeyError raise here, re-raise an AttributeError to not break getattr().
-            raise AttributeError(key)
-        return value.value if isinstance(value, RankedValue) else value
-
-    def get_rank(self, key):
-        value = self._option_values[key]
-        return value.rank if isinstance(value, RankedValue) else Rank.FLAG
-
-    def is_flagged(self, key):
-        return self.get_rank(key) == Rank.FLAG
-
-    def is_default(self, key):
-        return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
-
-    @property
-    def option_values(self):
-        return self._option_values
+def create_options(
+    scopes: list[str],
+    register_fn: Callable[[Options], None],
+    args: list[str] | None = None,
+    *,
+    env: dict[str, str] | None = None,
+    config: dict[str, dict[str, Any]] | None = None,
+) -> Options:
+    options = Options.create(
+        env=env or {},
+        config=Config.load_file_contents(
+            [FileContent("pants.toml", toml.dumps(config or {}).encode())]
+        ),
+        known_scope_infos=[ScopeInfo(scope) for scope in scopes],
+        args=["./pants", *(args or ())],
+    )
+    register_fn(options)
+    return options
 
 
-def create_options(options, passthru_args=None, fingerprintable_options=None):
-    """Create a fake Options object for testing.
+# ----------------------------------------------------------------------------------------
+# Boolean handling.
+# ----------------------------------------------------------------------------------------
 
-    Note that the returned object only provides access to the provided options values. There is
-    no registration mechanism on this object. Code under test shouldn't care about resolving
-    cmd-line flags vs. config vs. env vars etc. etc.
 
-    :param dict options: A dict of scope -> (dict of option name -> value).
-    :param list passthru_args: A list of passthrough command line argument values.
-    :param dict fingerprintable_options: A dict of scope -> (dict of option name -> option type).
-                                         This registry should contain entries for any of the
-                                         `options` that are expected to contribute to fingerprinting.
-    :returns: An fake `Options` object encapsulating the given scoped options.
-    """
-    fingerprintable = fingerprintable_options or defaultdict(dict)
+def register_bool_opts(opts: Options) -> None:
+    opts.register(GLOBAL_SCOPE, "--default-missing", type=bool)
+    opts.register(GLOBAL_SCOPE, "--default-true", type=bool, default=True)
+    opts.register(GLOBAL_SCOPE, "--default-false", type=bool, default=False)
+    opts.register(GLOBAL_SCOPE, "--unset", type=bool, default=UnsetBool)
+    opts.register(GLOBAL_SCOPE, "--implicit-true", type=bool, implicit_value=True)
+    opts.register(GLOBAL_SCOPE, "--implicit-false", type=bool, implicit_value=False)
+    opts.register(
+        GLOBAL_SCOPE,
+        "--implicit-false-default-false",
+        type=bool,
+        implicit_value=False,
+        default=False,
+    )
+    opts.register(
+        GLOBAL_SCOPE, "--implicit-false-default-true", type=bool, implicit_value=False, default=True
+    )
 
-    class FakeOptions:
-        def for_scope(self, scope):
-            # TODO(John Sirois): Some users pass in A dict of scope -> _FakeOptionValues instead of a
-            # dict of scope -> (dict of option name -> value).  Clean up these usages and kill this
-            # accommodation.
-            options_for_this_scope = options.get(scope) or {}
-            if isinstance(options_for_this_scope, _FakeOptionValues):
-                options_for_this_scope = options_for_this_scope.option_values
 
-            if passthru_args:
-                # TODO: This is _very_ partial support for passthrough args: this should be
-                # inspecting the kwargs of option registrations to decide which arguments to
-                # extend: this explicit `passthrough_args` argument is only passthrough because
-                # it is marked as such.
-                pa = options_for_this_scope.get("passthrough_args", [])
-                if isinstance(pa, RankedValue):
-                    pa = pa.value
-                options_for_this_scope["passthrough_args"] = [*pa, *passthru_args]
+def test_bool_explicit_values() -> None:
+    def register(opt: Options) -> None:
+        opt.register(GLOBAL_SCOPE, "--opt", type=bool)
 
-            scoped_options = {}
-            if scope:
-                scoped_options.update(self.for_scope(enclosing_scope(scope)).option_values)
-            scoped_options.update(options_for_this_scope)
-            return _FakeOptionValues(scoped_options)
+    def assert_val(arg: str, expected: bool) -> None:
+        global_options = create_options(
+            [GLOBAL_SCOPE], register, [f"--opt={arg}"]
+        ).for_global_scope()
+        assert global_options.opt is expected
 
-        def for_global_scope(self):
-            return self.for_scope(GLOBAL_SCOPE)
+    assert_val("false", False)
+    assert_val("False", False)
+    assert_val("true", True)
+    assert_val("True", True)
 
-        def items(self):
-            return list(options.items())
 
-        @property
-        def scope_to_flags(self):
-            return {}
+def test_bool_defaults() -> None:
+    opts = create_options([GLOBAL_SCOPE], register_bool_opts).for_global_scope()
+    assert opts.default_missing is False
+    assert opts.default_true is True
+    assert opts.default_false is False
 
-        def get_fingerprintable_for_scope(self, bottom_scope):
-            """Returns a list of fingerprintable (option type, option value) pairs for the given
-            scope.
+    assert opts.unset is None
 
-            Note that this method only collects values for a single scope, NOT from
-            all enclosing scopes as in the Options class!
+    assert opts.implicit_true is False
+    assert opts.implicit_false is True
+    assert opts.implicit_false_default_false is False
+    assert opts.implicit_false_default_true is True
 
-            :param str bottom_scope: The scope to gather fingerprintable options for.
-            """
-            pairs = []
-            option_values = self.for_scope(bottom_scope)
-            for option_name, option_type in fingerprintable[bottom_scope].items():
-                pairs.append((option_type, option_values[option_name]))
-            return pairs
 
-        def __getitem__(self, scope):
-            return self.for_scope(scope)
+def test_bool_args() -> None:
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register_bool_opts,
+        [
+            "--default-missing",
+            "--default-true",
+            "--default-false",
+            "--unset",
+            "--implicit-true",
+            "--implicit-false",
+            "--implicit-false-default-false",
+            "--implicit-false-default-true",
+        ],
+    ).for_global_scope()
+    assert opts.default_missing is True
+    assert opts.default_true is True
+    assert opts.default_false is True
 
-    return FakeOptions()
+    assert opts.unset is True
+
+    assert opts.implicit_true is True
+    assert opts.implicit_false is False
+    assert opts.implicit_false_default_false is False
+    assert opts.implicit_false_default_true is False
+
+
+def test_bool_negate() -> None:
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register_bool_opts,
+        [
+            "--no-default-missing",
+            "--no-default-true",
+            "--no-default-false",
+            "--no-unset",
+            "--no-implicit-true",
+            "--no-implicit-false",
+            "--no-implicit-false-default-false",
+            "--no-implicit-false-default-true",
+        ],
+    ).for_global_scope()
+    assert opts.default_missing is False
+    assert opts.default_true is False
+    assert opts.default_false is False
+
+    assert opts.unset is False
+
+    assert opts.implicit_true is False
+    assert opts.implicit_false is True
+    assert opts.implicit_false_default_false is True
+    assert opts.implicit_false_default_true is True
+
+
+@pytest.mark.parametrize("val", [False, True])
+def test_bool_config(val: bool) -> None:
+    opt_names = (
+        "default_missing",
+        "default_true",
+        "default_false",
+        "implicit_true",
+        "implicit_false",
+        "implicit_false_default_false",
+        "implicit_false_default_true",
+    )
+    opts = create_options(
+        [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
+    ).for_global_scope()
+    for opt in opt_names:
+        assert opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
+
+
+@pytest.mark.parametrize("val", (11, "AlmostTrue"))
+def test_bool_invalid_value(val: Any) -> None:
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--opt", type=bool)
+
+    with pytest.raises(BooleanConversionError):
+        create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
 
 
 class OptionsTest(unittest.TestCase):
@@ -207,24 +251,27 @@ class OptionsTest(unittest.TestCase):
         return options
 
     _known_scope_infos = [
-        global_scope(),
-        intermediate("compile"),
-        task("compile.java"),
-        task("compile.scala"),
-        task("cache.compile.scala"),
-        intermediate("stale"),
-        intermediate("test"),
-        task("test.junit"),
-        subsystem("passconsumer"),
-        task("simple"),
-        task("simple-dashed"),
-        task("scoped.a.bit"),
-        task("scoped.and-dashed"),
-        task("fromfile"),
-        task("fingerprinting"),
-        task("enum-opt"),
-        task("separate-enum-opt-scope"),
-        task("other-enum-scope"),
+        ScopeInfo(scope)
+        for scope in (
+            GLOBAL_SCOPE,
+            "compile",
+            "compile.java",
+            "compile.scala",
+            "cache.compile.scala",
+            "stale",
+            "test",
+            "test.junit",
+            "passconsumer",
+            "simple",
+            "simple-dashed",
+            "scoped.a.bit",
+            "scoped.and-dashed",
+            "fromfile",
+            "fingerprinting",
+            "enum-opt",
+            "separate-enum-opt-scope",
+            "other-enum-scope",
+        )
     ]
 
     class SomeEnumOption(Enum):
@@ -248,16 +295,6 @@ class OptionsTest(unittest.TestCase):
         register_global("--pants-foo")
         register_global("--bar-baz")
         register_global("--store-true-flag", type=bool, fingerprint=True)
-        register_global("--store-false-flag", type=bool, implicit_value=False)
-        register_global("--store-true-def-true-flag", type=bool, default=True)
-        register_global("--store-true-def-false-flag", type=bool, default=False)
-        register_global(
-            "--store-false-def-false-flag", type=bool, implicit_value=False, default=False
-        )
-        register_global(
-            "--store-false-def-true-flag", type=bool, implicit_value=False, default=True
-        )
-        register_global("--def-unset-bool-flag", type=bool, default=UnsetBool)
 
         # Choices.
         register_global("--str-choices", choices=["foo", "bar"])
@@ -507,88 +544,6 @@ class OptionsTest(unittest.TestCase):
                     flags=f'--file-listy="{fp1}" --file-listy="{fp2}"'
                 ).for_global_scope()
                 self.assertEqual([fp1, fp2], global_options.file_listy)
-
-    def test_explicit_boolean_values(self) -> None:
-        def assert_boolean_value(*, arg: str, expected: bool) -> None:
-            global_options = self._parse(flags=f"--verbose={arg}").for_global_scope()
-            assert global_options.verbose is expected
-
-        assert_boolean_value(arg="false", expected=False)
-        assert_boolean_value(arg="False", expected=False)
-        assert_boolean_value(arg="true", expected=True)
-        assert_boolean_value(arg="True", expected=True)
-
-    def test_boolean_defaults(self) -> None:
-        global_options = self._parse().for_global_scope()
-        self.assertFalse(global_options.store_true_flag)
-        self.assertTrue(global_options.store_false_flag)
-        self.assertFalse(global_options.store_true_def_false_flag)
-        self.assertTrue(global_options.store_true_def_true_flag)
-        self.assertFalse(global_options.store_false_def_false_flag)
-        self.assertTrue(global_options.store_false_def_true_flag)
-        self.assertIsNone(global_options.def_unset_bool_flag)
-
-    def test_boolean_set_option(self) -> None:
-        global_options = self._parse(
-            flags="--store-true-flag --store-false-flag --store-true-def-true-flag "
-            "--store-true-def-false-flag --store-false-def-true-flag --store-false-def-false-flag "
-            "--def-unset-bool-flag"
-        ).for_global_scope()
-        self.assertTrue(global_options.store_true_flag)
-        self.assertFalse(global_options.store_false_flag)
-        self.assertTrue(global_options.store_true_def_false_flag)
-        self.assertTrue(global_options.store_true_def_true_flag)
-        self.assertFalse(global_options.store_false_def_false_flag)
-        self.assertFalse(global_options.store_false_def_true_flag)
-        self.assertTrue(global_options.def_unset_bool_flag)
-
-    def test_boolean_negate_option(self) -> None:
-        global_options = self._parse(
-            flags="--no-store-true-flag --no-store-false-flag  --no-store-true-def-true-flag "
-            "--no-store-true-def-false-flag --no-store-false-def-true-flag "
-            "--no-store-false-def-false-flag --no-def-unset-bool-flag"
-        ).for_global_scope()
-        self.assertFalse(global_options.store_true_flag)
-        self.assertTrue(global_options.store_false_flag)
-        self.assertFalse(global_options.store_true_def_false_flag)
-        self.assertFalse(global_options.store_true_def_true_flag)
-        self.assertTrue(global_options.store_false_def_false_flag)
-        self.assertTrue(global_options.store_false_def_true_flag)
-        self.assertFalse(global_options.def_unset_bool_flag)
-
-    def test_boolean_config_override(self) -> None:
-        def assert_options_set(value: bool) -> None:
-            global_options = self._parse(
-                config={
-                    "DEFAULT": {
-                        "store_true_flag": value,
-                        "store_false_flag": value,
-                        "store_true_def_true_flag": value,
-                        "store_true_def_false_flag": value,
-                        "store_false_def_true_flag": value,
-                        "store_false_def_false_flag": value,
-                        "def_unset_bool_flag": value,
-                    },
-                },
-            ).for_global_scope()
-            assert global_options.store_true_flag == value
-            assert global_options.store_false_flag == value
-            assert global_options.store_true_def_false_flag == value
-            assert global_options.store_true_def_true_flag == value
-            assert global_options.store_false_def_false_flag == value
-            assert global_options.store_false_def_true_flag == value
-            assert global_options.def_unset_bool_flag == value
-
-        assert_options_set(False)
-        assert_options_set(True)
-
-    def test_boolean_invalid_value(self) -> None:
-        def assert_invalid_value(val) -> None:
-            with self.assertRaises(BooleanConversionError):
-                self._parse(config={"DEFAULT": {"store_true_flag": val}}).for_global_scope()
-
-        assert_invalid_value(11)
-        assert_invalid_value("AlmostTrue")
 
     def test_list_option(self) -> None:
         def check(

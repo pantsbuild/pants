@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
+from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
@@ -46,6 +47,10 @@ class MyPyFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipMyPyField).value
 
 
 @dataclass(frozen=True)

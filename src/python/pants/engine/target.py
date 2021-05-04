@@ -783,6 +783,9 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
+    You can optionally set implement the classmethod `opt_out` so that targets have a
+    mechanism to not match with the FieldSet even if they have the `required_fields` registered.
+
     For example:
 
         @dataclass(frozen=True)
@@ -791,6 +794,10 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
             sources: FortranSources
             fortran_version: FortranVersion
+
+            @classmethod
+            def opt_out(cls, tgt: Target) -> bool:
+                return tgt.get(MaybeSkipFortranTestsField).value
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
@@ -810,22 +817,36 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     address: Address
 
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        """If `True`, the target will not match with the field set, even if it has the FieldSet's
+        `required_fields`.
+
+        Note: this method is not intended to categorically opt out a target type from a
+        FieldSet, i.e. to always opt out based solely on the target type. While it is possible to
+        do, some error messages will incorrectly suggest that that target is compatible with the
+        FieldSet. Instead, if you need this feature, please ask us to implement it. See
+        https://github.com/pantsbuild/pants/pull/12002 for discussion.
+        """
+        return False
+
     @final
     @classmethod
     def is_applicable(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
+        return tgt.has_fields(cls.required_fields) and not cls.opt_out(tgt)
 
     @final
     @classmethod
     def applicable_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+        cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
     ) -> tuple[type[Target], ...]:
         return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+            tgt_type
+            for tgt_type in target_types
+            if tgt_type.class_has_fields(cls.required_fields, union_membership)
         )
 
+    @final
     @classmethod
     def create(cls: type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
@@ -1029,28 +1050,32 @@ class ScalarField(Generic[T], Field):
 class BoolField(Field):
     """A field whose value is a boolean.
 
-    If subclasses do not set the class property `required = True` or `default`, the value will
-    default to None. This can be useful to represent three states: unspecified, False, and True.
-
-        class ZipSafe(BoolField):
-            alias = "zip_safe"
-            default = True
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
     """
 
-    value: Optional[bool]
-    default: ClassVar[Optional[bool]] = None
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool:  # type: ignore[override]
+        value_or_default = super().compute_value(raw_value, address)
+        if not isinstance(value_or_default, bool):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type="a boolean"
+            )
+        return value_or_default
+
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type = bool
+    expected_type_description = "a boolean or None"
 
     @classmethod
     def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is not None and not isinstance(value_or_default, bool):
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="a boolean",
-            )
-        return value_or_default
+        return super().compute_value(raw_value, address)
 
 
 class IntField(ScalarField[int]):

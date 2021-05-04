@@ -5,6 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
+from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -55,6 +56,10 @@ class PylintFieldSet(FieldSet):
 
     sources: PythonSources
     dependencies: Dependencies
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPylintField).value
 
 
 @dataclass(frozen=True)
