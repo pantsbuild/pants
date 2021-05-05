@@ -420,6 +420,21 @@ def download_pex_bin() -> Iterator[Path]:
 # -----------------------------------------------------------------------------------------------
 
 
+def build_all_wheels() -> None:
+    build_pants_wheels()
+    build_3rdparty_wheels()
+    install_and_test_packages(
+        CONSTANTS.pants_unstable_version,
+        extra_pip_args=[
+            "--only-binary=:all:",
+            "-f",
+            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
+            "-f",
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+        ],
+    )
+
+
 def build_pants_wheels() -> None:
     banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
     version = CONSTANTS.pants_unstable_version
@@ -731,25 +746,8 @@ def tag_release() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test release & dry run
+# Test release
 # -----------------------------------------------------------------------------------------------
-
-
-def dry_run_install() -> None:
-    banner(f"Performing a dry run release with {CONSTANTS.python_version}")
-    build_pants_wheels()
-    build_3rdparty_wheels()
-    install_and_test_packages(
-        CONSTANTS.pants_unstable_version,
-        extra_pip_args=[
-            "--only-binary=:all:",
-            "-f",
-            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
-            "-f",
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
-        ],
-    )
-    banner(f"Dry run release succeeded with {CONSTANTS.python_version}")
 
 
 def test_release() -> None:
@@ -770,17 +768,6 @@ def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None 
 # -----------------------------------------------------------------------------------------------
 # Release introspection
 # -----------------------------------------------------------------------------------------------
-
-
-def validate_roles() -> None:
-    # Validate that ownership sets are exactly what we expect, even for legacy packages
-    # that we no longer publish.  Effectively we're using release time as an opportunity
-    # to do wider security validation than is strictly necessary just for releasing.
-    PackageAccessValidator.validate_all()
-
-
-def list_packages() -> None:
-    print("\n".join(package.name for package in PACKAGES))
 
 
 class PrebuiltWheel(NamedTuple):
@@ -872,32 +859,29 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("publish")
-    subparsers.add_parser("dry-run-install")
     subparsers.add_parser("test-release")
-    subparsers.add_parser("build-pants-wheels")
-    subparsers.add_parser("build-3rdparty-wheels")
+    subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-roles")
-    subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
-    subparsers.add_parser("fetch-and-check-prebuilt-wheels")
+    subparsers.add_parser("check-prebuilt-wheels")
     return parser
 
 
 def main() -> None:
     args = create_parser().parse_args()
+    # Ensure that we use the correct Python when building the pantsbuild.pants
+    # `python_distribution` and when compiling Rust.
+    os.environ["PY"] = f"python{CONSTANTS.python_version}"
+    os.environ["PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS"] = f'["=={CONSTANTS.python_version}.*"]'
     if args.command == "publish":
         publish()
-    if args.command == "dry-run-install":
-        dry_run_install()
     if args.command == "test-release":
         test_release()
-    if args.command == "build-pants-wheels":
-        build_pants_wheels()
-    if args.command == "build-3rdparty-wheels":
-        build_3rdparty_wheels()
+    if args.command == "build-wheels":
+        build_all_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
     if args.command == "build-local-pex":
@@ -905,12 +889,10 @@ def main() -> None:
     if args.command == "build-universal-pex":
         build_pex(fetch=True)
     if args.command == "validate-roles":
-        validate_roles()
-    if args.command == "list-packages":
-        list_packages()
+        PackageAccessValidator.validate_all()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "fetch-and-check-prebuilt-wheels":
+    if args.command == "check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             fetch_prebuilt_wheels(tempdir)
             check_prebuilt_wheels_present(tempdir)

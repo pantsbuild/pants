@@ -303,13 +303,13 @@ jobs:
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
-        ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_37 -- build-wheels
 
-        USE_PY38=true ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_38 -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_39 -- build-wheels
 
-        ./build-support/bin/release.sh -f
+        ./pants run build-support/bin:release_37 -- build-fs-util
 
         '
     - env:
@@ -388,13 +388,13 @@ jobs:
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
-        ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_37 -- build-wheels
 
-        USE_PY38=true ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_38 -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh -n
+        ./pants run build-support/bin:release_39 -- build-wheels
 
-        ./build-support/bin/release.sh -f
+        ./pants run build-support/bin:release_37 -- build-fs-util
 
         '
     - env:
