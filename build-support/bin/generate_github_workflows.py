@@ -391,7 +391,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     """
                 ),
                 "if": DONT_SKIP_WHEELS,
-                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.no-buildsense.toml']"},
+                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"},
             }
             if is_macos:
                 step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
