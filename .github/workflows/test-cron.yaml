@@ -4,7 +4,7 @@
 
 
 env:
-  PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:

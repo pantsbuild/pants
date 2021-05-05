@@ -127,13 +127,9 @@ def pants_virtualenv_cache() -> Step:
     }
 
 
-def global_env(*, disable_buildsense: bool = False) -> Env:
+def global_env() -> Env:
     return {
-        "PANTS_CONFIG_FILES": (
-            "+['pants.ci.toml', 'pants.no-buildsense.toml']"
-            if disable_buildsense
-            else "+['pants.ci.toml']"
-        ),
+        "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
         "RUST_BACKTRACE": "all",
     }
 
@@ -499,7 +495,7 @@ def generate() -> dict[Path, str]:
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
             "jobs": test_workflow_jobs([PYTHON38_VERSION, PYTHON39_VERSION], cron=True),
-            "env": global_env(disable_buildsense=True),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )
