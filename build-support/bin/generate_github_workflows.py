@@ -358,7 +358,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": MACOS_ENV,
-            "timeout-minutes": 20,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),

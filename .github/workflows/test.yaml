@@ -627,7 +627,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 20
+    timeout-minutes: 40
 name: Pull Request CI
 'on':
 - push
