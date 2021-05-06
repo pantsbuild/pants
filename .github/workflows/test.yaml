@@ -119,6 +119,11 @@ jobs:
         ./pants help subsystems
 
         '
+    - name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-bootstrap-linux
+        path: .pants.d/pants.log
     - name: Upload native_engine.so
       uses: actions/upload-artifact@v2
       with:
@@ -312,6 +317,11 @@ jobs:
         ./build-support/bin/release.sh -f
 
         '
+    - name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-wheels-linux
+        path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -397,6 +407,11 @@ jobs:
         ./build-support/bin/release.sh -f
 
         '
+    - name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-wheels-macos
+        path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
