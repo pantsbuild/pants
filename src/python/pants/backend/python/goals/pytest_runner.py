@@ -13,7 +13,12 @@ from pants.backend.python.goals.coverage_py import (
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import ConsoleScript, PythonTestsSources, PythonTestsTimeout
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    PythonTestsExtraEnvVars,
+    PythonTestsSources,
+    PythonTestsTimeout,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -39,6 +44,7 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -79,6 +85,7 @@ class PythonTestFieldSet(TestFieldSet):
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
+    extra_env_vars: PythonTestsExtraEnvVars
 
     def is_conftest_or_type_stub(self) -> bool:
         """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
@@ -114,6 +121,7 @@ async def setup_pytest_for_target(
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
+    complete_env: CompleteEnvironment,
 ) -> TestSetup:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
@@ -223,6 +231,8 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
+        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within `python_tests`
+        **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.

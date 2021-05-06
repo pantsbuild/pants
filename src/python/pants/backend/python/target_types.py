@@ -428,6 +428,16 @@ class PythonTestsTimeout(IntField):
         return result
 
 
+class PythonTestsExtraEnvVars(StringSequenceField):
+    alias = "extra_env_vars"
+    help = (
+        "Additional environment variables to include in test processes. "
+        "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+        "`ENV_VAR` to copy the value of a variable in Pants's own environment. "
+        "This will be merged with and override values from [test].extra_env_vars."
+    )
+
+
 class PythonTests(Target):
     alias = "python_tests"
     core_fields = (
@@ -437,6 +447,7 @@ class PythonTests(Target):
         PythonTestsDependencies,
         PythonTestsTimeout,
         RuntimePackageDependenciesField,
+        PythonTestsExtraEnvVars,
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
