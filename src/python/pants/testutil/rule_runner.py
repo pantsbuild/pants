@@ -35,7 +35,12 @@ from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
-from pants.option.global_options import ExecutionOptions, GlobalOptions, LocalStoreOptions
+from pants.option.global_options import (
+    DynamicRemoteExecutionOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -139,6 +144,9 @@ class RuleRunner:
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
+        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(
+            options, self.environment
+        )
         local_store_options = LocalStoreOptions.from_options(global_options)
         if isolated_local_store:
             if root_dir:
@@ -163,7 +171,9 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(options, self.environment),
+            execution_options=ExecutionOptions.from_options(
+                global_options, dynamic_execution_options
+            ),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(
