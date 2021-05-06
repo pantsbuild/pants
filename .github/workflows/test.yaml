@@ -298,7 +298,7 @@ jobs:
 
         '
     - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -383,7 +383,7 @@ jobs:
           '
     - env:
         ARCHFLAGS: -arch x86_64
-        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug

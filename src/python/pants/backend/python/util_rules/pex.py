@@ -18,10 +18,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
-    PythonRequirementConstraintsField,
-    PythonRequirementsField,
-)
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
@@ -30,7 +27,6 @@ from pants.backend.python.util_rules.pex_environment import (
     PexRuntimeEnvironment,
     PythonExecutable,
 )
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -39,7 +35,6 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     FileContent,
-    GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -53,7 +48,6 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import Targets
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -273,51 +267,6 @@ async def find_interpreter(
 
 
 @dataclass(frozen=True)
-class MaybeConstraintsFile:
-    path: str | None
-    digest: Digest
-
-
-@rule(desc="Resolve requirements constraints file")
-async def resolve_requirements_constraints_file(python_setup: PythonSetup) -> MaybeConstraintsFile:
-    if python_setup.requirement_constraints:
-        digest = await Get(
-            Digest,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin="the option `[python-setup].requirement_constraints`",
-            ),
-        )
-        return MaybeConstraintsFile(python_setup.requirement_constraints, digest)
-
-    if python_setup.requirement_constraints_target:
-        targets = await Get(
-            Targets,
-            UnparsedAddressInputs(
-                [python_setup.requirement_constraints_target], owning_address=None
-            ),
-        )
-        tgt = targets.expect_single()
-        if not tgt.has_field(PythonRequirementConstraintsField):
-            raise ValueError(
-                "Invalid target type for `[python-setup].requirement_constraints_target`. Please "
-                f"use a `_python_constraints` target instead of a `{tgt.alias}` target."
-            )
-        formatted_constraints = "\n".join(
-            str(constraint) for constraint in tgt[PythonRequirementConstraintsField].value
-        )
-        path = "constraints.generated.txt"
-        digest = await Get(
-            Digest, CreateDigest([FileContent(path, formatted_constraints.encode())])
-        )
-        return MaybeConstraintsFile(path, digest)
-
-    return MaybeConstraintsFile(None, EMPTY_DIGEST)
-
-
-@dataclass(frozen=True)
 class BuildPexResult:
     result: ProcessResult
     pex_filename: str
@@ -335,7 +284,6 @@ async def build_pex(
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
-    constraints_file: MaybeConstraintsFile,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
@@ -400,9 +348,16 @@ async def build_pex(
     argv.extend(request.requirements)
 
     constraint_file_digest = EMPTY_DIGEST
-    if request.apply_requirement_constraints and constraints_file.path is not None:
-        argv.extend(["--constraints", constraints_file.path])
-        constraint_file_digest = constraints_file.digest
+    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
+        constraint_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="the option `[python-setup].requirement-constraints`",
+            ),
+        )
 
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
