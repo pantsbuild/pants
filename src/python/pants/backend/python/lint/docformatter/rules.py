@@ -9,13 +9,8 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -69,7 +64,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
             output_filename="docformatter.pex",
             internal_only=True,
             requirements=PexRequirements(docformatter.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
             main=docformatter.main,
         ),
     )

@@ -9,13 +9,8 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -78,7 +73,7 @@ async def setup_black(
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
     # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
     # the machine.
-    all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+    all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
         (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
         python_setup,
     )
@@ -88,7 +83,7 @@ async def setup_black(
             all_interpreter_constraints.requires_python38_or_newer()
             and black.options.is_default("interpreter_constraints")
         )
-        else PexInterpreterConstraints(black.interpreter_constraints)
+        else InterpreterConstraints(black.interpreter_constraints)
     )
 
     black_pex_get = Get(

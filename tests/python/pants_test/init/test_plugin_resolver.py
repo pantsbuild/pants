@@ -13,13 +13,8 @@ from pex.interpreter import PythonInterpreter
 from pkg_resources import Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexInterpreterConstraints,
-    PexProcess,
-    PexRequest,
-    PexRequirements,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
 from pants.core.util_rules import archive, external_tool
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
@@ -62,7 +57,7 @@ def rule_runner() -> RuleRunner:
 
 def _create_pex(
     rule_runner: RuleRunner,
-    interpreter_constraints: PexInterpreterConstraints,
+    interpreter_constraints: InterpreterConstraints,
 ) -> Pex:
     request = PexRequest(
         output_filename="setup-py-runner.pex",
@@ -76,7 +71,7 @@ def _create_pex(
 def _run_setup_py(
     rule_runner: RuleRunner,
     plugin: str,
-    interpreter_constraints: PexInterpreterConstraints,
+    interpreter_constraints: InterpreterConstraints,
     version: Optional[str],
     setup_py_args: Iterable[str],
     install_dir: str,
@@ -128,9 +123,9 @@ def plugin_resolution(
                 yield new_chroot, True
 
     interpreter_constraints = (
-        PexInterpreterConstraints([f"=={interpreter.identity.version_str}"])
+        InterpreterConstraints([f"=={interpreter.identity.version_str}"])
         if interpreter
-        else PexInterpreterConstraints([">=3.7"])
+        else InterpreterConstraints([">=3.7"])
     )
 
     with provide_chroot(chroot) as (root_dir, create_artifacts):

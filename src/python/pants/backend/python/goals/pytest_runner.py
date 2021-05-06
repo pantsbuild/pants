@@ -14,9 +14,9 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import ConsoleScript, PythonTestsSources, PythonTestsTimeout
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -120,9 +120,7 @@ async def setup_pytest_for_target(
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
-        all_targets, python_setup
-    )
+    interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
     requirements_pex_get = Get(
         Pex,

@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -143,14 +143,14 @@ class ParsedPythonImports(DeduplicatedCollection[str]):
 @dataclass(frozen=True)
 class ParsePythonImportsRequest:
     sources: Sources
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     string_imports: bool
 
 
 @rule
 async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPythonImports:
     python_interpreter, script_digest, stripped_sources = await MultiGet(
-        Get(PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints),
+        Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
         Get(Digest, CreateDigest([FileContent("__parse_python_imports.py", _SCRIPT.encode())])),
         Get(StrippedSourceFiles, SourceFilesRequest([request.sources])),
     )

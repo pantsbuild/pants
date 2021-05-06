@@ -9,7 +9,7 @@ from typing import cast
 
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.backend.python.target_types import InterpreterConstraintsField
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
@@ -91,7 +91,7 @@ async def py_constraints(
         )
 
         constraints_per_tgt = [
-            PexInterpreterConstraints.create_from_targets([tgt], python_setup)
+            InterpreterConstraints.create_from_targets([tgt], python_setup)
             for tgt in all_python_targets
         ]
 
@@ -100,7 +100,7 @@ async def py_constraints(
             for tgt in all_python_targets
         )
         transitive_constraints_per_tgt = [
-            PexInterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
             for transitive_targets in transitive_targets_per_tgt
         ]
 
@@ -144,7 +144,7 @@ async def py_constraints(
         return PyConstraintsGoal(exit_code=0)
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    final_constraints = PexInterpreterConstraints.create_from_targets(
+    final_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     )
 
@@ -162,7 +162,7 @@ async def py_constraints(
 
     constraints_to_addresses = defaultdict(set)
     for tgt in transitive_targets.closure:
-        constraints = PexInterpreterConstraints.create_from_targets([tgt], python_setup)
+        constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
         if not constraints:
             continue
         constraints_to_addresses[constraints].add(tgt.address)

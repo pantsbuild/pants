@@ -14,13 +14,8 @@ import toml
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -306,7 +301,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
             output_filename="coverage.pex",
             internal_only=True,
             requirements=PexRequirements(coverage.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(coverage.interpreter_constraints),
             main=coverage.main,
         ),
     )

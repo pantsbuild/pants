@@ -17,10 +17,10 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     parse_requirements_file,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     MaybeConstraintsFile,
     Pex,
-    PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
     PexRequirements,
@@ -63,7 +63,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
-    hardcoded_interpreter_constraints: PexInterpreterConstraints | None
+    hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
@@ -82,7 +82,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         direct_deps_only: bool = False,
         description: str | None = None,
     ) -> None:
@@ -138,7 +138,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> PexFromTargetsRequest:
@@ -210,12 +210,12 @@ async def pex_from_targets(
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
-        calculated_constraints = PexInterpreterConstraints.create_from_targets(
+        calculated_constraints = InterpreterConstraints.create_from_targets(
             all_targets, python_setup
         )
         # If there are no targets, we fall back to the global constraints. This is relevant,
         # for example, when running `./pants repl` with no specs.
-        interpreter_constraints = calculated_constraints or PexInterpreterConstraints(
+        interpreter_constraints = calculated_constraints or InterpreterConstraints(
             python_setup.interpreter_constraints
         )
 

@@ -23,13 +23,8 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     SetupPyCommandsField,
 )
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
@@ -290,7 +285,7 @@ class RunSetupPyRequest:
     """A request to run a setup.py command."""
 
     exported_target: ExportedTarget
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     chroot: SetupPyChroot
     args: Tuple[str, ...]
 
@@ -365,7 +360,7 @@ async def package_python_dist(
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
-    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+    interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     )
     chroot = await Get(

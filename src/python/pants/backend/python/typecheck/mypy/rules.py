@@ -11,9 +11,9 @@ from pants.backend.python.target_types import PythonRequirementsField, PythonSou
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -57,7 +57,7 @@ class MyPyFieldSet(FieldSet):
 class MyPyPartition:
     root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     python_version_already_configured: bool
 
 
@@ -158,7 +158,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             mypy.options.is_default("interpreter_constraints")
             and partition.interpreter_constraints.requires_python38_or_newer()
         )
-        else PexInterpreterConstraints(mypy.interpreter_constraints)
+        else InterpreterConstraints(mypy.interpreter_constraints)
     )
 
     plugin_sources_get = Get(
@@ -313,9 +313,9 @@ async def mypy_typecheck(
 
     interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
-        interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+        interpreter_constraints = InterpreterConstraints.create_from_targets(
             transitive_targets.closure, python_setup
-        ) or PexInterpreterConstraints(mypy.interpreter_constraints)
+        ) or InterpreterConstraints(mypy.interpreter_constraints)
         interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
             transitive_targets
         )

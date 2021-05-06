@@ -9,8 +9,8 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     PexResolveInfo,
@@ -90,7 +90,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
             output_filename="isort.pex",
             internal_only=True,
             requirements=PexRequirements(isort.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(isort.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(isort.interpreter_constraints),
             main=isort.main,
         ),
     )
