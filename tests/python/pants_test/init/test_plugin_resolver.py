@@ -170,7 +170,7 @@ def plugin_resolution(
         complete_env = CompleteEnvironment(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
-        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, complete_env)
+        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
         plugin_resolver = PluginResolver(
             bootstrap_scheduler, interpreter_constraints=interpreter_constraints
         )
