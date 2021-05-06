@@ -180,7 +180,7 @@ class HelpPrinter(MaybeColor):
         ):
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             summary = self._format_summary_description(
-                target_type_info.summary or "<no description>", chars_before_description
+                target_type_info.summary, chars_before_description
             )
             print(f"{alias_str}{summary}\n")
         specific_help_cmd = f"{self._bin_name} help $target_type"

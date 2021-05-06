@@ -127,13 +127,9 @@ def pants_virtualenv_cache() -> Step:
     }
 
 
-def global_env(*, disable_buildsense: bool = False) -> Env:
+def global_env() -> Env:
     return {
-        "PANTS_CONFIG_FILES": (
-            "+['pants.ci.toml', 'pants.no-buildsense.toml']"
-            if disable_buildsense
-            else "+['pants.ci.toml']"
-        ),
+        "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
         "RUST_BACKTRACE": "all",
     }
 
@@ -362,7 +358,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": MACOS_ENV,
-            "timeout-minutes": 20,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -395,7 +391,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     """
                 ),
                 "if": DONT_SKIP_WHEELS,
-                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.no-buildsense.toml']"},
+                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"},
             }
             if is_macos:
                 step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
@@ -499,7 +495,7 @@ def generate() -> dict[Path, str]:
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
             "jobs": test_workflow_jobs([PYTHON38_VERSION, PYTHON39_VERSION], cron=True),
-            "env": global_env(disable_buildsense=True),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )

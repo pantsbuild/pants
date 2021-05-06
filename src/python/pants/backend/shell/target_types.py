@@ -7,6 +7,7 @@ import re
 from enum import Enum
 from typing import Optional
 
+from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.process import BinaryPathTest
 from pants.engine.target import (
@@ -74,6 +75,10 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
+class Shunit2TestsDependencies(Dependencies):
+    supports_transitive_excludes = True
+
+
 class Shunit2TestsSources(ShellSources):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
 
@@ -106,10 +111,11 @@ class Shunit2Tests(Target):
     alias = "shunit2_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        Shunit2TestsDependencies,
         Shunit2TestsSources,
         Shunit2TestsTimeout,
         Shunit2ShellField,
+        RuntimePackageDependenciesField,
     )
     help = (
         "Tests of Bourne-based shell scripts using the shUnit2 test framework.\n\n"

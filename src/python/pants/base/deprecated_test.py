@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest.mock
-import warnings
-from contextlib import contextmanager
 
 import pytest
 from packaging.version import Version
@@ -24,125 +22,79 @@ from pants.base.deprecated import (
 )
 from pants.option.option_value_container import OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
-from pants.util.collections import assert_single_element
 
 _FAKE_CUR_VERSION = "2.0.0.dev0"
 FUTURE_VERSION = "9999.9.9.dev0"
 
 
-@contextmanager
-def assert_deprecation(deprecation_expected=True):
-    with warnings.catch_warnings(record=True) as seen_warnings:
-
-        def assert_deprecation_warning():
-            if deprecation_expected:
-                warning = assert_single_element(seen_warnings)
-                assert warning.category == DeprecationWarning
-                return warning.message
-            else:
-                assert len(seen_warnings) == 0
-
-        warnings.simplefilter("always")
-        assert len(seen_warnings) == 0
-        yield assert_deprecation_warning
-        assert_deprecation_warning()
-
-
-def test_deprecated_function():
-    expected_return = "deprecated_function"
-
-    @deprecated(FUTURE_VERSION)
+def test_deprecated_function(caplog) -> None:
+    @deprecated(FUTURE_VERSION, hint_message="A hint!")
     def deprecated_function():
-        return expected_return
+        return "some val"
 
-    with assert_deprecation():
-        assert deprecated_function() == expected_return
-
-
-def test_deprecated_method():
-    expected_return = "deprecated_method"
-
-    class Test:
+    class Foo:
         @deprecated(FUTURE_VERSION)
         def deprecated_method(self):
-            return expected_return
+            return "some val"
 
-    with assert_deprecation():
-        assert Test().deprecated_method() == expected_return
-
-
-def test_deprecated_conditional_true():
-    predicate = lambda: True
-    with assert_deprecation():
-        deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
-
-
-def test_deprecated_conditional_false():
-    predicate = lambda: False
-    with assert_deprecation(deprecation_expected=False):
-        deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
-
-
-def test_deprecated_property():
-    expected_return = "deprecated_property"
-
-    class Test:
-        @property
+        @property  # type: ignore[misc]
         @deprecated(FUTURE_VERSION)
         def deprecated_property(self):
-            return expected_return
+            return "some val"
 
-    with assert_deprecation():
-        assert Test().deprecated_property == expected_return
+    assert not caplog.records
+    assert deprecated_function() == "some val"
+    assert len(caplog.records) == 1
+    assert deprecated_function.__name__ in caplog.text
+    assert "A hint!" in caplog.text
 
+    caplog.clear()
+    assert Foo().deprecated_method() == "some val"
+    assert len(caplog.records) == 1
+    assert Foo.deprecated_method.__name__ in caplog.text
 
-def test_deprecated_module():
-    with assert_deprecation() as extract_deprecation_warning:
-        # Note: Attempting to import here a dummy module that just calls deprecated_module() does not
-        # properly trigger the deprecation, due to a bad interaction with pytest that I've not fully
-        # understood.  But we trust python to correctly execute modules on import, so just testing a
-        # direct call of deprecated_module() here is fine.
-        deprecated_module(FUTURE_VERSION, hint_message="Do not use me.")
-        warning_message = str(extract_deprecation_warning())
-        assert "module will be removed" in warning_message
-        assert "Do not use me" in warning_message
-
-
-def test_deprecation_hint():
-    hint_message = "Find the foos, fast!"
-    expected_return = "deprecated_function"
-
-    @deprecated(FUTURE_VERSION, hint_message=hint_message)
-    def deprecated_function():
-        return expected_return
-
-    with assert_deprecation() as extract_deprecation_warning:
-        assert deprecated_function() == expected_return
-        assert hint_message in str(extract_deprecation_warning())
+    caplog.clear()
+    assert Foo().deprecated_property == "some val"
+    assert len(caplog.records) == 1
+    assert "deprecated_property" in caplog.text
 
 
-def test_deprecation_subject():
-    subject = "`./pants blah`"
-    expected_return = "deprecated_function"
-
-    @deprecated(FUTURE_VERSION, subject=subject)
-    def deprecated_function():
-        return expected_return
-
-    with assert_deprecation() as extract_deprecation_warning:
-        assert deprecated_function() == expected_return
-        assert subject in str(extract_deprecation_warning())
-
-
-def test_removal_version_required():
+def test_deprecated_function_invalid() -> None:
     with pytest.raises(MissingSemanticVersionError):
 
-        @deprecated(None)
-        def test_func():
+        @deprecated(None)  # type: ignore[arg-type]
+        def func():
             pass
 
+    with pytest.raises(BadDecoratorNestingError):
 
-def test_removal_version_bad():
+        class Test:
+            @deprecated(FUTURE_VERSION)  # type: ignore[misc]
+            @property
+            def prop(this):
+                pass
+
+
+def test_deprecated_conditional(caplog) -> None:
+    assert not caplog.records
+    deprecated_conditional(lambda: True, FUTURE_VERSION, "deprecated entity")
+    assert len(caplog.records) == 1
+    assert "deprecated entity" in caplog.text
+
+    caplog.clear()
+    deprecated_conditional(lambda: False, FUTURE_VERSION, "deprecated entity")
+    assert not caplog.records
+
+
+def test_deprecated_module(caplog) -> None:
+    assert not caplog.records
+    deprecated_module(FUTURE_VERSION, hint_message="Do not use me.")
+    assert len(caplog.records) == 1
+    assert "module will be removed" in caplog.text
+    assert "Do not use me" in caplog.text
+
+
+def test_removal_version_bad() -> None:
     with pytest.raises(BadSemanticVersionError):
         warn_or_error("a.a.a", "dummy description")
 
@@ -153,11 +105,11 @@ def test_removal_version_bad():
             pass
 
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error(1.0, "dummy description")
+        warn_or_error(1.0, "dummy description")  # type: ignore[arg-type]
 
     with pytest.raises(BadSemanticVersionError):
 
-        @deprecated(1.0)
+        @deprecated(1.0)  # type: ignore[arg-type]
         def test_func1():
             pass
 
@@ -170,17 +122,15 @@ def test_removal_version_bad():
         def test_func1a():
             pass
 
-
-def test_removal_version_non_dev():
     with pytest.raises(NonDevSemanticVersionError):
 
         @deprecated("1.0.0")
-        def test_func1a():
+        def test_func1b():
             pass
 
 
 @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
-def test_removal_version_same():
+def test_removal_version_same() -> None:
     with pytest.raises(CodeRemovedError):
         warn_or_error(_FAKE_CUR_VERSION, "dummy description")
 
@@ -192,7 +142,7 @@ def test_removal_version_same():
         test_func()
 
 
-def test_removal_version_lower():
+def test_removal_version_lower() -> None:
     with pytest.raises(CodeRemovedError):
         warn_or_error("0.0.27.dev0", "dummy description")
 
@@ -204,17 +154,7 @@ def test_removal_version_lower():
         test_func()
 
 
-def test_bad_decorator_nesting():
-    with pytest.raises(BadDecoratorNestingError):
-
-        class Test:
-            @deprecated(FUTURE_VERSION)
-            @property
-            def test_prop(this):
-                pass
-
-
-def test_deprecation_start_version_validation():
+def test_deprecation_start_version_validation() -> None:
     with pytest.raises(BadSemanticVersionError):
         warn_or_error(
             removal_version="1.0.0.dev0",
@@ -231,7 +171,7 @@ def test_deprecation_start_version_validation():
 
 
 @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
-def test_deprecation_start_period():
+def test_deprecation_start_period(caplog) -> None:
     with pytest.raises(CodeRemovedError):
         warn_or_error(
             removal_version=_FAKE_CUR_VERSION,
@@ -239,26 +179,14 @@ def test_deprecation_start_period():
             deprecation_start_version="1.0.0.dev0",
         )
 
-    warnings.simplefilter("always")
-    with pytest.warns(None) as record:
-        warn_or_error(
-            removal_version="999.999.999.dev999",
-            deprecated_entity_description="demo",
-            deprecation_start_version=_FAKE_CUR_VERSION,
-        )
-    assert len(record) == 1
-    assert (
-        str(record[0].message) == "DEPRECATED: demo will be removed in version 999.999.999.dev999."
+    caplog.clear()
+    warn_or_error(
+        removal_version="999.999.999.dev999",
+        deprecated_entity_description="demo",
+        deprecation_start_version=_FAKE_CUR_VERSION,
     )
-
-    assert (
-        warn_or_error(
-            removal_version="999.999.999.dev999",
-            deprecated_entity_description="demo",
-            deprecation_start_version="500.0.0.dev0",
-        )
-        is None
-    )
+    assert len(caplog.records) == 1
+    assert "DEPRECATED: demo will be removed in version 999.999.999.dev999." in caplog.text
 
 
 def test_resolve_conflicting_options() -> None:

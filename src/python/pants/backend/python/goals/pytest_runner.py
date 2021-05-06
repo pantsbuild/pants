@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Optional
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -15,7 +15,7 @@ from pants.backend.python.goals.coverage_py import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
-    PythonRuntimePackageDependencies,
+    PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -32,8 +32,10 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.test import (
+    BuildPackageDependenciesRequest,
+    BuiltPackageDependencies,
+    RuntimePackageDependenciesField,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -42,7 +44,7 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -61,13 +63,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
@@ -88,7 +84,8 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
-    runtime_package_dependencies: PythonRuntimePackageDependencies
+    runtime_package_dependencies: RuntimePackageDependenciesField
+    extra_env_vars: PythonTestsExtraEnvVars
 
     def is_conftest_or_type_stub(self) -> bool:
         """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
@@ -124,6 +121,7 @@ async def setup_pytest_for_target(
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
+    complete_env: CompleteEnvironment,
 ) -> TestSetup:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
@@ -155,23 +153,10 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
-    # Create any assets that the test depends on through the `runtime_package_dependencies` field.
-    assets: Tuple[BuiltPackage, ...] = ()
-    unparsed_runtime_packages = (
-        request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
+    build_package_dependencies_get = Get(
+        BuiltPackageDependencies,
+        BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
     )
-    if unparsed_runtime_packages.values:
-        runtime_package_targets = await Get(
-            Targets, UnparsedAddressInputs, unparsed_runtime_packages
-        )
-        field_sets_per_target = await Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),
-        )
-        assets = await MultiGet(
-            Get(BuiltPackage, PackageFieldSet, field_set)
-            for field_set in field_sets_per_target.field_sets
-        )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
@@ -182,12 +167,14 @@ async def setup_pytest_for_target(
         requirements_pex,
         prepared_sources,
         field_set_source_files,
+        built_package_dependencies,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
+        build_package_dependencies_get,
         extra_output_directory_digest_get,
     )
 
@@ -216,7 +203,7 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
-                *(binary.digest for binary in assets),
+                *(pkg.digest for pkg in built_package_dependencies),
             )
         ),
     )
@@ -246,6 +233,8 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
+        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within `python_tests`
+        **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.

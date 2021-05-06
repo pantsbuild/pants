@@ -14,6 +14,9 @@ from pants.backend.shell.target_types import (
     Shunit2TestsTimeout,
 )
 from pants.core.goals.test import (
+    BuildPackageDependenciesRequest,
+    BuiltPackageDependencies,
+    RuntimePackageDependenciesField,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -58,6 +61,7 @@ class Shunit2FieldSet(TestFieldSet):
     sources: Shunit2TestsSources
     timeout: Shunit2TestsTimeout
     shell: Shunit2ShellField
+    runtime_package_dependencies: RuntimePackageDependenciesField
 
 
 @dataclass(frozen=True)
@@ -152,9 +156,13 @@ async def setup_shunit2_for_target(
         "https://raw.githubusercontent.com/kward/shunit2/b9102bb763cc603b3115ed30a5648bf950548097/shunit2",
         FileDigest("1f11477b7948150d1ca50cdd41d89be4ed2acd137e26d2e0fe23966d0e272cc5", 40987),
     )
-    shunit2_script, transitive_targets, env = await MultiGet(
+    shunit2_script, transitive_targets, built_package_dependencies, env = await MultiGet(
         Get(Digest, DownloadFile, shunit2_download_file),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
+        Get(
+            BuiltPackageDependencies,
+            BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
+        ),
         Get(Environment, EnvironmentRequest(["PATH"])),
     )
 
@@ -197,7 +205,12 @@ async def setup_shunit2_for_target(
     input_digest = await Get(
         Digest,
         MergeDigests(
-            [shunit2_script, updated_test_digest, dependencies_source_files.snapshot.digest]
+            (
+                shunit2_script,
+                updated_test_digest,
+                dependencies_source_files.snapshot.digest,
+                *(pkg.digest for pkg in built_package_dependencies),
+            )
         ),
     )
 

@@ -8,8 +8,9 @@ https://github.com/myint/docformatter.
 """
 
 from pants.backend.python.lint import python_fmt
+from pants.backend.python.lint.docformatter import skip_field
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 
 
 def rules():
-    return (*docformatter_rules(), *python_fmt.rules())
+    return (*docformatter_rules(), *python_fmt.rules(), *skip_field.rules())

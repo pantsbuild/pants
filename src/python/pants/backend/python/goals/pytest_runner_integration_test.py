@@ -21,7 +21,12 @@ from pants.backend.python.target_types import (
     PythonTests,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestResult,
+    build_runtime_package_dependencies,
+    get_filtered_environment,
+)
 from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -35,6 +40,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            build_runtime_package_dependencies,
             create_or_update_coverage_config,
             *pytest_runner.rules(),
             *pex_from_targets.rules(),
@@ -378,19 +384,38 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
                 import os
 
                 def test_args():
-                    assert os.getenv("SOME_VAR") == "some_value"
-                    assert os.getenv("OTHER_VAR") == "other_value"
+                    assert os.getenv("ARG_WITH_VALUE_VAR") == "arg_with_value_var"
+                    assert os.getenv("ARG_WITHOUT_VALUE_VAR") == "arg_without_value_value"
+                    assert os.getenv("PYTHON_TESTS_VAR_WITH_VALUE") == "python_tests_var_with_value"
+                    assert os.getenv("PYTHON_TESTS_VAR_WITHOUT_VALUE") == "python_tests_var_without_value"
+                    assert os.getenv("PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR") == "python_tests_override_with_value_var_override"
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_tests()",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+            python_tests(
+                extra_env_vars=(
+                    "PYTHON_TESTS_VAR_WITHOUT_VALUE",
+                    "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
+                    "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                )
+            )
+            """
+            ),
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_extra_env_vars.py"))
     result = run_pytest(
         rule_runner,
         tgt,
-        extra_args=['--test-extra-env-vars=["SOME_VAR=some_value", "OTHER_VAR"]'],
-        env={"OTHER_VAR": "other_value"},
+        extra_args=[
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR"]'
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_value",
+            "PYTHON_TESTS_VAR_WITHOUT_VALUE": "python_tests_var_without_value",
+            "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR": "python_tests_override_with_value_var",
+        },
     )
     assert result.exit_code == 0
 
@@ -405,7 +430,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
                 import subprocess
 
                 def test_embedded_binary():
-                    assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
+                    assert b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
 
                     # Ensure that we didn't accidentally pull in the binary's sources. This is a
                     # special type of dependency that should not be included with the rest of the

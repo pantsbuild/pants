@@ -4,7 +4,7 @@
 
 
 env:
-  PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
@@ -480,7 +480,7 @@ jobs:
         python-version:
         - '3.8'
         - '3.9'
-    timeout-minutes: 20
+    timeout-minutes: 40
 name: Daily Extended Python Testing
 'on':
   schedule:

@@ -18,6 +18,7 @@ from pants.backend.python.dependency_inference.default_module_mapping import DEF
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -33,10 +34,10 @@ from pants.engine.target import (
     ScalarField,
     SecondaryOwnerMixin,
     Sources,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
+    TriBoolField,
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
@@ -269,7 +270,6 @@ class PexInheritPathField(StringField):
 class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
-    value: bool
     help = (
         "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
         "not zip safe, it will be written to disk prior to execution. You may need to mark "
@@ -280,7 +280,6 @@ class PexZipSafeField(BoolField):
 class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
-    value: bool
     help = (
         "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
         "can use less memory in RAM-constrained environments."
@@ -290,7 +289,6 @@ class PexAlwaysWriteCacheField(BoolField):
 class PexIgnoreErrorsField(BoolField):
     alias = "ignore_errors"
     default = False
-    value: bool
     help = "Should PEX ignore when it cannot resolve dependencies?"
 
 
@@ -304,7 +302,7 @@ class PexShebangField(StringField):
     )
 
 
-class PexEmitWarningsField(BoolField):
+class PexEmitWarningsField(TriBoolField):
     alias = "emit_warnings"
     help = (
         "Whether or not to emit PEX warnings at runtime.\n\nThe default is determined by the "
@@ -345,7 +343,6 @@ class PexExecutionModeField(StringField):
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
-    value: bool
     help = (
         "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included, the "
         "generated PEX file can be executed with `PEX_TOOLS=1 <pex file> --help` to gain access "
@@ -399,18 +396,6 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonRuntimePackageDependencies(SpecialCasedDependencies):
-    alias = "runtime_package_dependencies"
-    help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
-    )
-
-
 class PythonTestsTimeout(IntField):
     alias = "timeout"
     help = (
@@ -443,6 +428,16 @@ class PythonTestsTimeout(IntField):
         return result
 
 
+class PythonTestsExtraEnvVars(StringSequenceField):
+    alias = "extra_env_vars"
+    help = (
+        "Additional environment variables to include in test processes. "
+        "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+        "`ENV_VAR` to copy the value of a variable in Pants's own environment. "
+        "This will be merged with and override values from [test].extra_env_vars."
+    )
+
+
 class PythonTests(Target):
     alias = "python_tests"
     core_fields = (
@@ -450,8 +445,9 @@ class PythonTests(Target):
         InterpreterConstraintsField,
         PythonTestsSources,
         PythonTestsDependencies,
-        PythonRuntimePackageDependencies,
         PythonTestsTimeout,
+        RuntimePackageDependenciesField,
+        PythonTestsExtraEnvVars,
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "

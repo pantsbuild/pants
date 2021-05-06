@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import warnings
+import logging
 from functools import wraps
 from typing import Any, Callable, Optional
 
@@ -10,6 +10,8 @@ from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
+
+logger = logging.getLogger(__name__)
 
 
 class DeprecationApplicationError(Exception):
@@ -51,11 +53,9 @@ def is_deprecation_active(deprecation_start_version: Optional[str]) -> bool:
     return deprecation_start_version is None or Version(deprecation_start_version) <= PANTS_SEMVER
 
 
-def get_deprecated_tense(
-    removal_version: str, future_tense: str = "will be", past_tense: str = "was"
-) -> str:
+def get_deprecated_tense(removal_version: str) -> str:
     """Provides the grammatical tense for a given deprecated version vs the current version."""
-    return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
+    return "will be" if (Version(removal_version) >= PANTS_SEMVER) else "was"
 
 
 @memoized_method
@@ -98,30 +98,12 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
         )
 
 
-def _get_frame_info(stacklevel: int) -> inspect.FrameInfo:
-    """Get a Traceback for the given `stacklevel`.
-
-    For example:
-    `stacklevel=0` means this function's frame (_get_frame_info()).
-    `stacklevel=1` means the calling function's frame.
-    See https://docs.python.org/3/library/inspect.html#inspect.getouterframes for more info.
-
-    NB: If `stacklevel` is greater than the number of actual frames, the outermost frame is used
-    instead.
-    """
-    frame_list = inspect.getouterframes(inspect.currentframe())
-    frame_stack_index = stacklevel if stacklevel < len(frame_list) else len(frame_list) - 1
-    return frame_list[frame_stack_index]
-
-
 # TODO: propagate `deprecation_start_version` to other methods in this file!
 def warn_or_error(
     removal_version: str,
     deprecated_entity_description: str,
     hint: Optional[str] = None,
     deprecation_start_version: Optional[str] = None,
-    stacklevel: int = 3,
-    frame_info: Optional[inspect.FrameInfo] = None,
     print_warning: bool = True,
 ) -> None:
     """Check the removal_version against the current pants version.
@@ -137,9 +119,6 @@ def warn_or_error(
                                       begin to display a deprecation warning. This must be less
                                       than the `removal_version`. If not provided, the
                                       deprecation warning is always displayed.
-    :param stacklevel: The stacklevel to pass to warnings.warn, which determines the file name and
-                       line number of the error message.
-    :param frame_info: If provided, use this frame info instead of getting one from `stacklevel`.
     :param print_warning: Whether to print a warning for deprecations *before* their removal.
                           If this flag is off, an exception will still be raised for options
                           past their deprecation date.
@@ -153,37 +132,23 @@ def warn_or_error(
         )
         if deprecation_start_semver >= removal_semver:
             raise InvalidSemanticVersionOrderingError(
-                "The deprecation start version {} must be less than the end version {}.".format(
-                    deprecation_start_version, removal_version
-                )
+                f"The deprecation start version {deprecation_start_version} must be less than "
+                f"the end version {removal_version}."
             )
         elif PANTS_SEMVER < deprecation_start_semver:
             return
 
-    msg = "DEPRECATED: {} {} removed in version {}.".format(
-        deprecated_entity_description, get_deprecated_tense(removal_version), removal_version
+    msg = (
+        f"DEPRECATED: {deprecated_entity_description} {get_deprecated_tense(removal_version)} "
+        f"removed in version {removal_version}."
     )
     if hint:
-        msg += "\n  {}".format(hint)
+        msg += f"\n\n{hint}"
 
-    # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
-    # way to get a warning message to display to stderr. We get that from frame_info.
-    if frame_info is None:
-        frame_info = _get_frame_info(stacklevel)
-    _, filename, line_number, _, _, _ = frame_info
-
-    if removal_semver > PANTS_SEMVER:
-        if print_warning:
-            # This output is filtered by warning filters.
-            warnings.warn_explicit(
-                message=msg,
-                category=DeprecationWarning,
-                filename=filename,
-                lineno=line_number,
-            )
-        return
-    else:
+    if removal_semver <= PANTS_SEMVER:
         raise CodeRemovedError(msg)
+    if print_warning:
+        logger.warning(msg)
 
 
 def deprecated_conditional(
@@ -192,7 +157,6 @@ def deprecated_conditional(
     entity_description: str,
     hint_message: Optional[str] = None,
     deprecation_start_version: Optional[str] = None,
-    stacklevel: int = 4,
 ) -> None:
     """Marks a certain configuration as deprecated.
 
@@ -203,7 +167,6 @@ def deprecated_conditional(
     :param removal_version: The pants version which will remove the deprecated functionality.
     :param entity_description: A description of the deprecated entity.
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
-    :param stacklevel: How far up in the stack do we go to find the calling fn to report
     :raises DeprecationApplicationError if the deprecation is applied improperly.
     """
     validate_deprecation_semver(removal_version, "removal version")
@@ -213,7 +176,6 @@ def deprecated_conditional(
             entity_description,
             hint_message,
             deprecation_start_version=deprecation_start_version,
-            stacklevel=stacklevel,
         )
 
 
@@ -269,7 +231,6 @@ def deprecated_module(
     removal_version: str,
     hint_message: Optional[str] = None,
     *,
-    stacklevel: int = 3,
     deprecation_start_version: Optional[str] = None,
 ) -> None:
     """Marks an entire module as deprecated.
@@ -280,13 +241,11 @@ def deprecated_module(
     :param removal_version: The pantsbuild.pants version which will remove the deprecated
                             function.
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
-    :param stacklevel: The stacklevel to pass to warnings.warn.
     """
     warn_or_error(
         removal_version,
         "module",
         hint_message,
-        stacklevel=stacklevel,
         deprecation_start_version=deprecation_start_version,
     )
 

@@ -11,12 +11,13 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
@@ -28,10 +29,14 @@ from pants.engine.process import FallibleProcessResult, InteractiveProcess, Inte
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     Sources,
+    SpecialCasedDependencies,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    Targets,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
@@ -511,6 +516,49 @@ def enrich_test_result(
         extra_output=test_result.extra_output,
         output_setting=test_subsystem.output,
     )
+
+
+# -------------------------------------------------------------------------------------------
+# `runtime_package_dependencies` field
+# -------------------------------------------------------------------------------------------
+
+
+class RuntimePackageDependenciesField(SpecialCasedDependencies):
+    alias = "runtime_package_dependencies"
+    help = (
+        "Addresses to targets that can be built with the `./pants package` goal and whose "
+        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
+        "as if you had run `./pants package`. It will include the results in your test's chroot, "
+        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
+        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
+        "`pex_binary`, `python_awslambda`, or an `archive`."
+    )
+
+
+class BuiltPackageDependencies(Collection[BuiltPackage]):
+    pass
+
+
+@dataclass(frozen=True)
+class BuildPackageDependenciesRequest:
+    field: RuntimePackageDependenciesField
+
+
+@rule(desc="Build runtime package dependencies for tests", level=LogLevel.DEBUG)
+async def build_runtime_package_dependencies(
+    request: BuildPackageDependenciesRequest,
+) -> BuiltPackageDependencies:
+    unparsed_addresses = request.field.to_unparsed_address_inputs()
+    if not unparsed_addresses:
+        return BuiltPackageDependencies()
+    tgts = await Get(Targets, UnparsedAddressInputs, unparsed_addresses)
+    field_sets_per_tgt = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, tgts)
+    )
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in field_sets_per_tgt.field_sets
+    )
+    return BuiltPackageDependencies(packages)
 
 
 def rules():

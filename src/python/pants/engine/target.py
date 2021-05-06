@@ -753,46 +753,14 @@ def generate_subtarget(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class _AbstractFieldSet(EngineAwareParameter, ABC):
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-
-    @final
-    @classmethod
-    def is_applicable(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @final
-    @classmethod
-    def applicable_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    def debug_hint(self) -> str:
-        return self.address.spec
-
-    def __repr__(self) -> str:
-        # We use a short repr() because this often shows up in stack traces. We don't need any of
-        # the field information because we can ask a user to send us their BUILD file.
-        return f"{self.__class__.__name__}(address={self.address})"
-
-
 def _get_field_set_fields_from_target(
-    field_set: Type[_AbstractFieldSet], target: Target
-) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
+    field_set: type[FieldSet], target: Target
+) -> dict[str, Field]:
+    all_expected_fields: dict[str, type[Field]] = {
         dataclass_field.name: dataclass_field.type
         for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)
     }
-
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -804,7 +772,8 @@ def _get_field_set_fields_from_target(
 _FS = TypeVar("_FS", bound="FieldSet")
 
 
-class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
+@dataclass(frozen=True)
+class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     """An ad hoc set of fields from a target which are used by rules.
 
     Subclasses should declare all the fields they consume as dataclass attributes. They should also
@@ -814,6 +783,9 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
+    You can optionally set implement the classmethod `opt_out` so that targets have a
+    mechanism to not match with the FieldSet even if they have the `required_fields` registered.
+
     For example:
 
         @dataclass(frozen=True)
@@ -822,6 +794,10 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
 
             sources: FortranSources
             fortran_version: FortranVersion
+
+            @classmethod
+            def opt_out(cls, tgt: Target) -> bool:
+                return tgt.get(MaybeSkipFortranTestsField).value
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
@@ -837,26 +813,65 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
         print(field_set.sources)
     """
 
+    required_fields: ClassVar[tuple[type[Field], ...]]
+
+    address: Address
+
     @classmethod
-    def create(cls: Type[_FS], tgt: Target) -> _FS:
+    def opt_out(cls, tgt: Target) -> bool:
+        """If `True`, the target will not match with the field set, even if it has the FieldSet's
+        `required_fields`.
+
+        Note: this method is not intended to categorically opt out a target type from a
+        FieldSet, i.e. to always opt out based solely on the target type. While it is possible to
+        do, some error messages will incorrectly suggest that that target is compatible with the
+        FieldSet. Instead, if you need this feature, please ask us to implement it. See
+        https://github.com/pantsbuild/pants/pull/12002 for discussion.
+        """
+        return False
+
+    @final
+    @classmethod
+    def is_applicable(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields) and not cls.opt_out(tgt)
+
+    @final
+    @classmethod
+    def applicable_target_types(
+        cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
+    ) -> tuple[type[Target], ...]:
+        return tuple(
+            tgt_type
+            for tgt_type in target_types
+            if tgt_type.class_has_fields(cls.required_fields, union_membership)
+        )
+
+    @final
+    @classmethod
+    def create(cls: type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
             address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
         )
 
+    def debug_hint(self) -> str:
+        return self.address.spec
 
-_AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
+    def __repr__(self) -> str:
+        # We use a short repr() because this often shows up in stack traces. We don't need any of
+        # the field information because we can ask a user to send us their BUILD file.
+        return f"{self.__class__.__name__}(address={self.address})"
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetRootsToFieldSets(Generic[_AFS]):
-    mapping: FrozenDict[Target, Tuple[_AFS, ...]]
+class TargetRootsToFieldSets(Generic[_FS]):
+    mapping: FrozenDict[Target, tuple[_FS, ...]]
 
-    def __init__(self, mapping: Mapping[Target, Iterable[_AFS]]) -> None:
+    def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
         self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
 
     @memoized_property
-    def field_sets(self) -> Tuple[_AFS, ...]:
+    def field_sets(self) -> tuple[_FS, ...]:
         return tuple(
             itertools.chain.from_iterable(
                 field_sets_per_target for field_sets_per_target in self.mapping.values()
@@ -864,7 +879,7 @@ class TargetRootsToFieldSets(Generic[_AFS]):
         )
 
     @memoized_property
-    def targets(self) -> Tuple[Target, ...]:
+    def targets(self) -> tuple[Target, ...]:
         return tuple(self.mapping.keys())
 
 
@@ -876,8 +891,8 @@ class NoApplicableTargetsBehavior(Enum):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetRootsToFieldSetsRequest(Generic[_AFS]):
-    field_set_superclass: Type[_AFS]
+class TargetRootsToFieldSetsRequest(Generic[_FS]):
+    field_set_superclass: type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
@@ -886,7 +901,7 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
 
     def __init__(
         self,
-        field_set_superclass: Type[_AFS],
+        field_set_superclass: type[_FS],
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
@@ -900,25 +915,25 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FieldSetsPerTarget(Generic[_AFS]):
+class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
-    collection: Tuple[Tuple[_AFS, ...], ...]
+    collection: tuple[tuple[_FS, ...], ...]
 
-    def __init__(self, collection: Iterable[Iterable[_AFS]]):
+    def __init__(self, collection: Iterable[Iterable[_FS]]):
         self.collection = tuple(tuple(iterable) for iterable in collection)
 
     @memoized_property
-    def field_sets(self) -> Tuple[_AFS, ...]:
+    def field_sets(self) -> tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FieldSetsPerTargetRequest(Generic[_AFS]):
-    field_set_superclass: Type[_AFS]
-    targets: Tuple[Target, ...]
+class FieldSetsPerTargetRequest(Generic[_FS]):
+    field_set_superclass: type[_FS]
+    targets: tuple[Target, ...]
 
-    def __init__(self, field_set_superclass: Type[_AFS], targets: Iterable[Target]):
+    def __init__(self, field_set_superclass: type[_FS], targets: Iterable[Target]):
         self.field_set_superclass = field_set_superclass
         self.targets = tuple(targets)
 
@@ -1035,28 +1050,32 @@ class ScalarField(Generic[T], Field):
 class BoolField(Field):
     """A field whose value is a boolean.
 
-    If subclasses do not set the class property `required = True` or `default`, the value will
-    default to None. This can be useful to represent three states: unspecified, False, and True.
-
-        class ZipSafe(BoolField):
-            alias = "zip_safe"
-            default = True
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
     """
 
-    value: Optional[bool]
-    default: ClassVar[Optional[bool]] = None
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool:  # type: ignore[override]
+        value_or_default = super().compute_value(raw_value, address)
+        if not isinstance(value_or_default, bool):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type="a boolean"
+            )
+        return value_or_default
+
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type = bool
+    expected_type_description = "a boolean or None"
 
     @classmethod
     def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is not None and not isinstance(value_or_default, bool):
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="a boolean",
-            )
-        return value_or_default
+        return super().compute_value(raw_value, address)
 
 
 class IntField(ScalarField[int]):

@@ -70,7 +70,6 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
-    _AbstractFieldSet,
     generate_subtarget,
     generate_subtarget_address,
 )
@@ -924,14 +923,14 @@ class NoApplicableTargetsException(Exception):
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
         *,
-        field_set_types: Iterable[Type[_AbstractFieldSet]],
+        field_set_types: Iterable[type[FieldSet]],
         goal_description: str,
     ) -> NoApplicableTargetsException:
         applicable_target_types = {
             target_type
             for field_set_type in field_set_types
             for target_type in field_set_type.applicable_target_types(
-                registered_target_types.types, union_membership=union_membership
+                registered_target_types.types, union_membership
             )
         }
         return cls(
@@ -960,7 +959,7 @@ class AmbiguousImplementationsException(Exception):
     def __init__(
         self,
         target: Target,
-        field_sets: Iterable[_AbstractFieldSet],
+        field_sets: Iterable[FieldSet],
         *,
         goal_description: str,
     ) -> None:
@@ -1023,12 +1022,9 @@ async def find_valid_field_sets_for_target_roots(
 
 @rule
 def find_valid_field_sets(
-    request: FieldSetsPerTargetRequest,
-    union_membership: UnionMembership,
+    request: FieldSetsPerTargetRequest, union_membership: UnionMembership
 ) -> FieldSetsPerTarget:
-    field_set_types: Iterable[Type[FieldSet]] = union_membership.union_rules[
-        request.field_set_superclass
-    ]
+    field_set_types = union_membership.get(request.field_set_superclass)
     return FieldSetsPerTarget(
         (
             field_set_type.create(target)

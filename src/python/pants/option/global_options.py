@@ -465,8 +465,8 @@ class GlobalOptions(Subsystem):
                 "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
                 "your string as a regex pattern. For example:\n\n"
                 "  ignore_warnings = [\n"
-                "    'The option `[isort.config]` is not configured',\n"
-                "    '$regex$DeprecationWarning: DEPRECATED:\\s*'\n"
+                "    \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
+                "    '$regex$:No files\\s*'\n"
                 "  ]"
             ),
         )

@@ -61,7 +61,7 @@ function usage() {
   echo "       Ensures the latest packages have been propagated to PyPI"
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
-  echo " -o  Lists all pantsbuild package owners."
+  echo " -o  Validates that all pantsbuild packages are assigned the expected user roles."
   echo " -w  List pre-built wheels for this release (specifically the URLs to download)."
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
@@ -90,7 +90,7 @@ while getopts ":${_OPTS}" opt; do
       exit $?
       ;;
     o)
-      run_packages_script list-owners
+      run_packages_script validate-roles
       exit $?
       ;;
     w)
