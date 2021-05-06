@@ -13,7 +13,7 @@ import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Tuple, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -120,6 +120,125 @@ class AuthPluginResult:
 
 
 @dataclass(frozen=True)
+class DynamicRemoteExecutionOptions:
+    """Options related to remote execution of processes which are computed dynamically."""
+
+    remote_execution: bool
+    remote_cache_read: bool
+    remote_cache_write: bool
+    remote_instance_name: str | None
+    remote_store_headers: dict[str, str]
+    remote_execution_headers: dict[str, str]
+
+    @classmethod
+    def disabled(cls) -> DynamicRemoteExecutionOptions:
+        return DynamicRemoteExecutionOptions(
+            remote_execution=False,
+            remote_cache_read=False,
+            remote_cache_write=False,
+            remote_instance_name=None,
+            remote_store_headers={},
+            remote_execution_headers={},
+        )
+
+    @classmethod
+    def from_options(
+        cls, full_options: Options, env: CompleteEnvironment, *, local_only: bool
+    ) -> DynamicRemoteExecutionOptions:
+        if local_only:
+            return DynamicRemoteExecutionOptions(
+                remote_execution=False,
+                remote_cache_read=False,
+                remote_cache_write=False,
+                remote_instance_name=None,
+                remote_store_headers={},
+                remote_execution_headers={},
+            )
+
+        bootstrap_options = full_options.bootstrap_option_values()
+        assert bootstrap_options is not None
+        remote_execution = cast(bool, bootstrap_options.remote_execution)
+        remote_cache_read = cast(bool, bootstrap_options.remote_cache_read)
+        remote_cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        remote_instance_name = cast("str | None", bootstrap_options.remote_instance_name)
+        remote_execution_headers = cast(
+            "dict[str, str]", bootstrap_options.remote_execution_headers
+        )
+        remote_store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
+
+        if bootstrap_options.remote_oauth_bearer_token_path:
+            oauth_token = (
+                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
+            )
+            if set(oauth_token).intersection({"\n", "\r"}):
+                raise OptionsError(
+                    f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
+                    "must not contain multiple lines."
+                )
+            token_header = {"authorization": f"Bearer {oauth_token}"}
+            remote_execution_headers.update(token_header)
+            remote_store_headers.update(token_header)
+
+        if (
+            bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_auth_plugin.strip()
+            and (remote_execution or remote_cache_read or remote_cache_write)
+        ):
+            if ":" not in bootstrap_options.remote_auth_plugin:
+                raise OptionsError(
+                    "Invalid value for `--remote-auth-plugin`: "
+                    f"{bootstrap_options.remote_auth_plugin}. Please use the format "
+                    f"`path.to.module:my_func`."
+                )
+            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
+            auth_plugin_module = importlib.import_module(auth_plugin_path)
+            auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
+            auth_plugin_result = cast(
+                AuthPluginResult,
+                auth_plugin_func(
+                    initial_execution_headers=remote_execution_headers,
+                    initial_store_headers=remote_store_headers,
+                    options=full_options,
+                    env=dict(env),
+                ),
+            )
+            if not auth_plugin_result.is_available:
+                # NB: This is debug because we expect plugins to log more informative messages.
+                logger.debug(
+                    "Disabling remote caching and remote execution because authentication was not "
+                    "available via the plugin from `--remote-auth-plugin`."
+                )
+                remote_execution = False
+                remote_cache_read = False
+                remote_cache_write = False
+            else:
+                logger.debug(
+                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
+                )
+                remote_execution_headers = auth_plugin_result.execution_headers
+                remote_store_headers = auth_plugin_result.store_headers
+                if (
+                    auth_plugin_result.instance_name is not None
+                    and auth_plugin_result.instance_name != remote_instance_name
+                ):
+                    logger.debug(
+                        f"Overriding `--remote-instance-name={repr(remote_instance_name)}` to "
+                        f"instead be {repr(auth_plugin_result.instance_name)} due to the plugin "
+                        "from `--remote-auth-plugin`."
+                    )
+                    remote_instance_name = auth_plugin_result.instance_name
+
+        return DynamicRemoteExecutionOptions(
+            remote_execution=remote_execution,
+            remote_cache_read=remote_cache_read,
+            remote_cache_write=remote_cache_write,
+            remote_instance_name=remote_instance_name,
+            remote_store_headers=remote_store_headers,
+            remote_execution_headers=remote_execution_headers,
+        )
+
+
+@dataclass(frozen=True)
 class ExecutionOptions:
     """A collection of all options related to (remote) execution of processes.
 
@@ -156,80 +275,10 @@ class ExecutionOptions:
 
     @classmethod
     def from_options(
-        cls, options: Options, env: CompleteEnvironment, local_only: bool = False
+        cls,
+        bootstrap_options: OptionValueContainer,
+        dynamic_execution_options: DynamicRemoteExecutionOptions,
     ) -> ExecutionOptions:
-        bootstrap_options = options.bootstrap_option_values()
-        assert bootstrap_options is not None
-        # Possibly change some remoting options.
-        remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
-        remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
-        remote_instance_name = cast(Optional[str], bootstrap_options.remote_instance_name)
-        remote_execution = cast(bool, bootstrap_options.remote_execution) and not local_only
-        remote_cache_read = cast(bool, bootstrap_options.remote_cache_read) and not local_only
-        remote_cache_write = cast(bool, bootstrap_options.remote_cache_write) and not local_only
-        if not local_only and bootstrap_options.remote_oauth_bearer_token_path:
-            oauth_token = (
-                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-            )
-            if set(oauth_token).intersection({"\n", "\r"}):
-                raise OptionsError(
-                    f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
-                    "must not contain multiple lines."
-                )
-            token_header = {"authorization": f"Bearer {oauth_token}"}
-            remote_execution_headers.update(token_header)
-            remote_store_headers.update(token_header)
-        if (
-            not local_only
-            and bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_auth_plugin.strip()
-            and (remote_execution or remote_cache_read or remote_cache_write)
-        ):
-            if ":" not in bootstrap_options.remote_auth_plugin:
-                raise OptionsError(
-                    "Invalid value for `--remote-auth-plugin`: "
-                    f"{bootstrap_options.remote_auth_plugin}. Please use the format "
-                    f"`path.to.module:my_func`."
-                )
-            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
-            auth_plugin_module = importlib.import_module(auth_plugin_path)
-            auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
-            auth_plugin_result = cast(
-                AuthPluginResult,
-                auth_plugin_func(
-                    initial_execution_headers=remote_execution_headers,
-                    initial_store_headers=remote_store_headers,
-                    options=options,
-                    env=dict(env),
-                ),
-            )
-            if not auth_plugin_result.is_available:
-                # NB: This is debug because we expect plugins to log more informative messages.
-                logger.debug(
-                    "Disabling remote caching and remote execution because authentication was not "
-                    "available via the plugin from `--remote-auth-plugin`."
-                )
-                remote_execution = False
-                remote_cache_read = False
-                remote_cache_write = False
-            else:
-                logger.debug(
-                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
-                )
-                remote_execution_headers = auth_plugin_result.execution_headers
-                remote_store_headers = auth_plugin_result.store_headers
-                if (
-                    auth_plugin_result.instance_name is not None
-                    and auth_plugin_result.instance_name != remote_instance_name
-                ):
-                    logger.debug(
-                        f"Overriding `--remote-instance-name={repr(remote_instance_name)}` to "
-                        f"instead be {repr(auth_plugin_result.instance_name)} due to the plugin "
-                        "from `--remote-auth-plugin`."
-                    )
-                    remote_instance_name = auth_plugin_result.instance_name
-
-        # Determine the remote addresses.
         # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
         # We validate that users set `grpc` and `grpcs` in the options system for clarity, but then
         # normalize to `http`/`https`.
@@ -246,11 +295,11 @@ class ExecutionOptions:
 
         return cls(
             # Remote execution strategy.
-            remote_execution=remote_execution,
-            remote_cache_read=remote_cache_read,
-            remote_cache_write=remote_cache_write,
+            remote_execution=dynamic_execution_options.remote_execution,
+            remote_cache_read=dynamic_execution_options.remote_cache_read,
+            remote_cache_write=dynamic_execution_options.remote_cache_write,
             # General remote setup.
-            remote_instance_name=remote_instance_name,
+            remote_instance_name=dynamic_execution_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
             process_execution_local_cache=bootstrap_options.process_execution_local_cache,
@@ -260,7 +309,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
-            remote_store_headers=remote_store_headers,
+            remote_store_headers=dynamic_execution_options.remote_store_headers,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
@@ -270,7 +319,7 @@ class ExecutionOptions:
             # Remote execution setup.
             remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=remote_execution_headers,
+            remote_execution_headers=dynamic_execution_options.remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
         )
 

@@ -35,7 +35,12 @@ from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
-from pants.option.global_options import ExecutionOptions, GlobalOptions, LocalStoreOptions
+from pants.option.global_options import (
+    DynamicRemoteExecutionOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -149,6 +154,10 @@ class RuleRunner:
                 store_dir = safe_mkdtemp(prefix="lmdb_store.")
             local_store_options = dataclasses.replace(local_store_options, store_dir=store_dir)
 
+        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(
+            options, self.environment, local_only=False
+        )
+
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
@@ -163,7 +172,9 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(options, self.environment),
+            execution_options=ExecutionOptions.from_options(
+                global_options, dynamic_execution_options
+            ),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(
