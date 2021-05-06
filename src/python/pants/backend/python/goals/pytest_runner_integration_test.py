@@ -384,19 +384,38 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
                 import os
 
                 def test_args():
-                    assert os.getenv("SOME_VAR") == "some_value"
-                    assert os.getenv("OTHER_VAR") == "other_value"
+                    assert os.getenv("ARG_WITH_VALUE_VAR") == "arg_with_value_var"
+                    assert os.getenv("ARG_WITHOUT_VALUE_VAR") == "arg_without_value_value"
+                    assert os.getenv("PYTHON_TESTS_VAR_WITH_VALUE") == "python_tests_var_with_value"
+                    assert os.getenv("PYTHON_TESTS_VAR_WITHOUT_VALUE") == "python_tests_var_without_value"
+                    assert os.getenv("PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR") == "python_tests_override_with_value_var_override"
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_tests()",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+            python_tests(
+                extra_env_vars=(
+                    "PYTHON_TESTS_VAR_WITHOUT_VALUE",
+                    "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
+                    "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                )
+            )
+            """
+            ),
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_extra_env_vars.py"))
     result = run_pytest(
         rule_runner,
         tgt,
-        extra_args=['--test-extra-env-vars=["SOME_VAR=some_value", "OTHER_VAR"]'],
-        env={"OTHER_VAR": "other_value"},
+        extra_args=[
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR"]'
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_value",
+            "PYTHON_TESTS_VAR_WITHOUT_VALUE": "python_tests_var_without_value",
+            "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR": "python_tests_override_with_value_var",
+        },
     )
     assert result.exit_code == 0
 
