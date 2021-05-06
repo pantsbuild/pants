@@ -22,7 +22,7 @@ from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
-from common import banner, die, green, travis_section
+from common import banner, die, green
 from reversion import reversion
 
 from pants.util.strutil import strip_prefix
@@ -210,13 +210,13 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
         ],
         check=True,
     )
-    run_venv_pants(["list", "src::"])
     outputted_version = run_venv_pants(["--version"])
     if outputted_version != version:
         die(
             f"Installed version of Pants ({outputted_version}) did not match requested "
             f"version ({version})!"
         )
+    run_venv_pants(["list", "src::"])
 
 
 def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
@@ -308,6 +308,16 @@ class _Constants:
     @property
     def python_version(self) -> str:
         return ".".join(map(str, sys.version_info[:2]))
+
+    @property
+    def env(self) -> dict[str, str]:
+        """An environment that ensures we use the correct Python interpreter when building
+        pantsbuild.pants and compiling Rust."""
+        return {
+            **os.environ,
+            "PY": f"python{CONSTANTS.python_version}",
+            "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f'["=={CONSTANTS.python_version}.*"]',
+        }
 
 
 CONSTANTS = _Constants()
@@ -455,7 +465,7 @@ def build_pants_wheels() -> None:
 
     with set_pants_version(CONSTANTS.pants_unstable_version):
         try:
-            subprocess.run(args, check=True)
+            subprocess.run(args, env=CONSTANTS.env, check=True)
         except subprocess.CalledProcessError as e:
             failed_packages = ",".join(package.name for package in PACKAGES)
             failed_targets = " ".join(package.target for package in PACKAGES)
@@ -506,6 +516,7 @@ def build_3rdparty_wheels() -> None:
                     "--type=3rdparty",
                     *pkg_tgts,
                 ],
+                env=CONSTANTS.env,
                 stdout=subprocess.PIPE,
                 check=True,
             )
@@ -519,38 +530,39 @@ def build_3rdparty_wheels() -> None:
                 "broken?"
             )
         subprocess.run(
-            [Path(venv_tmpdir, "bin/pip"), "wheel", f"--wheel-dir={dest}", *deps],
+            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *deps],
             check=True,
         )
+        green(f"Wrote 3rdparty wheels to {dest}")
 
 
 def build_fs_util() -> None:
     # See https://www.pantsbuild.org/docs/contributions-rust for a description of fs_util. We
     # include it in our releases because it can be a useful standalone tool.
-    with travis_section("fs_util", "Building fs_util"):
-        command = ["./cargo", "build", "-p", "fs_util"]
-        release_mode = os.environ.get("MODE", "") != "debug"
-        if release_mode:
-            command.append("--release")
-        subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
-        current_os = (
-            subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
-            .stdout.decode()
-            .strip()
-        )
-        dest_dir = (
-            Path(CONSTANTS.deploy_dir)
-            / "bin"
-            / "fs_util"
-            / current_os
-            / CONSTANTS.pants_unstable_version
-        )
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(
-            f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
-            dest_dir,
-        )
-        green(f"Built fs_util at {dest_dir / 'fs_util'}.")
+    banner("Building fs_util")
+    command = ["./cargo", "build", "-p", "fs_util"]
+    release_mode = os.environ.get("MODE", "") != "debug"
+    if release_mode:
+        command.append("--release")
+    subprocess.run(command, check=True, env={**CONSTANTS.env, "RUST_BACKTRACE": "1"})
+    current_os = (
+        subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
+        .stdout.decode()
+        .strip()
+    )
+    dest_dir = (
+        Path(CONSTANTS.deploy_dir)
+        / "bin"
+        / "fs_util"
+        / current_os
+        / CONSTANTS.pants_unstable_version
+    )
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
+        dest_dir,
+    )
+    green(f"Built fs_util at {dest_dir / 'fs_util'}.")
 
 
 # TODO: We should be using `./pants package` and `pex_binary` for this...If Pants is lacking in
@@ -872,10 +884,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    # Ensure that we use the correct Python when building the pantsbuild.pants
-    # `python_distribution` and when compiling Rust.
-    os.environ["PY"] = f"python{CONSTANTS.python_version}"
-    os.environ["PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS"] = f'["=={CONSTANTS.python_version}.*"]'
+    os.environ.update(CONSTANTS.env)
     if args.command == "publish":
         publish()
     if args.command == "test-release":
