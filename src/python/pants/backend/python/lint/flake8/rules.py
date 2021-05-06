@@ -8,13 +8,8 @@ from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -47,7 +42,7 @@ class Flake8Request(LintRequest):
 @dataclass(frozen=True)
 class Flake8Partition:
     field_sets: Tuple[Flake8FieldSet, ...]
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
 
 
 def generate_argv(
@@ -136,7 +131,7 @@ async def flake8_lint(
     # (http://flake8.pycqa.org/en/latest/user/invocation.html). We batch targets by their
     # constraints to ensure, for example, that all Python 2 targets run together and all Python 3
     # targets run together.
-    constraints_to_field_sets = PexInterpreterConstraints.group_field_sets_by_constraints(
+    constraints_to_field_sets = InterpreterConstraints.group_field_sets_by_constraints(
         request.field_sets, python_setup
     )
     partitioned_results = await MultiGet(

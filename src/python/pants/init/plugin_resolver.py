@@ -9,13 +9,8 @@ from typing import Optional, TypeVar, cast
 from pkg_resources import WorkingSet
 from pkg_resources import working_set as global_working_set
 
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
@@ -39,7 +34,7 @@ class ResolvedPluginDistributions(DeduplicatedCollection[str]):
 
 @rule
 async def resolve_plugins(
-    interpreter_constraints: PexInterpreterConstraints, global_options: GlobalOptions
+    interpreter_constraints: InterpreterConstraints, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     """This rule resolves plugins using a VenvPex, and exposes the absolute paths of their dists.
 
@@ -90,13 +85,13 @@ class PluginResolver:
     def __init__(
         self,
         scheduler: BootstrapScheduler,
-        interpreter_constraints: Optional[PexInterpreterConstraints] = None,
+        interpreter_constraints: Optional[InterpreterConstraints] = None,
     ) -> None:
         self._scheduler = scheduler
         self._interpreter_constraints = (
             interpreter_constraints
             if interpreter_constraints is not None
-            else PexInterpreterConstraints([f"=={'.'.join(map(str, sys.version_info[:3]))}"])
+            else InterpreterConstraints([f"=={'.'.join(map(str, sys.version_info[:3]))}"])
         )
 
     def resolve(
@@ -142,6 +137,6 @@ class PluginResolver:
 
 def rules():
     return [
-        QueryRule(ResolvedPluginDistributions, [PexInterpreterConstraints]),
+        QueryRule(ResolvedPluginDistributions, [InterpreterConstraints]),
         *collect_rules(),
     ]

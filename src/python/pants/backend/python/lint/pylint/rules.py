@@ -13,9 +13,9 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -73,13 +73,13 @@ class PylintTargetSetup:
 class PylintPartition:
     field_sets: Tuple[PylintFieldSet, ...]
     targets_with_dependencies: Targets
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     plugin_targets: Targets
 
     def __init__(
         self,
         target_setups: Iterable[PylintTargetSetup],
-        interpreter_constraints: PexInterpreterConstraints,
+        interpreter_constraints: InterpreterConstraints,
         plugin_targets: Iterable[Target],
     ) -> None:
         field_sets = []
@@ -261,7 +261,7 @@ async def pylint_lint(
         request.field_sets, linted_targets, per_target_dependencies
     ):
         target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
-        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
             (
                 *(
                     tgt[InterpreterConstraintsField]

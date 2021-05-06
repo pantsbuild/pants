@@ -13,8 +13,8 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     PexResolveInfo,
@@ -109,7 +109,7 @@ async def generate_python_from_protobuf(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
         requirements=PexRequirements([python_protobuf_mypy_plugin.requirement]),
-        interpreter_constraints=PexInterpreterConstraints(
+        interpreter_constraints=InterpreterConstraints(
             python_protobuf_mypy_plugin.interpreter_constraints
         ),
     )
