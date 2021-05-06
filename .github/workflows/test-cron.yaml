@@ -482,4 +482,6 @@ jobs:
         - '3.9'
     timeout-minutes: 40
 name: Daily Extended Python Testing
-on: pull_request
+'on':
+  schedule:
+  - cron: 45 8 * * *
