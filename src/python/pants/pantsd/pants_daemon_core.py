@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import contextmanager
+from typing import Iterator
 
 from typing_extensions import Protocol
 
@@ -73,6 +75,15 @@ class PantsDaemonCore:
                 return True
             return self._services.are_all_alive()
 
+    @contextmanager
+    def _handle_exceptions(self) -> Iterator[None]:
+        try:
+            yield
+        except Exception as e:
+            self._kill_switch.set()
+            self._scheduler = None
+            raise e
+
     def _initialize(
         self,
         options_fingerprint: str,
@@ -113,9 +124,10 @@ class PantsDaemonCore:
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.
         """
 
-        build_config, options = self._options_initializer.build_config_and_options(
-            options_bootstrapper, env, raise_=True
-        )
+        with self._handle_exceptions():
+            build_config, options = self._options_initializer.build_config_and_options(
+                options_bootstrapper, env, raise_=True
+            )
 
         scheduler_restart_explanation: str | None = None
 
@@ -147,13 +159,14 @@ class PantsDaemonCore:
                 # and services.
                 bootstrap_options = options.bootstrap_option_values()
                 assert bootstrap_options is not None
-                self._initialize(
-                    options_fingerprint,
-                    bootstrap_options,
-                    build_config,
-                    dynamic_execution_options,
-                    scheduler_restart_explanation,
-                )
+                with self._handle_exceptions():
+                    self._initialize(
+                        options_fingerprint,
+                        bootstrap_options,
+                        build_config,
+                        dynamic_execution_options,
+                        scheduler_restart_explanation,
+                    )
 
             self._prior_dynamic_exec_options = dynamic_execution_options
 
