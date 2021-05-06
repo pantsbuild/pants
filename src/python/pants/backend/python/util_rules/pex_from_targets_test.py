@@ -228,9 +228,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert len(err.value.wrapped_exceptions) == 1
     assert isinstance(err.value.wrapped_exceptions[0], ValueError)
     assert (
-        "[python-setup].resolve_all_constraints is enabled, so "
-        "either [python-setup].requirement_constraints or "
-        "[python-setup].requirement_constraints_target must also be provided."
+        "`[python-setup].resolve_all_constraints` is enabled, so "
+        "`[python-setup].requirement_constraints` must also be set."
     ) in str(err.value)
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
