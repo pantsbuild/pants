@@ -21,16 +21,13 @@ NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/rust/engine" \
   -e "^rust-toolchain" \
   -e "^build-support/bin/rust" \
-  -e "^build-support/bin/generate_travis_yml.py" \
   -e "^build-support/bin/generate_github_workflows.py")
 
 NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/python/pants/VERSION" \
   -e "^src/python/pants/notes" \
   -e "^src/rust/engine/fs/fs_util" \
-  -e "^build-support/bin/release.sh" \
-  -e "^build-support/bin/packages.py" \
-  -e "^build-support/bin/generate_travis_yml.py" \
+  -e "^build-support/bin/release.py" \
   -e "^build-support/bin/generate_github_workflows.py")
 
 # To avoid putting skip labels multiple times, check if the labels already exist
