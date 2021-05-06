@@ -119,6 +119,11 @@ jobs:
         ./pants help subsystems
 
         '
+    - name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-bootstrap-linux
+        path: .pants.d/pants.log
     - name: Upload native_engine.so
       uses: actions/upload-artifact@v2
       with:

@@ -277,6 +277,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         """
                     ),
                 },
+                upload_log_artifacts(name="bootstrap-linux"),
                 native_engine_so_upload(),
                 {
                     "name": "Test and Lint Rust",
@@ -428,6 +429,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         },
                         setup_toolchain_auth(),
                         build_wheels_step(is_macos=False),
+                        upload_log_artifacts(name="wheels-linux"),
                         deploy_to_s3_step,
                     ],
                 },
@@ -446,6 +448,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         # Python version (marked via matrix.strategy).
                         *rust_caches(),
                         build_wheels_step(is_macos=True),
+                        upload_log_artifacts(name="wheels-macos"),
                         deploy_to_s3_step,
                     ],
                 },
