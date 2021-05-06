@@ -122,9 +122,7 @@ class PantsDaemonCore:
         # Because these options are computed dynamically via side-effects like reading from a file,
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
-        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(
-            options, env, local_only=False
-        )
+        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(options, env)
         exec_options_changed = dynamic_execution_options != self._prior_dynamic_exec_options
         if exec_options_changed:
             scheduler_restart_explanation = "Remote cache/execution options updated"

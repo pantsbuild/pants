@@ -144,6 +144,9 @@ class RuleRunner:
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
+        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(
+            options, self.environment
+        )
         local_store_options = LocalStoreOptions.from_options(global_options)
         if isolated_local_store:
             if root_dir:
@@ -153,10 +156,6 @@ class RuleRunner:
             else:
                 store_dir = safe_mkdtemp(prefix="lmdb_store.")
             local_store_options = dataclasses.replace(local_store_options, store_dir=store_dir)
-
-        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(
-            options, self.environment, local_only=False
-        )
 
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir

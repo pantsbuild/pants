@@ -143,7 +143,7 @@ class DynamicRemoteExecutionOptions:
 
     @classmethod
     def from_options(
-        cls, full_options: Options, env: CompleteEnvironment, *, local_only: bool
+        cls, full_options: Options, env: CompleteEnvironment, *, local_only: bool = False
     ) -> DynamicRemoteExecutionOptions:
         if local_only:
             return DynamicRemoteExecutionOptions(
