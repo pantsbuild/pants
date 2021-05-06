@@ -366,8 +366,10 @@ class JvmPlatformSettings:
         self._by_default = by_default
         self._validate_source_target()
 
-    def javac_args(self, dist_home):
+    @property
+    def javac_args(self):
         # todo support release
+        # must handle release here because source/target are mutually exclusive with release
         args = [
             "-source",
             str(self.source_level),
@@ -375,14 +377,8 @@ class JvmPlatformSettings:
             str(self.target_level),
         ]
         if self.args:
-            settings_args = self.args
-            if any("$JAVA_HOME" in a for a in self.args):
-                logger.debug(
-                    'Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'.format(dist_home)
-                )
-                settings_args = (a.replace("$JAVA_HOME", dist_home) for a in self.args)
-            args.extend(settings_args)
-        return args
+            args.extend(self.args)
+        return tuple(args)
 
     def _validate_source_target(self):
         if self.source_level > self.target_level:

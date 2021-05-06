@@ -37,7 +37,7 @@ from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
-from pants.java.distribution.distribution import DistributionLocator
+from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
@@ -495,6 +495,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     def _missing_deps_finder(self):
         dep_analyzer = JvmDependencyAnalyzer(
             get_buildroot(),
+            # NB: The analyzer doesn't use the distribution for this usecase, so passing the default
+            # is fine
             self._get_jvm_distribution(),
             self.context.products.get_data("runtime_classpath"),
         )
@@ -1120,8 +1122,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             underlying_libs = self._underlying.find_libs(names)
             return [self._rehome(l) for l in underlying_libs]
 
-        def generate_javac_args(self, *args):
-            return self._underlying.generate_javac_args(*args)
+        def generate_javac_args(self, settings):
+            return Distribution.substitute_java_home(settings.javac_args, self._home)
 
         def find_libs_path_globs(self, names):
             path_globs = []
@@ -1153,6 +1155,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         def _rehome(self, l):
             return os.path.join(self._home, self._unroot_lib_path(l))
 
+    @memoized_method
     def _get_jvm_distribution(self, settings=None):
         local_distribution = self._local_jvm_distribution(settings)
         return match(

@@ -73,12 +73,6 @@ class BaseZincCompile(JvmCompile):
         while arg_index < len(args):
             arg_index += validate(arg_index)
 
-    def _get_javac_arguments_for_platform(self, settings):
-        distribution = self._get_jvm_distribution(
-            settings
-        )  # theoretically, we could pass a settings here, or something
-        return self._format_zinc_arguments(settings, distribution)
-
     @staticmethod
     def _format_zinc_arguments(settings, distribution):
         """Extracts and formats the zinc arguments given in the jvm platform settings.
@@ -405,6 +399,10 @@ class BaseZincCompile(JvmCompile):
                 jar_file,
             ]
         )
+        # TODO pass -release X if it makes sense to do so.
+        # java >= 9, targeting 6,7,8,9, scala >= 2.12.5
+        # https://github.com/scala/scala/commit/4fd0629488dcf7219857bfda2c51bae1bc3924d1
+
         diag_out = self._diagnostics_out(ctx)
         if diag_out:
             zinc_args.extend(["-diag", diag_out])
@@ -456,7 +454,11 @@ class BaseZincCompile(JvmCompile):
             )
 
         zinc_args.extend(args)
-        zinc_args.extend(self._get_javac_arguments_for_platform(settings))
+        zinc_args.extend(
+            self._format_zinc_arguments(
+                ctx.target.platform, self._get_jvm_distribution(ctx.target.platform)
+            )
+        )
         zinc_args.append("-transactional")
 
         compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(
@@ -497,11 +499,13 @@ class BaseZincCompile(JvmCompile):
 
         self._verify_zinc_classpath(
             absolute_classpath,
-            settings,
+            self._get_jvm_distribution(ctx.target.platform),
             allow_dist=(self.execution_strategy != self.ExecutionStrategy.hermetic),
         )
         # TODO: Investigate upstream_analysis for hermetic compiles
-        self._verify_zinc_classpath(upstream_analysis.keys(), settings)
+        self._verify_zinc_classpath(
+            upstream_analysis.keys(), self._get_jvm_distribution(ctx.target.platform)
+        )
 
         zinc_args = self.create_zinc_args(
             ctx,
@@ -806,11 +810,10 @@ class BaseZincCompile(JvmCompile):
         """
         return [self._zinc.zinc.path]
 
-    def _verify_zinc_classpath(self, classpath, settings, allow_dist=True):
+    def _verify_zinc_classpath(self, classpath, dist, allow_dist=True):
         def is_outside(path, putative_parent):
             return os.path.relpath(path, putative_parent).startswith(os.pardir)
 
-        dist = self._get_jvm_distribution(settings)
         for path in classpath:
             if not os.path.isabs(path):
                 raise TaskError(

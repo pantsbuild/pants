@@ -112,7 +112,15 @@ class Distribution:
         return self._get_version(self.java)
 
     def generate_javac_args(self, settings):
-        return settings.javac_args(self.home)
+        return Distribution.substitute_java_home(settings.javac_args, self.home)
+
+    @staticmethod
+    def substitute_java_home(args, home):
+        if any("$JAVA_HOME" in a for a in args):
+            logger.debug(f'Substituting "$JAVA_HOME" with "{home}" in jvm-platform args.')
+            return (a.replace("$JAVA_HOME", home) for a in args)
+        else:
+            return args
 
     def find_libs(self, names):
         """Looks for jars in the distribution lib folder(s).

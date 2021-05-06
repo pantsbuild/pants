@@ -659,6 +659,7 @@ class BaseZincCompileIntegrationTest:
                                  sources=['A.java'])
                     jvm_binary(name='bin',
                                main='org.pantsbuild.cachetest.A',
+                               platform='seven',
                                dependencies=[':a'])
                     """
                 ),
