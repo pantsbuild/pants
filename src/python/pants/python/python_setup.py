@@ -6,55 +6,18 @@ from __future__ import annotations
 import logging
 import multiprocessing
 import os
-from enum import Enum
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
-from pants.option.errors import BooleanConversionError
-from pants.option.parser import Parser
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
-
-
-class ResolveAllConstraintsOption(Enum):
-    """When to allow re-using a resolve of an entire constraints file.
-
-    This helps avoid many repeated resolves of overlapping requirement subsets,
-    at the expense of using a larger requirement set that may be strictly necessary.
-
-    Note that use of any value other than NEVER requires --requirement-constraints to be set.
-    """
-
-    # Use the strict requirement subset always.
-    NEVER = "never"
-    # Use the strict requirement subset when building deployable binaries, but use
-    # the entire constraints file otherwise (e.g., when running tests).
-    NONDEPLOYABLES = "nondeployables"
-    # Always use the entire constraints file.
-    ALWAYS = "always"
-
-    @classmethod
-    def parse(cls, value: bool | str) -> bool:
-        try:
-            return Parser.ensure_bool(value)
-        except BooleanConversionError:
-            enum_value = cls(value)
-            bool_value = enum_value is not cls.NEVER
-            deprecated_conditional(
-                lambda: True,
-                removal_version="2.6.0.dev0",
-                entity_description="python-setup resolve_all_constraints non boolean values",
-                hint_message=f"Instead of {enum_value.value!r} use {bool_value!r}.",
-            )
-            return bool_value
 
 
 class PythonSetup(Subsystem):
@@ -94,8 +57,7 @@ class PythonSetup(Subsystem):
             "--resolve-all-constraints",
             advanced=True,
             default=True,
-            choices=(*(raco.value for raco in ResolveAllConstraintsOption), True, False),
-            type=ResolveAllConstraintsOption.parse,
+            type=bool,
             help=(
                 "If enabled, when resolving requirements, Pants will first resolve your entire "
                 "constraints file as a single global resolve. Then, if the code uses a subset of "
