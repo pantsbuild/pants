@@ -15,7 +15,7 @@ from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DynamicRemoteExecutionOptions
+from pants.option.global_options import AuthPluginResult, DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -59,7 +59,8 @@ class PantsDaemonCore:
         self._services: PantsServices | None = None
         self._fingerprint: str | None = None
 
-        self._prior_dynamic_exec_options: DynamicRemoteExecutionOptions | None = None
+        self._prior_dynamic_remote_options: DynamicRemoteOptions | None = None
+        self._prior_auth_plugin_result: AuthPluginResult | None = None
 
     def is_valid(self) -> bool:
         """Return true if the core is valid.
@@ -89,7 +90,7 @@ class PantsDaemonCore:
         options_fingerprint: str,
         bootstrap_options: OptionValueContainer,
         build_config: BuildConfiguration,
-        dynamic_execution_options: DynamicRemoteExecutionOptions,
+        dynamic_remote_options: DynamicRemoteOptions,
         scheduler_restart_explanation: str | None,
     ) -> None:
         """(Re-)Initialize the scheduler.
@@ -105,7 +106,7 @@ class PantsDaemonCore:
             if self._services:
                 self._services.shutdown()
             self._scheduler = EngineInitializer.setup_graph(
-                bootstrap_options, build_config, dynamic_execution_options, self._executor
+                bootstrap_options, build_config, dynamic_remote_options, self._executor
             )
 
             self._services = self._services_constructor(bootstrap_options, self._scheduler)
@@ -134,9 +135,11 @@ class PantsDaemonCore:
         # Because these options are computed dynamically via side-effects like reading from a file,
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
-        dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(options, env)
-        exec_options_changed = dynamic_execution_options != self._prior_dynamic_exec_options
-        if exec_options_changed:
+        dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(
+            options, env, self._prior_auth_plugin_result
+        )
+        remote_options_changed = dynamic_remote_options != self._prior_dynamic_remote_options
+        if remote_options_changed:
             scheduler_restart_explanation = "Remote cache/execution options updated"
 
         # Compute the fingerprint of the bootstrap options. Note that unlike
@@ -164,11 +167,12 @@ class PantsDaemonCore:
                         options_fingerprint,
                         bootstrap_options,
                         build_config,
-                        dynamic_execution_options,
+                        dynamic_remote_options,
                         scheduler_restart_explanation,
                     )
 
-            self._prior_dynamic_exec_options = dynamic_execution_options
+            self._prior_dynamic_remote_options = dynamic_remote_options
+            self._prior_auth_plugin_result = auth_plugin_result
 
             assert self._scheduler is not None
             return self._scheduler, self._options_initializer

@@ -13,23 +13,19 @@ from pants.base.build_environment import get_buildroot
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import (
-    DynamicRemoteExecutionOptions,
-    ExecutionOptions,
-    GlobalOptions,
-)
+from pants.option.global_options import DynamicRemoteOptions, ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import temporary_dir
 
 
-def create_dynamic_execution_options(
+def create_dynamic_remote_options(
     *,
     initial_headers: dict[str, str],
     token_path: str | None = None,
     plugin: str | None = None,
     local_only: bool = False,
-) -> DynamicRemoteExecutionOptions:
+) -> DynamicRemoteOptions:
     args = [
         "--remote-cache-read",
         "--remote-execution-address=grpc://fake.url:10",
@@ -45,34 +41,34 @@ def create_dynamic_execution_options(
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironment({})
     _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
-    return DynamicRemoteExecutionOptions.from_options(options, env, local_only=local_only)
+    return DynamicRemoteOptions.from_options(options, env, local_only=local_only)[0]
 
 
-def test_dynamic_execution_options_remote_oauth_bearer_token_path() -> None:
+def test_dynamic_remote_options_oauth_bearer_token_path() -> None:
     with temporary_dir() as tempdir:
         token_path = Path(tempdir, "token.txt")
         token_path.touch()
         token_path.write_text("my-token")
-        exec_options = create_dynamic_execution_options(
+        opts = create_dynamic_remote_options(
             initial_headers={"foo": "bar"}, token_path=str(token_path)
         )
-    assert exec_options.remote_store_headers == {"authorization": "Bearer my-token", "foo": "bar"}
-    assert exec_options.remote_execution_headers == {
+    assert opts.remote_store_headers == {"authorization": "Bearer my-token", "foo": "bar"}
+    assert opts.remote_execution_headers == {
         "authorization": "Bearer my-token",
         "foo": "bar",
     }
 
 
-def test_dynamic_execution_options_local_only() -> None:
+def test_dynamic_remote_options_local_only() -> None:
     # Test that local_only properly disables remote execution.
     assert (
-        create_dynamic_execution_options(initial_headers={}, local_only=True)
-        == DynamicRemoteExecutionOptions.disabled()
+        create_dynamic_remote_options(initial_headers={}, local_only=True)
+        == DynamicRemoteOptions.disabled()
     )
 
 
-def test_dynamic_execution_options_auth_plugin() -> None:
-    def compute_exec_options(state: str) -> DynamicRemoteExecutionOptions:
+def test_dynamic_remote_options_auth_plugin() -> None:
+    def compute_options(state: str) -> DynamicRemoteOptions:
         with temporary_dir() as tempdir:
             # NB: For an unknown reason, if we use the same file name for multiple runs, the plugin
             # result gets memoized. So, we use a distinct file name.
@@ -101,25 +97,25 @@ def test_dynamic_execution_options_auth_plugin() -> None:
                 )
             )
             sys.path.append(tempdir)
-            result = create_dynamic_execution_options(
+            result = create_dynamic_remote_options(
                 initial_headers={"foo": "bar"}, plugin=f"auth_plugin_{state}:auth_func"
             )
             sys.path.pop()
             return result
 
-    exec_options = compute_exec_options("OK")
-    assert exec_options.remote_store_headers == {
+    opts = compute_options("OK")
+    assert opts.remote_store_headers == {
         "store": "abc",
         "foo": "baz",
         "store_url": "grpc://fake.url:10",
     }
-    assert exec_options.remote_execution_headers == {"exec": "xyz", "foo": "baz"}
-    assert exec_options.remote_cache_read is True
-    assert exec_options.remote_instance_name == "custom_instance"
+    assert opts.remote_execution_headers == {"exec": "xyz", "foo": "baz"}
+    assert opts.remote_cache_read is True
+    assert opts.remote_instance_name == "custom_instance"
 
-    exec_options = compute_exec_options("UNAVAILABLE")
-    assert exec_options.remote_cache_read is False
-    assert exec_options.remote_instance_name == "main"
+    opts = compute_options("UNAVAILABLE")
+    assert opts.remote_cache_read is False
+    assert opts.remote_instance_name == "main"
 
 
 def test_execution_options_remote_addresses() -> None:
@@ -138,7 +134,7 @@ def test_execution_options_remote_addresses() -> None:
             ob, CompleteEnvironment({}), raise_=False
         )
         return ExecutionOptions.from_options(
-            options.for_global_scope(), DynamicRemoteExecutionOptions.disabled()
+            options.for_global_scope(), DynamicRemoteOptions.disabled()
         )
 
     host = "fake-with-http-in-url.com:10"

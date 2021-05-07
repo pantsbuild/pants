@@ -11,6 +11,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, cast
@@ -113,6 +114,7 @@ class AuthPluginResult:
     store_headers: dict[str, str]
     execution_headers: dict[str, str]
     instance_name: str | None = None
+    expiration: datetime | None = None
 
     @property
     def is_available(self) -> bool:
@@ -120,7 +122,7 @@ class AuthPluginResult:
 
 
 @dataclass(frozen=True)
-class DynamicRemoteExecutionOptions:
+class DynamicRemoteOptions:
     """Options related to remote execution of processes which are computed dynamically."""
 
     remote_execution: bool
@@ -131,8 +133,8 @@ class DynamicRemoteExecutionOptions:
     remote_execution_headers: dict[str, str]
 
     @classmethod
-    def disabled(cls) -> DynamicRemoteExecutionOptions:
-        return DynamicRemoteExecutionOptions(
+    def disabled(cls) -> DynamicRemoteOptions:
+        return DynamicRemoteOptions(
             remote_execution=False,
             remote_cache_read=False,
             remote_cache_write=False,
@@ -143,10 +145,15 @@ class DynamicRemoteExecutionOptions:
 
     @classmethod
     def from_options(
-        cls, full_options: Options, env: CompleteEnvironment, *, local_only: bool = False
-    ) -> DynamicRemoteExecutionOptions:
+        cls,
+        full_options: Options,
+        env: CompleteEnvironment,
+        prior_result: AuthPluginResult | None = None,
+        *,
+        local_only: bool = False,
+    ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
         if local_only:
-            return DynamicRemoteExecutionOptions(
+            disabled_opts = DynamicRemoteOptions(
                 remote_execution=False,
                 remote_cache_read=False,
                 remote_cache_write=False,
@@ -154,6 +161,7 @@ class DynamicRemoteExecutionOptions:
                 remote_store_headers={},
                 remote_execution_headers={},
             )
+            return disabled_opts, None
 
         bootstrap_options = full_options.bootstrap_option_values()
         assert bootstrap_options is not None
@@ -179,6 +187,7 @@ class DynamicRemoteExecutionOptions:
             remote_execution_headers.update(token_header)
             remote_store_headers.update(token_header)
 
+        auth_plugin_result: AuthPluginResult | None = None
         if (
             bootstrap_options.remote_auth_plugin
             and bootstrap_options.remote_auth_plugin.strip()
@@ -200,6 +209,7 @@ class DynamicRemoteExecutionOptions:
                     initial_store_headers=remote_store_headers,
                     options=full_options,
                     env=dict(env),
+                    prior_result=prior_result,
                 ),
             )
             if not auth_plugin_result.is_available:
@@ -228,7 +238,7 @@ class DynamicRemoteExecutionOptions:
                     )
                     remote_instance_name = auth_plugin_result.instance_name
 
-        return DynamicRemoteExecutionOptions(
+        opts = DynamicRemoteOptions(
             remote_execution=remote_execution,
             remote_cache_read=remote_cache_read,
             remote_cache_write=remote_cache_write,
@@ -236,6 +246,7 @@ class DynamicRemoteExecutionOptions:
             remote_store_headers=remote_store_headers,
             remote_execution_headers=remote_execution_headers,
         )
+        return opts, auth_plugin_result
 
 
 @dataclass(frozen=True)
@@ -277,7 +288,7 @@ class ExecutionOptions:
     def from_options(
         cls,
         bootstrap_options: OptionValueContainer,
-        dynamic_execution_options: DynamicRemoteExecutionOptions,
+        dynamic_remote_options: DynamicRemoteOptions,
     ) -> ExecutionOptions:
         # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
         # We validate that users set `grpc` and `grpcs` in the options system for clarity, but then
@@ -295,11 +306,11 @@ class ExecutionOptions:
 
         return cls(
             # Remote execution strategy.
-            remote_execution=dynamic_execution_options.remote_execution,
-            remote_cache_read=dynamic_execution_options.remote_cache_read,
-            remote_cache_write=dynamic_execution_options.remote_cache_write,
+            remote_execution=dynamic_remote_options.remote_execution,
+            remote_cache_read=dynamic_remote_options.remote_cache_read,
+            remote_cache_write=dynamic_remote_options.remote_cache_write,
             # General remote setup.
-            remote_instance_name=dynamic_execution_options.remote_instance_name,
+            remote_instance_name=dynamic_remote_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
             process_execution_local_cache=bootstrap_options.process_execution_local_cache,
@@ -309,7 +320,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
-            remote_store_headers=dynamic_execution_options.remote_store_headers,
+            remote_store_headers=dynamic_remote_options.remote_store_headers,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
@@ -319,7 +330,7 @@ class ExecutionOptions:
             # Remote execution setup.
             remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=dynamic_execution_options.remote_execution_headers,
+            remote_execution_headers=dynamic_remote_options.remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
         )
 
@@ -1052,9 +1063,10 @@ class GlobalOptions(Subsystem):
                 "options.\n\n"
                 "Format: `path.to.module:my_func`. Pants will import your module and run your "
                 "function. Update the `--pythonpath` option to ensure your file is loadable.\n\n"
-                "The function should take the kwargs `initial_store_headers: Dict[str, str]`, "
-                "`initial_execution_headers: Dict[str, str]`, and `options: Options` (from "
-                "pants.option.options). It should return an instance of "
+                "The function should take the kwargs `initial_store_headers: dict[str, str]`, "
+                "`initial_execution_headers: dict[str, str]`, `options: Options` (from "
+                "pants.option.options), `env: dict[str, str]`, and "
+                "`prior_result: AuthPluginResult | None`. It should return an instance of "
                 "`AuthPluginResult` from `pants.option.global_options`.\n\n"
                 "Pants will replace the headers it would normally use with whatever your plugin "
                 "returns; usually, you should include the `initial_store_headers` and "
@@ -1063,7 +1075,11 @@ class GlobalOptions(Subsystem):
                 "If you return `instance_name`, Pants will replace `--remote-instance-name` "
                 "with this value.\n\n"
                 "If the returned auth state is AuthPluginState.UNAVAILABLE, Pants will disable "
-                "remote caching and execution."
+                "remote caching and execution.\n\n"
+                "If Pantsd is in use, `prior_result` will be the previous "
+                "`AuthPluginResult` returned by your plugin, which allows you to reuse the result. "
+                "Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will "
+                "be `None`."
             ),
         )
 
