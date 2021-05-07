@@ -106,7 +106,7 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
 def warn_or_error(
     removal_version: str,
     entity: str,
-    hint: Optional[str] = None,
+    hint: str | None,
     *,
     start_version: str | None = None,
     print_warning: bool = True,
