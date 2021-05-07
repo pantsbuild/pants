@@ -99,7 +99,6 @@ class DaemonPantsRunner:
         self,
         args: Tuple[str, ...],
         env: Dict[str, str],
-        working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
     ) -> ExitCode:
         """Run a single daemonized run of Pants.
@@ -165,8 +164,6 @@ class DaemonPantsRunner:
                     stdout_fileno=stdout_fileno,
                     stderr_fileno=stderr_fileno,
                 ):
-                    return self.single_daemonized_run(
-                        ((command,) + args), env, working_directory.decode(), cancellation_latch
-                    )
+                    return self.single_daemonized_run(((command,) + args), env, cancellation_latch)
             finally:
                 logger.info(f"request completed: `{' '.join(args)}`")
