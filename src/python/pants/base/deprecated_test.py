@@ -28,7 +28,7 @@ FUTURE_VERSION = "9999.9.9.dev0"
 
 
 def test_deprecated_function(caplog) -> None:
-    @deprecated(FUTURE_VERSION, hint_message="A hint!")
+    @deprecated(FUTURE_VERSION, "A hint!")
     def deprecated_function():
         return "some val"
 
@@ -77,18 +77,18 @@ def test_deprecated_function_invalid() -> None:
 
 def test_deprecated_conditional(caplog) -> None:
     assert not caplog.records
-    deprecated_conditional(lambda: True, FUTURE_VERSION, "deprecated entity")
+    deprecated_conditional(lambda: True, FUTURE_VERSION, "deprecated entity", None)
     assert len(caplog.records) == 1
     assert "deprecated entity" in caplog.text
 
     caplog.clear()
-    deprecated_conditional(lambda: False, FUTURE_VERSION, "deprecated entity")
+    deprecated_conditional(lambda: False, FUTURE_VERSION, "deprecated entity", None)
     assert not caplog.records
 
 
 def test_deprecated_module(caplog) -> None:
     assert not caplog.records
-    deprecated_module(FUTURE_VERSION, hint_message="Do not use me.")
+    deprecated_module(FUTURE_VERSION, hint="Do not use me.")
     assert len(caplog.records) == 1
     assert "module will be removed" in caplog.text
     assert "Do not use me" in caplog.text
@@ -96,7 +96,7 @@ def test_deprecated_module(caplog) -> None:
 
 def test_removal_version_bad() -> None:
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error("a.a.a", "dummy description")
+        warn_or_error("a.a.a", "fake description", None)
 
     with pytest.raises(BadSemanticVersionError):
 
@@ -105,7 +105,7 @@ def test_removal_version_bad() -> None:
             pass
 
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error(1.0, "dummy description")  # type: ignore[arg-type]
+        warn_or_error(1.0, "fake description", None)  # type: ignore[arg-type]
 
     with pytest.raises(BadSemanticVersionError):
 
@@ -114,7 +114,7 @@ def test_removal_version_bad() -> None:
             pass
 
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error("1.a.0", "dummy description")
+        warn_or_error("1.a.0", "fake description", None)
 
     with pytest.raises(BadSemanticVersionError):
 
@@ -132,7 +132,7 @@ def test_removal_version_bad() -> None:
 @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
 def test_removal_version_same() -> None:
     with pytest.raises(CodeRemovedError):
-        warn_or_error(_FAKE_CUR_VERSION, "dummy description")
+        warn_or_error(_FAKE_CUR_VERSION, "fake description", None)
 
     @deprecated(_FAKE_CUR_VERSION)
     def test_func():
@@ -144,7 +144,7 @@ def test_removal_version_same() -> None:
 
 def test_removal_version_lower() -> None:
     with pytest.raises(CodeRemovedError):
-        warn_or_error("0.0.27.dev0", "dummy description")
+        warn_or_error("0.0.27.dev0", "fake description", None)
 
     @deprecated("0.0.27.dev0")
     def test_func():
@@ -156,17 +156,11 @@ def test_removal_version_lower() -> None:
 
 def test_deprecation_start_version_validation() -> None:
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error(
-            removal_version="1.0.0.dev0",
-            deprecated_entity_description="dummy",
-            deprecation_start_version="1.a.0",
-        )
+        warn_or_error(removal_version="1.0.0.dev0", entity="fake", hint=None, start_version="1.a.0")
 
     with pytest.raises(InvalidSemanticVersionOrderingError):
         warn_or_error(
-            removal_version="0.0.0.dev0",
-            deprecated_entity_description="dummy",
-            deprecation_start_version="1.0.0.dev0",
+            removal_version="0.0.0.dev0", entity="fake", hint=None, start_version="1.0.0.dev0"
         )
 
 
@@ -174,16 +168,15 @@ def test_deprecation_start_version_validation() -> None:
 def test_deprecation_start_period(caplog) -> None:
     with pytest.raises(CodeRemovedError):
         warn_or_error(
-            removal_version=_FAKE_CUR_VERSION,
-            deprecated_entity_description="demo",
-            deprecation_start_version="1.0.0.dev0",
+            removal_version=_FAKE_CUR_VERSION, entity="demo", hint=None, start_version="1.0.0.dev0"
         )
 
     caplog.clear()
     warn_or_error(
         removal_version="999.999.999.dev999",
-        deprecated_entity_description="demo",
-        deprecation_start_version=_FAKE_CUR_VERSION,
+        entity="demo",
+        hint=None,
+        start_version=_FAKE_CUR_VERSION,
     )
     assert len(caplog.records) == 1
     assert "DEPRECATED: demo will be removed in version 999.999.999.dev999." in caplog.text
@@ -227,6 +220,6 @@ def test_resolve_conflicting_options() -> None:
 
 
 def test_is_deprecation_active() -> None:
-    assert is_deprecation_active(deprecation_start_version=None)
-    assert is_deprecation_active(deprecation_start_version="1.0.0")
-    assert not is_deprecation_active(deprecation_start_version=FUTURE_VERSION)
+    assert is_deprecation_active(start_version=None)
+    assert is_deprecation_active(start_version="1.0.0")
+    assert not is_deprecation_active(start_version=FUTURE_VERSION)

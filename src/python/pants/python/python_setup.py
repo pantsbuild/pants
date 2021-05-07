@@ -50,9 +50,9 @@ class ResolveAllConstraintsOption(Enum):
             bool_value = enum_value is not cls.NEVER
             deprecated_conditional(
                 lambda: True,
-                removal_version="2.6.0.dev0",
-                entity_description="python-setup resolve_all_constraints non boolean values",
-                hint_message=f"Instead of {enum_value.value!r} use {bool_value!r}.",
+                "2.6.0.dev0",
+                entity="python-setup resolve_all_constraints non boolean values",
+                hint=f"Instead of {enum_value.value!r} use {bool_value!r}.",
             )
             return bool_value
 

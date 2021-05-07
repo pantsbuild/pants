@@ -205,7 +205,7 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)
-                if not field.alias.startswith("_") and field.deprecated_removal_version is None
+                if not field.alias.startswith("_") and field.removal_version is None
             ),
         )
 
@@ -269,7 +269,7 @@ class HelpInfoExtracter:
         name_to_target_type_info = {
             alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
             for alias, target_type in registered_target_types.aliases_to_types.items()
-            if not alias.startswith("_") and target_type.deprecated_removal_version is None
+            if not alias.startswith("_") and target_type.removal_version is None
         }
 
         return AllHelpInfo(
