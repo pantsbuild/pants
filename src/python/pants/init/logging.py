@@ -135,7 +135,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     print_stacktrace = global_bootstrap_options.print_stacktrace
 
     literal_filters = []
-    regex_filters = cast("list[str]", global_bootstrap_options.ignore_pants_warnings)
+    regex_filters = []
     for filt in cast("list[str]", global_bootstrap_options.ignore_warnings):
         if filt.startswith("$regex$"):
             regex_filters.append(strip_prefix(filt, "$regex$"))
