@@ -156,9 +156,7 @@ def test_removal_version_lower() -> None:
 
 def test_deprecation_start_version_validation() -> None:
     with pytest.raises(BadSemanticVersionError):
-        warn_or_error(
-            removal_version="1.0.0.dev0", entity="fake", hint=None, start_version="1.a.0"
-        )
+        warn_or_error(removal_version="1.0.0.dev0", entity="fake", hint=None, start_version="1.a.0")
 
     with pytest.raises(InvalidSemanticVersionOrderingError):
         warn_or_error(
