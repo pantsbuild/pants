@@ -3,15 +3,14 @@
 
 import unittest
 
-from pants.base.exceptions import BuildConfigurationError
 from pants.engine.environment import CompleteEnvironment
+from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.errors import OptionsError
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class OptionsInitializerTest(unittest.TestCase):
-    def test_invalid_version(self):
+    def test_invalid_version(self) -> None:
         options_bootstrapper = OptionsBootstrapper.create(
             env={},
             args=["--backend-packages=[]", "--pants-version=99.99.9999"],
@@ -19,17 +18,17 @@ class OptionsInitializerTest(unittest.TestCase):
         )
 
         env = CompleteEnvironment({})
-        with self.assertRaises(BuildConfigurationError):
-            OptionsInitializer(options_bootstrapper, env).build_config_and_options(
+        with self.assertRaises(ExecutionError):
+            OptionsInitializer(options_bootstrapper).build_config_and_options(
                 options_bootstrapper, env, raise_=True
             )
 
-    def test_global_options_validation(self):
+    def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
             env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
         )
         env = CompleteEnvironment({})
-        with self.assertRaises(OptionsError) as exc:
-            OptionsInitializer(ob, env).build_config_and_options(ob, env, raise_=True)
+        with self.assertRaises(ExecutionError) as exc:
+            OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
         self.assertIn("The `--remote-execution` option requires", str(exc.exception))
