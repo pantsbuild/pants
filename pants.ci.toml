@@ -27,6 +27,7 @@ org = "pantsbuild"
 ci_env_variables = [
   "TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL",
   "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_SHA", "GITHUB_REPOSITORY",
+  "GITHUB_WORKFLOW", "GITHUB_JOB",  # Temporary, just to help debugging issue w/ restricted tokens on scehduled builds
 ]
 restricted_token_matches =  """{
   'GITHUB_REPOSITORY': 'pantsbuild/pants', 
