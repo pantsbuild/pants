@@ -8,7 +8,7 @@ from typing import Callable, Optional, TextIO
 from colors import blue, cyan, green, magenta, red, yellow
 
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.rules import side_effecting
+from pants.engine.util import side_effecting
 
 
 @side_effecting
