@@ -1,8 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import glob
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -149,25 +152,28 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             """
         )
         with self.pantsd_successful_run_context() as ctx:
-            # This very hackily traverses up to the process's parent directory, rather than the
-            # workdir.
-            plugin_dir = Path(ctx.workdir).parent.parent / "auth_plugin"
-            plugin_dir.mkdir(parents=True, exist_ok=True)
-            (plugin_dir / "__init__.py").touch()
-            (plugin_dir / "auth.py").write_text(plugin)
 
             def run_auth_plugin() -> tuple[str, int]:
+                # This very hackily traverses up to the process's parent directory, rather than the
+                # workdir.
+                plugin_dir = Path(ctx.workdir).parent.parent / "auth_plugin"
+                plugin_dir.mkdir(parents=True, exist_ok=True)
+                (plugin_dir / "__init__.py").touch()
+                (plugin_dir / "auth.py").write_text(plugin)
                 sys.path.append(str(plugin_dir))
-                result = ctx.runner(
-                    [
-                        "--pythonpath=auth_plugin",
-                        "--remote-auth-plugin=auth_plugin.auth:auth_func",
-                        "--remote-cache-read",
-                        "--remote-store-address=grpc://fake",
-                        "help",
-                    ]
-                )
-                sys.path.pop()
+                try:
+                    result = ctx.runner(
+                        [
+                            "--pythonpath=auth_plugin",
+                            "--remote-auth-plugin=auth_plugin.auth:auth_func",
+                            "--remote-cache-read",
+                            "--remote-store-address=grpc://fake",
+                            "help",
+                        ]
+                    )
+                finally:
+                    sys.path.pop()
+                    shutil.rmtree(plugin_dir)
                 return result.stderr, ctx.checker.assert_started()
 
             first_stderr, first_pid = run_auth_plugin()
