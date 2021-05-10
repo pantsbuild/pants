@@ -530,24 +530,6 @@ class GlobalOptions(Subsystem):
                 "  ]"
             ),
         )
-        register(
-            "--ignore-pants-warnings",
-            type=list,
-            member_type=str,
-            default=[],
-            daemon=True,
-            advanced=True,
-            help="Regexps matching warning strings to ignore, e.g. "
-            '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
-            "matched from the start of the warning string, and are case-insensitive.",
-            removal_version="2.6.0.dev0",
-            removal_hint=(
-                "Use the global option `--ignore-warnings` instead.\n\nUnlike this option, "
-                "`--ignore-warnings` uses literal string matches instead of regex patterns by "
-                "default. If you would still like to use a regex pattern, prefix the string with "
-                "`$regex$`."
-            ),
-        )
 
         register(
             "--pants-version",

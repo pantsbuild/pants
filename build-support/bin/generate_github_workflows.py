@@ -338,6 +338,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "timeout-minutes": 40,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},

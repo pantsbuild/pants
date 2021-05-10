@@ -118,8 +118,8 @@ class Field:
     required: ClassVar[bool] = False
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[str | None] = None
-    deprecated_removal_hint: ClassVar[str | None] = None
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
 
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
@@ -143,20 +143,17 @@ class Field:
 
     @classmethod
     def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.deprecated_removal_version or address.is_file_target or raw_value is None:
+        if not cls.removal_version or address.is_file_target or raw_value is None:
             return
-        if not cls.deprecated_removal_hint:
+        if not cls.removal_hint:
             raise ValueError(
-                f"You specified `deprecated_removal_version` for {cls}, but not "
-                "the class property `deprecated_removal_hint`."
+                f"You specified `removal_version` for {cls}, but not the class property "
+                "`removal_hint`."
             )
         warn_or_error(
-            removal_version=cls.deprecated_removal_version,
-            deprecated_entity_description=f"the {repr(cls.alias)} field",
-            hint=(
-                f"Using the `{cls.alias}` field in the target {address}. "
-                f"{cls.deprecated_removal_hint}"
-            ),
+            cls.removal_version,
+            entity=f"the {repr(cls.alias)} field",
+            hint=(f"Using the `{cls.alias}` field in the target {address}. " f"{cls.removal_hint}"),
         )
 
     def __repr__(self) -> str:
@@ -280,8 +277,8 @@ class Target:
     help: ClassVar[str]
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[str | None] = None
-    deprecated_removal_hint: ClassVar[str | None] = None
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
 
     # These get calculated in the constructor
     address: Address
@@ -299,18 +296,17 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
     ) -> None:
-        if self.deprecated_removal_version and not address.is_file_target:
-            if not self.deprecated_removal_hint:
+        if self.removal_version and not address.is_file_target:
+            if not self.removal_hint:
                 raise ValueError(
-                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
-                    "the class property `deprecated_removal_hint`."
+                    f"You specified `removal_version` for {self.__class__}, but not "
+                    "the class property `removal_hint`."
                 )
             warn_or_error(
-                removal_version=self.deprecated_removal_version,
-                deprecated_entity_description=f"the {repr(self.alias)} target type",
+                self.removal_version,
+                entity=f"the {repr(self.alias)} target type",
                 hint=(
-                    f"Using the `{self.alias}` target type for {address}. "
-                    f"{self.deprecated_removal_hint}"
+                    f"Using the `{self.alias}` target type for {address}. " f"{self.removal_hint}"
                 ),
             )
 
