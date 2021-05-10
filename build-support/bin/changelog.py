@@ -10,8 +10,7 @@ from textwrap import dedent
 from typing import List
 
 from common import die
-
-from pants.version import MAJOR_MINOR
+from packaging.version import Version
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -31,11 +30,15 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def determine_release_branch(new_version: str) -> str:
-    new_version_major_minor = ".".join(new_version.split(".")[:2])
-    release_branch = (
-        "main" if new_version_major_minor == MAJOR_MINOR else f"{new_version_major_minor}.x"
+def determine_release_branch(new_version_str: str) -> str:
+    new_version = Version(new_version_str)
+    # Use the main branch for all dev releases, and for the first rc (which creates a stable branch).
+    use_main_branch = new_version.is_devrelease or (
+        new_version.pre
+        and "rc0" == "".join(str(p) for p in new_version.pre)
+        and new_version.micro == 0
     )
+    release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
     branch_confirmation = input(
         f"Have you recently pulled from upstream on the branch `{release_branch}`? "
         "This is needed to ensure the changelog is exhaustive. [Y/n]"
