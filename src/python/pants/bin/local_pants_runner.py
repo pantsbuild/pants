@@ -33,7 +33,7 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
 from pants.option.arg_splitter import HelpRequest
-from pants.option.global_options import DynamicRemoteExecutionOptions
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -76,11 +76,11 @@ class LocalPantsRunner:
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
         if scheduler is None:
-            dynamic_execution_options = DynamicRemoteExecutionOptions.from_options(options, env)
+            dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, env)
             bootstrap_options = options.bootstrap_option_values()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
-                bootstrap_options, build_config, dynamic_execution_options
+                bootstrap_options, build_config, dynamic_remote_options
             )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()

@@ -31,7 +31,7 @@ from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
-    DynamicRemoteExecutionOptions,
+    DynamicRemoteOptions,
     ExecutionOptions,
     GlobalOptions,
     LocalStoreOptions,
@@ -170,14 +170,12 @@ class EngineInitializer:
     def setup_graph(
         bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
-        dynamic_execution_options: DynamicRemoteExecutionOptions,
+        dynamic_remote_options: DynamicRemoteOptions,
         executor: PyExecutor | None = None,
     ) -> GraphScheduler:
         build_root = get_buildroot()
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
-        execution_options = ExecutionOptions.from_options(
-            bootstrap_options, dynamic_execution_options
-        )
+        execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
