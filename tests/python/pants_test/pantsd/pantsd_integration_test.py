@@ -1,12 +1,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import glob
 import os
+import shutil
 import signal
+import sys
 import threading
 import time
 import unittest
+from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional
 
@@ -99,8 +104,91 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 ctx.runner([f"--pantsd-invalidation-globs=ridiculous{idx}", "help"])
                 next_pid = ctx.checker.assert_started()
                 if last_pid is not None:
-                    self.assertNotEqual(last_pid, next_pid)
+                    assert last_pid != next_pid
                 last_pid = next_pid
+
+    def test_pantsd_lifecycle_invalidation_from_auth_plugin(self) -> None:
+        """If the dynamic remote options changed, we should reinitialize the scheduler but not
+        restart the daemon."""
+        plugin = dedent(
+            """\
+            from datetime import datetime
+            from pants.option.global_options import AuthPluginState, AuthPluginResult
+
+            def auth_func(
+                initial_execution_headers, initial_store_headers, options, env, prior_result
+            ):
+                # If the first run, don't change the headers, but use the `expiration` as a
+                # sentinel so that future runs know to change it.
+                if prior_result is None:
+                    return AuthPluginResult(
+                        state=AuthPluginState.OK,
+                        execution_headers=initial_execution_headers,
+                        store_headers=initial_store_headers,
+                        expiration=datetime.min,
+                    )
+
+                # If second run, still don't change the headers, but update the `expiration` as a
+                # sentinel for the next run.
+                if prior_result.expiration == datetime.min:
+                    return AuthPluginResult(
+                        state=AuthPluginState.OK,
+                        execution_headers=initial_execution_headers,
+                        store_headers=initial_store_headers,
+                        expiration=datetime.max,
+                    )
+
+                # Finally, on the third run, change the headers.
+                if prior_result.expiration == datetime.max:
+                    return AuthPluginResult(
+                        state=AuthPluginState.OK,
+                        execution_headers={"custom": "foo"},
+                        store_headers=initial_store_headers,
+                    )
+
+                # If there was a fourth run, or `prior_result` didn't preserve the `expiration`
+                # field properly, error.
+                raise AssertionError(f"Unexpected prior_result: {prior_result}")
+            """
+        )
+        with self.pantsd_successful_run_context() as ctx:
+
+            def run_auth_plugin() -> tuple[str, int]:
+                # This very hackily traverses up to the process's parent directory, rather than the
+                # workdir.
+                plugin_dir = Path(ctx.workdir).parent.parent / "auth_plugin"
+                plugin_dir.mkdir(parents=True, exist_ok=True)
+                (plugin_dir / "__init__.py").touch()
+                (plugin_dir / "auth.py").write_text(plugin)
+                sys.path.append(str(plugin_dir))
+                try:
+                    result = ctx.runner(
+                        [
+                            "--pythonpath=auth_plugin",
+                            "--remote-auth-plugin=auth_plugin.auth:auth_func",
+                            "--remote-cache-read",
+                            "--remote-store-address=grpc://fake",
+                            "help",
+                        ]
+                    )
+                finally:
+                    sys.path.pop()
+                    shutil.rmtree(plugin_dir)
+                return result.stderr, ctx.checker.assert_started()
+
+            first_stderr, first_pid = run_auth_plugin()
+            assert (
+                "Initializing scheduler" in first_stderr
+                or "reinitializing scheduler" in first_stderr
+            )
+
+            second_stderr, second_pid = run_auth_plugin()
+            assert "reinitializing scheduler" not in second_stderr
+            assert first_pid == second_pid
+
+            third_stderr, third_pid = run_auth_plugin()
+            assert "reinitializing scheduler" in third_stderr
+            assert second_pid == third_pid
 
     def test_pantsd_lifecycle_non_invalidation(self):
         with self.pantsd_successful_run_context() as ctx:

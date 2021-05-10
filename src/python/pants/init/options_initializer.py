@@ -24,7 +24,7 @@ from pants.init.extension_loader import (
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.errors import UnknownFlagsError
-from pants.option.global_options import DynamicRemoteExecutionOptions
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -74,7 +74,7 @@ def create_bootstrap_scheduler(
         EngineInitializer.setup_graph(
             options_bootstrapper.bootstrap_options.for_global_scope(),
             bc_builder.create(),
-            DynamicRemoteExecutionOptions.disabled(),
+            DynamicRemoteOptions.disabled(),
             executor,
         ).scheduler
     )
