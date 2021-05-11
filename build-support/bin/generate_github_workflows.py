@@ -251,6 +251,7 @@ def upload_log_artifacts(name: str) -> Step:
     return {
         "name": "Upload pants.log",
         "uses": "actions/upload-artifact@v2",
+        "if": "always()",
         "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
     }
 

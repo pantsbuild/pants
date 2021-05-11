@@ -318,7 +318,8 @@ jobs:
         ./pants lint typecheck ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-lint
@@ -393,7 +394,8 @@ jobs:
       run: './pants test ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-python-test-linux
@@ -470,7 +472,8 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-python-test-macos
