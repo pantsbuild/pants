@@ -74,6 +74,23 @@ root_patterns = [
 requirement_constraints = "3rdparty/python/constraints.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 
+[black]
+extra_requirements.add = [
+  # Black 20.8b1 depends on click >=7.1.2 and the click 8.0.0 release
+  # break Pants CI complaining about:
+  #
+  # RuntimeError: Click will abort further execution because Python was configured to use ASCII
+  #   as encoding for the environment. Consult https://click.palletsprojects.com/unicode-support/
+  #   for mitigation steps.
+  #
+  # This system supports the C.UTF-8 locale which is recommended. You might be able to resolve your
+  #   issue by exporting the following environment variables:
+  #
+  #     export LC_ALL=C.UTF-8
+  #     export LANG=C.UTF-8
+  "click==7.1.2"
+]
+
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
