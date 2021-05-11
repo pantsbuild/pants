@@ -19,7 +19,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -115,6 +115,9 @@ async def parse_shell_imports(
             input_digest=input_digest,
             description=f"Detect Shell imports for {request.fp}",
             level=LogLevel.DEBUG,
+            # We expect this to always fail, but it should still be cached because the process is
+            # deterministic.
+            cache_scope=ProcessCacheScope.ALWAYS,
         ),
     )
 
