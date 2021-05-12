@@ -1,8 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# NB: You must use lowercase and replace all `_` and `.` with `-` for the requirement's name.
-# See https://www.python.org/dev/peps/pep-0503/#normalized-names.
+# NB: The project names must follow the naming scheme at
+#  https://www.python.org/dev/peps/pep-0503/#normalized-names.
 DEFAULT_MODULE_MAPPING = {
     "ansicolors": ("colors",),
     "apache-airflow": ("airflow",),
