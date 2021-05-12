@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import json
 from textwrap import dedent
 from typing import Optional
@@ -88,3 +89,38 @@ def test_run_sample_script(
         pex_info = json.loads(result.stdout)
         assert (execution_mode is PexExecutionMode.UNZIP) == pex_info["unzip"]
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
+        assert pex_info["strip_pex_env"] is False
+
+
+def test_no_strip_pex_env_issues_12057() -> None:
+    sources = {
+        "src/app.py": dedent(
+            """\
+            import os
+            import sys
+
+
+            if __name__ == "__main__":
+                exit_code = os.environ.get("PANTS_ISSUES_12057")
+                if exit_code is None:
+                    os.environ["PANTS_ISSUES_12057"] = "42"
+                    os.execv(sys.executable, [sys.executable, *sys.argv])
+                sys.exit(int(exit_code))
+            """
+        ),
+        "src/BUILD": dedent(
+            """\
+            python_library(name="lib")
+            pex_binary(entry_point="app.py")
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src/app.py",
+        ]
+        result = run_pants(args)
+        assert result.exit_code == 42, result.stderr
