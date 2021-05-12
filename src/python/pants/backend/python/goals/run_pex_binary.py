@@ -10,7 +10,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.util_rules.pex import Pex, PexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -28,7 +28,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
-    pex_env: PexEnvironment,
+    pex_env: WorkspacePexEnvironment,
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
