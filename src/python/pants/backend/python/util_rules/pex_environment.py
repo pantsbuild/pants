@@ -232,10 +232,6 @@ class CompletePexEnvironment:
 
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
         to avoid PEX from trying to find a new interpreter.
-
-        If the process to be run is an interactive process that is run in the project workspace (as
-        opposed to an ephemeral Process chroot), set `run_in_workspace=True` to configure the
-        environment appropriately so as to not pollute the workspace.
         """
         d = dict(
             PATH=create_path_env_var(self._pex_environment.path),
