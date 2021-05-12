@@ -1,9 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Mapping, Optional, Tuple, cast
 
@@ -106,44 +108,8 @@ class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
+    named_caches_dir: PurePath
     bootstrap_python: Optional[PythonExecutable] = None
-
-    def create_argv(
-        self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
-    ) -> Tuple[str, ...]:
-        python = python or self.bootstrap_python
-        if python:
-            return (python.path, pex_filepath, *args)
-        if os.path.basename(pex_filepath) == pex_filepath:
-            return (f"./{pex_filepath}", *args)
-        return (pex_filepath, *args)
-
-    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
-        """The environment to use for running anything with PEX.
-
-        If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
-        to avoid PEX from trying to find a new interpreter.
-        """
-        d = dict(
-            PATH=create_path_env_var(self.path),
-            PEX_INHERIT_PATH="false",
-            PEX_IGNORE_RCFILES="true",
-            PEX_ROOT=str(self.pex_root),
-            **self.subprocess_environment_dict,
-        )
-        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
-        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
-        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
-        if not python_configured:
-            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
-        return d
-
-    @property
-    def pex_root(self) -> PurePath:
-        return PurePath(".cache/pex_root")
-
-    def append_only_caches(self) -> Mapping[str, str]:
-        return {"pex_root": str(self.pex_root)}
 
     def level(self) -> LogLevel:
         return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
@@ -233,8 +199,93 @@ async def find_pex_python(
             python_setup.interpreter_search_paths(pex_relevant_environment)
         ),
         subprocess_environment_dict=subprocess_env_vars.vars,
+        # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
+        #  the normalization only once, via the options system?
+        named_caches_dir=Path(global_options.options.named_caches_dir).resolve(),
         bootstrap_python=first_python_binary(),
     )
+
+
+@dataclass(frozen=True)
+class CompletePexEnvironment:
+    _pex_environment: PexEnvironment
+    pex_root: PurePath
+
+    _PEX_ROOT_DIRNAME = "pex_root"
+
+    @property
+    def interpreter_search_paths(self) -> Tuple[str, ...]:
+        return self._pex_environment.interpreter_search_paths
+
+    def create_argv(
+        self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
+    ) -> Tuple[str, ...]:
+        python = python or self._pex_environment.bootstrap_python
+        if python:
+            return (python.path, pex_filepath, *args)
+        if os.path.basename(pex_filepath) == pex_filepath:
+            return (f"./{pex_filepath}", *args)
+        return (pex_filepath, *args)
+
+    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
+        """The environment to use for running anything with PEX.
+
+        If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
+        to avoid PEX from trying to find a new interpreter.
+
+        If the process to be run is an interactive process that is run in the project workspace (as
+        opposed to an ephemeral Process chroot), set `run_in_workspace=True` to configure the
+        environment appropriately so as to not pollute the workspace.
+        """
+        d = dict(
+            PATH=create_path_env_var(self._pex_environment.path),
+            PEX_INHERIT_PATH="false",
+            PEX_IGNORE_RCFILES="true",
+            PEX_ROOT=str(self.pex_root),
+            **self._pex_environment.subprocess_environment_dict,
+        )
+        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
+        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
+        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
+        if not python_configured:
+            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
+        return d
+
+
+@dataclass(frozen=True)
+class SandboxPexEnvironment(CompletePexEnvironment):
+    append_only_caches: FrozenDict[str, str]
+
+    @classmethod
+    def create(cls, pex_environment) -> SandboxPexEnvironment:
+        pex_root = PurePath(".cache") / cls._PEX_ROOT_DIRNAME
+        return cls(
+            _pex_environment=pex_environment,
+            pex_root=pex_root,
+            append_only_caches=FrozenDict({cls._PEX_ROOT_DIRNAME: str(pex_root)}),
+        )
+
+
+class WorkspacePexEnvironment(CompletePexEnvironment):
+    @classmethod
+    def create(cls, pex_environment: PexEnvironment) -> WorkspacePexEnvironment:
+        # N.B.: When running in the workspace the engine doesn't offer an append_only_caches
+        # service to setup a symlink to our named cache for us. As such, we point the PEX_ROOT
+        # directly at the underlying append only cache in that case to re-use results there and
+        # to keep the workspace from being dirtied by the creation of a new Pex cache rooted
+        # there.
+        pex_root = pex_environment.named_caches_dir / cls._PEX_ROOT_DIRNAME
+        return cls(_pex_environment=pex_environment, pex_root=pex_root)
+
+
+@rule
+def sandbox_pex_environment(pex_environment: PexEnvironment) -> SandboxPexEnvironment:
+    return SandboxPexEnvironment.create(pex_environment)
+
+
+@rule
+def workspace_pex_environment(pex_environment: PexEnvironment) -> WorkspacePexEnvironment:
+    return WorkspacePexEnvironment.create(pex_environment)
 
 
 def rules():
