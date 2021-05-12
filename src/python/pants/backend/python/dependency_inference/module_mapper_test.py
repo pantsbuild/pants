@@ -255,7 +255,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
             python_requirement_library(
               name='un_normalized',
-              requirements=['Un-Normalized-Project>3', 'two_owners'],
+              requirements=['Un-Normalized-Project>3', 'two_owners', 'DiFFerent-than_Mapping'],
+              module_mapping={"different_THAN-mapping": ["different_than_mapping"]},
             )
 
             python_requirement_library(
@@ -272,6 +273,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         mapping=FrozenDict(
             {
                 "colors": Address("3rdparty/python", target_name="ansicolors"),
+                "different_than_mapping": Address("3rdparty/python", target_name="un_normalized"),
                 "local_dist": Address("3rdparty/python", target_name="direct_references"),
                 "pip": Address("3rdparty/python", target_name="direct_references"),
                 "req1": Address("3rdparty/python", target_name="req1"),

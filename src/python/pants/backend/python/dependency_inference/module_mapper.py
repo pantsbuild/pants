@@ -238,11 +238,9 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
         if not tgt.has_field(PythonRequirementsField):
             continue
         module_map = tgt.get(ModuleMappingField).value
-        for python_req in tgt[PythonRequirementsField].value:
-            modules = module_map.get(
-                python_req.project_name,
-                [python_req.project_name.lower().replace("-", "_")],
-            )
+        for req in tgt[PythonRequirementsField].value:
+            normalized_project_name = ModuleMappingField.normalize_project_name(req.project_name)
+            modules = module_map.get(normalized_project_name, [normalized_project_name])
             for module in modules:
                 if module in modules_to_addresses:
                     modules_with_multiple_owners[module].update(
