@@ -6,12 +6,14 @@ from __future__ import annotations
 import collections.abc
 import logging
 import os.path
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
 from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
@@ -591,10 +593,6 @@ class ModuleMappingField(DictStringToStringSequenceField):
     )
     value: FrozenDict[str, Tuple[str, ...]]
 
-    @staticmethod
-    def normalize_project_name(s: str) -> str:
-        return s.lower().replace("-", "_")
-
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
@@ -603,7 +601,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
         return FrozenDict(
             {
                 **DEFAULT_MODULE_MAPPING,
-                **{cls.normalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
+                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
             }
         )
 

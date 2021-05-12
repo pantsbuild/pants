@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
 from pants.backend.python.target_types import (
     ModuleMappingField,
     PythonRequirementsField,
@@ -239,8 +241,10 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             continue
         module_map = tgt.get(ModuleMappingField).value
         for req in tgt[PythonRequirementsField].value:
-            normalized_project_name = ModuleMappingField.normalize_project_name(req.project_name)
-            modules = module_map.get(normalized_project_name, [normalized_project_name])
+            normalized_project_name = canonicalize_project_name(req.project_name)
+            modules = module_map.get(
+                normalized_project_name, [normalized_project_name.replace("-", "_")]
+            )
             for module in modules:
                 if module in modules_to_addresses:
                     modules_with_multiple_owners[module].update(
