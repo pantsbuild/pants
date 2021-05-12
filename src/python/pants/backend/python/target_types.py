@@ -277,6 +277,19 @@ class PexZipSafeField(BoolField):
     )
 
 
+class PexStripEnvField(BoolField):
+    alias = "strip_pex_env"
+    default = True
+    help = (
+        "Whether or not to strip the PEX runtime environment of `PEX*` environment variables.\n\n"
+        "Most applications have no need for the `PEX*` environment variables that are used to "
+        "control PEX startup; so these variables are scrubbed from the environment by Pex before "
+        "transferring control to the application by default. This prevents any subprocesses that "
+        "happen to execute other PEX files from inheriting these control knob values since most "
+        "would be undesired; e.g.: PEX_MODULE or PEX_PATH."
+    )
+
+
 class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
