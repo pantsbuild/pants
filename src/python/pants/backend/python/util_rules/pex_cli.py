@@ -10,9 +10,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import (
-    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
+    SandboxPexEnvironment,
 )
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
@@ -113,7 +113,7 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_binary: PexPEX,
-    pex_env: PexEnvironment,
+    pex_env: SandboxPexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -179,7 +179,7 @@ async def setup_pex_cli_process(
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_env.append_only_caches(),
+        append_only_caches=pex_env.append_only_caches,
         level=request.level,
         cache_scope=request.cache_scope,
     )

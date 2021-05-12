@@ -29,9 +29,9 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
-    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
+    SandboxPexEnvironment,
 )
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -728,7 +728,7 @@ class VenvScriptWriter:
     def _create_venv_script(
         self,
         bash: BashBinary,
-        pex_environment: PexEnvironment,
+        pex_environment: SandboxPexEnvironment,
         *,
         script_path: PurePath,
         venv_executable: PurePath,
@@ -772,14 +772,16 @@ class VenvScriptWriter:
             content=FileContent(path=str(script_path), content=script.encode(), is_executable=True),
         )
 
-    def exe(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+    def exe(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
         """Writes a safe shim for the venv's executable `pex` script."""
         script_path = PurePath(f"{self.pex.name}_pex_shim.sh")
         return self._create_venv_script(
             bash, pex_environment, script_path=script_path, venv_executable=self.venv_dir / "pex"
         )
 
-    def bin(self, bash: BashBinary, pex_environment: PexEnvironment, name: str) -> VenvScript:
+    def bin(
+        self, bash: BashBinary, pex_environment: SandboxPexEnvironment, name: str
+    ) -> VenvScript:
         """Writes a safe shim for an executable or script in the venv's `bin` directory."""
         script_path = PurePath(f"{self.pex.name}_bin_{name}_shim.sh")
         return self._create_venv_script(
@@ -789,7 +791,7 @@ class VenvScriptWriter:
             venv_executable=self.venv_dir / "bin" / name,
         )
 
-    def python(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+    def python(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
         """Writes a safe shim for the venv's python binary."""
         return self.bin(bash, pex_environment, "python")
 
@@ -827,7 +829,7 @@ def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
 
 @rule
 async def create_venv_pex(
-    request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
+    request: VenvPexRequest, bash: BashBinary, pex_environment: SandboxPexEnvironment
 ) -> VenvPex:
     # VenvPex is motivated by improving performance of Python tools by eliminating traditional PEX
     # file startup overhead.
@@ -976,7 +978,7 @@ class PexProcess:
 
 
 @rule
-async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvironment) -> Process:
     pex = request.pex
     argv = pex_environment.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
@@ -996,7 +998,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches(),
+        append_only_caches=pex_environment.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -1048,7 +1050,7 @@ class VenvPexProcess:
 
 @rule
 async def setup_venv_pex_process(
-    request: VenvPexProcess, pex_environment: PexEnvironment
+    request: VenvPexProcess, pex_environment: SandboxPexEnvironment
 ) -> Process:
     venv_pex = request.venv_pex
     argv = (venv_pex.pex.argv0, *request.argv)
@@ -1065,7 +1067,7 @@ async def setup_venv_pex_process(
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches(),
+        append_only_caches=pex_environment.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
