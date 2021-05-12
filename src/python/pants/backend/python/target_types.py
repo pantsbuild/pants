@@ -6,7 +6,6 @@ from __future__ import annotations
 import collections.abc
 import logging
 import os.path
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
