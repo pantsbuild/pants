@@ -12,6 +12,7 @@ from enum import Enum
 from textwrap import dedent
 from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
 from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
@@ -574,7 +575,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
         "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
         '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
-        "used for Pants to be able to infer dependencies in BUILD files."
+        "used to infer dependencies."
     )
     value: FrozenDict[str, Tuple[str, ...]]
 
@@ -583,7 +584,12 @@ class ModuleMappingField(DictStringToStringSequenceField):
         cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
         provided_mapping = super().compute_value(raw_value, address)
-        return FrozenDict({**DEFAULT_MODULE_MAPPING, **(provided_mapping or {})})
+        return FrozenDict(
+            {
+                **DEFAULT_MODULE_MAPPING,
+                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
+            }
+        )
 
 
 class PythonRequirementLibrary(Target):

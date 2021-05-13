@@ -373,12 +373,12 @@ def test_python_distribution_dependency_injection() -> None:
     ["raw_value", "expected"],
     (
         (None, {}),
-        ({"new_dist": ["new_module"]}, {"new_dist": ("new_module",)}),
-        ({"PyYAML": ["custom_yaml"]}, {"PyYAML": ("custom_yaml",)}),
+        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
+        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
     ),
 )
 def test_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str]]
+    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
 ) -> None:
     merged = dict(DEFAULT_MODULE_MAPPING)
     merged.update(expected)
