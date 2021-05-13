@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
 from pants.backend.python.target_types import (
     ModuleMappingField,
     PythonRequirementsField,
@@ -238,10 +240,13 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
         if not tgt.has_field(PythonRequirementsField):
             continue
         module_map = tgt.get(ModuleMappingField).value
-        for python_req in tgt[PythonRequirementsField].value:
+        for req in tgt[PythonRequirementsField].value:
             modules = module_map.get(
-                python_req.project_name,
-                [python_req.project_name.lower().replace("-", "_")],
+                # NB: We only use `canonicalize_project_name()` for the key, but not the fallback
+                # value, because we want to preserve `.` in the module name. See
+                # https://www.python.org/dev/peps/pep-0503/#normalized-names.
+                canonicalize_project_name(req.project_name),
+                [req.project_name.lower().replace("-", "_")],
             )
             for module in modules:
                 if module in modules_to_addresses:
