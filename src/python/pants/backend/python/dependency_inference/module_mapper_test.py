@@ -88,10 +88,16 @@ def test_first_party_modules_mapping() -> None:
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
+    pants_testutil_addr = Address("", target_name="pantsbuild.testutil")
     submodule_addr = Address("", target_name="submodule")
     mapping = ThirdPartyPythonModuleMapping(
         mapping=FrozenDict(
-            {"colors": colors_addr, "pants": pants_addr, "req.submodule": submodule_addr}
+            {
+                "colors": colors_addr,
+                "pants": pants_addr,
+                "req.submodule": submodule_addr,
+                "pants.testutil": pants_testutil_addr,
+            }
         ),
         ambiguous_modules=FrozenDict({"ambiguous": (colors_addr, pants_addr)}),
     )
@@ -102,6 +108,9 @@ def test_third_party_modules_mapping() -> None:
     assert mapping.address_for_module("pants.task") == (pants_addr, ())
     assert mapping.address_for_module("pants.task.task") == (pants_addr, ())
     assert mapping.address_for_module("pants.task.task.Task") == (pants_addr, ())
+
+    assert mapping.address_for_module("pants.testutil") == (pants_testutil_addr, ())
+    assert mapping.address_for_module("pants.testutil.foo") == (pants_testutil_addr, ())
 
     assert mapping.address_for_module("req.submodule") == (submodule_addr, ())
     assert mapping.address_for_module("req.submodule.foo") == (submodule_addr, ())

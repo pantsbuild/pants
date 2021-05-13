@@ -241,9 +241,12 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             continue
         module_map = tgt.get(ModuleMappingField).value
         for req in tgt[PythonRequirementsField].value:
-            normalized_project_name = canonicalize_project_name(req.project_name)
             modules = module_map.get(
-                normalized_project_name, [normalized_project_name.replace("-", "_")]
+                # NB: We only use `canonicalize_project_name()` for the key, but not the fallback
+                # value, because we want to preserve `.` in the module name. See
+                # https://www.python.org/dev/peps/pep-0503/#normalized-names.
+                canonicalize_project_name(req.project_name),
+                [req.project_name.lower().replace("-", "_")],
             )
             for module in modules:
                 if module in modules_to_addresses:
