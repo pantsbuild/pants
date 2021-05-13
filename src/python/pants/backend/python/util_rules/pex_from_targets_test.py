@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import List, cast
+from typing import Iterable, List, cast
 
 import pytest
 from _pytest.tmpdir import TempPathFactory
@@ -178,6 +178,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         resolve_all_constraints: bool | None,
         *,
         direct_deps_only: bool = False,
+        additional_args: Iterable[str] = (),
     ) -> PexRequest:
         args = ["--backend-packages=pants.backend.python"]
         request = PexFromTargetsRequest(
@@ -185,6 +186,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             output_filename="demo.pex",
             internal_only=True,
             direct_deps_only=direct_deps_only,
+            additional_args=additional_args,
         )
         if resolve_all_constraints is not None:
             args.append(f"--python-setup-resolve-all-constraints={resolve_all_constraints!r}")
@@ -195,19 +197,29 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         rule_runner.set_options(args, env_inherit={"PATH"})
         return rule_runner.request(PexRequest, [request])
 
-    pex_req1 = get_pex_request("constraints1.txt", resolve_all_constraints=False)
+    pex_req1 = get_pex_request(
+        "constraints1.txt",
+        resolve_all_constraints=False,
+        additional_args=["--resolve-local-platforms"],
+    )
+    assert "--resolve-local-platforms" in pex_req1.additional_args
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
     assert pex_req1.repository_pex is None
-
     pex_req1_direct = get_pex_request(
         "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
     )
+    assert "--resolve-local-platforms" not in pex_req1_direct.additional_args
     assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req1_direct.repository_pex is None
 
-    pex_req2 = get_pex_request("constraints1.txt", resolve_all_constraints=True)
+    pex_req2 = get_pex_request(
+        "constraints1.txt",
+        resolve_all_constraints=True,
+        additional_args=["--resolve-local-platforms"],
+    )
+    assert "--resolve-local-platforms" in pex_req2.additional_args
     assert pex_req2.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
