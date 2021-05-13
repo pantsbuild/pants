@@ -44,6 +44,7 @@ async def format_shell_targets(
                 (
                     fmt_request_type.field_set_type.create(target)
                     for target in shell_fmt_targets.targets
+                    if fmt_request_type.field_set_type.is_applicable(target)
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),
