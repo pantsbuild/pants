@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
 from pants.engine.internals.native_engine import PyDigest, PySnapshot
+from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.rules import QueryRule
-from pants.engine.util import side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 

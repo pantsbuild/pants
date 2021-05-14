@@ -29,8 +29,8 @@ from pants.engine.goal import Goal
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
-from pants.engine.util import side_effecting
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel

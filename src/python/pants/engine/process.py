@@ -16,9 +16,9 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.util import side_effecting
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
