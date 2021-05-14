@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable, List, cast
+from typing import Any, Dict, Iterable, List, cast
 
 import pytest
 from _pytest.tmpdir import TempPathFactory
@@ -22,6 +22,7 @@ from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.contextutil import pushd
+from pants.util.ordered_set import OrderedSet
 
 
 @pytest.fixture
@@ -104,7 +105,7 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     return find_links
 
 
-def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
+def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
     rule_runner.scheduler.write_digest(pex.digest)
     completed_process = subprocess.run(
         args=[
@@ -118,7 +119,11 @@ def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
         stdout=subprocess.PIPE,
         check=True,
     )
-    return cast(List[str], json.loads(completed_process.stdout.decode())["requirements"])
+    return json.loads(completed_process.stdout)
+
+
+def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
+    return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
 def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
@@ -195,14 +200,17 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         args.append("--python-repos-indexes=[]")
         args.append(f"--python-repos-repos={find_links}")
         rule_runner.set_options(args, env_inherit={"PATH"})
-        return rule_runner.request(PexRequest, [request])
+        pex_request = rule_runner.request(PexRequest, [request])
+        assert OrderedSet(additional_args).issubset(OrderedSet(pex_request.additional_args))
+        return pex_request
+
+    additional_args = ["--no-strip-pex-env"]
 
     pex_req1 = get_pex_request(
         "constraints1.txt",
         resolve_all_constraints=False,
-        additional_args=["--resolve-local-platforms"],
+        additional_args=additional_args,
     )
-    assert "--resolve-local-platforms" in pex_req1.additional_args
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
@@ -210,30 +218,42 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req1_direct = get_pex_request(
         "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
     )
-    assert "--resolve-local-platforms" not in pex_req1_direct.additional_args
     assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req1_direct.repository_pex is None
 
     pex_req2 = get_pex_request(
         "constraints1.txt",
         resolve_all_constraints=True,
-        additional_args=["--resolve-local-platforms"],
+        additional_args=additional_args,
     )
-    assert "--resolve-local-platforms" in pex_req2.additional_args
     assert pex_req2.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
     assert pex_req2.repository_pex is not None
+    assert not info(rule_runner, pex_req2.repository_pex)["strip_pex_env"]
     repository_pex = pex_req2.repository_pex
     assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
 
     pex_req2_direct = get_pex_request(
-        "constraints1.txt", resolve_all_constraints=True, direct_deps_only=True
+        "constraints1.txt",
+        resolve_all_constraints=True,
+        direct_deps_only=True,
+        additional_args=additional_args,
     )
     assert pex_req2_direct.requirements == PexRequirements(["baz", url_req])
     assert pex_req2_direct.repository_pex == repository_pex
+    assert not info(rule_runner, pex_req2.repository_pex)["strip_pex_env"]
+
+    pex_req3_direct = get_pex_request(
+        "constraints1.txt",
+        resolve_all_constraints=True,
+        direct_deps_only=True,
+    )
+    assert pex_req3_direct.requirements == PexRequirements(["baz", url_req])
+    assert pex_req3_direct.repository_pex != repository_pex
+    assert info(rule_runner, pex_req3_direct.repository_pex)["strip_pex_env"]
 
     with pytest.raises(ExecutionError) as err:
         get_pex_request(None, resolve_all_constraints=True)
