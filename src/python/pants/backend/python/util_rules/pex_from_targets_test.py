@@ -119,7 +119,7 @@ def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
         stdout=subprocess.PIPE,
         check=True,
     )
-    return json.loads(completed_process.stdout)
+    return cast(Dict[str, Any], json.loads(completed_process.stdout))
 
 
 def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
@@ -252,6 +252,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         direct_deps_only=True,
     )
     assert pex_req3_direct.requirements == PexRequirements(["baz", url_req])
+    assert pex_req3_direct.repository_pex is not None
     assert pex_req3_direct.repository_pex != repository_pex
     assert info(rule_runner, pex_req3_direct.repository_pex)["strip_pex_env"]
 
