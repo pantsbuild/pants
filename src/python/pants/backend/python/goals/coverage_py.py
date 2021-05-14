@@ -31,12 +31,14 @@ from pants.core.goals.test import (
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
     MergeDigests,
+    PathGlobs,
     Snapshot,
 )
 from pants.engine.process import ProcessResult
@@ -44,6 +46,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
+from pants.source.source_root import AllSourceRoots
 from pants.util.logging import LogLevel
 
 """
@@ -158,6 +161,16 @@ class CoverageSubsystem(PythonToolBase):
                 f"non-standard location."
             ),
         )
+        register(
+            "--global-report",
+            type=bool,
+            default=False,
+            help=(
+                "If true, Pants will generate a global coverage report.\n\nThe global report will "
+                "include all Python source files in the workspace and not just those depended on "
+                "by the tests that were run."
+            ),
+        )
 
     @property
     def filter(self) -> Tuple[str, ...]:
@@ -189,6 +202,10 @@ class CoverageSubsystem(PythonToolBase):
                 "pyproject.toml": b"[tool.coverage",
             },
         )
+
+    @property
+    def global_report(self) -> bool:
+        return cast(bool, self.options.global_report)
 
 
 @dataclass(frozen=True)
@@ -315,29 +332,103 @@ class MergedCoverageData:
 
 @rule(desc="Merge Pytest coverage data", level=LogLevel.DEBUG)
 async def merge_coverage_data(
-    data_collection: PytestCoverageDataCollection, coverage_setup: CoverageSetup
+    data_collection: PytestCoverageDataCollection,
+    coverage_setup: CoverageSetup,
+    coverage: CoverageSubsystem,
+    source_roots: AllSourceRoots,
 ) -> MergedCoverageData:
-    if len(data_collection) == 1:
+    if len(data_collection) == 1 and not coverage.global_report:
         return MergedCoverageData(data_collection[0].digest)
-    # We prefix each .coverage file with its corresponding address to avoid collisions.
-    coverage_digests = await MultiGet(
-        Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        for data in data_collection
-    )
-    input_digest = await Get(Digest, MergeDigests(coverage_digests))
-    prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
+
+    coverage_digest_gets = []
+    coverage_data_file_paths = []
+    for data in data_collection:
+        # We prefix each .coverage file with its corresponding address to avoid collisions.
+        coverage_digest_gets.append(
+            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
+        )
+        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
+
+    if coverage.global_report:
+        global_coverage_base_dir = PurePath("__global_coverage__")
+
+        global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
+        global_coverage_config_content = toml.dumps(
+            {
+                "tool": {
+                    "coverage": {
+                        "run": {
+                            "relative_files": True,
+                            "source": list(source_root.path for source_root in source_roots),
+                        }
+                    }
+                }
+            }
+        ).encode()
+
+        no_op_exe_py_path = global_coverage_base_dir / "no-op-exe.py"
+
+        all_sources_digest, no_op_exe_py_digest, global_coverage_config_digest = await MultiGet(
+            Get(
+                Digest,
+                PathGlobs(globs=[f"{source_root.path}/**/*.py" for source_root in source_roots]),
+            ),
+            Get(Digest, CreateDigest([FileContent(path=str(no_op_exe_py_path), content=b"")])),
+            Get(
+                Digest,
+                CreateDigest(
+                    [
+                        FileContent(
+                            path=str(global_coverage_config_path),
+                            content=global_coverage_config_content,
+                        ),
+                    ]
+                ),
+            ),
+        )
+        extra_sources_digest = await Get(
+            Digest, MergeDigests((all_sources_digest, no_op_exe_py_digest))
+        )
+        input_digest = await Get(
+            Digest, MergeDigests((extra_sources_digest, global_coverage_config_digest))
+        )
+        result = await Get(
+            ProcessResult,
+            VenvPexProcess(
+                coverage_setup.pex,
+                argv=("run", "--rcfile", str(global_coverage_config_path), str(no_op_exe_py_path)),
+                input_digest=input_digest,
+                output_files=(".coverage",),
+                description="Create base global Pytest coverage report.",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        coverage_digests = await MultiGet(
+            Get(
+                Digest, AddPrefix(digest=result.output_digest, prefix=str(global_coverage_base_dir))
+            ),
+            *coverage_digest_gets,
+        )
+        coverage_data_file_paths.append(str(global_coverage_base_dir / ".coverage"))
+        input_digest = await Get(Digest, MergeDigests(coverage_digests))
+    else:
+        extra_sources_digest = EMPTY_DIGEST
+        input_digest = await Get(Digest, MergeDigests(await MultiGet(coverage_digest_gets)))
+
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             coverage_setup.pex,
-            argv=("combine", *prefixes),
+            argv=("combine", *sorted(coverage_data_file_paths)),
             input_digest=input_digest,
             output_files=(".coverage",),
-            description=f"Merge {len(prefixes)} Pytest coverage reports.",
+            description=f"Merge {len(coverage_data_file_paths)} Pytest coverage reports.",
             level=LogLevel.DEBUG,
         ),
     )
-    return MergedCoverageData(result.output_digest)
+    return MergedCoverageData(
+        await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest)))
+    )
 
 
 @rule(desc="Generate Pytest coverage reports", level=LogLevel.DEBUG)
