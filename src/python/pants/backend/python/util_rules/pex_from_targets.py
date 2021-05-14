@@ -298,7 +298,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         requirements=PexRequirements(all_constraints),
                         interpreter_constraints=interpreter_constraints,
                         platforms=request.platforms,
-                        additional_args=["-vvv"],
+                        additional_args=request.additional_args,
                     ),
                 )
     elif (
