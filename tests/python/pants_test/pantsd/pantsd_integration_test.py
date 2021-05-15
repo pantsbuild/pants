@@ -168,6 +168,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                             "--remote-auth-plugin=auth_plugin.auth:auth_func",
                             "--remote-cache-read",
                             "--remote-store-address=grpc://fake",
+                            "-ldebug",
                             "help",
                         ]
                     )

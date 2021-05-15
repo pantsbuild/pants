@@ -98,7 +98,7 @@ class PantsDaemonCore:
         Must be called under the lifecycle lock.
         """
         try:
-            logger.info(
+            logger.debug(
                 f"{scheduler_restart_explanation}: reinitializing scheduler..."
                 if scheduler_restart_explanation
                 else "Initializing scheduler..."
@@ -111,7 +111,7 @@ class PantsDaemonCore:
 
             self._services = self._services_constructor(bootstrap_options, self._scheduler)
             self._fingerprint = options_fingerprint
-            logger.info("Scheduler initialized.")
+            logger.debug("Scheduler initialized.")
         except Exception as e:
             self._kill_switch.set()
             self._scheduler = None
