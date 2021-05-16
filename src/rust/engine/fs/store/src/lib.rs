@@ -557,7 +557,7 @@ impl Store {
                 })
                 .await?;
               match maybe_bytes {
-                Some(bytes) => remote.store_bytes(&bytes).await,
+                Some(bytes) => remote.store_bytes(bytes).await,
                 None => Err(format!(
                   "Failed to upload digest {:?}: Not found in local store",
                   digest
