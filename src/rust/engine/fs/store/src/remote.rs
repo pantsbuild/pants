@@ -88,7 +88,7 @@ impl ByteStore {
     })
   }
 
-  pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
     let len = bytes.len();
     let digest = Digest::of_bytes(&bytes);
     let resource_name = format!(
@@ -109,11 +109,6 @@ impl ByteStore {
 
     let resource_name = resource_name.clone();
     let chunk_size_bytes = store.chunk_size_bytes;
-
-    // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
-    // lifetime but the slice passed into this method generally points into the shared memory
-    // of the LMDB store which is on the other side of the FFI boundary.
-    let bytes = Bytes::copy_from_slice(bytes);
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
       if offset >= bytes.len() && has_sent_any {
