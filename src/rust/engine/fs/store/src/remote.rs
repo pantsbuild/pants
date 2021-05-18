@@ -16,6 +16,7 @@ use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
+use std::ops::Range;
 use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request};
 use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
@@ -88,9 +89,70 @@ impl ByteStore {
     })
   }
 
-  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
-    let len = bytes.len();
+  pub(crate) fn chunk_size_bytes(&self) -> usize {
+    self.chunk_size_bytes
+  }
+
+  pub async fn store_buffered<WriteToBuffer, WriteResult>(
+    &self,
+    digest: Digest,
+    mut write_to_buffer: WriteToBuffer,
+  ) -> Result<(), String>
+  where
+    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
+    WriteResult: Future<Output = Result<(), String>>,
+  {
+    let write_buffer = tempfile::tempfile().map_err(|e| {
+      format!(
+        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
+        digest = digest,
+        err = e
+      )
+    })?;
+    let read_buffer = write_buffer.try_clone().map_err(|e| {
+      format!(
+        "Failed to create a read handle for the temporary upload buffer for {}",
+        e
+      )
+    })?;
+    write_to_buffer(write_buffer).await?;
+
+    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
+    // could be mutated by another process. We guard against this by creating an anonymous
+    // temporary file and ensuring it is written to and closed via the only other handle to it in
+    // the code just above.
+    let mmap = unsafe {
+      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| format!("{}", e))?;
+      madvise::madvise(
+        mapping.as_ptr(),
+        mapping.len(),
+        madvise::AccessPattern::Sequential,
+      )
+      .map_err(|e| format!("{}", e))?;
+      Ok(mapping) as Result<memmap::Mmap, String>
+    }?;
+
+    self
+      .store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range]))
+      .await
+  }
+
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
+    self
+      .store_bytes_source(digest, move |range| bytes.slice(range))
+      .await
+  }
+
+  async fn store_bytes_source<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), String>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let len = digest.size_bytes;
     let resource_name = format!(
       "{}/uploads/{}/blobs/{}/{}",
       self.instance_name.clone().unwrap_or_default(),
@@ -111,17 +173,17 @@ impl ByteStore {
     let chunk_size_bytes = store.chunk_size_bytes;
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
-      if offset >= bytes.len() && has_sent_any {
+      if offset >= len && has_sent_any {
         futures::future::ready(None)
       } else {
-        let next_offset = min(offset + chunk_size_bytes, bytes.len());
+        let next_offset = min(offset + chunk_size_bytes, len);
         let req = bazel_protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
           write_offset: offset as i64,
-          finish_write: next_offset == bytes.len(),
+          finish_write: next_offset == len,
           // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
           // https://github.com/danburkert/prost/pull/341
-          data: bytes.slice(offset..next_offset),
+          data: bytes(offset..next_offset),
         };
         futures::future::ready(Some((req, (next_offset, true))))
       }
@@ -137,7 +199,7 @@ impl ByteStore {
 
       let response = response.into_inner();
       if response.committed_size == len as i64 {
-        Ok(digest)
+        Ok(())
       } else {
         Err(format!(
           "Uploading file with digest {:?}: want committed size {} but got {}",

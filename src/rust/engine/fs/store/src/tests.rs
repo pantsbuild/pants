@@ -34,10 +34,6 @@ pub fn big_file_fingerprint() -> Fingerprint {
     .unwrap()
 }
 
-pub fn big_file_digest() -> Digest {
-  Digest::new(big_file_fingerprint(), big_file_bytes().len())
-}
-
 pub fn big_file_bytes() -> Bytes {
   let mut f = File::open(
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
