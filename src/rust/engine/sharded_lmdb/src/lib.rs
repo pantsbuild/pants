@@ -422,11 +422,11 @@ impl ShardedLmdb {
 
   pub async fn load_bytes_with<
     T: Send + 'static,
-    F: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
     fingerprint: Fingerprint,
-    f: F,
+    mut f: F,
   ) -> Result<Option<T>, String> {
     let store = self.clone();
     let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
