@@ -3,6 +3,7 @@
 
 import itertools
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional
@@ -44,8 +45,11 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -63,19 +67,13 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
-
-
-# If a user wants extra pytest output (e.g., plugin output) to show up in dist/
-# they must ensure that output goes under this directory. E.g.,
-# ./pants test <target> -- --html=extra-output/report.html
-_EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
@@ -94,6 +92,78 @@ class PythonTestFieldSet(TestFieldSet):
             return False
         file_name = PurePath(self.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
+
+
+# -----------------------------------------------------------------------------------------
+# Plugin hook
+# -----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PytestPluginSetup:
+    """The result of custom set up logic before Pytest runs.
+
+    Please reach out it if you would like certain functionality, such as allowing your plugin to set
+    environment variables.
+    """
+
+    digest: Digest = EMPTY_DIGEST
+
+
+@union
+@dataclass(frozen=True)  # type: ignore[misc]
+class PytestPluginSetupRequest(ABC):
+    """A request to set up the test environment before Pytest runs, e.g. to set up databases.
+
+    To use, subclass PytestPluginSetupRequest, register the rule
+    `UnionRule(PytestPluginSetupRequest, MyCustomPytestPluginSetupRequest)`, and add a rule that
+    takes your subclass as a parameter and returns `PytestPluginSetup`.
+    """
+
+    target: Target
+
+    @classmethod
+    @abstractmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether the setup implementation should be used for this target or not."""
+
+
+class AllPytestPluginSetups(Collection[PytestPluginSetup]):
+    pass
+
+
+# TODO: Why is this necessary? We should be able to use `PythonTestFieldSet` as the rule param.
+@dataclass(frozen=True)
+class AllPytestPluginSetupsRequest:
+    address: Address
+
+
+@rule
+async def run_all_setup_plugins(
+    request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
+) -> AllPytestPluginSetups:
+    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
+    applicable_setup_request_types = tuple(
+        request
+        for request in union_membership.get(PytestPluginSetupRequest)  # type: ignore[misc]
+        if request.is_applicable(wrapped_tgt.target)
+    )
+    setups = await MultiGet(
+        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc]
+        for request in applicable_setup_request_types
+    )
+    return AllPytestPluginSetups(setups)
+
+
+# -----------------------------------------------------------------------------------------
+# Core logic
+# -----------------------------------------------------------------------------------------
+
+
+# If a user wants extra pytest output (e.g., plugin output) to show up in dist/
+# they must ensure that output goes under this directory. E.g.,
+# ./pants test <target> -- --html=extra-output/report.html
+_EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
@@ -123,8 +193,9 @@ async def setup_pytest_for_target(
     global_options: GlobalOptions,
     complete_env: CompleteEnvironment,
 ) -> TestSetup:
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
+    transitive_targets, plugin_setups = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
+        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest(request.field_set.address)),
     )
     all_targets = transitive_targets.closure
 
@@ -202,6 +273,7 @@ async def setup_pytest_for_target(
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
                 *(pkg.digest for pkg in built_package_dependencies),
+                *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
         ),
     )
@@ -314,5 +386,31 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     )
 
 
+# -----------------------------------------------------------------------------------------
+# `runtime_package_dependencies` plugin
+# -----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RuntimePackagesPluginRequest(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return bool(target.get(RuntimePackageDependenciesField).value)
+
+
+@rule
+async def setup_runtime_packages(request: RuntimePackagesPluginRequest) -> PytestPluginSetup:
+    built_packages = await Get(
+        BuiltPackageDependencies,
+        BuildPackageDependenciesRequest(request.target.get(RuntimePackageDependenciesField)),
+    )
+    digest = await Get(Digest, MergeDigests(pkg.digest for pkg in built_packages))
+    return PytestPluginSetup(digest)
+
+
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, PythonTestFieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, PythonTestFieldSet),
+        UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+    ]
