@@ -111,7 +111,7 @@ impl ByteStore {
     })?;
     let read_buffer = write_buffer.try_clone().map_err(|e| {
       format!(
-        "Failed to create a read handle for the temporary upload buffer for for {digest:?}: {err}",
+        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
         digest = digest,
         err = e
       )
