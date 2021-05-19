@@ -123,13 +123,25 @@ impl ByteStore {
     // temporary file and ensuring it is written to and closed via the only other handle to it in
     // the code just above.
     let mmap = unsafe {
-      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| format!("{}", e))?;
-      madvise::madvise(
+      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
+        format!(
+          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
+          digest = digest,
+          err = e
+        )
+      })?;
+      if let Err(err) = madvise::madvise(
         mapping.as_ptr(),
         mapping.len(),
         madvise::AccessPattern::Sequential,
-      )
-      .map_err(|e| format!("{}", e))?;
+      ) {
+        log::warn!(
+          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
+          {digest:?}. Continuing with possible reduced performance: {err}",
+          digest = digest,
+          err = err
+        )
+      }
       Ok(mapping) as Result<memmap::Mmap, String>
     }?;
 
