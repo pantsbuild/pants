@@ -640,8 +640,9 @@ impl Store {
     match maybe_bytes {
       Some(bytes) => remote.store_bytes(bytes).await,
       None => Err(format!(
-        "Failed to upload digest {:?}: Not found in local store",
-        digest
+        "Failed to upload digest {entry_type:?} {digest:?}: Not found in local store.",
+        entry_type = entry_type,
+        digest = digest
       )),
     }
   }
