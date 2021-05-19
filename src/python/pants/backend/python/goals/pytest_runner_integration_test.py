@@ -13,7 +13,11 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
+from pants.backend.python.goals.pytest_runner import (
+    PytestPluginSetup,
+    PytestPluginSetupRequest,
+    PythonTestFieldSet,
+)
 from pants.backend.python.target_types import (
     PexBinary,
     PythonLibrary,
@@ -29,9 +33,11 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
+from pants.engine.rules import Get, rule
 from pants.engine.target import Target
+from pants.engine.unions import UnionRule
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
@@ -420,7 +426,43 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+class UsedPlugin(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return True
+
+
+class UnusedPlugin(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return False
+
+
+@rule
+async def used_plugin(_: UsedPlugin) -> PytestPluginSetup:
+    digest = await Get(Digest, CreateDigest([FileContent("used.txt", b"")]))
+    return PytestPluginSetup(digest=digest)
+
+
+@rule
+async def unused_plugin(_: UnusedPlugin) -> PytestPluginSetup:
+    digest = await Get(Digest, CreateDigest([FileContent("unused.txt", b"")]))
+    return PytestPluginSetup(digest=digest)
+
+
+def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+    # We test both the generic `PytestPluginSetup` mechanism and our `runtime_package_dependencies`
+    # feature in the same test to confirm multiple plugins can be used on the same target.
+    rule_runner = RuleRunner(
+        rules=[
+            *rule_runner.rules,
+            used_plugin,
+            unused_plugin,
+            UnionRule(PytestPluginSetupRequest, UsedPlugin),
+            UnionRule(PytestPluginSetupRequest, UnusedPlugin),
+        ],
+        target_types=rule_runner.target_types,
+    )
     rule_runner.write_files(
         {
             f"{PACKAGE}/say_hello.py": "print('Hello, test!')",
@@ -430,12 +472,17 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
                 import subprocess
 
                 def test_embedded_binary():
+                    assert os.path.exists("bin.pex")
                     assert b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
 
                     # Ensure that we didn't accidentally pull in the binary's sources. This is a
                     # special type of dependency that should not be included with the rest of the
                     # normal dependencies.
-                    assert os.path.exists("{PACKAGE}/say_hello.py") is False
+                    assert not os.path.exists("{PACKAGE}/say_hello.py")
+
+                def test_additional_plugins():
+                    assert os.path.exists("used.txt")
+                    assert not os.path.exists("unused.txt")
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
@@ -448,7 +495,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
-    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-args='-s'"])
+    result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
 
 
