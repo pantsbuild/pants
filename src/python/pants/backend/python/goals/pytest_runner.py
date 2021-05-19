@@ -222,11 +222,6 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
-    build_package_dependencies_get = Get(
-        BuiltPackageDependencies,
-        BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
-    )
-
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
     field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
@@ -236,14 +231,12 @@ async def setup_pytest_for_target(
         requirements_pex,
         prepared_sources,
         field_set_source_files,
-        built_package_dependencies,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
-        build_package_dependencies_get,
         extra_output_directory_digest_get,
     )
 
@@ -272,7 +265,6 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
-                *(pkg.digest for pkg in built_package_dependencies),
                 *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
         ),
@@ -303,7 +295,8 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
-        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within `python_tests`
+        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within
+        # `python_tests`
         **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
     }
 
