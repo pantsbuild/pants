@@ -211,8 +211,8 @@ async def lint(
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
 ) -> Lint:
-    request_types = union_membership[LintRequest]
-    requests: Iterable[StyleRequest] = tuple(
+    request_types = cast("Iterable[type[StyleRequest]]", union_membership[LintRequest])
+    requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
@@ -220,11 +220,11 @@ async def lint(
         )
         for request_type in request_types
     )
-    field_sets_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
+    field_sets_with_sources = await MultiGet(
         Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(request.field_sets))
         for request in requests
     )
-    valid_requests: Iterable[StyleRequest] = tuple(
+    valid_requests = tuple(
         request_cls(request)
         for request_cls, request in zip(request_types, field_sets_with_sources)
         if request

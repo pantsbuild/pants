@@ -440,7 +440,7 @@ async def determine_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
-    setup_kwargs_requests = union_membership.get(SetupKwargsRequest)  # type: ignore[misc]
+    setup_kwargs_requests = union_membership.get(SetupKwargsRequest)
     applicable_setup_kwargs_requests = tuple(
         request for request in setup_kwargs_requests if request.is_applicable(target)
     )
@@ -459,7 +459,7 @@ async def determine_setup_kwargs(
             "precise so that only one implementation is applicable for this target."
         )
     setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))
+    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
 
 
 @rule

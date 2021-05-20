@@ -59,7 +59,7 @@ class UnionRule:
             raise ValueError(msg)
 
 
-_T = TypeVar("_T")
+_T = TypeVar("_T", bound=type)
 
 
 @frozen_after_init
@@ -79,7 +79,7 @@ class UnionMembership:
             {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
         )
 
-    def __getitem__(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+    def __getitem__(self, union_type: _T) -> FrozenOrderedSet[_T]:
         """Get all members of this union type.
 
         If the union type does not exist because it has no members registered, this will raise an
@@ -89,9 +89,9 @@ class UnionMembership:
         - this is only a convention and is not actually enforced. So, you may have inaccurate type
         hints.
         """
-        return self.union_rules[union_type]
+        return self.union_rules[union_type]  # type: ignore[return-value]
 
-    def get(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+    def get(self, union_type: _T) -> FrozenOrderedSet[_T]:
         """Get all members of this union type.
 
         If the union type does not exist because it has no members registered, return an empty
@@ -101,7 +101,7 @@ class UnionMembership:
         - this is only a convention and is not actually enforced. So, you may have inaccurate type
         hints.
         """
-        return self.union_rules.get(union_type, FrozenOrderedSet())
+        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
 
     def is_member(self, union_type: Type, putative_member: Type) -> bool:
         members = self.union_rules.get(union_type)

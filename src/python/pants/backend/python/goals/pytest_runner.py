@@ -145,11 +145,11 @@ async def run_all_setup_plugins(
     wrapped_tgt = await Get(WrappedTarget, Address, request.address)
     applicable_setup_request_types = tuple(
         request
-        for request in union_membership.get(PytestPluginSetupRequest)  # type: ignore[misc]
+        for request in union_membership.get(PytestPluginSetupRequest)
         if request.is_applicable(wrapped_tgt.target)
     )
     setups = await MultiGet(
-        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc]
+        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc, abstract]
         for request in applicable_setup_request_types
     )
     return AllPytestPluginSetups(setups)

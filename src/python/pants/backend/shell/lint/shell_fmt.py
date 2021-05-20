@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.backend.shell.target_types import ShellSources
 from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
@@ -35,7 +36,7 @@ async def format_shell_targets(
     prior_formatter_result = original_sources.snapshot
 
     results = []
-    fmt_request_types = union_membership.union_rules[ShellFmtRequest]
+    fmt_request_types: Iterable[type[StyleRequest]] = union_membership[ShellFmtRequest]
     for fmt_request_type in fmt_request_types:
         result = await Get(
             EnrichedFmtResult,
