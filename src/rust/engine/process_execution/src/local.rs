@@ -295,13 +295,7 @@ impl CapturedWorkdir for CommandRunner {
     } else {
       workdir_path.to_owned()
     };
-    // TODO(#11406): Go back to using relative paths, rather than absolutifying them, once Rust
-    //  fixes https://github.com/rust-lang/rust/issues/80819 for macOS.
-    let argv0 = match RelativePath::new(&req.argv[0]) {
-      Ok(rel_path) => cwd.join(rel_path),
-      Err(_) => PathBuf::from(&req.argv[0]),
-    };
-    let mut command = HermeticCommand::new(argv0);
+    let mut command = HermeticCommand::new(&req.argv[0]);
     command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
