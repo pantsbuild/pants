@@ -965,7 +965,9 @@ pub fn make_execute_request(
 
   if matches!(
     req.cache_scope,
-    ProcessCacheScope::Never | ProcessCacheScope::PerRestart
+    ProcessCacheScope::Never
+      | ProcessCacheScope::PerRestartAlways
+      | ProcessCacheScope::PerRestartSuccessful
   ) {
     command
       .environment_variables

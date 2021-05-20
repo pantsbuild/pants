@@ -65,7 +65,7 @@ async def resolve_plugins(
     cache_scope = (
         ProcessCacheScope.NEVER
         if global_options.options.plugins_force_resolve
-        else ProcessCacheScope.PER_RESTART
+        else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
     plugins_process_result = await Get(

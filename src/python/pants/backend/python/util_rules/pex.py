@@ -250,10 +250,10 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
-            # NB: We want interpreter discovery to re-run fairly frequently (PER_RESTART), but
-            # not on every run of Pants (NEVER, which is effectively per-Session). See #10769 for
-            # a solution that is less of a tradeoff.
-            cache_scope=ProcessCacheScope.PER_RESTART,
+            # NB: We want interpreter discovery to re-run fairly frequently
+            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
+            # per-Session). See #10769 for a solution that is less of a tradeoff.
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
