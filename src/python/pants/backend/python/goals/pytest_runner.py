@@ -301,7 +301,9 @@ async def setup_pytest_for_target(
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
-    cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    cache_scope = (
+        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    )
     process = await Get(
         Process,
         VenvPexProcess(

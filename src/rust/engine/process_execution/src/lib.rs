@@ -121,8 +121,9 @@ pub enum ProcessCacheScope {
   // Cached only in memory (i.e. memoized in pantsd), but never persistently, and only if
   // successful.
   PerRestartSuccessful,
-  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
-  Never,
+  // Will run once per Session, i.e. once per run of Pants. This happens because the engine
+  // de-duplicates identical work; the process is neither memoized in memory nor cached to disk.
+  PerSession,
 }
 
 impl TryFrom<String> for ProcessCacheScope {
@@ -133,7 +134,7 @@ impl TryFrom<String> for ProcessCacheScope {
       "successful" => Ok(ProcessCacheScope::Successful),
       "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
       "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
-      "never" => Ok(ProcessCacheScope::Never),
+      "per_session" => Ok(ProcessCacheScope::PerSession),
       other => Err(format!("Unknown Process cache scope: {:?}", other)),
     }
   }
