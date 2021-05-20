@@ -1041,6 +1041,7 @@ dependencies = [
  "futures",
  "prost",
  "prost-types",
+ "rand 0.8.2",
  "rustls-native-certs",
  "tokio",
  "tokio-rustls",
