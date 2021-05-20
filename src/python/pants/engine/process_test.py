@@ -170,19 +170,19 @@ def test_cache_scope_per_restart() -> None:
 
     runner_one = new_rule_runner()
 
-    def run(process: Process) -> FallibleProcessResult:
+    def run1(process: Process) -> FallibleProcessResult:
         return runner_one.request(FallibleProcessResult, [process])
 
-    always_cache_success_res1 = run(always_cache_success)
-    always_cache_failure_res1 = run(always_cache_failure)
-    success_cache_success_res1 = run(success_cache_success)
-    success_cache_failure_res1 = run(success_cache_failure)
+    always_cache_success_res1 = run1(always_cache_success)
+    always_cache_failure_res1 = run1(always_cache_failure)
+    success_cache_success_res1 = run1(success_cache_success)
+    success_cache_failure_res1 = run1(success_cache_failure)
 
     runner_one.new_session("new session")
-    always_cache_success_res2 = run(always_cache_success)
-    always_cache_failure_res2 = run(always_cache_failure)
-    success_cache_success_res2 = run(success_cache_success)
-    success_cache_failure_res2 = run(success_cache_failure)
+    always_cache_success_res2 = run1(always_cache_success)
+    always_cache_failure_res2 = run1(always_cache_failure)
+    success_cache_success_res2 = run1(success_cache_success)
+    success_cache_failure_res2 = run1(success_cache_failure)
 
     # Even with a new session, most results should be memoized.
     assert always_cache_success_res1 is always_cache_success_res2
@@ -193,13 +193,13 @@ def test_cache_scope_per_restart() -> None:
     # But a new scheduler removes all memoization. We do not cache to disk.
     runner_two = new_rule_runner()
 
-    def run(process: Process) -> FallibleProcessResult:
+    def run2(process: Process) -> FallibleProcessResult:
         return runner_two.request(FallibleProcessResult, [process])
 
-    assert run(always_cache_success) != always_cache_success_res1
-    assert run(always_cache_failure) != always_cache_failure_res1
-    assert run(success_cache_success) != success_cache_success_res1
-    assert run(success_cache_failure) != success_cache_failure_res1
+    assert run2(always_cache_success) != always_cache_success_res1
+    assert run2(always_cache_failure) != always_cache_failure_res1
+    assert run2(success_cache_success) != success_cache_success_res1
+    assert run2(success_cache_failure) != success_cache_failure_res1
 
 
 def test_cache_scope_never(rule_runner: RuleRunner) -> None:
