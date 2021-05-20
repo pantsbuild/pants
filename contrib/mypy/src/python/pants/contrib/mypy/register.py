@@ -10,13 +10,9 @@ class MypyStandalone(MypyTask):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register("--skip", type=bool, default=False, help="Skip running mypy.")
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            help="Whether to run mypy on transitive dependencies of the given python targets.",
-        )
+        register('--skip', type=bool, default=False, help='Skip running mypy.')
+        register('--transitive', type=bool, default=False,
+                 help='Whether to run mypy on transitive dependencies of the given python targets.')
 
 
 def register_goals():
