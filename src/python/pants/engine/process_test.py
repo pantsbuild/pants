@@ -152,22 +152,54 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
 
 
 def test_cache_scope_per_restart() -> None:
-    process = Process(
-        argv=("/bin/bash", "-c", "echo $RANDOM"),
-        cache_scope=ProcessCacheScope.PER_RESTART,
-        description="random",
-    )
-    runner_one = new_rule_runner()
-    result_one = runner_one.request(FallibleProcessResult, [process])
-    runner_one.new_session("session one")
-    result_two = runner_one.request(FallibleProcessResult, [process])
-    # Should not re-run within the same Scheduler, even with a new Session.
-    assert result_one is result_two
+    success_argv = ("/bin/bash", "-c", "echo $RANDOM")
+    failure_argv = ("/bin/bash", "-c", "echo $RANDOM; exit 1")
 
-    # Should re-run in a new Scheduler.
+    always_cache_success = Process(
+        success_argv, cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS, description="foo"
+    )
+    always_cache_failure = Process(
+        failure_argv, cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS, description="foo"
+    )
+    success_cache_success = Process(
+        success_argv, cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL, description="foo"
+    )
+    success_cache_failure = Process(
+        failure_argv, cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL, description="foo"
+    )
+
+    runner_one = new_rule_runner()
+
+    def run1(process: Process) -> FallibleProcessResult:
+        return runner_one.request(FallibleProcessResult, [process])
+
+    always_cache_success_res1 = run1(always_cache_success)
+    always_cache_failure_res1 = run1(always_cache_failure)
+    success_cache_success_res1 = run1(success_cache_success)
+    success_cache_failure_res1 = run1(success_cache_failure)
+
+    runner_one.new_session("new session")
+    always_cache_success_res2 = run1(always_cache_success)
+    always_cache_failure_res2 = run1(always_cache_failure)
+    success_cache_success_res2 = run1(success_cache_success)
+    success_cache_failure_res2 = run1(success_cache_failure)
+
+    # Even with a new session, most results should be memoized.
+    assert always_cache_success_res1 is always_cache_success_res2
+    assert always_cache_failure_res1 is always_cache_failure_res2
+    assert success_cache_success_res1 is success_cache_success_res2
+    assert success_cache_failure_res1 != success_cache_failure_res2
+
+    # But a new scheduler removes all memoization. We do not cache to disk.
     runner_two = new_rule_runner()
-    result_three = runner_two.request(FallibleProcessResult, [process])
-    assert result_one.stdout != result_three.stdout
+
+    def run2(process: Process) -> FallibleProcessResult:
+        return runner_two.request(FallibleProcessResult, [process])
+
+    assert run2(always_cache_success) != always_cache_success_res1
+    assert run2(always_cache_failure) != always_cache_failure_res1
+    assert run2(success_cache_success) != success_cache_success_res1
+    assert run2(success_cache_failure) != success_cache_failure_res1
 
 
 def test_cache_scope_never(rule_runner: RuleRunner) -> None:

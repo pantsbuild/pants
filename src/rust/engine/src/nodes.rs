@@ -1424,8 +1424,10 @@ impl Node for NodeKey {
     match self {
       NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
         NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
-          ProcessCacheScope::Always | ProcessCacheScope::PerRestart => true,
-          ProcessCacheScope::Successful => process_result.0.exit_code == 0,
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
+          ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+            process_result.0.exit_code == 0
+          }
           ProcessCacheScope::Never => false,
         },
         _ => true,
