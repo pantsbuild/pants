@@ -143,10 +143,7 @@ pub async fn client_execute(
   let socket = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), port))
     .await
     .map_err(|err| {
-      NailgunClientError::PreConnect(format!(
-        "Nailgun client error connecting to localhost: {}",
-        err
-      ))
+      NailgunClientError::PreConnect(format!("Failed to connect to localhost: {}", err))
     })?;
 
   let mut child = nails::client::handle_connection(config, socket, command, async {
@@ -155,7 +152,7 @@ pub async fn client_execute(
     stdin_read
   })
   .await
-  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start remote task: {}", err)))?;
+  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start: {}", err)))?;
 
   handle_client_output(
     child.output_stream.take().unwrap(),
@@ -167,7 +164,7 @@ pub async fn client_execute(
   let exit_code: ExitCode = child
     .wait()
     .await
-    .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
+    .map_err(|err| NailgunClientError::PostConnect(format!("Failed during execution: {}", err)))?;
 
   Ok(exit_code.0)
 }

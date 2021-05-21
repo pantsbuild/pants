@@ -702,7 +702,7 @@ py_class!(class PyNailgunClient |py| {
       )).map(|code| code.to_py_object(py)).map_err(|e| match e{
         NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
         NailgunClientError::PostConnect(s) => {
-          let err_str = format!("Nailgun client error: {:?}", s);
+          let err_str = format!("Pantsd client error: {}", s);
           PyErr::new::<NailgunClientException, _>(py, (err_str,))
         },
         NailgunClientError::BrokenPipe => {
