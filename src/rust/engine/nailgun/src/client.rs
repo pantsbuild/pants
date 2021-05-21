@@ -172,7 +172,7 @@ pub async fn client_execute(
       }
       _ => format!("Failed during execution: {}", err),
     };
-    NailgunClientError::PostConnect(err_str.to_owned())
+    NailgunClientError::PostConnect(err_str)
   })?;
 
   Ok(exit_code.0)
