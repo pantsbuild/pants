@@ -106,7 +106,7 @@ def test_logs_unhandled_exception() -> None:
 
 def test_fails_ctrl_c_on_import() -> None:
     with temporary_dir() as tmpdir:
-        # TODO: figure out blah the cwd of the pants subprocess, not just the "workdir"!
+        # TODO: figure out blah2 the cwd of the pants subprocess, not just the "workdir"!
         pants_run = run_pants_with_workdir(
             lifecycle_stub_cmdline(),
             workdir=tmpdir,
