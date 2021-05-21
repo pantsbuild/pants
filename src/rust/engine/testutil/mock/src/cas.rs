@@ -278,24 +278,116 @@ macro_rules! check_instance_name {
   };
 }
 
+#[derive(Debug, Eq, PartialEq)]
+struct ParsedWriteResourceName<'a> {
+  instance_name: &'a str,
+  _uuid: &'a str,
+  hash: &'a str,
+  size: usize,
+}
+
+/// Parses a resource name of the form `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}` into
+/// a struct with references to the individual components of the resource name. The
+/// `{instance_name}` may be blank (with no leading slash) as per REAPI specification.
+fn parse_write_resource_name(resource: &str) -> Result<ParsedWriteResourceName, String> {
+  if resource.is_empty() {
+    return Err("Missing resource name".to_owned());
+  }
+
+  // Parse the resource name into parts separated by slashes (/).
+  let parts: Vec<_> = resource.split('/').collect();
+
+  // Search for the `uploads` path component.
+  let uploads_index = match parts.iter().position(|p| *p == "uploads") {
+    Some(index) => index,
+    None => return Err("Malformed resource name: missing `uploads` component".to_owned()),
+  };
+  let instance_parts = &parts[0..uploads_index];
+
+  if (parts.len() - uploads_index) < 5 {
+    return Err("Malformed resource name: not enough path components after `uploads`".to_owned());
+  }
+
+  if parts[uploads_index + 2] != "blobs" {
+    return Err("Malformed resource name: expected `blobs` component".to_owned());
+  }
+
+  let size = parts[uploads_index + 4]
+    .parse::<usize>()
+    .map_err(|_| "Malformed resource name: cannot parse size".to_owned())?;
+
+  let instance_name = if instance_parts.is_empty() {
+    ""
+  } else {
+    let last_instance_name_index =
+      instance_parts.iter().map(|x| (*x).len()).sum::<usize>() + instance_parts.len() - 1;
+    &resource[0..last_instance_name_index]
+  };
+
+  Ok(ParsedWriteResourceName {
+    instance_name,
+    _uuid: parts[uploads_index + 1],
+    hash: parts[uploads_index + 3],
+    size,
+  })
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ParsedReadResourceName<'a> {
+  instance_name: &'a str,
+  hash: &'a str,
+  size: usize,
+}
+
+/// `"{instance_name}/blobs/{hash}/{size}"`
+fn parse_read_resource_name(resource: &str) -> Result<ParsedReadResourceName, String> {
+  if resource.is_empty() {
+    return Err("Missing resource name".to_owned());
+  }
+
+  // Parse the resource name into parts separated by slashes (/).
+  let parts: Vec<_> = resource.split('/').collect();
+
+  // Search for the `blobs` path component.
+  let blobs_index = match parts.iter().position(|p| *p == "blobs") {
+    Some(index) => index,
+    None => return Err("Malformed resource name: missing `blobs` component".to_owned()),
+  };
+  let instance_parts = &parts[0..blobs_index];
+
+  if (parts.len() - blobs_index) < 3 {
+    return Err("Malformed resource name: not enough path components after `blobs`".to_owned());
+  }
+
+  let size = parts[blobs_index + 2]
+    .parse::<usize>()
+    .map_err(|_| "Malformed resource name: cannot parse size".to_owned())?;
+
+  let instance_name = if instance_parts.is_empty() {
+    ""
+  } else {
+    let last_instance_name_index =
+      instance_parts.iter().map(|x| (*x).len()).sum::<usize>() + instance_parts.len() - 1;
+    &resource[0..last_instance_name_index]
+  };
+
+  Ok(ParsedReadResourceName {
+    instance_name,
+    hash: parts[blobs_index + 1],
+    size,
+  })
+}
+
 impl StubCASResponder {
   fn instance_name(&self) -> String {
     self.instance_name.clone().unwrap_or_default()
   }
 
   fn read_internal(&self, req: &ReadRequest) -> Result<Vec<ReadResponse>, Status> {
-    let parts: Vec<_> = req.resource_name.splitn(4, '/').collect();
-    if parts.len() != 4
-      || parts.get(0) != Some(&self.instance_name().as_ref())
-      || parts.get(1) != Some(&"blobs")
-    {
-      return Err(Status::invalid_argument(format!(
-        "Bad resource name format {} - want {}/blobs/some-sha256/size",
-        req.resource_name,
-        self.instance_name(),
-      )));
-    }
-    let digest = parts[2];
+    let parsed_resource_name = parse_read_resource_name(&req.resource_name)
+      .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {}", err)))?;
+
+    let digest = parsed_resource_name.hash;
     let fingerprint = Fingerprint::from_hex_string(digest)
       .map_err(|e| Status::invalid_argument(format!("Bad digest {}: {}", digest, e)))?;
     if self.always_errors {
@@ -354,7 +446,6 @@ impl ByteStream for StubCASResponder {
     let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
-    let instance_name = self.instance_name();
 
     let mut stream = request.into_inner();
 
@@ -404,35 +495,27 @@ impl ByteStream for StubCASResponder {
         "Stream saw no messages".to_owned(),
       )),
       Some(resource_name) => {
-        let parts: Vec<_> = resource_name.splitn(6, '/').collect();
-        if parts.len() != 6
-          || parts.get(0) != Some(&instance_name.as_ref())
-          || parts.get(1) != Some(&"uploads")
-          || parts.get(3) != Some(&"blobs")
-        {
+        let parsed_resource_name =
+          parse_write_resource_name(&resource_name).map_err(Status::internal)?;
+
+        if parsed_resource_name.instance_name != self.instance_name().as_str() {
           return Err(Status::invalid_argument(format!(
-            "Bad resource name: {}",
-            resource_name
+            "Bad instance name in resource name: expected={}, actual={}",
+            self.instance_name(),
+            parsed_resource_name.instance_name
           )));
         }
-        let fingerprint = match Fingerprint::from_hex_string(parts[4]) {
+
+        let fingerprint = match Fingerprint::from_hex_string(parsed_resource_name.hash) {
           Ok(f) => f,
           Err(err) => {
             return Err(Status::invalid_argument(format!(
               "Bad fingerprint in resource name: {}: {}",
-              parts[4], err
+              parsed_resource_name.hash, err
             )));
           }
         };
-        let size = match parts[5].parse::<usize>() {
-          Ok(s) => s,
-          Err(err) => {
-            return Err(Status::invalid_argument(format!(
-              "Bad size in resource name: {}: {}",
-              parts[5], err
-            )));
-          }
-        };
+        let size = parsed_resource_name.size;
         if size != bytes.len() {
           return Err(Status::invalid_argument(format!(
             "Size was incorrect: resource name said size={} but got {}",
@@ -551,5 +634,88 @@ impl Capabilities for StubCASResponder {
     };
 
     Ok(Response::new(response))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{
+    parse_read_resource_name, parse_write_resource_name, ParsedReadResourceName,
+    ParsedWriteResourceName,
+  };
+
+  #[test]
+  fn parse_write_resource_name_correctly() {
+    // Test some basic success cases, but this skips testing failure cases because
+    // parse_write_resource_name is just a test helper.
+
+    let result = parse_write_resource_name("main/uploads/uuid-12345/blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedWriteResourceName {
+        instance_name: "main",
+        _uuid: "uuid-12345",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+
+    let result = parse_write_resource_name("uploads/uuid-12345/blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedWriteResourceName {
+        instance_name: "",
+        _uuid: "uuid-12345",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+
+    let result = parse_write_resource_name("a/b/c/uploads/uuid-12345/blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedWriteResourceName {
+        instance_name: "a/b/c",
+        _uuid: "uuid-12345",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+  }
+
+  #[test]
+  fn parse_read_resource_name_correctly() {
+    // Test some basic success cases, but this skips testing failure cases because
+    // parse_read_resource_namethis is just a test helper.
+
+    let result = parse_read_resource_name("main/blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedReadResourceName {
+        instance_name: "main",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+
+    let result = parse_read_resource_name("blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedReadResourceName {
+        instance_name: "",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+
+    let result = parse_read_resource_name("a/b/c/blobs/abc123/12").unwrap();
+    assert_eq!(
+      result,
+      ParsedReadResourceName {
+        instance_name: "a/b/c",
+        hash: "abc123",
+        size: 12,
+      }
+    );
   }
 }
