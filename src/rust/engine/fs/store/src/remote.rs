@@ -166,9 +166,11 @@ impl ByteStore {
     ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
   {
     let len = digest.size_bytes;
+    let instance_name = self.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
-      "{}/uploads/{}/blobs/{}/{}",
-      self.instance_name.clone().unwrap_or_default(),
+      "{}{}uploads/{}/blobs/{}/{}",
+      &instance_name,
+      if instance_name.is_empty() { "" } else { "/" },
       uuid::Uuid::new_v4(),
       digest.hash,
       digest.size_bytes,
@@ -245,9 +247,11 @@ impl ByteStore {
     f: F,
   ) -> Result<Option<T>, String> {
     let store = self.clone();
+    let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
-      "{}/blobs/{}/{}",
-      store.instance_name.clone().unwrap_or_default(),
+      "{}{}blobs/{}/{}",
+      &instance_name,
+      if instance_name.is_empty() { "" } else { "/" },
       digest.hash,
       digest.size_bytes
     );
