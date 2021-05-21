@@ -1428,7 +1428,7 @@ impl Node for NodeKey {
           ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
             process_result.0.exit_code == 0
           }
-          ProcessCacheScope::Never => false,
+          ProcessCacheScope::PerSession => false,
         },
         _ => true,
       },
