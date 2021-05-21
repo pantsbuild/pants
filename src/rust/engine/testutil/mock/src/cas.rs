@@ -646,9 +646,6 @@ mod tests {
 
   #[test]
   fn parse_write_resource_name_correctly() {
-    // Test some basic success cases, but this skips testing failure cases because
-    // parse_write_resource_name is just a test helper.
-
     let result = parse_write_resource_name("main/uploads/uuid-12345/blobs/abc123/12").unwrap();
     assert_eq!(
       result,
@@ -681,13 +678,46 @@ mod tests {
         size: 12,
       }
     );
+
+    // extra components after the size are accepted
+    let result =
+      parse_write_resource_name("a/b/c/uploads/uuid-12345/blobs/abc123/12/extra/stuff").unwrap();
+    assert_eq!(
+      result,
+      ParsedWriteResourceName {
+        instance_name: "a/b/c",
+        _uuid: "uuid-12345",
+        hash: "abc123",
+        size: 12,
+      }
+    );
+  }
+
+  #[test]
+  fn parse_write_resource_name_errors_as_expected() {
+    //
+    let err = parse_write_resource_name("").unwrap_err();
+    assert_eq!(err, "Missing resource name");
+
+    let err = parse_write_resource_name("main/uuid-12345/blobs/abc123/12").unwrap_err();
+    assert_eq!(err, "Malformed resource name: missing `uploads` component");
+
+    let err = parse_write_resource_name("main/uploads/uuid-12345/abc123/12").unwrap_err();
+    assert_eq!(
+      err,
+      "Malformed resource name: not enough path components after `uploads`"
+    );
+
+    let err = parse_write_resource_name("main/uploads/uuid-12345/abc123/12/foo").unwrap_err();
+    assert_eq!(err, "Malformed resource name: expected `blobs` component");
+
+    // negative size should be rejected
+    let err = parse_write_resource_name("main/uploads/uuid-12345/blobs/abc123/-12").unwrap_err();
+    assert_eq!(err, "Malformed resource name: cannot parse size");
   }
 
   #[test]
   fn parse_read_resource_name_correctly() {
-    // Test some basic success cases, but this skips testing failure cases because
-    // parse_read_resource_namethis is just a test helper.
-
     let result = parse_read_resource_name("main/blobs/abc123/12").unwrap();
     assert_eq!(
       result,
@@ -717,5 +747,24 @@ mod tests {
         size: 12,
       }
     );
+  }
+
+  #[test]
+  fn parse_read_resource_name_errors_as_expected() {
+    let err = parse_read_resource_name("").unwrap_err();
+    assert_eq!(err, "Missing resource name");
+
+    let err = parse_read_resource_name("main/abc123/12").unwrap_err();
+    assert_eq!(err, "Malformed resource name: missing `blobs` component");
+
+    let err = parse_read_resource_name("main/blobs/12").unwrap_err();
+    assert_eq!(
+      err,
+      "Malformed resource name: not enough path components after `blobs`"
+    );
+
+    // negative size should be rejected
+    let err = parse_read_resource_name("main/blobs/abc123/-12").unwrap_err();
+    assert_eq!(err, "Malformed resource name: cannot parse size");
   }
 }
