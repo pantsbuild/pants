@@ -788,7 +788,8 @@ class GlobalOptions(Subsystem):
                 "When the maximum memory is exceeded, the daemon will restart gracefully, "
                 "although all previous in-memory caching will be lost. Setting too low means that "
                 "you may miss out on some caching, whereas setting too high may over-consume "
-                "resources and may result in Pantsd being OOM-killed (out of memory).\n\n"
+                "resources and may result in the operating system killing Pantsd due to memory "
+                "overconsumption (e.g. via the OOM killer).\n\n"
                 "There is at most one pantsd process per workspace."
             ),
         )
