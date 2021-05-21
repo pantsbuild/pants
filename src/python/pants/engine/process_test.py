@@ -202,17 +202,19 @@ def test_cache_scope_per_restart() -> None:
     assert run2(success_cache_failure) != success_cache_failure_res1
 
 
-def test_cache_scope_never(rule_runner: RuleRunner) -> None:
+def test_cache_scope_per_session(rule_runner: RuleRunner) -> None:
     process = Process(
         argv=("/bin/bash", "-c", "echo $RANDOM"),
-        cache_scope=ProcessCacheScope.NEVER,
+        cache_scope=ProcessCacheScope.PER_SESSION,
         description="random",
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
-    rule_runner.new_session("next attempt")
     result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+    rule_runner.new_session("next attempt")
+    result_three = rule_runner.request(FallibleProcessResult, [process])
     # Should re-run in a new Session.
-    assert result_one.stdout != result_two.stdout
+    assert result_one != result_three
 
 
 # TODO: Move to fs_test.py.
