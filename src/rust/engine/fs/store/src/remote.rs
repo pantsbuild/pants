@@ -11,7 +11,7 @@ use bazel_protos::{self};
 use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
-use grpc_util::retry::retry_call;
+use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
@@ -371,7 +371,7 @@ impl ByteStore {
       let response = retry_call(client, move |mut client| {
         let request = request.clone();
         async move { client.find_missing_blobs(request).await }
-      })
+      }, status_is_retryable)
       .await
       .map_err(status_to_str)?;
 

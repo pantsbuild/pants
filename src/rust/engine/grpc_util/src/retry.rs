@@ -7,7 +7,7 @@ use futures::Future;
 use rand::{thread_rng, Rng};
 use tonic::{Code, Response, Status};
 
-fn is_retryable(status: &Status) -> bool {
+pub fn status_is_retryable(status: &Status) -> bool {
   matches!(
     status.code(),
     Code::Aborted
@@ -21,11 +21,12 @@ fn is_retryable(status: &Status) -> bool {
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
 #[inline]
-pub async fn retry_call<T, C, F, Fut>(client: C, f: F) -> Result<Response<T>, Status>
+pub async fn retry_call<T, E, C, F, Fut>(client: C, f: F, is_retryable: G) -> Result<Response<T>, Status>
 where
   C: Clone,
   F: Fn(C) -> Fut,
-  Fut: Future<Output = Result<Response<T>, Status>>,
+  G: Fn(&E) -> bool,
+  Fut: Future<Output = Result<Response<T>, E>>,
 {
   const INTERVAL_DURATION: Duration = Duration::from_millis(10);
   const MAX_RETRIES: u32 = 3;

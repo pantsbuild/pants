@@ -44,7 +44,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::retry::retry_call;
+use grpc_util::retry::{retry_call, status_is_retryable};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -1396,7 +1396,7 @@ pub async fn check_action_cache(
     let request = apply_headers(Request::new(request), &context.build_id);
 
     async move { client.get_action_result(request).await }
-  })
+  }, status_is_retryable)
   .await;
 
   match action_result_response {
