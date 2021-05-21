@@ -59,5 +59,5 @@ where
     num_retries += 1
   }
 
-  Err(last_error.take().unwrap())
+  Err(last_error.unwrap())
 }
