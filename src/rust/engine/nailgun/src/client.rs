@@ -161,10 +161,18 @@ pub async fn client_execute(
   )
   .await?;
 
-  let exit_code: ExitCode = child
-    .wait()
-    .await
-    .map_err(|err| NailgunClientError::PostConnect(format!("Failed during execution: {}", err)))?;
+  let exit_code: ExitCode = child.wait().await.map_err(|err| {
+    let err_str = match err.to_string().as_str() {
+      "Client exited before the server's result could be returned." => {
+        "The pantsd process was killed during the run.\n\nIf this was not intentionally done by you, \
+          Pants may have been OOM-killed (out of memory). You can set the global option \
+          `--pantsd-max-memory-usage` to reduce Pantsd's memory consumption."
+          .to_owned()
+      }
+      _ => format!("Failed during execution: {}", err),
+    };
+    NailgunClientError::PostConnect(err_str.to_owned())
+  })?;
 
   Ok(exit_code.0)
 }

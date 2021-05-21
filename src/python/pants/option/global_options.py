@@ -784,8 +784,12 @@ class GlobalOptions(Subsystem):
             type=int,
             default=2 ** 30,
             help=(
-                "The maximum memory usage of a pantsd process (in bytes). There is at most one "
-                "pantsd process per workspace."
+                "The maximum memory usage of the pantsd process (in bytes).\n\n"
+                "When the maximum memory is exceeded, the daemon will restart gracefully, "
+                "although all previous in-memory caching will be lost. Setting too low means that "
+                "you may miss out on some caching, whereas setting too high may over-consume "
+                "resources and may result in Pantsd being OOM-killed (out of memory).\n\n"
+                "There is at most one pantsd process per workspace."
             ),
         )
 
