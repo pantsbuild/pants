@@ -83,7 +83,15 @@ class BaseZincCompile(JvmCompile):
         :param settings: The jvm platform settings from which to extract the arguments.
         :type settings: :class:`JvmPlatformSettings`
         """
-        return [f"-C{arg}" for arg in distribution.generate_javac_args(settings)]
+        args = list(settings.args)
+        if all(a not in ("-C-source", "-C-target", "-C--release") for a in args):
+            args.extend([f"-C{arg}" for arg in settings.javac_source_target_args(distribution)])
+        # we could inject scala target/release here too, but I think it's unnecessary, because we
+        # can cover that in args.
+        # if we did, it'd look something like
+        # - check for -S-release and -S-target:... in args
+        # - if they aren't there, set some up depending on the distribution.
+        return distribution.substitute_home(args)
 
     @classmethod
     def implementation_version(cls):
@@ -399,9 +407,6 @@ class BaseZincCompile(JvmCompile):
                 jar_file,
             ]
         )
-        # TODO pass -release X if it makes sense to do so.
-        # java >= 9, targeting 6,7,8,9, scala >= 2.12.5
-        # https://github.com/scala/scala/commit/4fd0629488dcf7219857bfda2c51bae1bc3924d1
 
         diag_out = self._diagnostics_out(ctx)
         if diag_out:

@@ -1122,8 +1122,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             underlying_libs = self._underlying.find_libs(names)
             return [self._rehome(l) for l in underlying_libs]
 
-        def generate_javac_args(self, settings):
-            return Distribution.substitute_java_home(settings.javac_args, self._home)
+        def substitute_home(self, args):
+            return Distribution.substitute_java_home(args, self._home)
 
         def find_libs_path_globs(self, names):
             path_globs = []

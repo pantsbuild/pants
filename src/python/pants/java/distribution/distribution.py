@@ -111,8 +111,8 @@ class Distribution:
         """
         return self._get_version(self.java)
 
-    def generate_javac_args(self, settings):
-        return Distribution.substitute_java_home(settings.javac_args, self.home)
+    def substitute_home(self, args):
+        return Distribution.substitute_java_home(args, self.home)
 
     @staticmethod
     def substitute_java_home(args, home):

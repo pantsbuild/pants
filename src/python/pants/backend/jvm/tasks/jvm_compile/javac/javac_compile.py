@@ -110,7 +110,8 @@ class JavacCompile(JvmCompile):
         distribution = self._local_jvm_distribution(settings)
 
         javac_args = []
-        javac_args.extend(distribution.generate_javac_args(settings))
+        javac_args.extend(settings.javac_source_target_args(distribution))
+        javac_args.extend(distribution.substitute_home(settings.args))
 
         if self.execution_strategy == self.ExecutionStrategy.hermetic:
             javac_args.extend(
