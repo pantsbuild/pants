@@ -965,7 +965,7 @@ pub fn make_execute_request(
 
   if matches!(
     req.cache_scope,
-    ProcessCacheScope::Never
+    ProcessCacheScope::PerSession
       | ProcessCacheScope::PerRestartAlways
       | ProcessCacheScope::PerRestartSuccessful
   ) {
