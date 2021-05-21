@@ -84,6 +84,7 @@ class BaseZincCompile(JvmCompile):
         :type settings: :class:`JvmPlatformSettings`
         """
         args = list(settings.args)
+        # if source, target or release is already specified, then don't generate args for them.
         if all(a not in ("-C-source", "-C-target", "-C--release") for a in args):
             args.extend([f"-C{arg}" for arg in settings.javac_source_target_args(distribution)])
         # we could inject scala target/release here too, but I think it's unnecessary, because we

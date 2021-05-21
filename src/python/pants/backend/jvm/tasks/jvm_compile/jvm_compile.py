@@ -1155,6 +1155,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         def _rehome(self, l):
             return os.path.join(self._home, self._unroot_lib_path(l))
 
+        @property
+        def version(self):
+            return self._underlying.version
+
     @memoized_method
     def _get_jvm_distribution(self, settings=None):
         local_distribution = self._local_jvm_distribution(settings)
