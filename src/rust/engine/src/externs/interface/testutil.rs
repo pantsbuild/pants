@@ -1,48 +1,58 @@
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::sync::Arc;
 
-use super::PyExecutor;
-use cpython::{exc, py_class, PyErr, PyObject, PyResult, PyString};
 use parking_lot::Mutex;
+use pyo3::exceptions::PyAssertionError;
+use pyo3::prelude::*;
+use pyo3::types::PyType;
 use testutil_mock::{StubCAS, StubCASBuilder};
 
-py_class!(pub class PyStubCASBuilder |py| {
-  data builder: Arc<Mutex<Option<StubCASBuilder>>>;
+#[pyclass]
+pub struct PyStubCASBuilder {
+  builder: Arc<Mutex<Option<StubCASBuilder>>>,
+}
 
-  def always_errors(&self) -> PyResult<PyObject> {
-    let mut builder_opt = self.builder(py).lock();
+#[pymethods]
+impl PyStubCASBuilder {
+  fn always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
+    let mut builder_opt = self.builder.lock();
     let builder = builder_opt
       .take()
-      .ok_or_else(|| PyErr::new::<exc::Exception, _>(py, (PyString::new(py, "unable to unwrap StubCASBuilder"),)))?
-      .always_errors();
-    *builder_opt = Some(builder);
-    Ok(py.None())
-  }
-
-  def build(&self, executor: PyExecutor) -> PyResult<PyStubCAS> {
-    let executor = executor.executor(py);
-    executor.enter(|| {
-      let mut builder_opt = self.builder(py).lock();
-      let builder = builder_opt
-        .take()
-        .ok_or_else(|| PyErr::new::<exc::Exception, _>(py, (PyString::new(py, "unable to unwrap StubCASBuilder"),)))?;
-      let cas = builder.build();
-      PyStubCAS::create_instance(py, cas)
+      .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
+    *builder_opt = Some(builder.always_errors());
+    Ok(PyStubCASBuilder {
+      builder: self.builder.clone(),
     })
   }
-});
 
-py_class!(pub class PyStubCAS |py| {
-  data server: StubCAS;
+  fn build(&mut self) -> PyResult<PyStubCAS> {
+    let mut builder_opt = self.builder.lock();
+    let builder = builder_opt
+      .take()
+      .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
+    Ok(PyStubCAS {
+      stub_cas: builder.build(),
+    })
+  }
+}
 
-  @classmethod
-  def builder(_cls) -> PyResult<PyStubCASBuilder> {
-    let builder = StubCAS::builder();
-    PyStubCASBuilder::create_instance(py, Arc::new(Mutex::new(Some(builder))))
+#[pyclass]
+pub struct PyStubCAS {
+  stub_cas: StubCAS,
+}
+
+#[pymethods]
+impl PyStubCAS {
+  #[classmethod]
+  fn builder(_cls: &PyType) -> PyStubCASBuilder {
+    let builder = Arc::new(Mutex::new(Some(StubCAS::builder())));
+    PyStubCASBuilder { builder }
   }
 
-  def address(&self) -> PyResult<PyString> {
-    let server = self.server(py);
-    let address = server.address();
-    Ok(PyString::new(py, &address))
+  #[getter]
+  fn address(&self) -> String {
+    self.stub_cas.address()
   }
-});
+}
