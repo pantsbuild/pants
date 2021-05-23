@@ -7,14 +7,14 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.target_types import JavaLibrary
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
-from pants.java.compile.javac import rules as javac_rules
-from pants.java.target_types import JavaLibrary
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
