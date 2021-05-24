@@ -167,7 +167,12 @@ pub async fn client_execute(
         "The pantsd process was killed during the run.\n\nIf this was not intentionally done by you, \
           Pants may have been killed by the operating system due to memory overconsumption \
           (i.e. OOM-killed). You can set the global option `--pantsd-max-memory-usage` to reduce \
-          Pantsd's memory consumption (run `./pants help-advanced global`)."
+          Pantsd's memory consumption by retaining less in its in-memory cache \
+          (run `./pants help-advanced global`). You can also disable pantsd with the global \
+          option `--pantsd` to avoid persisting memory across Pants runs, although you will miss \
+          out on additional caching.\n\nIf neither of those help, please consider filing a \
+          GitHub issue or reaching out on Slack so that we can investigate the possible memory \
+          overconsumption (https://www.pantsbuild.org/docs/getting-help)."
           .to_owned()
       }
       _ => format!("Failed during execution: {}", err),
