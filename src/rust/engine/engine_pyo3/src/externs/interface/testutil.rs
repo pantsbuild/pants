@@ -1,8 +1,9 @@
-// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::sync::Arc;
 
+use crate::externs::interface::PyExecutor;
 use parking_lot::Mutex;
 use pyo3::exceptions::PyAssertionError;
 use pyo3::prelude::*;
@@ -27,13 +28,16 @@ impl PyStubCASBuilder {
     })
   }
 
-  fn build(&mut self) -> PyResult<PyStubCAS> {
+  fn build(&mut self, py_executor: PyExecutor) -> PyResult<PyStubCAS> {
     let mut builder_opt = self.builder.lock();
     let builder = builder_opt
       .take()
       .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
-    Ok(PyStubCAS {
-      stub_cas: builder.build(),
+    // NB: A Tokio runtime must be used when building StubCAS.
+    py_executor.executor.enter(|| {
+      Ok(PyStubCAS {
+        stub_cas: builder.build(),
+      })
     })
   }
 }

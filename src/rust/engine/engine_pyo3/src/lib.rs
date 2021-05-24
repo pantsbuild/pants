@@ -1,4 +1,4 @@
-// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #![deny(warnings)]
@@ -26,20 +26,10 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+// We only use unsafe pointer dereferences in our no_mangle exposed API, but it is nicer to list
+// just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
+// other unsafeness.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![type_length_limit = "43757804"]
 
-fn main() {
-  // NB: The native extension only works with the Python interpreter version it was built with
-  // (e.g. Python 3.7 vs 3.8).
-  println!("cargo:rerun-if-env-changed=PY");
-
-  if cfg!(target_os = "macos") {
-    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
-    // the underlying linker. This avoids "missing symbol" errors for Python symbols
-    // (e.g. `_PyImport_ImportModule`) at build time when bundling the cpython sources.
-    // The missing symbols will instead by dynamically resolved in the address space of the parent
-    // binary (e.g. `python`) at runtime. We do this to avoid needing to link to libpython
-    // (which would constrain us to specific versions of Python).
-    println!("cargo:rustc-cdylib-link-arg=-undefined");
-    println!("cargo:rustc-cdylib-link-arg=dynamic_lookup");
-  }
-}
+mod externs;

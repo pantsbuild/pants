@@ -81,18 +81,6 @@ use crate::{
   Tasks, Types, Value,
 };
 
-mod testutil;
-
-#[pyo3::prelude::pymodule]
-fn native_engine_pyo3(
-  _py: pyo3::prelude::Python,
-  m: &pyo3::prelude::PyModule,
-) -> pyo3::prelude::PyResult<()> {
-  m.add_class::<self::testutil::PyStubCAS>()?;
-  m.add_class::<self::testutil::PyStubCASBuilder>()?;
-  Ok(())
-}
-
 py_exception!(native_engine, PollTimeout);
 py_exception!(native_engine, NailgunConnectionException);
 py_exception!(native_engine, NailgunClientException);

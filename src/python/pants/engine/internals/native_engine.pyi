@@ -212,16 +212,6 @@ class PyTasks:
 class PyTypes:
     def __init__(self, **kwargs: Any) -> None: ...
 
-class PyStubCASBuilder:
-    def always_errors(self) -> PyStubCASBuilder: ...
-    def build(self) -> PyStubCAS: ...
-
-class PyStubCAS:
-    @classmethod
-    def builder(cls) -> PyStubCASBuilder: ...
-    @property
-    def address(self) -> str: ...
-
 class PyStdioDestination:
     pass
 

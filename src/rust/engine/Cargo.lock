@@ -666,7 +666,6 @@ dependencies = [
  "num_enum",
  "parking_lot",
  "process_execution",
- "pyo3",
  "rand 0.8.2",
  "regex",
  "reqwest",
@@ -687,6 +686,17 @@ dependencies = [
  "uuid",
  "watch",
  "workunit_store",
+]
+
+[[package]]
+name = "engine_pyo3"
+version = "0.0.1"
+dependencies = [
+ "hashing",
+ "mock",
+ "parking_lot",
+ "pyo3",
+ "task_executor",
 ]
 
 [[package]]
