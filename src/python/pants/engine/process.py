@@ -47,8 +47,9 @@ class ProcessCacheScope(Enum):
     # Cached only in memory (i.e. memoized in pantsd), but never persistently, and only if
     # successful.
     PER_RESTART_SUCCESSFUL = "per_restart_successful"
-    # Never cached anywhere: will run once per Session (i.e. once per run of Pants).
-    NEVER = "never"
+    # Will run once per Session, i.e. once per run of Pants. This happens because the engine
+    # de-duplicates identical work; the process is neither memoized in memory nor cached to disk.
+    PER_SESSION = "per_session"
 
 
 @frozen_after_init

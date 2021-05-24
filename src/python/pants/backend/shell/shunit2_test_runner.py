@@ -225,7 +225,9 @@ async def setup_shunit2_for_target(
         if runner.shell == Shunit2Shell.zsh
         else [runner.binary_path.path, *field_set_sources.snapshot.files]
     )
-    cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    cache_scope = (
+        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    )
     process = Process(
         argv=argv,
         input_digest=input_digest,
