@@ -9,6 +9,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Tuple
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.testutil.pants_integration_test import run_pants_with_workdir
@@ -104,6 +106,7 @@ def test_logs_unhandled_exception(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.skip(reason="Flaky: https://github.com/pantsbuild/pants/issues/12108")
 def test_fails_ctrl_c_on_import(tmp_path: Path) -> None:
     # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
     pants_run = run_pants_with_workdir(
