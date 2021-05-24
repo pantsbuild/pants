@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::externs::interface::PyExecutor;
+use super::PyExecutor;
 use parking_lot::Mutex;
 use pyo3::exceptions::PyAssertionError;
 use pyo3::prelude::*;
