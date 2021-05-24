@@ -84,8 +84,8 @@ use crate::{
 mod testutil;
 
 py_exception!(native_engine, PollTimeout);
-py_exception!(native_engine, NailgunConnectionException);
-py_exception!(native_engine, NailgunClientException);
+py_exception!(native_engine, PantsdConnectionException);
+py_exception!(native_engine, PantsdClientException);
 
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
@@ -93,13 +93,13 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "NailgunClientException",
-    py.get_type::<NailgunClientException>(),
+    "PantsdClientException",
+    py.get_type::<PantsdClientException>(),
   )?;
   m.add(
     py,
-    "NailgunConnectionException",
-    py.get_type::<NailgunConnectionException>(),
+    "PantsdConnectionException",
+    py.get_type::<PantsdConnectionException>(),
   )?;
 
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
@@ -700,11 +700,8 @@ py_class!(class PyNailgunClient |py| {
         args,
         env_list,
       )).map(|code| code.to_py_object(py)).map_err(|e| match e{
-        NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
-        NailgunClientError::PostConnect(s) => {
-          let err_str = format!("Nailgun client error: {:?}", s);
-          PyErr::new::<NailgunClientException, _>(py, (err_str,))
-        },
+        NailgunClientError::PreConnect(err_str) => PyErr::new::<PantsdConnectionException, _>(py, (err_str,)),
+        NailgunClientError::PostConnect(err_str) => PyErr::new::<PantsdClientException, _>(py, (err_str,)),
         NailgunClientError::BrokenPipe => {
           PyErr::new::<exc::BrokenPipeError, _>(py, NoArgs)
         }
