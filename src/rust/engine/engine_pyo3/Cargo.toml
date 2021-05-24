@@ -20,6 +20,10 @@ default = []
 [dependencies]
 hashing = { path = "../hashing" }
 parking_lot = "0.11"
-pyo3 = { version = "0.13", features = ["extension-module"] }
+# We must disable the `auto-initialize` feature because we do not enable `extension-module` normally
+# (see above comment in `features`), so `auto-initialize` would try to link to a static Python interpreter during
+# tests, which may fail. However, we need to then re-activate the `macros` feature. See
+# https://pyo3.rs/v0.13.2/features.html
+pyo3 = { version = "0.13", default-features = false, features = ["macros"] }
 task_executor = { path = "../task_executor" }
 testutil_mock = { package = "mock", path = "../testutil/mock" }
