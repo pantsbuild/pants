@@ -138,7 +138,10 @@ class PantsDaemonCore:
         dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(
             options, env, self._prior_auth_plugin_result
         )
-        remote_options_changed = dynamic_remote_options != self._prior_dynamic_remote_options
+        remote_options_changed = (
+            self._prior_dynamic_remote_options is not None
+            and dynamic_remote_options != self._prior_dynamic_remote_options
+        )
         if remote_options_changed:
             scheduler_restart_explanation = "Remote cache/execution options updated"
 
@@ -151,7 +154,9 @@ class PantsDaemonCore:
             options_bootstrapper.bootstrap_options,
             invert=True,
         )
-        bootstrap_options_changed = options_fingerprint != self._fingerprint
+        bootstrap_options_changed = (
+            self._fingerprint is not None and options_fingerprint != self._fingerprint
+        )
         if bootstrap_options_changed:
             scheduler_restart_explanation = "Initialization options changed"
 
