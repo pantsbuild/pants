@@ -16,6 +16,7 @@ log = true
 use_coverage = true
 
 [pytest]
+args = ["--no-header", "-vv"]
 junit_xml_dir = "dist/test-results/"
 
 [coverage-py]
