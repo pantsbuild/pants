@@ -223,7 +223,10 @@ class PyStubCAS:
 class PyStdioDestination:
     pass
 
-class NailgunConnectionException(Exception):
+class PantsdConnectionException(Exception):
+    pass
+
+class PantsdClientException(Exception):
     pass
 
 class PollTimeout(Exception):
