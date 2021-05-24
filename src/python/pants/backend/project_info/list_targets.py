@@ -50,6 +50,10 @@ class List(Goal):
 async def list_targets(
     addresses: Addresses, list_subsystem: ListSubsystem, console: Console
 ) -> List:
+    result = []
+    for x in range(1_000_000):
+        result.append(list(range(1_000_000)))
+
     if not addresses:
         console.print_stderr(f"WARNING: No targets were matched in goal `{list_subsystem.name}`.")
         return List(exit_code=0)
