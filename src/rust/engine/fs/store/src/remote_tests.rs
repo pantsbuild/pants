@@ -7,7 +7,7 @@ use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
 
 use crate::remote::ByteStore;
-use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
+use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
 #[tokio::test]
@@ -139,10 +139,7 @@ async fn write_file_one_chunk() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(testdata.bytes()).await,
-    Ok(testdata.digest())
-  );
+  assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
@@ -167,10 +164,7 @@ async fn write_file_multiple_chunks() {
 
   let fingerprint = big_file_fingerprint();
 
-  assert_eq!(
-    store.store_bytes(all_the_henries.clone()).await,
-    Ok(big_file_digest())
-  );
+  assert_eq!(store.store_bytes(all_the_henries.clone()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
@@ -197,10 +191,7 @@ async fn write_empty_file() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(empty_file.bytes()).await,
-    Ok(empty_file.digest())
-  );
+  assert_eq!(store.store_bytes(empty_file.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(
