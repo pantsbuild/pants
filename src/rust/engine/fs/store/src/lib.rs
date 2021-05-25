@@ -59,6 +59,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
+use crate::remote::ByteStoreError;
+use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::status_to_str;
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::Tree;
@@ -514,7 +517,19 @@ impl Store {
       (None, None) => Ok(None),
       (None, Some(remote_store)) => {
         let remote = remote_store.store.clone();
-        let maybe_bytes = remote.load_bytes_with(digest, Ok).await?;
+        let maybe_bytes = retry_call(
+          remote,
+          |remote| async move { remote.load_bytes_with(digest, Ok).await },
+          |err| match err {
+            ByteStoreError::Grpc(status) => status_is_retryable(status),
+            _ => false,
+          },
+        )
+        .await
+        .map_err(|err| match err {
+          ByteStoreError::Grpc(status) => status_to_str(status),
+          ByteStoreError::Other(msg) => msg,
+        })?;
 
         match maybe_bytes {
           Some(bytes) => {
@@ -771,13 +786,27 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = remote
-      .store
-      .load_bytes_with(tree_digest, |b| {
-        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-        Ok(tree)
-      })
-      .await?;
+    let tree_opt = retry_call(
+      remote,
+      |remote| async move {
+        remote
+          .store
+          .load_bytes_with(tree_digest, |b| {
+            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
+            Ok(tree)
+          })
+          .await
+      },
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })?;
 
     let tree = match tree_opt {
       Some(t) => t,

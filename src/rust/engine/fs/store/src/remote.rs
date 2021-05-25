@@ -40,7 +40,7 @@ impl fmt::Debug for ByteStore {
 }
 
 /// Represents an error from accessing a remote bytestore.
-enum ByteStoreError {
+pub enum ByteStoreError {
   /// gRPC error
   Grpc(Status),
 
@@ -294,7 +294,7 @@ impl ByteStore {
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, String> {
+  ) -> Result<Option<T>, ByteStoreError> {
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -333,7 +333,7 @@ impl ByteStore {
         Err(status) => {
           return match status.code() {
             Code::NotFound => Ok(None),
-            _ => Err(status_to_str(status)),
+            _ => Err(ByteStoreError::Grpc(status)),
           }
         }
       };
@@ -372,13 +372,13 @@ impl ByteStore {
           if status.code() == tonic::Code::NotFound {
             None
           } else {
-            return Err(status_to_str(status));
+            return Err(ByteStoreError::Grpc(status));
           }
         }
       };
 
       match maybe_bytes {
-        Some(b) => f(b).map(Some),
+        Some(b) => f(b).map(Some).map_err(ByteStoreError::Other),
         None => Ok(None),
       }
     };
