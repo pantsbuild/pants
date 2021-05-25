@@ -126,8 +126,9 @@ class SchedulerService(PantsService):
         if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
             raise Exception(
                 f"pantsd process {self._pid} was using "
-                f"{memory_usage_in_bytes} bytes of memory (above the limit of "
-                f"{self._max_memory_usage_in_bytes} bytes)."
+                f"{memory_usage_in_bytes} MiB of memory (above the "
+                f"`--pantsd-max-memory-usage` limit of "
+                f"{self._max_memory_usage_in_bytes} MiB)."
             )
 
     def _check_invalidation_watcher_liveness(self):

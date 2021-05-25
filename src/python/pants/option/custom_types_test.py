@@ -5,12 +5,49 @@ import unittest
 from textwrap import dedent
 from typing import Dict, List, Union
 
-from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool
+import pytest
+
+from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool, memory_size
 from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
 ParsedList = List[ValidPrimitives]
 ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
+
+
+def test_memory_size() -> None:
+    assert memory_size("1GiB") == 1_073_741_824
+    assert memory_size(" 1  GiB ") == 1_073_741_824
+    assert memory_size("1gib") == 1_073_741_824
+    assert memory_size("1.22GiB") == 1_309_965_025
+
+    assert memory_size("1MiB") == 1_048_576
+    assert memory_size(" 1  MiB ") == 1_048_576
+    assert memory_size("1mib") == 1_048_576
+    assert memory_size("1.4MiB") == 1_468_006
+
+    assert memory_size("1KiB") == 1024
+    assert memory_size(" 1  KiB ") == 1024
+    assert memory_size("1kib") == 1024
+    assert memory_size("1.4KiB") == 1433
+
+    assert memory_size("10B") == 10
+    assert memory_size(" 10  B ") == 10
+    assert memory_size("10b") == 10
+    assert memory_size("10.4B") == 10
+
+    assert memory_size("10") == 10
+    assert memory_size(" 10 ") == 10
+    assert memory_size("10.4") == 10
+
+    with pytest.raises(ParseError):
+        memory_size("")
+    with pytest.raises(ValueError):
+        memory_size("1.1.1GiB")
+    with pytest.raises(ValueError):
+        memory_size("10TiB")
+    with pytest.raises(ParseError):
+        memory_size("foo")
 
 
 class CustomTypesTest(unittest.TestCase):
