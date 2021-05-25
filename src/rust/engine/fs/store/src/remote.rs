@@ -9,9 +9,9 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bazel_protos::{self};
 use bytes::{Bytes, BytesMut};
-use futures::future::TryFutureExt;
 use futures::Future;
 use futures::StreamExt;
+use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
@@ -363,12 +363,17 @@ impl ByteStore {
     };
     let result_future = async move {
       let store2 = store.clone();
-      let mut client = store2.cas_client.as_ref().clone();
-      let request = request.clone();
-      let response = client
-        .find_missing_blobs(request)
-        .map_err(status_to_str)
-        .await?;
+      let client = store2.cas_client.as_ref().clone();
+      let response = retry_call(
+        client,
+        move |mut client| {
+          let request = request.clone();
+          async move { client.find_missing_blobs(request).await }
+        },
+        status_is_retryable,
+      )
+      .await
+      .map_err(status_to_str)?;
 
       response
         .into_inner()
