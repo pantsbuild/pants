@@ -602,7 +602,7 @@ pub trait CapturedWorkdir {
         Ok(FallibleProcessResultWithPlatform {
           stdout_digest,
           stderr_digest: hashing::EMPTY_DIGEST,
-          exit_code: libc::SIGTERM,
+          exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
           platform,
           metadata: result_metadata,
