@@ -284,6 +284,12 @@ class HelpInfoExtracter:
 
         Returns a pair (default, stringified default suitable for display).
         """
+        # If the kwargs already determine a string representation of the default for use in help
+        # messages, use that.
+        default_help_repr = kwargs.get("default_help_repr")
+        if default_help_repr is not None:
+            return default_help_repr
+
         ranked_default = kwargs.get("default")
         fallback: Any = None
         if is_list_option(kwargs):

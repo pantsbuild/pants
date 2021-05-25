@@ -838,12 +838,12 @@ class GlobalOptions(Subsystem):
             rule_threads_core,
             type=int,
             default=max(2, _CPU_COUNT // 2),
+            default_help_repr="max(2, #cores/2)",
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
                 f"also: `{rule_threads_max}`).\n\nValues less than 2 are not currently supported. "
-                "\n\nDefaults to half the number of cores on your machine.\n\nThis value is "
-                "independent of the number of processes that may be spawned in "
+                "\n\nThis value is independent of the number of processes that may be spawned in "
                 f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
             ),
         )
@@ -989,12 +989,12 @@ class GlobalOptions(Subsystem):
             process_execution_local_parallelism,
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
+            default_help_repr="#cores",
             advanced=True,
             help=(
                 "Number of concurrent processes that may be executed locally.\n\n"
-                "Defaults to the number of cores on your machine.\n\nThis value is independent of "
-                "the number of threads that may be used to execute the logic in `@rules` "
-                f"(controlled by `{rule_threads_core}`)."
+                "This value is independent of the number of threads that may be used to "
+                f"execute the logic in `@rules` (controlled by `{rule_threads_core}`)."
             ),
         )
         register(
