@@ -190,7 +190,8 @@ class ReferenceGenerator:
             if default_help_repr is None:
                 default_str = to_help_str(option_data["default"])
             else:
-                default_str = default_help_repr
+                # It should already be a string, but might as well be safe.
+                default_str = to_help_str(default_help_repr)
             escaped_default_str = markdown_safe(default_str)
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
