@@ -216,6 +216,7 @@ async def setup_pytest_for_target(
         ),
     )
 
+    # Ensure that the empty extra output dir exists.
     extra_output_directory_digest_get = Get(Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)]))
 
     prepared_sources_get = Get(
