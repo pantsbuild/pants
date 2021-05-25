@@ -553,7 +553,7 @@ async fn timeout() {
 
   let result = run_command_locally(process).await.unwrap();
 
-  assert_eq!(result.original.exit_code, -15);
+  assert_eq!(result.original.exit_code, 15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("sleepy-cat");
