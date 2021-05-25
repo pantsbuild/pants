@@ -115,7 +115,7 @@ class TestResult:
             return True
         if other.exit_code is None:
             return False
-        return self.exit_code < other.exit_code
+        return abs(self.exit_code) < abs(other.exit_code)
 
 
 class ShowOutput(Enum):
