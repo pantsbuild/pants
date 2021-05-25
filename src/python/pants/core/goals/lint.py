@@ -97,10 +97,6 @@ class LintResults:
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
-    # @memoized_property
-    # def reports(self) -> Tuple[LintReport, ...]:
-    #     return tuple(result.report for result in self.results if result.report)
-
 
 class EnrichedLintResults(LintResults, EngineAwareReturnType):
     """`LintResults` that are enriched for the sake of logging results as they come in.
@@ -157,7 +153,7 @@ class LintRequest(StyleRequest):
 
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
 # are written under this directory. E.g.,
-# ./pants lint <target> -- --output=reports/report.html
+# ./pants --flake8-args="--output-file=reports/report.txt" lint <target>
 LINTER_REPORT_DIR = "reports"
 
 
@@ -196,8 +192,8 @@ class LintSubsystem(GoalSubsystem):
                 "into this directory."
             ),
             removal_version="2.7.0.dev0",
-            removal_hint=f"Edit the linter's config to cause it to write reports under "
-            f"{LINTER_REPORT_DIR} .",
+            removal_hint=f"Edit the config file for the linter in question, or set its args via "
+            f"Pants options, to cause it to write reports under f{LINTER_REPORT_DIR} .",
         )
 
     @property
