@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
+use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -16,9 +17,8 @@ use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use std::ops::Range;
 use tonic::transport::Channel;
-use tonic::{Code, Interceptor, Request};
+use tonic::{Code, Interceptor, Request, Status};
 use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
@@ -38,6 +38,35 @@ impl fmt::Debug for ByteStore {
     write!(f, "ByteStore(name={:?})", self.instance_name)
   }
 }
+
+/// Represents an error from accessing a remote bytestore.
+enum ByteStoreError {
+  /// gRPC error
+  Grpc(Status),
+
+  /// Other errors
+  Other(String),
+}
+
+impl fmt::Display for ByteStoreError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
+      ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
+    }
+  }
+}
+
+impl fmt::Debug for ByteStoreError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      ByteStoreError::Grpc(status) => fmt::Debug::fmt(status, f),
+      ByteStoreError::Other(msg) => fmt::Debug::fmt(msg, f),
+    }
+  }
+}
+
+impl std::error::Error for ByteStoreError {}
 
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
@@ -122,7 +151,7 @@ impl ByteStore {
     // could be mutated by another process. We guard against this by creating an anonymous
     // temporary file and ensuring it is written to and closed via the only other handle to it in
     // the code just above.
-    let mmap = unsafe {
+    let mmap = Arc::new(unsafe {
       let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
         format!(
           "Failed to memory map the temporary file buffer for {digest:?}: {err}",
@@ -143,25 +172,45 @@ impl ByteStore {
         )
       }
       Ok(mapping) as Result<memmap::Mmap, String>
-    }?;
+    }?);
 
-    self
-      .store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range]))
-      .await
+    retry_call(
+      mmap,
+      |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })
   }
 
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
-    self
-      .store_bytes_source(digest, move |range| bytes.slice(range))
-      .await
+    retry_call(
+      bytes,
+      |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })
   }
 
   async fn store_bytes_source<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
-  ) -> Result<(), String>
+  ) -> Result<(), ByteStoreError>
   where
     ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
   {
@@ -210,16 +259,16 @@ impl ByteStore {
       let response = client
         .write(Request::new(stream))
         .await
-        .map_err(status_to_str)?;
+        .map_err(ByteStoreError::Grpc)?;
 
       let response = response.into_inner();
       if response.committed_size == len as i64 {
         Ok(())
       } else {
-        Err(format!(
+        Err(ByteStoreError::Other(format!(
           "Uploading file with digest {:?}: want committed size {} but got {}",
           digest, len, response.committed_size
-        ))
+        )))
       }
     });
 
