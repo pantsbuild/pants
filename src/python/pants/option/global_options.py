@@ -783,6 +783,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=memory_size,
             default="1GiB",
+            # `memory_size` will convert the `default` to # bytes, but we want to keep the string
+            # for `./pants help`.
+            default_help_repr="1GiB",
             help=(
                 "The maximum memory usage of the pantsd process.\n\n"
                 "When the maximum memory is exceeded, the daemon will restart gracefully, "
@@ -790,9 +793,8 @@ class GlobalOptions(Subsystem):
                 "you may miss out on some caching, whereas setting too high may over-consume "
                 "resources and may result in the operating system killing Pantsd due to memory "
                 "overconsumption (e.g. via the OOM killer).\n\n"
-                "You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g. "
-                "`2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
-                "Defaults to `1GiB`.\n\n"
+                "You can suffix with `GiB`, `GB`, `MiB`, `MB`, `KiB`, `kB`, or `B` to indicate "
+                "the unit, e.g. `2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
                 "There is at most one pantsd process per workspace."
             ),
         )
