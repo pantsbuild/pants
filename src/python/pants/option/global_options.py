@@ -841,8 +841,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
-                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
-                "This value is independent of the number of processes that may be spawned in "
+                f"also: `{rule_threads_max}`).\n\nValues less than 2 are not currently supported. "
+                "\n\nDefaults to half the number of cores on your machine.\n\nThis value is "
+                "independent of the number of processes that may be spawned in "
                 f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
             ),
         )
@@ -869,7 +870,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 f"Directory to use for the local file store, which stores the results of "
-                f"subprocesses run by Pants. {cache_instructions}"
+                f"subprocesses run by Pants.\n\n{cache_instructions}"
             ),
             # This default is also hard-coded into the engine's rust code in
             # fs::Store::default_path so that tools using a Store outside of pants
@@ -939,7 +940,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Directory to use for named global caches for tools and processes with trusted, "
-                f"concurrency-safe caches. {cache_instructions}"
+                f"concurrency-safe caches.\n\n{cache_instructions}"
             ),
             default=os.path.join(get_pants_cachedir(), "named_caches"),
         )
@@ -947,7 +948,9 @@ class GlobalOptions(Subsystem):
         register(
             "--local-execution-root-dir",
             advanced=True,
-            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
+            help=(
+                f"Directory to use for local process execution sandboxing.\n\n{cache_instructions}"
+            ),
             default=tempfile.gettempdir(),
         )
         register(
@@ -987,7 +990,12 @@ class GlobalOptions(Subsystem):
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
             advanced=True,
-            help="Number of concurrent processes that may be executed locally.",
+            help=(
+                "Number of concurrent processes that may be executed locally.\n\n"
+                "Defaults to the number of cores on your machine.\n\nThis value is independent of "
+                "the number of threads that may be used to execute the logic in `@rules` "
+                f"(controlled by `{rule_threads_core}`)."
+            ),
         )
         register(
             "--process-execution-remote-parallelism",
@@ -1338,7 +1346,10 @@ class GlobalOptions(Subsystem):
         if opts.rule_threads_core < 2:
             # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
             # at a time, and a `@goal_rule` will only block one thread.
-            raise OptionsError("--rule-threads-core values less than 2 are not supported.")
+            raise OptionsError(
+                "--rule-threads-core values less than 2 are not supported, but it was set to "
+                f"{opts.rule_threads_core}."
+            )
 
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
             raise OptionsError(
