@@ -368,10 +368,14 @@ impl ByteStore {
     let result_future = async move {
       let store2 = store.clone();
       let client = store2.cas_client.as_ref().clone();
-      let response = retry_call(client, move |mut client| {
-        let request = request.clone();
-        async move { client.find_missing_blobs(request).await }
-      }, status_is_retryable)
+      let response = retry_call(
+        client,
+        move |mut client| {
+          let request = request.clone();
+          async move { client.find_missing_blobs(request).await }
+        },
+        status_is_retryable,
+      )
       .await
       .map_err(status_to_str)?;
 

@@ -23,6 +23,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessMetadata, RemoteCacheWarningsBehavior,
 };
+use grpc_util::retry::status_is_retryable;
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -371,24 +372,28 @@ impl CommandRunner {
       .await?;
 
     let client = self.action_cache_client.as_ref().clone();
-    retry_call(client, move |mut client| {
-      let update_action_cache_request = remexec::UpdateActionResultRequest {
-        instance_name: metadata
-          .instance_name
-          .as_ref()
-          .cloned()
-          .unwrap_or_else(|| "".to_owned()),
-        action_digest: Some(action_digest.into()),
-        action_result: Some(action_result.clone()),
-        ..remexec::UpdateActionResultRequest::default()
-      };
+    retry_call(
+      client,
+      move |mut client| {
+        let update_action_cache_request = remexec::UpdateActionResultRequest {
+          instance_name: metadata
+            .instance_name
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| "".to_owned()),
+          action_digest: Some(action_digest.into()),
+          action_result: Some(action_result.clone()),
+          ..remexec::UpdateActionResultRequest::default()
+        };
 
-      async move {
-        client
-          .update_action_result(update_action_cache_request)
-          .await
-      }
-    })
+        async move {
+          client
+            .update_action_result(update_action_cache_request)
+            .await
+        }
+      },
+      status_is_retryable,
+    )
     .await
     .map_err(status_to_str)?;
 

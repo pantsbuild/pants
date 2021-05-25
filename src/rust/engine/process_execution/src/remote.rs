@@ -1382,21 +1382,25 @@ pub async fn check_action_cache(
     .increment_counter(Metric::RemoteCacheRequests, 1);
 
   let client = action_cache_client.as_ref().clone();
-  let action_result_response = retry_call(client, move |mut client| {
-    let request = remexec::GetActionResultRequest {
-      action_digest: Some(action_digest.into()),
-      instance_name: metadata
-        .instance_name
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(String::new),
-      ..remexec::GetActionResultRequest::default()
-    };
+  let action_result_response = retry_call(
+    client,
+    move |mut client| {
+      let request = remexec::GetActionResultRequest {
+        action_digest: Some(action_digest.into()),
+        instance_name: metadata
+          .instance_name
+          .as_ref()
+          .cloned()
+          .unwrap_or_else(String::new),
+        ..remexec::GetActionResultRequest::default()
+      };
 
-    let request = apply_headers(Request::new(request), &context.build_id);
+      let request = apply_headers(Request::new(request), &context.build_id);
 
-    async move { client.get_action_result(request).await }
-  }, status_is_retryable)
+      async move { client.get_action_result(request).await }
+    },
+    status_is_retryable,
+  )
   .await;
 
   match action_result_response {
