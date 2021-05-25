@@ -127,6 +127,7 @@ def test_default() -> None:
     do_test(["--foo"], {}, "None")
     do_test(["--foo"], {"type": int}, "None")
     do_test(["--foo"], {"type": int, "default": 42}, "42")
+    do_test(["--foo"], {"type": int, "default": 65536, "default_help_repr": "64KiB"}, "64KiB")
     do_test(["--foo"], {"type": list}, "[]")
     do_test(["--foo"], {"type": dict}, "{}")
     do_test(["--foo"], {"type": LogLevel}, "None")
