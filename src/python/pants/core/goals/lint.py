@@ -5,17 +5,19 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
 from pants.core.goals.style_request import StyleRequest
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
@@ -24,14 +26,13 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import path_safe, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class LintReport:
-    file_name: str
     digest: Digest
 
 
@@ -96,9 +97,9 @@ class LintResults:
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
-    @memoized_property
-    def reports(self) -> Tuple[LintReport, ...]:
-        return tuple(result.report for result in self.results if result.report)
+    # @memoized_property
+    # def reports(self) -> Tuple[LintReport, ...]:
+    #     return tuple(result.report for result in self.results if result.report)
 
 
 class EnrichedLintResults(LintResults, EngineAwareReturnType):
@@ -154,6 +155,12 @@ class LintRequest(StyleRequest):
     """
 
 
+# If a user wants linter reports to show up in dist/ they must ensure that the reports
+# are written under this directory. E.g.,
+# ./pants lint <target> -- --output=reports/report.html
+LINTER_REPORT_DIR = "reports"
+
+
 class LintSubsystem(GoalSubsystem):
     name = "lint"
     help = "Run all linters and/or formatters in check mode."
@@ -188,15 +195,14 @@ class LintSubsystem(GoalSubsystem):
                 "Specifying a directory causes linters that support writing report files to write "
                 "into this directory."
             ),
+            removal_version="2.7.0.dev0",
+            removal_hint=f"Edit the linter's config to cause it to write reports under "
+            f"{LINTER_REPORT_DIR} .",
         )
 
     @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
-
-    @property
-    def reports_dir(self) -> Optional[str]:
-        return cast(Optional[str], self.options.reports_dir)
 
 
 class Lint(Goal):
@@ -210,6 +216,7 @@ async def lint(
     targets: Targets,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
+    dist_dir: DistDir,
 ) -> Lint:
     request_types = cast("Iterable[type[StyleRequest]]", union_membership[LintRequest])
     requests = tuple(
@@ -261,29 +268,34 @@ async def lint(
 
     all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
 
-    reports = list(itertools.chain.from_iterable(results.reports for results in all_results))
-    if reports:
-        # TODO(#10532): Tolerate when a linter has multiple reports.
-        linters_with_multiple_reports = [
-            results.linter_name for results in all_results if len(results.reports) > 1
-        ]
-        if linters_with_multiple_reports:
-            if lint_subsystem.per_file_caching:
-                suggestion = "Try running without `--lint-per-file-caching` set."
-            else:
-                suggestion = (
-                    "The linters likely partitioned the input targets, such as grouping by Python "
-                    "interpreter compatibility. Try running on fewer targets or unset "
-                    "`--lint-reports-dir`."
-                )
-            raise InvalidLinterReportsError(
-                "Multiple reports would have been written for these linters: "
-                f"{linters_with_multiple_reports}. The option `--lint-reports-dir` only works if "
-                f"each linter has a single result. {suggestion}"
-            )
-        merged_reports = await Get(Digest, MergeDigests(report.digest for report in reports))
-        workspace.write_digest(merged_reports)
-        logger.info(f"Wrote lint result files to {lint_subsystem.reports_dir}.")
+    # Handle reports.
+    disambiguated_dirs: set[str] = set()
+
+    def write_report(digest: Digest, subdir: str) -> None:
+        while subdir in disambiguated_dirs:
+            # It's unlikely that two distinct partition descriptions will become the
+            # same after path_safe(), but might as well be safe.
+            subdir += "_"
+        disambiguated_dirs.add(subdir)
+        output_dir = str(dist_dir.relpath / "lint" / subdir)
+        workspace.write_digest(
+            digest,
+            path_prefix=output_dir,
+        )
+        logger.info(f"Wrote linter result files to {output_dir}.")
+
+    for results in all_results:
+        if len(results.results) == 1 and results.results[0].report:
+            write_report(results.results[0].report.digest, results.linter_name)
+        else:
+            for result in results.results:
+                if result.report:
+                    write_report(
+                        result.report.digest,
+                        os.path.join(
+                            results.linter_name, path_safe(result.partition_description or "all")
+                        ),
+                    )
 
     exit_code = 0
     if all_results:
