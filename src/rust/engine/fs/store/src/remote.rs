@@ -40,6 +40,7 @@ impl fmt::Debug for ByteStore {
 }
 
 /// Represents an error from accessing a remote bytestore.
+#[derive(Debug)]
 pub enum ByteStoreError {
   /// gRPC error
   Grpc(Status),
@@ -53,15 +54,6 @@ impl fmt::Display for ByteStoreError {
     match self {
       ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
       ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
-    }
-  }
-}
-
-impl fmt::Debug for ByteStoreError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      ByteStoreError::Grpc(status) => fmt::Debug::fmt(status, f),
-      ByteStoreError::Other(msg) => fmt::Debug::fmt(msg, f),
     }
   }
 }
