@@ -17,7 +17,7 @@ class Black(PythonToolBase):
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     # TODO: simplify `test_works_with_python39()` to stop using a VCS version.
-    default_version = "black==20.8b1"
+    default_version = "black==21.5b1"
     default_extra_requirements = ["setuptools"]
     default_main = ConsoleScript("black")
     register_interpreter_constraints = True
