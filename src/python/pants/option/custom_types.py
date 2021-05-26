@@ -9,6 +9,8 @@ import re
 from enum import Enum
 from typing import Dict, Iterable, List, Pattern, Sequence
 
+import pint
+
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
@@ -98,6 +100,35 @@ def shell_str(s: str) -> str:
     :API: public
     """
     return s
+
+
+def memory_size(s: str | int | float) -> int:
+    """A string or number that normalizes into the number of bytes.
+
+    :API: public
+    """
+    if isinstance(s, (int, float)):
+        return int(s)
+    if not s:
+        raise ParseError("Missing value.")
+
+    ureg = pint.UnitRegistry()
+    invalid_suffix = ParseError(
+        f"Invalid suffix for `{s}`. Expected either a bare number or one of `GB`, `GiB`, `MB`, "
+        f"`MiB`, `kB`, `KiB`, or `B`."
+    )
+    try:
+        parsed = ureg(s)
+    except pint.UndefinedUnitError:
+        raise invalid_suffix
+
+    if isinstance(parsed, (int, float)):
+        return int(parsed)
+    try:
+        parsed.ito("byte")
+    except pint.DimensionalityError:
+        raise invalid_suffix
+    return int(parsed.magnitude)
 
 
 def _convert(val, acceptable_types):
