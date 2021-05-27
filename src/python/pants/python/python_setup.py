@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import os
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, cast
@@ -16,6 +15,7 @@ from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +100,14 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=multiprocessing.cpu_count() // 2,
+            default=CPU_COUNT // 2,
+            default_help_repr="#cores/2",
             advanced=True,
             help=(
-                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
                 "can run multiple subprocesses in parallel, the maximum total parallelism will be "
                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
-                "Setting this option higher may result in better parallelism, but, if set too "
+                "\n\nSetting this option higher may result in better parallelism, but, if set too "
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
