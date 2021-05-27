@@ -1,4 +1,6 @@
 [GLOBAL]
+colors = true
+
 remote_cache_read = true
 remote_cache_write = true
 # We want to continue to get logs when remote caching errors.
