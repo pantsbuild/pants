@@ -11,6 +11,14 @@ from typing import Optional, Set
 logger = logging.getLogger(__name__)
 
 
+# We use `sched_getaffinity()` to get the number of cores available to the process, rather than
+# the raw number of cores. This ensures that containers report their # of cores, rather than
+# the host's.
+CPU_COUNT = (
+    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+) or 2
+
+
 OS_ALIASES = {
     "darwin": {"macos", "darwin", "macosx", "mac os x", "mac"},
     "linux": {"linux", "linux2"},
