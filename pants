@@ -46,6 +46,7 @@ function exec_pants_bare() {
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
 
+  # shellcheck disable=SC2086
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
     exec ${PANTS_PREPEND_ARGS:-} "$(venv_dir)/bin/python" "${PANTS_EXE}" "$@"
 }
