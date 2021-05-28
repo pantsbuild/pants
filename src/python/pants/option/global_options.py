@@ -34,13 +34,9 @@ from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
-
-
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
 
 
 # The time that leases are acquired for in the local store. Configured on the Python side
@@ -417,7 +413,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    process_execution_local_parallelism=_CPU_COUNT,
+    process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
@@ -855,7 +851,7 @@ class GlobalOptions(Subsystem):
         register(
             rule_threads_core,
             type=int,
-            default=max(2, _CPU_COUNT // 2),
+            default=max(2, CPU_COUNT // 2),
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
