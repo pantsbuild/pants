@@ -408,18 +408,16 @@ async def merge_coverage_data(
                 level=LogLevel.DEBUG,
             ),
         )
-        coverage_digests = await MultiGet(
+        coverage_digest_gets.append(
             Get(
                 Digest, AddPrefix(digest=result.output_digest, prefix=str(global_coverage_base_dir))
-            ),
-            *coverage_digest_gets,
+            )
         )
         coverage_data_file_paths.append(str(global_coverage_base_dir / ".coverage"))
-        input_digest = await Get(Digest, MergeDigests(coverage_digests))
     else:
         extra_sources_digest = EMPTY_DIGEST
-        input_digest = await Get(Digest, MergeDigests(await MultiGet(coverage_digest_gets)))
 
+    input_digest = await Get(Digest, MergeDigests(await MultiGet(coverage_digest_gets)))
     result = await Get(
         ProcessResult,
         VenvPexProcess(
