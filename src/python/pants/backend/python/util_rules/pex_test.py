@@ -292,15 +292,15 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
         rule_runner, requirements=PexRequirements(direct_deps)
     )
     assert_direct_requirements(direct_pex_info)
-    assert {
-        "certifi-2021.5.30-py2.py3-none-any.whl",
-        "chardet-3.0.4-py2.py3-none-any.whl",
-        "idna-2.10-py2.py3-none-any.whl",
-        "requests-2.23.0-py2.py3-none-any.whl",
-        "urllib3-1.25.11-py2.py3-none-any.whl",
-    } == set(direct_pex_info["distributions"].keys())
+    assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
 
-    constraints = ["requests==2.0.0"]
+    constraints = [
+        "requests==2.16.0",
+        "certifi==2019.6.16",
+        "chardet==3.0.2",
+        "idna==2.5",
+        "urllib3==1.21.1",
+    ]
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
@@ -308,9 +308,13 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
-    assert {"requests-2.0.0-py2.py3-none-any.whl"} == set(
-        constrained_pex_info["distributions"].keys()
-    )
+    assert {
+        "certifi-2019.6.16-py2.py3-none-any.whl",
+        "chardet-3.0.2-py2.py3-none-any.whl",
+        "idna-2.5-py2.py3-none-any.whl",
+        "requests-2.16.0-py2.py3-none-any.whl",
+        "urllib3-1.21.1-py2.py3-none-any.whl",
+    } == set(constrained_pex_info["distributions"].keys())
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
@@ -374,11 +378,22 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
+    constraints = [
+        "requests==2.23.0",
+        "certifi==2020.12.5",
+        "chardet==3.0.4",
+        "idna==2.10",
+        "urllib3==1.25.11",
+    ]
+    rule_runner.create_file("constraints.txt", "\n".join(constraints))
     venv_pex = create_pex_and_get_all_data(
-        rule_runner, pex_type=pex_type, requirements=PexRequirements(["requests==2.23.0"])
+        rule_runner,
+        pex_type=pex_type,
+        requirements=PexRequirements(["requests==2.23.0"]),
+        additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
-    assert dists[0] == PexDistributionInfo("certifi", Version("2021.05.30"), None, ())
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
     assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
     assert dists[2] == PexDistributionInfo(
         "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
