@@ -587,7 +587,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     )
     assert_direct_requirements(direct_pex_info)
     assert {
-        "certifi-2020.12.5-py2.py3-none-any.whl",
+        "certifi-2021.5.30-py2.py3-none-any.whl",
         "chardet-3.0.4-py2.py3-none-any.whl",
         "idna-2.10-py2.py3-none-any.whl",
         "requests-2.23.0-py2.py3-none-any.whl",
@@ -672,7 +672,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         rule_runner, pex_type=pex_type, requirements=PexRequirements(["requests==2.23.0"])
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
-    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
+    assert dists[0] == PexDistributionInfo("certifi", Version("2021.05.30"), None, ())
     assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
     assert dists[2] == PexDistributionInfo(
         "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
