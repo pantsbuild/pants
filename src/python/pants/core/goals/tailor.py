@@ -225,7 +225,6 @@ class TailorSubsystem(GoalSubsystem):
             "--alias-mapping",
             advanced=True,
             type=dict,
-            member_type=str,
             help="A mapping from standard target type to custom type to use instead. The custom "
             "type can be a custom target type or a macro that offers compatible functionality "
             "to the one it replaces (see https://www.pantsbuild.org/docs/macros).",
