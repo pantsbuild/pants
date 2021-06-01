@@ -41,10 +41,15 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
-    # Cached only in memory (i.e. memoized in pantsd), but never persistently.
-    PER_RESTART = "per_restart"
-    # Never cached anywhere: will run once per Session (i.e. once per run of Pants).
-    NEVER = "never"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
+    # success vs. failure.
+    PER_RESTART_ALWAYS = "per_restart_always"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently, and only if
+    # successful.
+    PER_RESTART_SUCCESSFUL = "per_restart_successful"
+    # Will run once per Session, i.e. once per run of Pants. This happens because the engine
+    # de-duplicates identical work; the process is neither memoized in memory nor cached to disk.
+    PER_SESSION = "per_session"
 
 
 @frozen_after_init
@@ -542,7 +547,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             input_digest=script_digest,
             argv=[script_path, request.binary_name],
             env={"PATH": search_path},
-            cache_scope=ProcessCacheScope.PER_RESTART,
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
 
@@ -558,7 +563,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                cache_scope=ProcessCacheScope.PER_RESTART,
+                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
             ),
         )
         for path in found_paths

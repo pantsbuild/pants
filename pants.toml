@@ -20,7 +20,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.10.0",
+  "toolchain.pants.plugin==0.11.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -139,6 +139,7 @@ release_notes = """
   '2.3.x': 'src/python/pants/notes/2.3.x.md',
   '2.4.x': 'src/python/pants/notes/2.4.x.md',
   '2.5.x': 'src/python/pants/notes/2.5.x.md',
+  '2.6.x': 'src/python/pants/notes/2.6.x.md',
 }
 """
 

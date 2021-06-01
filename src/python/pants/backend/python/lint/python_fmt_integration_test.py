@@ -45,7 +45,20 @@ def run_black_and_isort(
             "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
         ],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        # We propagate LANG and LC_ALL to satisfy click, which black depends upon. Without this we
+        # see something like the following in CI:
+        #
+        # RuntimeError: Click will abort further execution because Python was configured to use
+        # ASCII as encoding for the environment. Consult
+        # https://click.palletsprojects.com/unicode-support/ for mitigation steps.
+        #
+        # This system supports the C.UTF-8 locale which is recommended. You might be able to
+        # resolve your issue by exporting the following environment variables:
+        #
+        #     export LC_ALL=C.UTF-8
+        #     export LANG=C.UTF-8
+        #
+        env_inherit={"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"},
     )
     return rule_runner.request(LanguageFmtResults, [fmt_targets])
 

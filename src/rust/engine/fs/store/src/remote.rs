@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
+use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -9,15 +10,15 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bazel_protos::{self};
 use bytes::{Bytes, BytesMut};
-use futures::future::TryFutureExt;
 use futures::Future;
 use futures::StreamExt;
+use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::transport::Channel;
-use tonic::{Code, Interceptor, Request};
+use tonic::{Code, Interceptor, Request, Status};
 use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
@@ -37,6 +38,27 @@ impl fmt::Debug for ByteStore {
     write!(f, "ByteStore(name={:?})", self.instance_name)
   }
 }
+
+/// Represents an error from accessing a remote bytestore.
+#[derive(Debug)]
+pub enum ByteStoreError {
+  /// gRPC error
+  Grpc(Status),
+
+  /// Other errors
+  Other(String),
+}
+
+impl fmt::Display for ByteStoreError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
+      ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
+    }
+  }
+}
+
+impl std::error::Error for ByteStoreError {}
 
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
@@ -88,12 +110,108 @@ impl ByteStore {
     })
   }
 
-  pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
-    let len = bytes.len();
+  pub(crate) fn chunk_size_bytes(&self) -> usize {
+    self.chunk_size_bytes
+  }
+
+  pub async fn store_buffered<WriteToBuffer, WriteResult>(
+    &self,
+    digest: Digest,
+    mut write_to_buffer: WriteToBuffer,
+  ) -> Result<(), String>
+  where
+    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
+    WriteResult: Future<Output = Result<(), String>>,
+  {
+    let write_buffer = tempfile::tempfile().map_err(|e| {
+      format!(
+        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
+        digest = digest,
+        err = e
+      )
+    })?;
+    let read_buffer = write_buffer.try_clone().map_err(|e| {
+      format!(
+        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
+        digest = digest,
+        err = e
+      )
+    })?;
+    write_to_buffer(write_buffer).await?;
+
+    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
+    // could be mutated by another process. We guard against this by creating an anonymous
+    // temporary file and ensuring it is written to and closed via the only other handle to it in
+    // the code just above.
+    let mmap = Arc::new(unsafe {
+      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
+        format!(
+          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
+          digest = digest,
+          err = e
+        )
+      })?;
+      if let Err(err) = madvise::madvise(
+        mapping.as_ptr(),
+        mapping.len(),
+        madvise::AccessPattern::Sequential,
+      ) {
+        log::warn!(
+          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
+          {digest:?}. Continuing with possible reduced performance: {err}",
+          digest = digest,
+          err = err
+        )
+      }
+      Ok(mapping) as Result<memmap::Mmap, String>
+    }?);
+
+    retry_call(
+      mmap,
+      |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })
+  }
+
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
+    retry_call(
+      bytes,
+      |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })
+  }
+
+  async fn store_bytes_source<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let len = digest.size_bytes;
+    let instance_name = self.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
-      "{}/uploads/{}/blobs/{}/{}",
-      self.instance_name.clone().unwrap_or_default(),
+      "{}{}uploads/{}/blobs/{}/{}",
+      &instance_name,
+      if instance_name.is_empty() { "" } else { "/" },
       uuid::Uuid::new_v4(),
       digest.hash,
       digest.size_bytes,
@@ -110,23 +228,18 @@ impl ByteStore {
     let resource_name = resource_name.clone();
     let chunk_size_bytes = store.chunk_size_bytes;
 
-    // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
-    // lifetime but the slice passed into this method generally points into the shared memory
-    // of the LMDB store which is on the other side of the FFI boundary.
-    let bytes = Bytes::copy_from_slice(bytes);
-
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
-      if offset >= bytes.len() && has_sent_any {
+      if offset >= len && has_sent_any {
         futures::future::ready(None)
       } else {
-        let next_offset = min(offset + chunk_size_bytes, bytes.len());
+        let next_offset = min(offset + chunk_size_bytes, len);
         let req = bazel_protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
           write_offset: offset as i64,
-          finish_write: next_offset == bytes.len(),
+          finish_write: next_offset == len,
           // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
           // https://github.com/danburkert/prost/pull/341
-          data: bytes.slice(offset..next_offset),
+          data: bytes(offset..next_offset),
         };
         futures::future::ready(Some((req, (next_offset, true))))
       }
@@ -138,16 +251,16 @@ impl ByteStore {
       let response = client
         .write(Request::new(stream))
         .await
-        .map_err(status_to_str)?;
+        .map_err(ByteStoreError::Grpc)?;
 
       let response = response.into_inner();
       if response.committed_size == len as i64 {
-        Ok(digest)
+        Ok(())
       } else {
-        Err(format!(
+        Err(ByteStoreError::Other(format!(
           "Uploading file with digest {:?}: want committed size {} but got {}",
           digest, len, response.committed_size
-        ))
+        )))
       }
     });
 
@@ -173,11 +286,13 @@ impl ByteStore {
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, String> {
+  ) -> Result<Option<T>, ByteStoreError> {
     let store = self.clone();
+    let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
-      "{}/blobs/{}/{}",
-      store.instance_name.clone().unwrap_or_default(),
+      "{}{}blobs/{}/{}",
+      &instance_name,
+      if instance_name.is_empty() { "" } else { "/" },
       digest.hash,
       digest.size_bytes
     );
@@ -210,7 +325,7 @@ impl ByteStore {
         Err(status) => {
           return match status.code() {
             Code::NotFound => Ok(None),
-            _ => Err(status_to_str(status)),
+            _ => Err(ByteStoreError::Grpc(status)),
           }
         }
       };
@@ -249,13 +364,13 @@ impl ByteStore {
           if status.code() == tonic::Code::NotFound {
             None
           } else {
-            return Err(status_to_str(status));
+            return Err(ByteStoreError::Grpc(status));
           }
         }
       };
 
       match maybe_bytes {
-        Some(b) => f(b).map(Some),
+        Some(b) => f(b).map(Some).map_err(ByteStoreError::Other),
         None => Ok(None),
       }
     };
@@ -293,12 +408,17 @@ impl ByteStore {
     };
     let result_future = async move {
       let store2 = store.clone();
-      let mut client = store2.cas_client.as_ref().clone();
-      let request = request.clone();
-      let response = client
-        .find_missing_blobs(request)
-        .map_err(status_to_str)
-        .await?;
+      let client = store2.cas_client.as_ref().clone();
+      let response = retry_call(
+        client,
+        move |mut client| {
+          let request = request.clone();
+          async move { client.find_missing_blobs(request).await }
+        },
+        status_is_retryable,
+      )
+      .await
+      .map_err(status_to_str)?;
 
       response
         .into_inner()

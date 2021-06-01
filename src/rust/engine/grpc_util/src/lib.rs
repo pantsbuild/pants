@@ -36,6 +36,7 @@ use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, Meta
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 pub mod prost;
+pub mod retry;
 
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
 pub fn create_endpoint(

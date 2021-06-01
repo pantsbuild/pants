@@ -32,7 +32,7 @@ from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.option.global_options import (
@@ -191,8 +191,8 @@ class RuleRunner:
         return os.path.join(self.build_root, ".pants.d")
 
     @property
-    def rules(self) -> FrozenOrderedSet[Rule]:
-        return self.build_config.rules
+    def rules(self) -> FrozenOrderedSet[Rule | UnionRule]:
+        return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:

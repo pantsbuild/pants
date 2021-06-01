@@ -63,9 +63,9 @@ async def resolve_plugins(
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
     # paths in a way that invalidates the Process-cache. See the method doc.
     cache_scope = (
-        ProcessCacheScope.NEVER
+        ProcessCacheScope.PER_SESSION
         if global_options.options.plugins_force_resolve
-        else ProcessCacheScope.PER_RESTART
+        else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
     plugins_process_result = await Get(

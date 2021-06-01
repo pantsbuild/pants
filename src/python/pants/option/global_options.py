@@ -24,7 +24,7 @@ from pants.base.build_environment import (
 )
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
-from pants.option.custom_types import dir_option
+from pants.option.custom_types import dir_option, memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -34,13 +34,9 @@ from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
-
-
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
 
 
 # The time that leases are acquired for in the local store. Configured on the Python side
@@ -417,7 +413,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    process_execution_local_parallelism=_CPU_COUNT,
+    process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
@@ -781,11 +777,21 @@ class GlobalOptions(Subsystem):
         register(
             "--pantsd-max-memory-usage",
             advanced=True,
-            type=int,
-            default=2 ** 30,
+            type=memory_size,
+            default="1GiB",
+            # `memory_size` will convert the `default` to # bytes, but we want to keep the string
+            # for `./pants help`.
+            default_help_repr="1GiB",
             help=(
-                "The maximum memory usage of a pantsd process (in bytes). There is at most one "
-                "pantsd process per workspace."
+                "The maximum memory usage of the pantsd process.\n\n"
+                "When the maximum memory is exceeded, the daemon will restart gracefully, "
+                "although all previous in-memory caching will be lost. Setting too low means that "
+                "you may miss out on some caching, whereas setting too high may over-consume "
+                "resources and may result in the operating system killing Pantsd due to memory "
+                "overconsumption (e.g. via the OOM killer).\n\n"
+                "You can suffix with `GiB`, `GB`, `MiB`, `MB`, `KiB`, `kB`, or `B` to indicate "
+                "the unit, e.g. `2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
+                "There is at most one pantsd process per workspace."
             ),
         )
 
@@ -832,12 +838,13 @@ class GlobalOptions(Subsystem):
         register(
             rule_threads_core,
             type=int,
-            default=max(2, _CPU_COUNT // 2),
+            default=max(2, CPU_COUNT // 2),
+            default_help_repr="max(2, #cores/2)",
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
-                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
-                "This value is independent of the number of processes that may be spawned in "
+                f"also: `{rule_threads_max}`).\n\nValues less than 2 are not currently supported. "
+                "\n\nThis value is independent of the number of processes that may be spawned in "
                 f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
             ),
         )
@@ -864,7 +871,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 f"Directory to use for the local file store, which stores the results of "
-                f"subprocesses run by Pants. {cache_instructions}"
+                f"subprocesses run by Pants.\n\n{cache_instructions}"
             ),
             # This default is also hard-coded into the engine's rust code in
             # fs::Store::default_path so that tools using a Store outside of pants
@@ -934,7 +941,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Directory to use for named global caches for tools and processes with trusted, "
-                f"concurrency-safe caches. {cache_instructions}"
+                f"concurrency-safe caches.\n\n{cache_instructions}"
             ),
             default=os.path.join(get_pants_cachedir(), "named_caches"),
         )
@@ -942,7 +949,9 @@ class GlobalOptions(Subsystem):
         register(
             "--local-execution-root-dir",
             advanced=True,
-            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
+            help=(
+                f"Directory to use for local process execution sandboxing.\n\n{cache_instructions}"
+            ),
             default=tempfile.gettempdir(),
         )
         register(
@@ -981,8 +990,13 @@ class GlobalOptions(Subsystem):
             process_execution_local_parallelism,
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
+            default_help_repr="#cores",
             advanced=True,
-            help="Number of concurrent processes that may be executed locally.",
+            help=(
+                "Number of concurrent processes that may be executed locally.\n\n"
+                "This value is independent of the number of threads that may be used to "
+                f"execute the logic in `@rules` (controlled by `{rule_threads_core}`)."
+            ),
         )
         register(
             "--process-execution-remote-parallelism",
@@ -1333,7 +1347,10 @@ class GlobalOptions(Subsystem):
         if opts.rule_threads_core < 2:
             # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
             # at a time, and a `@goal_rule` will only block one thread.
-            raise OptionsError("--rule-threads-core values less than 2 are not supported.")
+            raise OptionsError(
+                "--rule-threads-core values less than 2 are not supported, but it was set to "
+                f"{opts.rule_threads_core}."
+            )
 
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
             raise OptionsError(

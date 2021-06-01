@@ -269,11 +269,11 @@ impl ByteStore {
   /// blocking, this accepts a function that views a slice rather than returning a clone of the
   /// data. The upshot is that the database is able to provide slices directly into shared memory.
   ///
-  pub async fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  pub async fn load_bytes_with<T: Send + 'static, F: FnMut(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
     digest: Digest,
-    f: F,
+    mut f: F,
   ) -> Result<Option<T>, String> {
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging

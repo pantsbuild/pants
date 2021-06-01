@@ -10,7 +10,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.util_rules.pex import Pex, PexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -28,7 +28,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
-    pex_env: PexEnvironment,
+    pex_env: WorkspacePexEnvironment,
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
@@ -58,7 +58,13 @@ async def create_pex_binary_run_request(
         PexRequest(
             output_filename=output_filename,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
-            additional_args=field_set.generate_additional_args(pex_binary_defaults),
+            additional_args=(
+                *field_set.generate_additional_args(pex_binary_defaults),
+                # N.B.: Since we cobble together the runtime environment via PEX_PATH and
+                # PEX_EXTRA_SYS_PATH below, it's important for any app that re-executes itself that
+                # these environment variables are not stripped.
+                "--no-strip-pex-env",
+            ),
             internal_only=True,
             # Note that the entry point file is not in the PEX itself. It's loaded by setting
             # `PEX_EXTRA_SYS_PATH`.
