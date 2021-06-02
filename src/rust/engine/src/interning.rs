@@ -43,6 +43,8 @@ use crate::externs;
 pub struct Interns {
   forward_keys: Mutex<HashMap<InternKey, Key, FNV>>,
   reverse_keys: RwLock<HashMap<Key, Value, FNV>>,
+  // TODO(John Sirois): A volatile is all we need here since id_generator is always accessed under
+  // the forward_keys lock. Once the Rust memory model becomes defined, we might not even need that.
   id_generator: atomic::AtomicU64,
 }
 
@@ -58,20 +60,16 @@ impl Interns {
     };
 
     py.allow_threads(|| {
-      let (key, key_was_new) = {
-        let mut forward_keys = self.forward_keys.lock();
-        if let Some(key) = forward_keys.get(&intern_key) {
-          (*key, false)
-        } else {
-          let id = self.id_generator.fetch_add(1, atomic::Ordering::SeqCst);
-          let key = Key::new(id, type_id);
-          forward_keys.insert(intern_key, key);
-          (key, true)
-        }
-      };
-      if key_was_new {
+      let mut forward_keys = self.forward_keys.lock();
+      let key = if let Some(key) = forward_keys.get(&intern_key) {
+        *key
+      } else {
+        let id = self.id_generator.fetch_add(1, atomic::Ordering::SeqCst);
+        let key = Key::new(id, type_id);
         self.reverse_keys.write().insert(key, v);
-      }
+        forward_keys.insert(intern_key, key);
+        key
+      };
       Ok(key)
     })
   }
@@ -84,7 +82,13 @@ impl Interns {
       .read()
       .get(&k)
       .cloned()
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
+      .unwrap_or_else(|| {
+        panic!(
+          "Previously memoized object disappeared for Key {{ id: {}, type_id: {} }}!",
+          k.id(),
+          k.type_id()
+        )
+      })
   }
 }
 
