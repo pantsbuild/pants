@@ -43,8 +43,6 @@ use crate::externs;
 pub struct Interns {
   forward_keys: Mutex<HashMap<InternKey, Key, Fnv>>,
   reverse_keys: RwLock<HashMap<Key, Value, Fnv>>,
-  // TODO(John Sirois): A volatile is all we need here since id_generator is always accessed under
-  // the forward_keys lock. Once the Rust memory model becomes defined, we might not even need that.
   id_generator: atomic::AtomicU64,
 }
 
@@ -64,7 +62,7 @@ impl Interns {
       let key = if let Some(key) = forward_keys.get(&intern_key) {
         *key
       } else {
-        let id = self.id_generator.fetch_add(1, atomic::Ordering::SeqCst);
+        let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
         let key = Key::new(id, type_id);
         self.reverse_keys.write().insert(key, v);
         forward_keys.insert(intern_key, key);
