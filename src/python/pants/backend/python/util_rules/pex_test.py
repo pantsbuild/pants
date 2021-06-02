@@ -492,7 +492,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     )
     assert_direct_requirements(direct_pex_info)
     assert {
-        "certifi-2020.12.5-py2.py3-none-any.whl",
+        "certifi-2021.5.30-py2.py3-none-any.whl",
         "chardet-3.0.4-py2.py3-none-any.whl",
         "idna-2.10-py2.py3-none-any.whl",
         "requests-2.23.0-py2.py3-none-any.whl",
