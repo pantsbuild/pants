@@ -130,6 +130,7 @@ def pants_virtualenv_cache() -> Step:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_BUILDSENSE_ENABLE": "True",
         "RUST_BACKTRACE": "all",
     }
 

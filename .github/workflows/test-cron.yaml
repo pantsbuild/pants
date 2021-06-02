@@ -4,6 +4,7 @@
 
 
 env:
+  PANTS_BUILDSENSE_ENABLE: 'True'
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
