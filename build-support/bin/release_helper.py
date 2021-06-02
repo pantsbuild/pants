@@ -309,16 +309,6 @@ class _Constants:
     def python_version(self) -> str:
         return ".".join(map(str, sys.version_info[:2]))
 
-    @property
-    def env(self) -> dict[str, str]:
-        """An environment that ensures we use the correct Python interpreter when building
-        pantsbuild.pants and compiling Rust."""
-        return {
-            **os.environ,
-            "PY": f"python{CONSTANTS.python_version}",
-            "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f'["=={CONSTANTS.python_version}.*"]',
-        }
-
 
 CONSTANTS = _Constants()
 
@@ -465,7 +455,7 @@ def build_pants_wheels() -> None:
 
     with set_pants_version(CONSTANTS.pants_unstable_version):
         try:
-            subprocess.run(args, env=CONSTANTS.env, check=True)
+            subprocess.run(args, check=True)
         except subprocess.CalledProcessError as e:
             failed_packages = ",".join(package.name for package in PACKAGES)
             failed_targets = " ".join(package.target for package in PACKAGES)
@@ -516,7 +506,6 @@ def build_3rdparty_wheels() -> None:
                     "--type=3rdparty",
                     *pkg_tgts,
                 ],
-                env=CONSTANTS.env,
                 stdout=subprocess.PIPE,
                 check=True,
             )
@@ -544,7 +533,7 @@ def build_fs_util() -> None:
     release_mode = os.environ.get("MODE", "") != "debug"
     if release_mode:
         command.append("--release")
-    subprocess.run(command, check=True, env={**CONSTANTS.env, "RUST_BACKTRACE": "1"})
+    subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
     current_os = (
         subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
         .stdout.decode()
@@ -869,7 +858,7 @@ def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
@@ -884,7 +873,6 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    os.environ.update(CONSTANTS.env)
     if args.command == "publish":
         publish()
     if args.command == "test-release":
