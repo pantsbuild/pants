@@ -15,7 +15,6 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
@@ -32,11 +31,12 @@ from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
+    DynamicRemoteOptions,
     ExecutionOptions,
     GlobalOptions,
     LocalStoreOptions,
 )
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
@@ -168,18 +168,14 @@ class EngineInitializer:
 
     @staticmethod
     def setup_graph(
-        options_bootstrapper: OptionsBootstrapper,
+        bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
-        env: CompleteEnvironment,
-        executor: Optional[PyExecutor] = None,
-        local_only: bool = False,
+        dynamic_remote_options: DynamicRemoteOptions,
+        executor: PyExecutor | None = None,
     ) -> GraphScheduler:
         build_root = get_buildroot()
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        options = options_bootstrapper.full_options(build_configuration)
-        assert bootstrap_options is not None
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
-        execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
+        execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,

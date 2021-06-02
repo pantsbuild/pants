@@ -179,7 +179,9 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
 def test_report_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_flake8(rule_runner, [tgt], extra_args=["--lint-reports-dir='.'"])
+    result = run_flake8(
+        rule_runner, [tgt], extra_args=["--flake8-args='--output-file=reports/foo.txt'"]
+    )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert result[0].stdout.strip() == ""

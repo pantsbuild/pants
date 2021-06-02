@@ -4,36 +4,29 @@
 from __future__ import annotations
 
 import dataclasses
-import functools
-import itertools
 import json
 import logging
 import shlex
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import FrozenSet, Iterable, Iterator, List, Mapping, Sequence, Set, Tuple, TypeVar
+from typing import Iterable, Iterator, List, Mapping, Tuple
 
 import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
-from typing_extensions import Protocol
 
-from pants.backend.python.target_types import InterpreterConstraintsField, MainSpecification
+from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
-    PythonRequirementConstraintsField,
-    PythonRequirementsField,
-)
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
-    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
+    SandboxPexEnvironment,
 )
-from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -42,7 +35,6 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     FileContent,
-    GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -56,13 +48,11 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import Target, Targets
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -78,226 +68,6 @@ class PexRequirements(DeduplicatedCollection[str]):
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
-
-
-# This protocol allows us to work with any arbitrary FieldSet. See
-# https://mypy.readthedocs.io/en/stable/protocols.html.
-class FieldSetWithInterpreterConstraints(Protocol):
-    @property
-    def address(self) -> Address:
-        ...
-
-    @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
-
-
-_FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
-
-
-# Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
-class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
-    def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
-        super().__init__(
-            v if isinstance(v, Requirement) else self.parse_constraint(v)
-            for v in sorted(constraints, key=lambda c: str(c))
-        )
-
-    @staticmethod
-    def parse_constraint(constraint: str) -> Requirement:
-        """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
-
-        We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
-        interpreter.py's `parse_requirement()`.
-        """
-        try:
-            parsed_requirement = Requirement.parse(constraint)
-        except ValueError:
-            parsed_requirement = Requirement.parse(f"CPython{constraint}")
-        return parsed_requirement
-
-    @classmethod
-    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> List[Requirement]:
-        """Given a collection of constraints sets, merge by ORing within each individual constraint
-        set and ANDing across each distinct constraint set.
-
-        For example, given `[["CPython>=2.7", "CPython<=3"], ["CPython==3.6.*"]]`, return
-        `["CPython>=2.7,==3.6.*", "CPython<=3,==3.6.*"]`.
-        """
-        # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
-        # identical top-level parsed constraint sets.
-        if not constraint_sets:
-            return []
-        parsed_constraint_sets: Set[FrozenSet[Requirement]] = set()
-        for constraint_set in constraint_sets:
-            # Each element (a ParsedConstraint) will get ORed.
-            parsed_constraint_set = frozenset(
-                cls.parse_constraint(constraint) for constraint in constraint_set
-            )
-            parsed_constraint_sets.add(parsed_constraint_set)
-
-        def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
-            merged_specs: Set[Tuple[str, str]] = set()
-            expected_interpreter = parsed_constraints[0].project_name
-            for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name == expected_interpreter:
-                    merged_specs.update(parsed_constraint.specs)
-                    continue
-
-                def key_fn(req: Requirement):
-                    return req.project_name
-
-                # NB: We must pre-sort the data for itertools.groupby() to work properly.
-                sorted_constraints = sorted(parsed_constraints, key=key_fn)
-                attempted_interpreters = {
-                    interp: sorted(
-                        str(parsed_constraint) for parsed_constraint in parsed_constraints
-                    )
-                    for interp, parsed_constraints in itertools.groupby(
-                        sorted_constraints, key=key_fn
-                    )
-                }
-                raise ValueError(
-                    "Tried ANDing Python interpreter constraints with different interpreter "
-                    "types. Please use only one interpreter type. Got "
-                    f"{attempted_interpreters}."
-                )
-
-            formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
-            return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
-
-        def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
-            if req1.project_name != req2.project_name:
-                return -1 if req1.project_name < req2.project_name else 1
-            if req1.specs == req2.specs:
-                return 0
-            return -1 if req1.specs < req2.specs else 1
-
-        return sorted(
-            {
-                and_constraints(constraints_product)
-                for constraints_product in itertools.product(*parsed_constraint_sets)
-            },
-            key=functools.cmp_to_key(cmp_constraints),
-        )
-
-    @classmethod
-    def create_from_targets(
-        cls, targets: Iterable[Target], python_setup: PythonSetup
-    ) -> PexInterpreterConstraints:
-        return cls.create_from_compatibility_fields(
-            (
-                tgt[InterpreterConstraintsField]
-                for tgt in targets
-                if tgt.has_field(InterpreterConstraintsField)
-            ),
-            python_setup,
-        )
-
-    @classmethod
-    def create_from_compatibility_fields(
-        cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
-    ) -> PexInterpreterConstraints:
-        constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
-        # This will OR within each field and AND across fields.
-        merged_constraints = cls.merge_constraint_sets(constraint_sets)
-        return PexInterpreterConstraints(merged_constraints)
-
-    @classmethod
-    def group_field_sets_by_constraints(
-        cls, field_sets: Iterable[_FS], python_setup: PythonSetup
-    ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
-        results = defaultdict(set)
-        for fs in field_sets:
-            constraints = cls.create_from_compatibility_fields(
-                [fs.interpreter_constraints], python_setup
-            )
-            results[constraints].add(fs)
-        return FrozenDict(
-            {
-                constraints: tuple(sorted(field_sets, key=lambda fs: fs.address))
-                for constraints, field_sets in sorted(results.items())
-            }
-        )
-
-    def generate_pex_arg_list(self) -> List[str]:
-        args = []
-        for constraint in self:
-            args.extend(["--interpreter-constraint", str(constraint)])
-        return args
-
-    def _includes_version(self, major_minor: str, last_patch: int) -> bool:
-        patch_versions = list(reversed(range(0, last_patch + 1)))
-        for req in self:
-            if any(
-                req.specifier.contains(f"{major_minor}.{p}") for p in patch_versions  # type: ignore[attr-defined]
-            ):
-                return True
-        return False
-
-    def includes_python2(self) -> bool:
-        """Checks if any of the constraints include Python 2.
-
-        This will return True even if the code works with Python 3 too, so long as at least one of
-        the constraints works with Python 2.
-        """
-        last_py27_patch_version = 18
-        return self._includes_version("2.7", last_patch=last_py27_patch_version)
-
-    def minimum_python_version(self) -> str | None:
-        """Find the lowest major.minor Python version that will work with these constraints.
-
-        The constraints may also be compatible with later versions; this is the lowest version that
-        still works.
-        """
-        if self.includes_python2():
-            return "2.7"
-        max_expected_py3_patch_version = 15  # The current max is 3.6.12.
-        for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
-            if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
-                return major_minor
-        return None
-
-    def _requires_python3_version_or_newer(
-        self, *, allowed_versions: Iterable[str], prior_version: str
-    ) -> bool:
-        # Assume any 3.x release has no more than 15 releases. The max is currently 3.6.12.
-        patch_versions = list(reversed(range(0, 15)))
-        # We only need to look at the prior Python release. For example, consider Python 3.8+
-        # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
-        # `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work correctly as
-        # it's an invalid constraint so setuptools returns False always. `['==2.7.*', '==3.8.*']`
-        # will fail because not every single constraint is exclusively 3.8.
-        prior_versions = [f"{prior_version}.{p}" for p in patch_versions]
-        allowed_versions = [
-            f"{major_minor}.{p}" for major_minor in allowed_versions for p in patch_versions
-        ]
-        for req in self:
-            if any(
-                req.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
-            ):
-                return False
-            if not any(
-                req.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
-            ):
-                return False
-        return True
-
-    def requires_python38_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.8+.
-
-        This will return False if Python 3.8 is allowed, but prior versions like 3.7 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.8", "3.9", "3.10"], prior_version="3.7"
-        )
-
-    def __str__(self) -> str:
-        return " OR ".join(str(constraint) for constraint in self)
-
-    def debug_hint(self) -> str:
-        return str(self)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -320,7 +90,7 @@ class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     requirements: PexRequirements
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
     additional_inputs: Digest | None
@@ -337,7 +107,7 @@ class PexRequest(EngineAwareParameter):
         output_filename: str,
         internal_only: bool,
         requirements: PexRequirements = PexRequirements(),
-        interpreter_constraints=PexInterpreterConstraints(),
+        interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
@@ -442,7 +212,7 @@ logger = logging.getLogger(__name__)
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(
-    interpreter_constraints: PexInterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
+    interpreter_constraints: InterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
@@ -480,10 +250,10 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
-            # NB: We want interpreter discovery to re-run fairly frequently (PER_RESTART), but
-            # not on every run of Pants (NEVER, which is effectively per-Session). See #10769 for
-            # a solution that is less of a tradeoff.
-            cache_scope=ProcessCacheScope.PER_RESTART,
+            # NB: We want interpreter discovery to re-run fairly frequently
+            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
+            # per-Session). See #10769 for a solution that is less of a tradeoff.
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
@@ -494,51 +264,6 @@ async def find_interpreter(
             logger.info("%s", log_output)
 
     return PythonExecutable(path=path, fingerprint=fingerprint)
-
-
-@dataclass(frozen=True)
-class MaybeConstraintsFile:
-    path: str | None
-    digest: Digest
-
-
-@rule(desc="Resolve requirements constraints file")
-async def resolve_requirements_constraints_file(python_setup: PythonSetup) -> MaybeConstraintsFile:
-    if python_setup.requirement_constraints:
-        digest = await Get(
-            Digest,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin="the option `[python-setup].requirement_constraints`",
-            ),
-        )
-        return MaybeConstraintsFile(python_setup.requirement_constraints, digest)
-
-    if python_setup.requirement_constraints_target:
-        targets = await Get(
-            Targets,
-            UnparsedAddressInputs(
-                [python_setup.requirement_constraints_target], owning_address=None
-            ),
-        )
-        tgt = targets.expect_single()
-        if not tgt.has_field(PythonRequirementConstraintsField):
-            raise ValueError(
-                "Invalid target type for `[python-setup].requirement_constraints_target`. Please "
-                f"use a `_python_constraints` target instead of a `{tgt.alias}` target."
-            )
-        formatted_constraints = "\n".join(
-            str(constraint) for constraint in tgt[PythonRequirementConstraintsField].value
-        )
-        path = "constraints.generated.txt"
-        digest = await Get(
-            Digest, CreateDigest([FileContent(path, formatted_constraints.encode())])
-        )
-        return MaybeConstraintsFile(path, digest)
-
-    return MaybeConstraintsFile(None, EMPTY_DIGEST)
 
 
 @dataclass(frozen=True)
@@ -559,7 +284,6 @@ async def build_pex(
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
-    constraints_file: MaybeConstraintsFile,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
@@ -602,7 +326,7 @@ async def build_pex(
         # will have already validated that there were no platforms.
         if request.internal_only:
             python = await Get(
-                PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
+                PythonExecutable, InterpreterConstraints, request.interpreter_constraints
             )
 
     argv.append("--no-emit-warnings")
@@ -624,9 +348,16 @@ async def build_pex(
     argv.extend(request.requirements)
 
     constraint_file_digest = EMPTY_DIGEST
-    if request.apply_requirement_constraints and constraints_file.path is not None:
-        argv.extend(["--constraints", constraints_file.path])
-        constraint_file_digest = constraints_file.digest
+    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
+        constraint_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="the option `[python-setup].requirement-constraints`",
+            ),
+        )
 
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
@@ -728,7 +459,7 @@ class VenvScriptWriter:
     def _create_venv_script(
         self,
         bash: BashBinary,
-        pex_environment: PexEnvironment,
+        pex_environment: SandboxPexEnvironment,
         *,
         script_path: PurePath,
         venv_executable: PurePath,
@@ -772,14 +503,16 @@ class VenvScriptWriter:
             content=FileContent(path=str(script_path), content=script.encode(), is_executable=True),
         )
 
-    def exe(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+    def exe(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
         """Writes a safe shim for the venv's executable `pex` script."""
         script_path = PurePath(f"{self.pex.name}_pex_shim.sh")
         return self._create_venv_script(
             bash, pex_environment, script_path=script_path, venv_executable=self.venv_dir / "pex"
         )
 
-    def bin(self, bash: BashBinary, pex_environment: PexEnvironment, name: str) -> VenvScript:
+    def bin(
+        self, bash: BashBinary, pex_environment: SandboxPexEnvironment, name: str
+    ) -> VenvScript:
         """Writes a safe shim for an executable or script in the venv's `bin` directory."""
         script_path = PurePath(f"{self.pex.name}_bin_{name}_shim.sh")
         return self._create_venv_script(
@@ -789,7 +522,7 @@ class VenvScriptWriter:
             venv_executable=self.venv_dir / "bin" / name,
         )
 
-    def python(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+    def python(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
         """Writes a safe shim for the venv's python binary."""
         return self.bin(bash, pex_environment, "python")
 
@@ -827,7 +560,7 @@ def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
 
 @rule
 async def create_venv_pex(
-    request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
+    request: VenvPexRequest, bash: BashBinary, pex_environment: SandboxPexEnvironment
 ) -> VenvPex:
     # VenvPex is motivated by improving performance of Python tools by eliminating traditional PEX
     # file startup overhead.
@@ -976,7 +709,7 @@ class PexProcess:
 
 
 @rule
-async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvironment) -> Process:
     pex = request.pex
     argv = pex_environment.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
@@ -996,7 +729,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches(),
+        append_only_caches=pex_environment.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -1048,7 +781,7 @@ class VenvPexProcess:
 
 @rule
 async def setup_venv_pex_process(
-    request: VenvPexProcess, pex_environment: PexEnvironment
+    request: VenvPexProcess, pex_environment: SandboxPexEnvironment
 ) -> Process:
     venv_pex = request.venv_pex
     argv = (venv_pex.pex.argv0, *request.argv)
@@ -1065,7 +798,7 @@ async def setup_venv_pex_process(
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches(),
+        append_only_caches=pex_environment.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,

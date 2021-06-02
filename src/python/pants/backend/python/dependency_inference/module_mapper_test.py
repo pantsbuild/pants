@@ -7,9 +7,11 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 
 import pytest
+from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
     PythonModule,
@@ -22,6 +24,13 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+
+
+def test_default_module_mapping_is_normalized() -> None:
+    for k in DEFAULT_MODULE_MAPPING:
+        assert k == canonicalize_project_name(
+            k
+        ), "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
 
 
 @pytest.mark.parametrize(
@@ -79,10 +88,16 @@ def test_first_party_modules_mapping() -> None:
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
+    pants_testutil_addr = Address("", target_name="pantsbuild.testutil")
     submodule_addr = Address("", target_name="submodule")
     mapping = ThirdPartyPythonModuleMapping(
         mapping=FrozenDict(
-            {"colors": colors_addr, "pants": pants_addr, "req.submodule": submodule_addr}
+            {
+                "colors": colors_addr,
+                "pants": pants_addr,
+                "req.submodule": submodule_addr,
+                "pants.testutil": pants_testutil_addr,
+            }
         ),
         ambiguous_modules=FrozenDict({"ambiguous": (colors_addr, pants_addr)}),
     )
@@ -93,6 +108,9 @@ def test_third_party_modules_mapping() -> None:
     assert mapping.address_for_module("pants.task") == (pants_addr, ())
     assert mapping.address_for_module("pants.task.task") == (pants_addr, ())
     assert mapping.address_for_module("pants.task.task.Task") == (pants_addr, ())
+
+    assert mapping.address_for_module("pants.testutil") == (pants_testutil_addr, ())
+    assert mapping.address_for_module("pants.testutil.foo") == (pants_testutil_addr, ())
 
     assert mapping.address_for_module("req.submodule") == (submodule_addr, ())
     assert mapping.address_for_module("req.submodule.foo") == (submodule_addr, ())
@@ -255,7 +273,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
             python_requirement_library(
               name='un_normalized',
-              requirements=['Un-Normalized-Project>3', 'two_owners'],
+              requirements=['Un-Normalized-Project>3', 'two_owners', 'DiFFerent-than_Mapping'],
+              module_mapping={"different_THAN-mapping": ["different_than_mapping"]},
             )
 
             python_requirement_library(
@@ -272,6 +291,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         mapping=FrozenDict(
             {
                 "colors": Address("3rdparty/python", target_name="ansicolors"),
+                "different_than_mapping": Address("3rdparty/python", target_name="un_normalized"),
                 "local_dist": Address("3rdparty/python", target_name="direct_references"),
                 "pip": Address("3rdparty/python", target_name="direct_references"),
                 "req1": Address("3rdparty/python", target_name="req1"),

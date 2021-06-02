@@ -4,57 +4,20 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import os
-from enum import Enum
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.environment import Environment
-from pants.option.custom_types import file_option, target_option
-from pants.option.errors import BooleanConversionError
-from pants.option.parser import Parser
+from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
-
-
-class ResolveAllConstraintsOption(Enum):
-    """When to allow re-using a resolve of an entire constraints file.
-
-    This helps avoid many repeated resolves of overlapping requirement subsets,
-    at the expense of using a larger requirement set that may be strictly necessary.
-
-    Note that use of any value other than NEVER requires --requirement-constraints to be set.
-    """
-
-    # Use the strict requirement subset always.
-    NEVER = "never"
-    # Use the strict requirement subset when building deployable binaries, but use
-    # the entire constraints file otherwise (e.g., when running tests).
-    NONDEPLOYABLES = "nondeployables"
-    # Always use the entire constraints file.
-    ALWAYS = "always"
-
-    @classmethod
-    def parse(cls, value: bool | str) -> bool:
-        try:
-            return Parser.ensure_bool(value)
-        except BooleanConversionError:
-            enum_value = cls(value)
-            bool_value = enum_value is not cls.NEVER
-            deprecated_conditional(
-                lambda: True,
-                removal_version="2.6.0.dev0",
-                entity_description="python-setup resolve_all_constraints non boolean values",
-                hint_message=f"Instead of {enum_value.value!r} use {bool_value!r}.",
-            )
-            return bool_value
 
 
 class PythonSetup(Subsystem):
@@ -82,7 +45,6 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             type=file_option,
-            mutually_exclusive_group="constraints",
             help=(
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use.\n\nSee "
@@ -92,25 +54,10 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--requirement-constraints-target",
-            advanced=True,
-            type=target_option,
-            mutually_exclusive_group="constraints",
-            help=(
-                "When resolving third-party requirements, use this "
-                "_python_constraints target to determine which versions to use.\n\nThis is "
-                "primarily intended for macros (for now). Normally, use "
-                "`--requirement-constraints` instead with a constraints file.\n\nSee "
-                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraints and how constraints are applied in Pex and pip."
-            ),
-        )
-        register(
             "--resolve-all-constraints",
             advanced=True,
             default=True,
-            choices=(*(raco.value for raco in ResolveAllConstraintsOption), True, False),
-            type=ResolveAllConstraintsOption.parse,
+            type=bool,
             help=(
                 "If enabled, when resolving requirements, Pants will first resolve your entire "
                 "constraints file as a single global resolve. Then, if the code uses a subset of "
@@ -153,13 +100,14 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=multiprocessing.cpu_count() // 2,
+            default=CPU_COUNT // 2,
+            default_help_repr="#cores/2",
             advanced=True,
             help=(
-                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
                 "can run multiple subprocesses in parallel, the maximum total parallelism will be "
                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
-                "Setting this option higher may result in better parallelism, but, if set too "
+                "\n\nSetting this option higher may result in better parallelism, but, if set too "
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
@@ -172,11 +120,6 @@ class PythonSetup(Subsystem):
     def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
         return cast("str | None", self.options.requirement_constraints)
-
-    @property
-    def requirement_constraints_target(self) -> str | None:
-        """Address for a _python_constraints target."""
-        return cast("str | None", self.options.requirement_constraints_target)
 
     @property
     def resolve_all_constraints(self) -> bool:

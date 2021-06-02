@@ -3,6 +3,7 @@
 
 import itertools
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional
@@ -13,10 +14,15 @@ from pants.backend.python.goals.coverage_py import (
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import ConsoleScript, PythonTestsSources, PythonTestsTimeout
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    PythonTestsExtraEnvVars,
+    PythonTestsSources,
+    PythonTestsTimeout,
+)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -39,7 +45,11 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
+from pants.engine.collection import Collection
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -57,19 +67,13 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
-
-
-# If a user wants extra pytest output (e.g., plugin output) to show up in dist/
-# they must ensure that output goes under this directory. E.g.,
-# ./pants test <target> -- --html=extra-output/report.html
-_EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,7 @@ class PythonTestFieldSet(TestFieldSet):
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
+    extra_env_vars: PythonTestsExtraEnvVars
 
     def is_conftest_or_type_stub(self) -> bool:
         """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
@@ -87,6 +92,78 @@ class PythonTestFieldSet(TestFieldSet):
             return False
         file_name = PurePath(self.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
+
+
+# -----------------------------------------------------------------------------------------
+# Plugin hook
+# -----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PytestPluginSetup:
+    """The result of custom set up logic before Pytest runs.
+
+    Please reach out it if you would like certain functionality, such as allowing your plugin to set
+    environment variables.
+    """
+
+    digest: Digest = EMPTY_DIGEST
+
+
+@union
+@dataclass(frozen=True)  # type: ignore[misc]
+class PytestPluginSetupRequest(ABC):
+    """A request to set up the test environment before Pytest runs, e.g. to set up databases.
+
+    To use, subclass PytestPluginSetupRequest, register the rule
+    `UnionRule(PytestPluginSetupRequest, MyCustomPytestPluginSetupRequest)`, and add a rule that
+    takes your subclass as a parameter and returns `PytestPluginSetup`.
+    """
+
+    target: Target
+
+    @classmethod
+    @abstractmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether the setup implementation should be used for this target or not."""
+
+
+class AllPytestPluginSetups(Collection[PytestPluginSetup]):
+    pass
+
+
+# TODO: Why is this necessary? We should be able to use `PythonTestFieldSet` as the rule param.
+@dataclass(frozen=True)
+class AllPytestPluginSetupsRequest:
+    address: Address
+
+
+@rule
+async def run_all_setup_plugins(
+    request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
+) -> AllPytestPluginSetups:
+    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
+    applicable_setup_request_types = tuple(
+        request
+        for request in union_membership.get(PytestPluginSetupRequest)
+        if request.is_applicable(wrapped_tgt.target)
+    )
+    setups = await MultiGet(
+        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc, abstract]
+        for request in applicable_setup_request_types
+    )
+    return AllPytestPluginSetups(setups)
+
+
+# -----------------------------------------------------------------------------------------
+# Core logic
+# -----------------------------------------------------------------------------------------
+
+
+# If a user wants extra pytest output (e.g., plugin output) to show up in dist/
+# they must ensure that output goes under this directory. E.g.,
+# ./pants test <target> -- --html=extra-output/report.html
+_EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
@@ -114,15 +191,15 @@ async def setup_pytest_for_target(
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
+    complete_env: CompleteEnvironment,
 ) -> TestSetup:
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
+    transitive_targets, plugin_setups = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
+        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest(request.field_set.address)),
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
-        all_targets, python_setup
-    )
+    interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
     requirements_pex_get = Get(
         Pex,
@@ -139,15 +216,11 @@ async def setup_pytest_for_target(
         ),
     )
 
+    # Ensure that the empty extra output dir exists.
     extra_output_directory_digest_get = Get(Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)]))
 
     prepared_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
-    )
-
-    build_package_dependencies_get = Get(
-        BuiltPackageDependencies,
-        BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
     )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
@@ -159,14 +232,12 @@ async def setup_pytest_for_target(
         requirements_pex,
         prepared_sources,
         field_set_source_files,
-        built_package_dependencies,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
-        build_package_dependencies_get,
         extra_output_directory_digest_get,
     )
 
@@ -195,7 +266,7 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
-                *(pkg.digest for pkg in built_package_dependencies),
+                *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
         ),
     )
@@ -225,10 +296,15 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
+        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within
+        # `python_tests`
+        **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
-    cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    cache_scope = (
+        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    )
     process = await Get(
         Process,
         VenvPexProcess(
@@ -306,5 +382,31 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     )
 
 
+# -----------------------------------------------------------------------------------------
+# `runtime_package_dependencies` plugin
+# -----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RuntimePackagesPluginRequest(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return bool(target.get(RuntimePackageDependenciesField).value)
+
+
+@rule
+async def setup_runtime_packages(request: RuntimePackagesPluginRequest) -> PytestPluginSetup:
+    built_packages = await Get(
+        BuiltPackageDependencies,
+        BuildPackageDependenciesRequest(request.target.get(RuntimePackageDependenciesField)),
+    )
+    digest = await Get(Digest, MergeDigests(pkg.digest for pkg in built_packages))
+    return PytestPluginSetup(digest)
+
+
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, PythonTestFieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, PythonTestFieldSet),
+        UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+    ]

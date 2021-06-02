@@ -15,7 +15,7 @@ from pants.backend.python.dependency_inference.python_stdlib.combined import com
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -138,7 +138,7 @@ async def infer_python_dependencies_via_imports(
             ParsedPythonImports,
             ParsePythonImportsRequest(
                 request.sources_field,
-                PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+                InterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
             ),
         ),

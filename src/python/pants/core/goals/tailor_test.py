@@ -292,7 +292,11 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         run_rule_with_mocks(
             tailor.tailor,
             rule_args=[
-                create_goal_subsystem(TailorSubsystem, build_file_indent="    "),
+                create_goal_subsystem(
+                    TailorSubsystem,
+                    build_file_indent="    ",
+                    alias_mapping={"fortran_library": "my_fortran_lib"},
+                ),
                 console,
                 workspace,
                 union_membership,
@@ -358,7 +362,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         stdout_str = stdio_reader.get_stdout()
 
     assert (
-        "Created src/fortran/baz/BUILD:\n  - Added fortran_library target src/fortran/baz"
+        "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target src/fortran/baz"
         in stdout_str
     )
     assert (
@@ -366,7 +370,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         in stdout_str
     )
     assert (
-        "Updated src/fortran/conflict/BUILD:\n  - Added fortran_library target "
+        "Updated src/fortran/conflict/BUILD:\n  - Added my_fortran_lib target "
         "src/fortran/conflict:conflict0"
     ) in stdout_str
 

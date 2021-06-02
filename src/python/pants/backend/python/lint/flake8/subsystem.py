@@ -15,7 +15,7 @@ class Flake8(PythonToolBase):
     options_scope = "flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
-    default_version = "flake8>=3.7.9,<3.9"
+    default_version = "flake8>=3.9.2,<4.0"
     default_extra_requirements = [
         "setuptools<45; python_full_version == '2.7.*'",
         "setuptools; python_version > '2.7'",

@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeVar, Union, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
@@ -115,7 +115,7 @@ class TestResult:
             return True
         if other.exit_code is None:
             return False
-        return self.exit_code < other.exit_code
+        return abs(self.exit_code) < abs(other.exit_code)
 
 
 class ShowOutput(Enum):
@@ -202,7 +202,7 @@ _CD = TypeVar("_CD", bound=CoverageData)
 
 @union
 class CoverageDataCollection(Collection[_CD]):
-    element_type: Type[_CD]
+    element_type: ClassVar[type[_CD]]
 
 
 class CoverageReport(ABC):
@@ -450,13 +450,11 @@ async def run_tests(
             key=lambda cov_data: str(type(cov_data)),
         )
 
-        coverage_types_to_collection_types: Dict[
-            Type[CoverageData], Type[CoverageDataCollection]
-        ] = {
-            collection_cls.element_type: collection_cls
+        coverage_types_to_collection_types = {
+            collection_cls.element_type: collection_cls  # type: ignore[misc]
             for collection_cls in union_membership.get(CoverageDataCollection)
         }
-        coverage_collections: List[CoverageDataCollection] = []
+        coverage_collections = []
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
             collection_cls = coverage_types_to_collection_types[data_cls]
             coverage_collections.append(collection_cls(data))
@@ -466,7 +464,7 @@ async def run_tests(
             for coverage_collection in coverage_collections
         )
 
-        coverage_report_files: List[PurePath] = []
+        coverage_report_files: list[PurePath] = []
         for coverage_reports in coverage_reports_collections:
             report_files = coverage_reports.materialize(console, workspace)
             coverage_report_files.extend(report_files)

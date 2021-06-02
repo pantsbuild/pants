@@ -205,7 +205,7 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)
-                if not field.alias.startswith("_") and field.deprecated_removal_version is None
+                if not field.alias.startswith("_") and field.removal_version is None
             ),
         )
 
@@ -269,7 +269,7 @@ class HelpInfoExtracter:
         name_to_target_type_info = {
             alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
             for alias, target_type in registered_target_types.aliases_to_types.items()
-            if not alias.startswith("_") and target_type.deprecated_removal_version is None
+            if not alias.startswith("_") and target_type.removal_version is None
         }
 
         return AllHelpInfo(
@@ -280,10 +280,13 @@ class HelpInfoExtracter:
 
     @staticmethod
     def compute_default(**kwargs) -> Any:
-        """Compute the default val for help display for an option registered with these kwargs.
+        """Compute the default val for help display for an option registered with these kwargs."""
+        # If the kwargs already determine a string representation of the default for use in help
+        # messages, use that.
+        default_help_repr = kwargs.get("default_help_repr")
+        if default_help_repr is not None:
+            return str(default_help_repr)  # Should already be a string, but might as well be safe.
 
-        Returns a pair (default, stringified default suitable for display).
-        """
         ranked_default = kwargs.get("default")
         fallback: Any = None
         if is_list_option(kwargs):

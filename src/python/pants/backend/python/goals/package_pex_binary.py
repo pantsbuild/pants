@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
     PexShebangField,
+    PexStripEnvField,
     PexZipSafeField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -62,6 +63,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     inherit_path: PexInheritPathField
     shebang: PexShebangField
     zip_safe: PexZipSafeField
+    strip_env: PexStripEnvField
     platforms: PythonPlatformsField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
@@ -84,6 +86,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
             args.append("--not-zip-safe")
+        if self.strip_env.value is False:
+            args.append("--no-strip-pex-env")
         if self._execution_mode is PexExecutionMode.UNZIP:
             args.append("--unzip")
         if self._execution_mode is PexExecutionMode.VENV:

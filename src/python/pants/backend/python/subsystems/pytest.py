@@ -7,7 +7,7 @@ import os.path
 from typing import Iterable, cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.option.custom_types import file_option, shell_str
+from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 
 
@@ -99,18 +99,6 @@ class PyTest(Subsystem):
             ),
         )
         register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help="Path to pytest.ini or alternative Pytest config file.",
-            removal_version="2.6.0.dev0",
-            removal_hint=(
-                "Pants now auto-discovers config files, so there is no need to set "
-                "`[pytest].config` if `[pytest].config_discovery` is enabled (the default)."
-            ),
-        )
-        register(
             "--config-discovery",
             type=bool,
             default=True,
@@ -151,8 +139,6 @@ class PyTest(Subsystem):
             check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
 
         return ConfigFilesRequest(
-            specified=cast("str | None", self.options.config),
-            specified_option_name=f"[{self.options_scope}].config",
             discovery=cast(bool, self.options.config_discovery),
             check_existence=check_existence,
             check_content=check_content,

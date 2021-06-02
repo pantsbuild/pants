@@ -431,8 +431,8 @@ class Parser:
         if removal_version is not None:
             warn_or_error(
                 removal_version=removal_version,
-                deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
-                deprecation_start_version=kwargs.get("deprecation_start_version", None),
+                entity=f"option '{dest}' in {self._scope_str()}",
+                start_version=kwargs.get("deprecation_start_version", None),
                 hint=kwargs.get("removal_hint", None),
                 print_warning=print_warning,
             )
@@ -443,6 +443,7 @@ class Parser:
         "choices",
         "dest",
         "default",
+        "default_help_repr",
         "implicit_value",
         "metavar",
         "help",

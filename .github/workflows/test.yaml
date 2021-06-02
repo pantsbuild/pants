@@ -56,7 +56,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/beta-2021-04-07-*
+        path: '~/.rustup/toolchains/1.52.1-*
 
           ~/.rustup/update-hashes
 
@@ -119,6 +119,12 @@ jobs:
         ./pants help subsystems
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-bootstrap-linux
+        path: .pants.d/pants.log
     - name: Upload native_engine.so
       uses: actions/upload-artifact@v2
       with:
@@ -169,6 +175,11 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -184,7 +195,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/beta-2021-04-07-*
+        path: '~/.rustup/toolchains/1.52.1-*
 
           ~/.rustup/update-hashes
 
@@ -298,7 +309,7 @@ jobs:
 
         '
     - env:
-        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -312,6 +323,12 @@ jobs:
         ./pants run build-support/bin:release_37 -- build-fs-util
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-wheels-linux
+        path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -359,7 +376,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/beta-2021-04-07-*
+        path: '~/.rustup/toolchains/1.52.1-*
 
           ~/.rustup/update-hashes
 
@@ -383,7 +400,7 @@ jobs:
           '
     - env:
         ARCHFLAGS: -arch x86_64
-        PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.no-buildsense.toml']
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -397,6 +414,12 @@ jobs:
         ./pants run build-support/bin:release_37 -- build-fs-util
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-wheels-macos
+        path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -468,7 +491,8 @@ jobs:
         ./pants lint typecheck ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-lint
@@ -542,7 +566,8 @@ jobs:
       run: './pants test ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-python-test-linux
@@ -618,7 +643,8 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
-    - name: Upload pants.log
+    - if: always()
+      name: Upload pants.log
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-python-test-macos
@@ -627,7 +653,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 20
+    timeout-minutes: 40
 name: Pull Request CI
 'on':
 - push

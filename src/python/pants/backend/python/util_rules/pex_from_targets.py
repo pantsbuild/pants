@@ -17,10 +17,9 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     parse_requirements_file,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
-    MaybeConstraintsFile,
     Pex,
-    PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
     PexRequirements,
@@ -33,7 +32,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, MergeDigests
+from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -63,7 +62,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
-    hardcoded_interpreter_constraints: PexInterpreterConstraints | None
+    hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
@@ -82,7 +81,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         direct_deps_only: bool = False,
         description: str | None = None,
     ) -> None:
@@ -138,7 +137,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> PexFromTargetsRequest:
@@ -180,11 +179,7 @@ class TwoStepPexFromTargetsRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def pex_from_targets(
-    request: PexFromTargetsRequest,
-    python_setup: PythonSetup,
-    constraints_file: MaybeConstraintsFile,
-) -> PexRequest:
+async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     if request.direct_deps_only:
         targets = await Get(Targets, Addresses(request.addresses))
         direct_deps = await MultiGet(
@@ -210,12 +205,12 @@ async def pex_from_targets(
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
-        calculated_constraints = PexInterpreterConstraints.create_from_targets(
+        calculated_constraints = InterpreterConstraints.create_from_targets(
             all_targets, python_setup
         )
         # If there are no targets, we fall back to the global constraints. This is relevant,
         # for example, when running `./pants repl` with no specs.
-        interpreter_constraints = calculated_constraints or PexInterpreterConstraints(
+        interpreter_constraints = calculated_constraints or InterpreterConstraints(
             python_setup.interpreter_constraints
         )
 
@@ -232,12 +227,19 @@ async def pex_from_targets(
     repository_pex: Pex | None = None
     description = request.description
 
-    if constraints_file.path:
-        constraints_file_contents = await Get(DigestContents, Digest, constraints_file.digest)
+    if python_setup.requirement_constraints:
+        constraints_file_contents = await Get(
+            DigestContents,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="the option `[python-setup].requirement_constraints`",
+            ),
+        )
         constraints_file_reqs = set(
             parse_requirements_file(
                 constraints_file_contents[0].content.decode(),
-                rel_path=constraints_file.path,
+                rel_path=python_setup.requirement_constraints,
             )
         )
 
@@ -264,14 +266,9 @@ async def pex_from_targets(
         # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.
         unconstrained_projects = name_req_projects - constraint_file_projects
         if unconstrained_projects:
-            constraints_descr = (
-                f"constraints file {constraints_file.path}"
-                if python_setup.requirement_constraints
-                else f"_python_constraints target {python_setup.requirement_constraints_target}"
-            )
             logger.warning(
-                f"The {constraints_descr} does not contain entries for the following "
-                f"requirements: {', '.join(unconstrained_projects)}"
+                f"The constraints file {python_setup.requirement_constraints} does not contain "
+                f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
         if python_setup.resolve_all_constraints:
@@ -301,7 +298,7 @@ async def pex_from_targets(
                         requirements=PexRequirements(all_constraints),
                         interpreter_constraints=interpreter_constraints,
                         platforms=request.platforms,
-                        additional_args=["-vvv"],
+                        additional_args=request.additional_args,
                     ),
                 )
     elif (
@@ -309,9 +306,8 @@ async def pex_from_targets(
         and python_setup.resolve_all_constraints_was_set_explicitly()
     ):
         raise ValueError(
-            "[python-setup].resolve_all_constraints is enabled, so either "
-            "[python-setup].requirement_constraints or "
-            "[python-setup].requirement_constraints_target must also be provided."
+            "`[python-setup].resolve_all_constraints` is enabled, so "
+            "`[python-setup].requirement_constraints` must also be set."
         )
 
     return PexRequest(

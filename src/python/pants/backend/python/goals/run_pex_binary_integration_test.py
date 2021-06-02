@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import json
+import os
 from textwrap import dedent
 from typing import Optional
 
@@ -88,3 +90,71 @@ def test_run_sample_script(
         pex_info = json.loads(result.stdout)
         assert (execution_mode is PexExecutionMode.UNZIP) == pex_info["unzip"]
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
+        assert pex_info["strip_pex_env"] is False
+
+
+def test_no_strip_pex_env_issues_12057() -> None:
+    sources = {
+        "src/app.py": dedent(
+            """\
+            import os
+            import sys
+
+
+            if __name__ == "__main__":
+                exit_code = os.environ.get("PANTS_ISSUES_12057")
+                if exit_code is None:
+                    os.environ["PANTS_ISSUES_12057"] = "42"
+                    os.execv(sys.executable, [sys.executable, *sys.argv])
+                sys.exit(int(exit_code))
+            """
+        ),
+        "src/BUILD": dedent(
+            """\
+            python_library(name="lib")
+            pex_binary(entry_point="app.py")
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src/app.py",
+        ]
+        result = run_pants(args)
+        assert result.exit_code == 42, result.stderr
+
+
+def test_no_leak_pex_root_issues_12055() -> None:
+    read_config_result = run_pants(["help-all"])
+    read_config_result.assert_success()
+    config_data = json.loads(read_config_result.stdout)
+    global_advanced_options = {
+        option["config_key"]: [
+            ranked_value["value"] for ranked_value in option["value_history"]["ranked_values"]
+        ][-1]
+        for option in config_data["scope_to_help_info"][""]["advanced"]
+    }
+    named_caches_dir = global_advanced_options["named_caches_dir"]
+
+    sources = {
+        "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
+        "src/BUILD": dedent(
+            """\
+            python_library(name="lib")
+            pex_binary(entry_point="app.py")
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src/app.py",
+        ]
+        result = run_pants(args)
+        result.assert_success()
+        assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()

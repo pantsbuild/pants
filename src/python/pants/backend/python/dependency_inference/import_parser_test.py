@@ -14,7 +14,7 @@ from pants.backend.python.dependency_inference.import_parser import (
 )
 from pants.backend.python.target_types import PythonLibrary, PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import (
@@ -58,7 +58,7 @@ def assert_imports_parsed(
         [
             ParsePythonImportsRequest(
                 tgt[PythonSources],
-                PexInterpreterConstraints([constraints]),
+                InterpreterConstraints([constraints]),
                 string_imports=string_imports,
             )
         ],

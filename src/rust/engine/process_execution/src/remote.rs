@@ -44,6 +44,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
+use grpc_util::retry::{retry_call, status_is_retryable};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -965,7 +966,9 @@ pub fn make_execute_request(
 
   if matches!(
     req.cache_scope,
-    ProcessCacheScope::Never | ProcessCacheScope::PerRestart
+    ProcessCacheScope::PerSession
+      | ProcessCacheScope::PerRestartAlways
+      | ProcessCacheScope::PerRestartSuccessful
   ) {
     command
       .environment_variables
@@ -1378,19 +1381,27 @@ pub async fn check_action_cache(
     .workunit_store
     .increment_counter(Metric::RemoteCacheRequests, 1);
 
-  let request = remexec::GetActionResultRequest {
-    action_digest: Some(action_digest.into()),
-    instance_name: metadata
-      .instance_name
-      .as_ref()
-      .cloned()
-      .unwrap_or_else(String::new),
-    ..remexec::GetActionResultRequest::default()
-  };
+  let client = action_cache_client.as_ref().clone();
+  let action_result_response = retry_call(
+    client,
+    move |mut client| {
+      let request = remexec::GetActionResultRequest {
+        action_digest: Some(action_digest.into()),
+        instance_name: metadata
+          .instance_name
+          .as_ref()
+          .cloned()
+          .unwrap_or_else(String::new),
+        ..remexec::GetActionResultRequest::default()
+      };
 
-  let mut client = action_cache_client.as_ref().clone();
-  let request = apply_headers(Request::new(request), &context.build_id);
-  let action_result_response = client.get_action_result(request).await;
+      let request = apply_headers(Request::new(request), &context.build_id);
+
+      async move { client.get_action_result(request).await }
+    },
+    status_is_retryable,
+  )
+  .await;
 
   match action_result_response {
     Ok(action_result) => {

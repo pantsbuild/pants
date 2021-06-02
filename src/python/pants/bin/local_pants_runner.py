@@ -33,6 +33,7 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
 from pants.option.arg_splitter import HelpRequest
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -74,12 +75,16 @@ class LocalPantsRunner:
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
-        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
-            options_bootstrapper, build_config, env
-        )
+        if scheduler is None:
+            dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, env)
+            bootstrap_options = options.bootstrap_option_values()
+            assert bootstrap_options is not None
+            scheduler = EngineInitializer.setup_graph(
+                bootstrap_options, build_config, dynamic_remote_options
+            )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
-        return graph_scheduler_helper.new_session(
+        return scheduler.new_session(
             run_id,
             dynamic_ui=global_options.dynamic_ui,
             use_colors=global_options.get("colors", True),
@@ -110,7 +115,7 @@ class LocalPantsRunner:
         :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
-        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper, env)
+        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
         build_config, options = options_initializer.build_config_and_options(
             options_bootstrapper, env, raise_=True
         )
