@@ -81,6 +81,14 @@ impl Interns {
       .get(&k)
       .cloned()
       .unwrap_or_else(|| {
+        // N.B.: This panic is effectively an assertion that `Key::new` is only ever called above in
+        // `key_insert` under an exclusive lock where it is then inserted in `reverse_keys` before
+        // exiting the lock and being returned to the caller. This ensures that all `Key`s in the
+        // wild _must_ be in `reverse_keys`. As such, the code involved in generating the panic
+        // message should be immaterial and never fire. If it does fire though, then the assertion
+        // was proven incorrect and the `Key` is not, in fact, in `reverse_keys`. Since the `Debug`
+        // impl for `Key` currently uses this very method to render the `Key` we avoid using the
+        // debug formatting for `Key` to avoid generating a panic while panicking.
         panic!(
           "Previously memoized object disappeared for Key {{ id: {}, type_id: {} }}!",
           k.id(),
