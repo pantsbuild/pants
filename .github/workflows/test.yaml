@@ -562,6 +562,8 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
+    - name: check pants cfg
+      run: './pants help buildsense'
     - name: Run Python tests
       run: './pants test ::
 
@@ -639,6 +641,8 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
+    - name: check pants cfg
+      run: './pants help buildsense'
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test ::
 
