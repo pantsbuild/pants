@@ -5,7 +5,6 @@
 python_requirements(
   module_mapping={
     "ansicolors": ["colors"],
-    "beautifulsoup4": ["bs4"],
     "PyYAML": ["yaml"],
     "setuptools": ["pkg_resources"],
   }

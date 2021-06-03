@@ -38,7 +38,6 @@ from pants.engine.internals.graph import (
     OwnersRequest,
     TooManyTargetsException,
     TransitiveExcludesNotSupportedError,
-    parse_dependencies_field,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
@@ -46,6 +45,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -418,9 +418,7 @@ def test_resolve_generated_subtarget() -> None:
     rule_runner.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
     generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
     generated_target = rule_runner.get_target(generated_target_address)
-    assert generated_target == MockTarget(
-        {Sources.alias: ["f1.txt"]}, address=generated_target_address
-    )
+    assert generated_target == MockTarget({Sources.alias: ["f1.txt"]}, generated_target_address)
 
 
 def test_resolve_specs_snapshot() -> None:
@@ -713,7 +711,7 @@ def test_find_valid_field_sets(caplog) -> None:
             """
         ),
     )
-    valid_tgt = FortranTarget({}, address=Address("", target_name="valid"))
+    valid_tgt = FortranTarget({}, Address("", target_name="valid"))
     valid_spec = AddressLiteralSpec("", "valid")
     invalid_spec = AddressLiteralSpec("", "invalid")
 
@@ -815,7 +813,7 @@ def test_no_applicable_targets_exception() -> None:
         in str(exc)
     )
 
-    invalid_tgt = Tgt3({}, address=Address("blah"))
+    invalid_tgt = Tgt3({}, Address("blah"))
     exc = NoApplicableTargetsException(
         [invalid_tgt],
         Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("foo.ext")])),
@@ -888,7 +886,7 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
-    sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
+    sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], addr)
     hydrated_sources = sources_rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(sources)]
     )
@@ -916,7 +914,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     addr = Address("", target_name="lib")
     sources_rule_runner.create_files("", files=["f1.f95"])
 
-    valid_sources = SourcesSubclass(["*"], address=addr)
+    valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
@@ -924,7 +922,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
-    invalid_sources = Sources(["*"], address=addr)
+    invalid_sources = Sources(["*"], addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
@@ -936,7 +934,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
     sources_rule_runner.create_files("", files=["f1.f95"])
-    sources = Sources(["non_existent.f95"], address=Address("", target_name="lib"))
+    sources = Sources(["non_existent.f95"], Address("", target_name="lib"))
     with pytest.raises(ExecutionError) as exc:
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
     assert "Unmatched glob" in str(exc.value)
@@ -953,7 +951,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     # be matched. This is intentional to ensure that we use `any` glob conjunction rather
     # than the normal `all` conjunction.
     sources_rule_runner.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
-    sources = DefaultSources(None, address=addr)
+    sources = DefaultSources(None, addr)
     assert set(sources.value or ()) == set(DefaultSources.default)
 
     hydrated_sources = sources_rule_runner.request(
@@ -964,21 +962,24 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> None:
     class ExpectedExtensionsSources(Sources):
-        expected_file_extensions = (".f95", ".f03")
+        expected_file_extensions = (".f95", ".f03", "")
 
     addr = Address("src/fortran", target_name="lib")
-    sources_rule_runner.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
-    sources = ExpectedExtensionsSources(["s.f*"], address=addr)
+    sources_rule_runner.create_files("src/fortran", ["s.f95", "s.f03", "s.f08", "s"])
+
+    def get_sources(srcs: Iterable[str]) -> Tuple[str, ...]:
+        return sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, addr))]
+        ).snapshot.files
+
     with pytest.raises(ExecutionError) as exc:
-        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
-    assert "s.f08" in str(exc.value)
+        get_sources(["s.f*"])
+    assert "['src/fortran/s.f08']" in str(exc.value)
     assert str(addr) in str(exc.value)
 
     # Also check that we support valid sources
-    valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
-    assert sources_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(valid_sources)]
-    ).snapshot.files == ("src/fortran/s.f95",)
+    assert get_sources(["s.f95"]) == ("src/fortran/s.f95",)
+    assert get_sources(["s"]) == ("src/fortran/s",)
 
 
 def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
@@ -995,9 +996,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         return sources_rule_runner.request(
             HydratedSources,
             [
-                HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name="example"))
-                ),
+                HydrateSourcesRequest(sources_cls(sources, Address("", target_name="example"))),
             ],
         )
 
@@ -1081,7 +1080,7 @@ def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
 
 def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
-    protocol_sources = AvroSources(["*.avro"], address=addr)
+    protocol_sources = AvroSources(["*.avro"], addr)
     assert (
         protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
         is True
@@ -1120,7 +1119,7 @@ def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> 
     class CustomAvroSources(AvroSources):
         pass
 
-    protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+    protocol_sources = CustomAvroSources(["*.avro"], addr)
     assert (
         protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
         is True
@@ -1142,7 +1141,7 @@ def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> No
     class AdaSources(Sources):
         pass
 
-    protocol_sources = AvroSources(["*.avro"], address=addr)
+    protocol_sources = AvroSources(["*.avro"], addr)
     assert protocol_sources.can_generate(AdaSources, codegen_rule_runner.union_membership) is False
     generated = codegen_rule_runner.request(
         HydratedSources,
@@ -1224,28 +1223,6 @@ def test_transitive_excludes_error() -> None:
     assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]
 
 
-def test_parse_dependencies_field() -> None:
-    """Ensure that we correctly handle `!` and `!!` ignores.
-
-    We leave the rest of the parsing to AddressInput and Address.
-    """
-    result = parse_dependencies_field(
-        MockDependencies(
-            ["a/b/c", "!a/b/c", "f.txt", "!f.txt", "!!transitive_exclude.txt"],
-            address=Address("demo/subdir"),
-        ),
-        subproject_roots=[],
-        registered_target_types=[],
-        union_membership=UnionMembership({}),
-    )
-    expected_addresses = {AddressInput("a/b/c"), AddressInput("f.txt")}
-    assert set(result.addresses) == expected_addresses
-    assert set(result.ignored_addresses) == {
-        *expected_addresses,
-        AddressInput("transitive_exclude.txt"),
-    }
-
-
 class SmalltalkDependencies(Dependencies):
     supports_transitive_excludes = True
 
@@ -1312,7 +1289,8 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
-            QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(Addresses, [DependenciesRequest]),
+            QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
@@ -1330,6 +1308,42 @@ def assert_dependencies_resolved(
     target = rule_runner.get_target(requested_address)
     result = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
     assert sorted(result) == sorted(expected)
+
+
+def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) -> None:
+    """Ensure that we correctly handle `!` and `!!` ignores.
+
+    We leave the rest of the parsing to AddressInput and Address.
+    """
+    dependencies_rule_runner.create_files("files", ["f.txt", "transitive_exclude.txt"])
+    dependencies_rule_runner.add_to_build_file("files", "smalltalk(sources=['*.txt'])")
+    dependencies_rule_runner.add_to_build_file("a/b/c", "smalltalk()")
+    dependencies_rule_runner.add_to_build_file(
+        "demo/subdir",
+        dedent(
+            """\
+            smalltalk(
+                dependencies=[
+                    'a/b/c',
+                    '!a/b/c',
+                    'files/f.txt',
+                    '!files/f.txt',
+                    '!!files/transitive_exclude.txt',
+                ],
+            )
+            """
+        ),
+    )
+    target = dependencies_rule_runner.get_target(Address("demo/subdir"))
+    result = dependencies_rule_runner.request(
+        ExplicitlyProvidedDependencies, [DependenciesRequest(target[Dependencies])]
+    )
+    expected_addresses = {Address("a/b/c"), Address("files", relative_file_path="f.txt")}
+    assert set(result.includes) == expected_addresses
+    assert set(result.ignores) == {
+        *expected_addresses,
+        Address("files", relative_file_path="transitive_exclude.txt"),
+    }
 
 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
@@ -1400,7 +1414,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
         provided_deps = ["//:provided"]
         if injected:
             provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, address=Address("", target_name="target"))
+        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
         result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
         assert result == Addresses(sorted([*injected, Address("", target_name="provided")]))
 

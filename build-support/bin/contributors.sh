@@ -20,7 +20,7 @@ function usage() {
   echo "revision is output.  This is useful to generate a thank-you list for"
   echo "release announcements by specifying \`-s [previous release tag]\`."
 
-  if (( $# > 0 )); then
+  if (($# > 0)); then
     die "$@"
   else
     exit 0
@@ -43,9 +43,9 @@ function contributors() {
   # Include all commits in range but exclude:
   #  - all commits from the imported zinc tree.
   #  - commits that are from running the publish goal
-  git log --use-mailmap --format="format:%aN;%s" "${range}" ^imported_zinc_tree \
-    | grep -v "pants build committing publish data" \
-    | sed -e 's/;.*$//'
+  git log --use-mailmap --format="format:%aN;%s" "${range}" ^imported_zinc_tree |
+    grep -v "pants build committing publish data" |
+    sed -e 's/;.*$//'
 
 }
 
@@ -57,7 +57,8 @@ Created by running \`$0\`.
 
 HEADER
 
-  (cat - - <(contributors) << FIXED_LIST
+  (
+    cat - - <(contributors) << FIXED_LIST
 # You can add contributors that don't show up as an author in the git log
 # manually here.  Just add a line for their full name.  Comments and blank
 # lines are ignored.
@@ -66,8 +67,8 @@ HEADER
 Alyssa Pohahau
 
 FIXED_LIST
-) | grep -v -E "^[[:space:]]*#" | \
-    grep -v -E "^[[:space:]]*$" | \
-    LC_ALL=C sort -u | \
+  ) | grep -v -E "^[[:space:]]*#" |
+    grep -v -E "^[[:space:]]*$" |
+    LC_ALL=C sort -u |
     sed -E -e "s|^|+ |" >> CONTRIBUTORS.md
 fi

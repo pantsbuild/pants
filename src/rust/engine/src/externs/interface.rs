@@ -49,6 +49,7 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -65,6 +66,7 @@ use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
+use process_execution::RemoteCacheWarningsBehavior;
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
@@ -75,14 +77,15 @@ use workunit_store::{
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+  Function, Intrinsics, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
+  Tasks, Types, Value,
 };
 
 mod testutil;
 
 py_exception!(native_engine, PollTimeout);
-py_exception!(native_engine, NailgunConnectionException);
-py_exception!(native_engine, NailgunClientException);
+py_exception!(native_engine, PantsdConnectionException);
+py_exception!(native_engine, PantsdClientException);
 
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
@@ -90,13 +93,13 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "NailgunClientException",
-    py.get_type::<NailgunClientException>(),
+    "PantsdClientException",
+    py.get_type::<PantsdClientException>(),
   )?;
   m.add(
     py,
-    "NailgunConnectionException",
-    py.get_type::<NailgunConnectionException>(),
+    "PantsdConnectionException",
+    py.get_type::<PantsdConnectionException>(),
   )?;
 
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
@@ -113,7 +116,8 @@ py_module_initializer!(native_engine, |py, m| {
         d: bool,
         e: PyDict,
         f: Vec<String>,
-        g: String
+        g: Vec<String>,
+        h: String
       )
     ),
   )?;
@@ -321,7 +325,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "session_isolated_shallow_clone",
-    py_fn!(py, session_isolated_shallow_clone(a: PySession)),
+    py_fn!(py, session_isolated_shallow_clone(a: PySession, b: String)),
   )?;
 
   m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
@@ -383,16 +387,21 @@ py_module_initializer!(native_engine, |py, m| {
         tasks_ptr: PyTasks,
         types_ptr: PyTypes,
         build_root_buf: String,
-        local_store_dir_buf: String,
         local_execution_root_dir_buf: String,
         named_caches_dir_buf: String,
         ca_certs_path: Option<String>,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         remoting_options: PyRemotingOptions,
+        local_store_options: PyLocalStoreOptions,
         exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
+  )?;
+  m.add(
+    py,
+    "scheduler_shutdown",
+    py_fn!(py, scheduler_shutdown(a: PyScheduler, b: u64)),
   )?;
 
   m.add(
@@ -413,6 +422,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyNailgunClient>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
+  m.add_class::<PyLocalStoreOptions>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
@@ -523,8 +533,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
     _cls,
     local_parallelism: u64,
     remote_parallelism: u64,
-    cleanup_local_dirs: bool,
-    use_local_cache: bool,
+    local_cleanup: bool,
+    local_cache: bool,
     remote_cache_read: bool,
     remote_cache_write: bool
   ) -> CPyResult<Self> {
@@ -532,8 +542,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
       ExecutionStrategyOptions {
         local_parallelism: local_parallelism as usize,
         remote_parallelism: remote_parallelism as usize,
-        cleanup_local_dirs,
-        use_local_cache,
+        local_cleanup,
+        local_cache,
         remote_cache_read,
         remote_cache_write,
       }
@@ -542,9 +552,6 @@ py_class!(class PyExecutionStrategyOptions |py| {
 });
 
 // Represents configuration related to remote execution and caching.
-//
-// The data stored by PyRemotingOptions originally was passed directly into scheduler_create
-// but has been broken out separately because the large number of options became unwieldy.
 py_class!(class PyRemotingOptions |py| {
   data options: RemotingOptions;
 
@@ -560,6 +567,7 @@ py_class!(class PyRemotingOptions |py| {
     store_chunk_bytes: u64,
     store_chunk_upload_timeout: u64,
     store_rpc_retries: u64,
+    cache_warnings_behavior: String,
     cache_eager_fetch: bool,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
@@ -577,10 +585,40 @@ py_class!(class PyRemotingOptions |py| {
         store_chunk_bytes: store_chunk_bytes as usize,
         store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
         store_rpc_retries: store_rpc_retries as usize,
+        cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior).unwrap(),
         cache_eager_fetch,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+      }
+    )
+  }
+});
+
+py_class!(class PyLocalStoreOptions |py| {
+  data options: LocalStoreOptions;
+
+  def __new__(
+    _cls,
+    store_dir: String,
+    process_cache_max_size_bytes: usize,
+    files_max_size_bytes: usize,
+    directories_max_size_bytes: usize,
+    lease_time_millis: u64,
+    shard_count: u8,
+  ) -> CPyResult<Self> {
+    if shard_count.count_ones() != 1 {
+        let err_string = format!("The local store shard count must be a power of two: got {}", shard_count);
+        return Err(PyErr::new::<exc::ValueError, _>(py, (err_string,)));
+    }
+    Self::create_instance(py,
+      LocalStoreOptions {
+        store_dir: PathBuf::from(store_dir),
+        process_cache_max_size_bytes,
+        files_max_size_bytes,
+        directories_max_size_bytes,
+        lease_time: Duration::from_millis(lease_time_millis),
+        shard_count,
       }
     )
   }
@@ -595,14 +633,19 @@ py_class!(class PySession |py| {
           session_values: PyObject,
           cancellation_latch: PySessionCancellationLatch,
     ) -> CPyResult<Self> {
-      Self::create_instance(py, Session::new(
+      let session = Session::new(
           scheduler.scheduler(py),
           should_render_ui,
           build_id,
           session_values.into(),
           cancellation_latch.cancelled(py).clone(),
-        )
-      )
+        ).map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?;
+      Self::create_instance(py, session)
+    }
+
+    def cancel(&self) -> PyUnitResult {
+        self.session(py).cancel();
+        Ok(None)
     }
 });
 
@@ -657,11 +700,8 @@ py_class!(class PyNailgunClient |py| {
         args,
         env_list,
       )).map(|code| code.to_py_object(py)).map_err(|e| match e{
-        NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
-        NailgunClientError::PostConnect(s) => {
-          let err_str = format!("Nailgun client error: {:?}", s);
-          PyErr::new::<NailgunClientException, _>(py, (err_str,))
-        },
+        NailgunClientError::PreConnect(err_str) => PyErr::new::<PantsdConnectionException, _>(py, (err_str,)),
+        NailgunClientError::PostConnect(err_str) => PyErr::new::<PantsdClientException, _>(py, (err_str,)),
         NailgunClientError::BrokenPipe => {
           PyErr::new::<exc::BrokenPipeError, _>(py, NoArgs)
         }
@@ -866,13 +906,13 @@ fn scheduler_create(
   tasks_ptr: PyTasks,
   types_ptr: PyTypes,
   build_root_buf: String,
-  local_store_dir_buf: String,
   local_execution_root_dir_buf: String,
   named_caches_dir_buf: String,
   ca_certs_path_buf: Option<String>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   remoting_options: PyRemotingOptions,
+  local_store_options: PyLocalStoreOptions,
   exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
@@ -901,10 +941,10 @@ fn scheduler_create(
         PathBuf::from(build_root_buf),
         ignore_patterns,
         use_gitignore,
-        PathBuf::from(local_store_dir_buf),
         PathBuf::from(local_execution_root_dir_buf),
         PathBuf::from(named_caches_dir_buf),
         ca_certs_path_buf.map(PathBuf::from),
+        local_store_options.options(py).clone(),
         remoting_options.options(py).clone(),
         exec_strategy_opts.options(py).clone(),
       )
@@ -1156,6 +1196,18 @@ fn scheduler_metrics(
   })
 }
 
+fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler, timeout_secs: u64) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    py.allow_threads(|| {
+      scheduler
+        .core
+        .executor
+        .block_on(scheduler.core.shutdown(Duration::from_secs(timeout_secs)));
+    })
+  });
+  Ok(None)
+}
+
 fn all_counter_names(_: Python) -> CPyResult<Vec<String>> {
   Ok(Metric::all_metrics())
 }
@@ -1395,9 +1447,16 @@ fn session_record_test_observation(
   })
 }
 
-fn session_isolated_shallow_clone(py: Python, session_ptr: PySession) -> CPyResult<PySession> {
+fn session_isolated_shallow_clone(
+  py: Python,
+  session_ptr: PySession,
+  build_id: String,
+) -> CPyResult<PySession> {
   with_session(py, session_ptr, |session| {
-    PySession::create_instance(py, session.isolated_shallow_clone())
+    let session_clone = session
+      .isolated_shallow_clone(build_id)
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    PySession::create_instance(py, session_clone)
   })
 }
 
@@ -1815,7 +1874,8 @@ fn stdio_initialize(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
-  message_regex_filters: Vec<String>,
+  literal_filters: Vec<String>,
+  regex_filters: Vec<String>,
   log_file: String,
 ) -> CPyResult<PyTuple> {
   let log_levels_by_target = log_levels_by_target
@@ -1827,21 +1887,29 @@ fn stdio_initialize(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
-  let message_regex_filters = message_regex_filters
+  let regex_filters = regex_filters
     .iter()
     .map(|re| {
       Regex::new(re).map_err(|e| {
-        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+        PyErr::new::<exc::Exception, _>(
+          py,
+          format!(
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
+            e,
+          )
+        )
       })
     })
     .collect::<Result<Vec<Regex>, _>>()?;
+
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
-    message_regex_filters,
+    literal_filters,
+    regex_filters,
     PathBuf::from(log_file),
   )
   .map_err(|s| {

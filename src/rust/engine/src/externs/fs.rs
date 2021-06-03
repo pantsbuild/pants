@@ -99,6 +99,10 @@ py_class!(pub class PyDigest |py| {
     def __hash__(&self) -> PyResult<u64> {
       Ok(self.digest(py).hash.prefix_hash())
     }
+
+    def __repr__(&self) -> PyResult<String> {
+      Ok(format!("Digest('{}', {})", self.digest(py).hash.to_hex(), self.digest(py).size_bytes))
+    }
 });
 
 pub fn to_py_snapshot(snapshot: Snapshot) -> PyResult<PySnapshot> {

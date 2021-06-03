@@ -78,7 +78,7 @@ def test_get_pyenv_root() -> None:
 def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
-    rule_runner.create_file(".python-version", local_pyenv_version + "\n")
+    rule_runner.write_files({".python-version": f"{local_pyenv_version}\n"})
     with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
         pyenv_root,
         expected_paths,
@@ -95,7 +95,7 @@ def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
 def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
-    rule_runner.create_file(".python-version", local_pyenv_version + "\n")
+    rule_runner.write_files({".python-version": f"{local_pyenv_version}\n"})
     with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
         with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
             pyenv_root,

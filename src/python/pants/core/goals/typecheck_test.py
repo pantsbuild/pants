@@ -19,7 +19,8 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
+from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -112,7 +113,7 @@ class InvalidRequest(MockTypecheckRequest):
 def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address=address)
+    return MockTarget({}, address)
 
 
 def run_typecheck_rule(
@@ -121,27 +122,29 @@ def run_typecheck_rule(
     targets: List[Target],
     include_sources: bool = True,
 ) -> Tuple[int, str]:
-    console = MockConsole(use_colors=False)
     union_membership = UnionMembership({TypecheckRequest: request_types})
-    result: Typecheck = run_rule_with_mocks(
-        typecheck,
-        rule_args=[console, Targets(targets), union_membership],
-        mock_gets=[
-            MockGet(
-                output_type=EnrichedTypecheckResults,
-                input_type=TypecheckRequest,
-                mock=lambda field_set_collection: field_set_collection.typecheck_results,
-            ),
-            MockGet(
-                output_type=FieldSetsWithSources,
-                input_type=FieldSetsWithSourcesRequest,
-                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert not console.stdout.getvalue()
-    return result.exit_code, console.stderr.getvalue()
+    with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+        result: Typecheck = run_rule_with_mocks(
+            typecheck,
+            rule_args=[console, Targets(targets), union_membership],
+            mock_gets=[
+                MockGet(
+                    output_type=EnrichedTypecheckResults,
+                    input_type=TypecheckRequest,
+                    mock=lambda field_set_collection: field_set_collection.typecheck_results,
+                ),
+                MockGet(
+                    output_type=FieldSetsWithSources,
+                    input_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
+                    ),
+                ),
+            ],
+            union_membership=union_membership,
+        )
+        assert not stdio_reader.get_stdout()
+        return result.exit_code, stdio_reader.get_stderr()
 
 
 def test_empty_target_noops() -> None:

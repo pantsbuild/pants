@@ -21,10 +21,11 @@ protobuf = { version = "2.0.6", features = ["with-bytes"] }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.1.39"
-tokio = { version = "0.2.23", features = ["rt-threaded", "macros", "signal", "stream"] }
+tokio = { version = "1.4", features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = { version = "0.1", features = ["signal"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-bytes = "0.5"
+bytes = "1.0"
 tempfile = "3"
 testutil = { path = "../../testutil" }

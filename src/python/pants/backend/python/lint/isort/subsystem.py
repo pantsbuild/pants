@@ -1,10 +1,14 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
+from __future__ import annotations
+
+import os.path
+from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -41,10 +45,38 @@ class Isort(PythonToolBase):
         )
         register(
             "--config",
+            # TODO: Figure out how to deprecate this being a list in favor of a single string.
+            #  Thanks to config autodiscovery, this option should only be used because you want
+            #  Pants to explicitly set `--settings`, which only works w/ 1 config file.
+            #  isort 4 users should instead use autodiscovery to support multiple config files.
+            #  Deprecating this could be tricky, but should be possible thanks to the implicit
+            #  add syntax.
+            #
+            #  When deprecating, also deprecate the user manually setting `--settings` with
+            #  `[isort].args`.
             type=list,
             member_type=file_option,
             advanced=True,
-            help="Path to `isort.cfg` or alternative isort config file(s).",
+            help=(
+                "Path to config file understood by isort "
+                "(https://pycqa.github.io/isort/docs/configuration/config_files/).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location.\n\n"
+                "If using isort 5+ and you specify only 1 config file, Pants will configure "
+                "isort's argv to point to your config file."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during "
+                "runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
         )
 
     @property
@@ -52,9 +84,32 @@ class Isort(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Tuple[str, ...]:
+    def config(self) -> tuple[str, ...]:
         return tuple(self.options.config)
+
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://pycqa.github.io/isort/docs/configuration/config_files/.
+        check_existence = []
+        check_content = {}
+        for d in ("", *dirs):
+            check_existence.append(os.path.join(d, ".isort.cfg"))
+            check_content.update(
+                {
+                    os.path.join(d, "pyproject.toml"): b"[tool.isort]",
+                    os.path.join(d, "setup.cfg"): b"[isort]",
+                    os.path.join(d, "tox.ini"): b"[isort]",
+                    os.path.join(d, ".editorconfig"): b"[*.py]",
+                }
+            )
+
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
+            check_existence=check_existence,
+            check_content=check_content,
+        )

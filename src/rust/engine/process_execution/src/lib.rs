@@ -115,10 +115,15 @@ pub enum ProcessCacheScope {
   Always,
   // Cached in all locations, but only if the process exits successfully.
   Successful,
-  // Cached only in memory (i.e. memoized in pantsd), but never persistently.
-  PerRestart,
-  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
-  Never,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
+  // success vs. failure.
+  PerRestartAlways,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently, and only if
+  // successful.
+  PerRestartSuccessful,
+  // Will run once per Session, i.e. once per run of Pants. This happens because the engine
+  // de-duplicates identical work; the process is neither memoized in memory nor cached to disk.
+  PerSession,
 }
 
 impl TryFrom<String> for ProcessCacheScope {
@@ -127,8 +132,9 @@ impl TryFrom<String> for ProcessCacheScope {
     match variant_candidate.to_lowercase().as_ref() {
       "always" => Ok(ProcessCacheScope::Always),
       "successful" => Ok(ProcessCacheScope::Successful),
-      "per_restart" => Ok(ProcessCacheScope::PerRestart),
-      "never" => Ok(ProcessCacheScope::Never),
+      "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
+      "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
+      "per_session" => Ok(ProcessCacheScope::PerSession),
       other => Err(format!("Unknown Process cache scope: {:?}", other)),
     }
   }
@@ -409,9 +415,9 @@ impl From<ExecutedActionMetadata> for ProcessResultMetadata {
   }
 }
 
-impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
-  fn into(self) -> ExecutedActionMetadata {
-    let (total_start, total_end) = match self.total_elapsed {
+impl From<ProcessResultMetadata> for ExecutedActionMetadata {
+  fn from(metadata: ProcessResultMetadata) -> ExecutedActionMetadata {
+    let (total_start, total_end) = match metadata.total_elapsed {
       Some(elapsed) => {
         // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
         // only care about accurately preserving the duration.
@@ -614,6 +620,14 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
   fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
     Arc::new(*command_runner)
   }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum RemoteCacheWarningsBehavior {
+  Ignore,
+  FirstOnly,
+  Backoff,
 }
 
 #[cfg(test)]

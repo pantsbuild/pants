@@ -12,10 +12,10 @@ class Docformatter(PythonToolBase):
     options_scope = "docformatter"
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
-    default_version = "docformatter>=1.3.1,<1.4"
+    default_version = "docformatter>=1.4,<1.5"
     default_main = ConsoleScript("docformatter")
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython==2.7.*", "CPython>=3.4,<3.9"]
+    default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod
     def register_options(cls, register):

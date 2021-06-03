@@ -6,13 +6,14 @@ from __future__ import annotations
 import getpass
 import logging
 import os
+import platform
 import socket
-import sys
 import time
 import uuid
 from collections import OrderedDict
+from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -43,7 +44,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 class RunTracker:
     """Tracks and times the execution of a single Pants run."""
 
-    def __init__(self, options: Options):
+    def __init__(self, args: Tuple[str, ...], options: Options):
         """
         :API: public
         """
@@ -57,6 +58,7 @@ class RunTracker:
         millis = int((run_timestamp * 1000) % 1000)
         self.run_id = f"pants_run_{str_time}_{millis}_{run_uuid}"
 
+        self._args = args
         self._all_options = options
         info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
         self._run_info: Dict[str, Any] = {}
@@ -86,7 +88,7 @@ class RunTracker:
         self._run_start_time = run_start_time
 
         datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
-        cmd_line = " ".join(["pants"] + sys.argv[1:])
+        cmd_line = " ".join(("pants",) + self._args[1:])
 
         self._run_info.update(
             {
@@ -102,6 +104,57 @@ class RunTracker:
                 "specs_from_command_line": specs,
             }
         )
+
+    def get_anonymous_telemetry_data(self, repo_id: str) -> dict[str, str | list[str]]:
+        # TODO: Find a way to know from a goal name whether it's a standard or a custom
+        #  goal whose name could, in theory, reveal something proprietary. That's more work than
+        #  we want to do at the moment, so we maintain this manual list for now.
+        standard_goals = {
+            "count-loc",
+            "dependees",
+            "dependencies",
+            "export-codegen",
+            "filedeps",
+            "filter",
+            "fmt",
+            "lint",
+            "list",
+            "package",
+            "py-constraints",
+            "repl",
+            "roots",
+            "run",
+            "tailor",
+            "test",
+            "typecheck",
+            "validate",
+        }
+
+        def maybe_hash_with_repo_id_prefix(s: str) -> str:
+            qualified_str = f"{repo_id}.{s}" if s else repo_id
+            # If the repo_id is the empty string we return a blank string.
+            return sha256(qualified_str.encode()).hexdigest() if repo_id else ""
+
+        return {
+            "run_id": str(self._run_info.get("id", uuid.uuid4())),
+            "timestamp": str(self._run_info.get("timestamp")),
+            # Note that this method is called after the StreamingWorkunitHandler.session() ends,
+            # i.e., after end_run() has been called, so duration will be set.
+            "duration": str(self._run_total_duration),
+            "outcome": str(self._run_info.get("outcome")),
+            "platform": platform.platform(),
+            "python_implementation": platform.python_implementation(),
+            "python_version": platform.python_version(),
+            "pants_version": str(self._run_info.get("version")),
+            # Note that if repo_id is the empty string then these three fields will be empty.
+            "repo_id": maybe_hash_with_repo_id_prefix(""),
+            "machine_id": maybe_hash_with_repo_id_prefix(str(uuid.getnode())),
+            "user_id": maybe_hash_with_repo_id_prefix(getpass.getuser()),
+            # Note that we conserve the order in which the goals were specified on the cmd line.
+            "standard_goals": [goal for goal in self.goals if goal in standard_goals],
+            # Lets us know of any custom goals were used, without knowing their names.
+            "num_goals": str(len(self.goals)),
+        }
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
@@ -131,7 +184,7 @@ class RunTracker:
             raise Exception("RunTracker.end_run() called without calling .start()")
 
         duration = time.time() - self._run_start_time
-        self._total_run_time = duration
+        self._run_total_duration = duration
 
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
         self._run_info["outcome"] = outcome_str
@@ -139,7 +192,7 @@ class RunTracker:
         native_engine.set_per_run_log_path(None)
 
     def get_cumulative_timings(self) -> List[Dict[str, Any]]:
-        return [{"label": "main", "timing": self._total_run_time}]
+        return [{"label": "main", "timing": self._run_total_duration}]
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}

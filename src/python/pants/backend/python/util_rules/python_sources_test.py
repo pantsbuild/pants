@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import os.path
 from textwrap import dedent
-from typing import Iterable, List, Type
+from typing import Iterable
 
 import pytest
 
@@ -50,14 +51,13 @@ def rule_runner() -> RuleRunner:
 
 def create_target(
     rule_runner: RuleRunner,
-    *,
     parent_directory: str,
-    files: List[str],
-    target_cls: Type[Target] = PythonTarget,
+    files: list[str],
+    target_cls: type[Target] = PythonTarget,
 ) -> Target:
-    rule_runner.create_files(parent_directory, files=files)
-    address = Address(spec_path=parent_directory, target_name="target")
-    return target_cls({Sources.alias: files}, address=address)
+    rule_runner.write_files({os.path.join(parent_directory, f): "" for f in files})
+    address = Address(parent_directory, target_name="target")
+    return target_cls({Sources.alias: files}, address)
 
 
 def get_stripped_sources(
@@ -114,25 +114,17 @@ def get_unstripped_sources(
 
 def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
     targets = [
-        create_target(
-            rule_runner, parent_directory="src/python", files=["p.py"], target_cls=PythonTarget
-        ),
-        create_target(
-            rule_runner, parent_directory="src/python", files=["f.txt"], target_cls=Files
-        ),
-        create_target(
-            rule_runner, parent_directory="src/python", files=["r.txt"], target_cls=Resources
-        ),
-        create_target(
-            rule_runner, parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
-        ),
+        create_target(rule_runner, "src/python", ["p.py"], PythonTarget),
+        create_target(rule_runner, "src/python", ["f.txt"], Files),
+        create_target(rule_runner, "src/python", ["r.txt"], Resources),
+        create_target(rule_runner, "src/python", ["j.java"], NonPythonTarget),
     ]
 
     def assert_stripped(
         *,
         include_resources: bool,
         include_files: bool,
-        expected: List[str],
+        expected: list[str],
     ) -> None:
         result = get_stripped_sources(
             rule_runner, targets, include_resources=include_resources, include_files=include_files
@@ -140,7 +132,7 @@ def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
         assert result.stripped_source_files.snapshot.files == tuple(expected)
 
     def assert_unstripped(
-        *, include_resources: bool, include_files: bool, expected: List[str]
+        *, include_resources: bool, include_files: bool, expected: list[str]
     ) -> None:
         result = get_unstripped_sources(
             rule_runner, targets, include_resources=include_resources, include_files=include_files
@@ -184,7 +176,7 @@ def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_top_level_source_root(rule_runner: RuleRunner) -> None:
-    targets = [create_target(rule_runner, parent_directory="", files=["f1.py", "f2.py"])]
+    targets = [create_target(rule_runner, "", ["f1.py", "f2.py"])]
 
     stripped_result = get_stripped_sources(rule_runner, targets, source_roots=["/"])
     assert stripped_result.stripped_source_files.snapshot.files == ("f1.py", "f2.py")
@@ -196,10 +188,8 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
 
 def test_files_not_used_for_source_roots(rule_runner: RuleRunner) -> None:
     targets = [
-        create_target(
-            rule_runner, parent_directory="src/py", files=["f.py"], target_cls=PythonTarget
-        ),
-        create_target(rule_runner, parent_directory="src/files", files=["f.txt"], target_cls=Files),
+        create_target(rule_runner, "src/py", ["f.py"], PythonTarget),
+        create_target(rule_runner, "src/files", ["f.txt"], Files),
     ]
     assert get_unstripped_sources(
         rule_runner, targets, include_files=True, source_roots=["src/py", "src/files"]
@@ -207,33 +197,29 @@ def test_files_not_used_for_source_roots(rule_runner: RuleRunner) -> None:
 
 
 def test_python_protobuf(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir/f.proto",
-        dedent(
-            """\
-            syntax = "proto2";
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir/f.proto": dedent(
+                """\
+                syntax = "proto2";
 
-            package dir;
-            """
-        ),
-    )
-    rule_runner.create_file(
-        "src/protobuf/other_dir/f.proto",
-        dedent(
-            """\
-            syntax = "proto2";
+                package dir;
+                """
+            ),
+            "src/protobuf/dir/BUILD": "protobuf_library()",
+            "src/protobuf/other_dir/f.proto": dedent(
+                """\
+                syntax = "proto2";
 
-            package other_dir;
-            """
-        ),
-    )
-    rule_runner.add_to_build_file("src/protobuf/dir", "protobuf_library()")
-    rule_runner.add_to_build_file(
-        "src/protobuf/other_dir", "protobuf_library(python_source_root='src/python')"
+                package other_dir;
+                """
+            ),
+            "src/protobuf/other_dir/BUILD": "protobuf_library(python_source_root='src/python')",
+        }
     )
     targets = [
-        ProtobufLibrary({}, address=Address("src/protobuf/dir")),
-        ProtobufLibrary({}, address=Address("src/protobuf/other_dir")),
+        ProtobufLibrary({}, Address("src/protobuf/dir")),
+        ProtobufLibrary({}, Address("src/protobuf/other_dir")),
     ]
     backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
 

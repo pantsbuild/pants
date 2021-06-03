@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Set
+from __future__ import annotations
 
 import pytest
 
@@ -11,9 +11,13 @@ from pants.engine.target import Dependencies, Sources, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
+class MockSources(Sources):
+    default = ("*.ext",)
+
+
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (Sources, Dependencies)
+    core_fields = (MockSources, Dependencies)
 
 
 @pytest.fixture
@@ -21,26 +25,11 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(rules=filedeps.rules(), target_types=[MockTarget, ProtobufLibrary])
 
 
-def setup_target(
-    rule_runner: RuleRunner,
-    path: str,
-    *,
-    sources: Optional[List[str]] = None,
-    dependencies: Optional[List[str]] = None,
-) -> None:
-    if sources:
-        rule_runner.create_files(path, sources)
-    rule_runner.add_to_build_file(
-        path,
-        f"tgt(sources={sources or []}, dependencies={dependencies or []})",
-    )
-
-
 def assert_filedeps(
     rule_runner: RuleRunner,
     *,
-    targets: List[str],
-    expected: Set[str],
+    targets: list[str],
+    expected: set[str],
     transitive: bool = False,
     globs: bool = False,
 ) -> None:
@@ -58,139 +47,132 @@ def test_no_target(rule_runner: RuleRunner) -> None:
 
 
 def test_one_target_no_source(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "some/target")
-    assert_filedeps(rule_runner, targets=["some/target"], expected={"some/target/BUILD"})
+    rule_runner.write_files({"a/BUILD": "tgt()"})
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD"})
 
 
 def test_one_target_one_source(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "some/target", sources=["file.py"])
-    assert_filedeps(
-        rule_runner, targets=["some/target"], expected={"some/target/BUILD", "some/target/file.py"}
-    )
+    rule_runner.write_files({"a/f.ext": "", "a/BUILD": "tgt()"})
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.ext"})
 
 
 def test_one_target_multiple_source(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "some/target", sources=["file1.py", "file2.py"])
-    assert_filedeps(
-        rule_runner,
-        targets=["some/target"],
-        expected={"some/target/BUILD", "some/target/file1.py", "some/target/file2.py"},
-    )
+    rule_runner.write_files({"a/f1.ext": "", "a/f2.ext": "", "a/BUILD": "tgt()"})
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f1.ext", "a/f2.ext"})
 
 
 def test_one_target_no_source_one_dep(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "dep/target", sources=["file.py"])
-    setup_target(rule_runner, "some/target", dependencies=["dep/target"])
-    assert_filedeps(rule_runner, targets=["some/target"], expected={"some/target/BUILD"})
+    rule_runner.write_files(
+        {
+            "dep/f.ext": "",
+            "dep/BUILD": "tgt()",
+            "a/BUILD": "tgt(dependencies=['dep'])",
+        }
+    )
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD"})
     assert_filedeps(
-        rule_runner,
-        targets=["some/target"],
-        transitive=True,
-        expected={"some/target/BUILD", "dep/target/BUILD", "dep/target/file.py"},
+        rule_runner, targets=["a"], transitive=True, expected={"a/BUILD", "dep/BUILD", "dep/f.ext"}
     )
 
 
 def test_one_target_one_source_with_dep(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "dep/target", sources=["file.py"])
-    setup_target(rule_runner, "some/target", sources=["file.py"], dependencies=["dep/target"])
-    direct_files = {"some/target/BUILD", "some/target/file.py"}
-    assert_filedeps(rule_runner, targets=["some/target"], expected=direct_files)
+    rule_runner.write_files(
+        {
+            "dep/f.ext": "",
+            "dep/BUILD": "tgt()",
+            "a/f.ext": "",
+            "a/BUILD": "tgt(dependencies=['dep'])",
+        }
+    )
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.ext"})
     assert_filedeps(
         rule_runner,
-        targets=["some/target"],
+        targets=["a"],
         transitive=True,
-        expected={
-            *direct_files,
-            "dep/target/BUILD",
-            "dep/target/file.py",
-        },
+        expected={"a/BUILD", "a/f.ext", "dep/BUILD", "dep/f.ext"},
     )
 
 
 def test_multiple_targets_one_source(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "some/target", sources=["file.py"])
-    setup_target(rule_runner, "other/target", sources=["file.py"])
+    rule_runner.write_files({"a/f.ext": "", "a/BUILD": "tgt()", "b/f.ext": "", "b/BUILD": "tgt()"})
     assert_filedeps(
         rule_runner,
-        targets=["some/target", "other/target"],
-        expected={
-            "some/target/BUILD",
-            "some/target/file.py",
-            "other/target/BUILD",
-            "other/target/file.py",
-        },
+        targets=["a", "b"],
+        expected={"a/BUILD", "a/f.ext", "b/BUILD", "b/f.ext"},
     )
 
 
 def test_multiple_targets_one_source_with_dep(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "dep1/target", sources=["file.py"])
-    setup_target(rule_runner, "dep2/target", sources=["file.py"])
-    setup_target(rule_runner, "some/target", sources=["file.py"], dependencies=["dep1/target"])
-    setup_target(rule_runner, "other/target", sources=["file.py"], dependencies=["dep2/target"])
-    direct_files = {
-        "some/target/BUILD",
-        "some/target/file.py",
-        "other/target/BUILD",
-        "other/target/file.py",
-    }
-    assert_filedeps(
-        rule_runner,
-        targets=["some/target", "other/target"],
-        expected=direct_files,
+    rule_runner.write_files(
+        {
+            "dep1/f.ext": "",
+            "dep1/BUILD": "tgt()",
+            "dep2/f.ext": "",
+            "dep2/BUILD": "tgt()",
+            "a/f.ext": "",
+            "a/BUILD": "tgt(dependencies=['dep1'])",
+            "b/f.ext": "",
+            "b/BUILD": "tgt(dependencies=['dep2'])",
+        }
     )
+    direct_files = {
+        "a/BUILD",
+        "a/f.ext",
+        "b/BUILD",
+        "b/f.ext",
+    }
+    assert_filedeps(rule_runner, targets=["a", "b"], expected=direct_files)
     assert_filedeps(
         rule_runner,
-        targets=["some/target", "other/target"],
+        targets=["a", "b"],
         transitive=True,
-        expected={
-            *direct_files,
-            "dep1/target/BUILD",
-            "dep1/target/file.py",
-            "dep2/target/BUILD",
-            "dep2/target/file.py",
-        },
+        expected={*direct_files, "dep1/BUILD", "dep1/f.ext", "dep2/BUILD", "dep2/f.ext"},
     )
 
 
 def test_multiple_targets_one_source_overlapping(rule_runner: RuleRunner) -> None:
-    setup_target(rule_runner, "dep/target", sources=["file.py"])
-    setup_target(rule_runner, "some/target", sources=["file.py"], dependencies=["dep/target"])
-    setup_target(rule_runner, "other/target", sources=["file.py"], dependencies=["dep/target"])
-    direct_files = {
-        "some/target/BUILD",
-        "some/target/file.py",
-        "other/target/BUILD",
-        "other/target/file.py",
-    }
-    assert_filedeps(rule_runner, targets=["some/target", "other/target"], expected=direct_files)
+    rule_runner.write_files(
+        {
+            "dep/f.ext": "",
+            "dep/BUILD": "tgt()",
+            "a/f.ext": "",
+            "a/BUILD": "tgt(dependencies=['dep'])",
+            "b/f.ext": "",
+            "b/BUILD": "tgt(dependencies=['dep'])",
+        }
+    )
+    direct_files = {"a/BUILD", "a/f.ext", "b/BUILD", "b/f.ext"}
+    assert_filedeps(rule_runner, targets=["a", "b"], expected=direct_files)
     assert_filedeps(
         rule_runner,
-        targets=["some/target", "other/target"],
+        targets=["a", "b"],
         transitive=True,
-        expected={*direct_files, "dep/target/BUILD", "dep/target/file.py"},
+        expected={*direct_files, "dep/BUILD", "dep/f.ext"},
     )
 
 
 def test_globs(rule_runner: RuleRunner) -> None:
-    rule_runner.create_files("some/target", ["test1.py", "test2.py"])
-    rule_runner.add_to_build_file("some/target", target="tgt(sources=['test*.py'])")
+    rule_runner.write_files(
+        {
+            "a/test1.ext": "",
+            "a/test2.ext": "",
+            "a/BUILD": "tgt(sources=['test*.ext'])",
+        }
+    )
     assert_filedeps(
         rule_runner,
-        targets=["some/target"],
-        expected={"some/target/BUILD", "some/target/test*.py"},
+        targets=["a"],
+        expected={"a/BUILD", "a/test*.ext"},
         globs=True,
     )
 
 
 def test_build_with_file_ext(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("some/target/BUILD.ext", contents="tgt()")
-    assert_filedeps(rule_runner, targets=["some/target"], expected={"some/target/BUILD.ext"})
+    rule_runner.write_files({"a/BUILD.ext": "tgt()"})
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD.ext"})
 
 
 def test_codegen_targets_use_protocol_files(rule_runner: RuleRunner) -> None:
     # That is, don't output generated files.
-    rule_runner.create_file("some/target/f.proto")
-    rule_runner.add_to_build_file("some/target", "protobuf_library()")
-    assert_filedeps(
-        rule_runner, targets=["some/target"], expected={"some/target/BUILD", "some/target/f.proto"}
-    )
+    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_library()"})
+    assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.proto"})

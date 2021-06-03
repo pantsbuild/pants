@@ -106,17 +106,16 @@ impl AsRef<[u8]> for VersionedFingerprint {
 #[derive(Debug, Clone)]
 pub struct ShardedLmdb {
   // First Database is content, second is leases.
-  lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
+  lmdbs: HashMap<u8, (PathBuf, Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
   max_size_per_shard: usize,
   executor: task_executor::Executor,
   lease_time: Duration,
+  shard_count: u8,
+  shard_fingerprint_mask: u8,
 }
 
 impl ShardedLmdb {
-  const NUM_SHARDS: u8 = 0x10;
-  const NUM_SHARDS_SHIFT: u8 = 4;
-
   // Whenever we change the byte format of data stored in lmdb, we will
   // need to increment this schema version. This schema version will
   // be appended to the Fingerprint-derived keys to create the key
@@ -135,13 +134,36 @@ impl ShardedLmdb {
     max_size: usize,
     executor: task_executor::Executor,
     lease_time: Duration,
+    shard_count: u8,
   ) -> Result<ShardedLmdb, String> {
+    if shard_count.count_ones() != 1 {
+      return Err(format!(
+        "The shard_count must be a power of two: got {}.",
+        shard_count
+      ));
+    }
+
+    let max_size_per_shard = max_size / (shard_count as usize);
+    // We select which shard to use by masking to select only the relevant number of high order bits
+    // from the high order byte of each stored key.
+    let shard_fingerprint_mask = {
+      // Create a mask of the appropriate width.
+      let mask_width = shard_count.trailing_zeros();
+      let mut mask = 0_u8;
+      for _ in 0..mask_width {
+        mask <<= 1;
+        mask |= 1;
+      }
+      // Then move it into the high order bits.
+      mask.rotate_left(Self::shard_shift(shard_count) as u32)
+    };
+
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    let max_size_per_shard = max_size / (Self::NUM_SHARDS as usize);
-
-    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size_per_shard)? {
+    for (env, dir, fingerprint_prefix) in
+      ShardedLmdb::envs(&root_path, max_size_per_shard, shard_count)?
+    {
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
@@ -162,7 +184,7 @@ impl ShardedLmdb {
 
       lmdbs.insert(
         fingerprint_prefix,
-        (Arc::new(env), content_database, lease_database),
+        (dir, Arc::new(env), content_database, lease_database),
       );
     }
 
@@ -172,23 +194,34 @@ impl ShardedLmdb {
       max_size_per_shard,
       executor,
       lease_time,
+      shard_count,
+      shard_fingerprint_mask,
     })
+  }
+
+  ///
+  /// Return the left shift value that will place the relevant portion of a byte (for the given
+  /// shard count, which is asserted in the constructor to be a power of two) into the high order
+  /// bits of a byte.
+  ///
+  fn shard_shift(shard_count: u8) -> u8 {
+    let mask_width = shard_count.trailing_zeros() as u8;
+    8 - mask_width
   }
 
   fn envs(
     root_path: &Path,
     max_size_per_shard: usize,
+    shard_count: u8,
   ) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
-    let mut envs = Vec::with_capacity(Self::NUM_SHARDS as usize);
-    for b in 0x00..Self::NUM_SHARDS {
-      // NB: This shift is NUM_SHARDS dependent.
-      let fingerprint_prefix = b << Self::NUM_SHARDS_SHIFT;
-      let mut dirname = String::new();
-      fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
-      let dirname = dirname[0..1].to_owned();
-      let dir = root_path.join(dirname);
+    let shard_shift = Self::shard_shift(shard_count);
+
+    let mut envs = Vec::with_capacity(shard_count as usize);
+    for b in 0..shard_count {
+      let dir = root_path.join(format!("{:x}", b));
       fs::safe_create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
+      let fingerprint_prefix = b.rotate_left(shard_shift as u32);
       envs.push((
         ShardedLmdb::make_env(&dir, max_size_per_shard)?,
         dir,
@@ -240,11 +273,23 @@ impl ShardedLmdb {
 
   // First Database is content, second is leases.
   pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
-    self.lmdbs[&(fingerprint.0[0] & 0xF0)].clone()
+    let (_, env, db1, db2) = self.get_raw(fingerprint.0[0]);
+    (env.clone(), *db1, *db2)
+  }
+
+  pub(crate) fn get_raw(
+    &self,
+    prefix_byte: u8,
+  ) -> &(PathBuf, Arc<Environment>, Database, Database) {
+    &self.lmdbs[&(prefix_byte & self.shard_fingerprint_mask)]
   }
 
   pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
-    self.lmdbs.values().cloned().collect()
+    self
+      .lmdbs
+      .values()
+      .map(|(_, env, db1, db2)| (env.clone(), *db1, *db2))
+      .collect()
   }
 
   pub async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
@@ -377,11 +422,11 @@ impl ShardedLmdb {
 
   pub async fn load_bytes_with<
     T: Send + 'static,
-    F: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
     fingerprint: Fingerprint,
-    f: F,
+    mut f: F,
   ) -> Result<Option<T>, String> {
     let store = self.clone();
     let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
@@ -391,8 +436,8 @@ impl ShardedLmdb {
         let (env, db, _) = store.get(&fingerprint);
         let ro_txn = env
           .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {}", err));
-        ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
+          .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
+        match ro_txn.get(db, &effective_key) {
           Ok(bytes) => f(bytes).map(Some),
           Err(lmdb::Error::NotFound) => Ok(None),
           Err(err) => Err(format!(
@@ -400,14 +445,16 @@ impl ShardedLmdb {
             effective_key.to_hex(),
             err,
           )),
-        })
+        }
       })
       .await
   }
 
   #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size_per_shard)? {
+    for (env, old_dir, _) in
+      ShardedLmdb::envs(&self.root_path, self.max_size_per_shard, self.shard_count)?
+    {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
       env
         .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
@@ -436,3 +483,6 @@ impl ShardedLmdb {
     Ok(())
   }
 }
+
+#[cfg(test)]
+mod tests;

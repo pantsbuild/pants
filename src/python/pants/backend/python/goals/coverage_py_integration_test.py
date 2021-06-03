@@ -57,6 +57,10 @@ SOURCES = {
         )
         """
     ),
+    "src/python/core/BUILD": "python_library()",
+    "src/python/core/__init__.py": "",
+    "src/python/core/untested.py": "CONSTANT = 42",
+    "foo/bar.py": "BAZ = True",
     # Test that a `tests/` source root accurately gets coverage data for the `src/`
     # root.
     "tests/python/project_test/__init__.py": "",
@@ -113,6 +117,7 @@ def run_coverage(tmpdir: str, *more_args: str) -> PantsResult:
         f"{tmpdir}/tests/python/project_test:multiply",
         f"{tmpdir}/tests/python/project_test:arithmetic",
         f"{tmpdir}/tests/python/project_test/no_src",
+        f"--source-root-patterns=['/{tmpdir}/src/python', '{tmpdir}/tests/python', '{tmpdir}/foo']",
         *more_args,
     ]
     result = run_pants(command)
@@ -146,6 +151,35 @@ def test_coverage() -> None:
         )
         in result.stderr
     )
+
+
+def test_coverage_global() -> None:
+    with setup_tmpdir(SOURCES) as tmpdir:
+        result = run_coverage(tmpdir, "--coverage-py-global-report")
+    assert (
+        dedent(
+            f"""\
+            Name                                                          Stmts   Miss  Cover
+            ---------------------------------------------------------------------------------
+            {tmpdir}/foo/bar.py                                            1      1     0%
+            {tmpdir}/src/python/core/__init__.py                           0      0   100%
+            {tmpdir}/src/python/core/untested.py                           1      1     0%
+            {tmpdir}/src/python/project/__init__.py                        0      0   100%
+            {tmpdir}/src/python/project/lib.py                             6      0   100%
+            {tmpdir}/src/python/project/lib_test.py                        3      0   100%
+            {tmpdir}/src/python/project/random.py                          2      2     0%
+            {tmpdir}/tests/python/project_test/__init__.py                 0      0   100%
+            {tmpdir}/tests/python/project_test/no_src/BUILD.py             1      1     0%
+            {tmpdir}/tests/python/project_test/no_src/__init__.py          0      0   100%
+            {tmpdir}/tests/python/project_test/no_src/test_no_src.py       2      0   100%
+            {tmpdir}/tests/python/project_test/test_arithmetic.py          3      0   100%
+            {tmpdir}/tests/python/project_test/test_multiply.py            3      0   100%
+            ---------------------------------------------------------------------------------
+            TOTAL                                                            22      5    77%
+            """
+        )
+        in result.stderr
+    ), result.stderr
 
 
 def test_coverage_with_filter() -> None:

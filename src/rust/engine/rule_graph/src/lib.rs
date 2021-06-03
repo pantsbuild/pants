@@ -220,11 +220,11 @@ pub fn visualize_entry<R: Rule>(
       // Color "singleton" entries (with no params)!
       if e.params().is_empty() {
         Some(Palette::Olive.fmt_for_graph(display_args))
-      } else if let Some(color) = e.rule().and_then(|r| r.color()) {
-        // Color "intrinsic" entries (provided by the rust codebase)!
-        Some(color.fmt_for_graph(display_args))
       } else {
-        None
+        // Color "intrinsic" entries (provided by the rust codebase)!
+        e.rule()
+          .and_then(|r| r.color())
+          .map(|color| color.fmt_for_graph(display_args))
       }
     }
     &Entry::Param(_) => {

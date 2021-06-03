@@ -21,7 +21,8 @@ from pants.version import VERSION
 def test_run_tracker_timing_output(**kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            run_tracker = RunTracker(create_options_bootstrapper([]).bootstrap_options)
+            ob = create_options_bootstrapper([])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
             run_tracker.start(run_start_time=time.time(), specs=["::"])
             frozen_time = kwargs["frozen_time"]
             frozen_time.tick(delta=datetime.timedelta(seconds=1))
@@ -40,9 +41,11 @@ def test_run_tracker_timing_output(**kwargs) -> None:
 def test_run_information(exit_code, expected, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
-            run_tracker = RunTracker(create_options_bootstrapper([]).bootstrap_options)
+            spec = "test/example.py"
+            ob = create_options_bootstrapper(["list", spec])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
 
-            specs = ["src/python/pants/goal/run_tracker_test.py"]
+            specs = [spec]
             run_tracker.start(run_start_time=time.time(), specs=specs)
 
             run_information = run_tracker.run_information()
@@ -58,10 +61,8 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
             assert run_information["timestamp"] == 1578657601.0
             assert run_information["user"] == getpass.getuser()
             assert run_information["version"] == VERSION
-            assert re.match("pants.*run_tracker_test.py", run_information["cmd_line"])
-            assert run_information["specs_from_command_line"] == [
-                "src/python/pants/goal/run_tracker_test.py"
-            ]
+            assert re.match(f"pants.*{spec}", run_information["cmd_line"])
+            assert run_information["specs_from_command_line"] == [spec]
 
             frozen_time = kwargs["frozen_time"]
             frozen_time.tick(delta=datetime.timedelta(seconds=1))
@@ -69,3 +70,70 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
             run_tracker.end_run(exit_code)
             run_information_after_ended = run_tracker.run_information()
             assert run_information_after_ended["outcome"] == expected
+
+
+@freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")  # type: ignore[call-arg]
+def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
+    with temporary_dir() as buildroot:
+        with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
+            ob = create_options_bootstrapper([])
+            opts = ob.bootstrap_options
+            monkeypatch.setattr(opts, "_goals", ["test", "customgoal", "lint"])
+            run_tracker = RunTracker(ob.args, opts)
+            run_tracker.start(run_start_time=time.time(), specs=[])
+            kwargs["frozen_time"].tick(delta=datetime.timedelta(seconds=1))
+            run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE)
+            repo_id = "A" * 36
+            telemetry = run_tracker.get_anonymous_telemetry_data(repo_id)
+
+            # Check that all keys have non-trivial values.
+            for key in (
+                "run_id",
+                "timestamp",
+                "duration",
+                "outcome",
+                "platform",
+                "python_implementation",
+                "python_version",
+                "pants_version",
+                "repo_id",
+                "machine_id",
+                "user_id",
+                "standard_goals",
+                "num_goals",
+            ):
+                assert bool(telemetry.get(key))
+
+            # Verify a few easy-to-check values.
+            assert telemetry["timestamp"] == "1578657601.0"
+            assert telemetry["duration"] == "1.0"
+            assert telemetry["outcome"] == "SUCCESS"
+            assert telemetry["standard_goals"] == ["test", "lint"]
+            assert telemetry["num_goals"] == "3"
+
+
+def test_anonymous_telemetry_with_no_repo_id() -> None:
+    with temporary_dir() as buildroot:
+        with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
+            ob = create_options_bootstrapper([])
+            run_tracker = RunTracker(ob.args, ob.bootstrap_options)
+            run_tracker.start(run_start_time=time.time(), specs=[])
+            run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE)
+            repo_id = ""
+            telemetry = run_tracker.get_anonymous_telemetry_data(repo_id)
+
+            # Check that these keys have non-trivial values.
+            for key in (
+                "run_id",
+                "timestamp",
+                "duration",
+                "outcome",
+                "platform",
+                "python_implementation",
+                "python_version",
+                "pants_version",
+            ):
+                assert bool(telemetry.get(key))
+
+            for key in ("repo_id", "machine_id", "user_id"):
+                assert telemetry.get(key) == ""

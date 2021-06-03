@@ -263,6 +263,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
+    let local_only = Store::local_only(runtime.clone(), &store_dir).map_err(|e| {
+      format!(
+        "Failed to open/create store for directory {:?}: {}",
+        store_dir, e
+      )
+    })?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
         let chunk_size =
@@ -292,9 +298,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         }
 
         (
-          Store::with_remote(
-            runtime.clone(),
-            &store_dir,
+          local_only.into_with_remote(
             cas_address,
             top_match
               .value_of("remote-instance-name")
@@ -316,15 +320,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(runtime.clone(), &store_dir), false),
+      None => (Ok(local_only), false),
     };
-    let store = store_result.map_err(|e| {
-      format!(
-        "Failed to open/create store for directory {:?}: {}",
-        store_dir, e
-      )
-    })?;
-    (store, store_has_remote)
+    (store_result?, store_has_remote)
   };
 
   match top_match.subcommand() {

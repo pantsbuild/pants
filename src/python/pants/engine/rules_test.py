@@ -30,7 +30,7 @@ from pants.engine.rules import (
     rule,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
@@ -44,7 +44,6 @@ def create_scheduler(rules, validate=True):
         ignore_patterns=[],
         use_gitignore=False,
         build_root=str(Path.cwd()),
-        local_store_dir="./.pants.d/lmdb_store",
         local_execution_root_dir="./.pants.d",
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,
@@ -52,6 +51,7 @@ def create_scheduler(rules, validate=True):
         union_membership=UnionMembership({}),
         executor=_EXECUTOR,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
+        local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,
     )
 

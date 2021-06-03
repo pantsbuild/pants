@@ -8,14 +8,17 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
@@ -27,7 +30,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -42,8 +45,8 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must end in the "
@@ -129,13 +132,31 @@ async def inject_lambda_handler_dependency(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    handler = await Get(
-        ResolvedPythonAwsHandler,
-        ResolvePythonAwsHandlerRequest(original_tgt.target[PythonAwsLambdaHandlerField]),
+    explicitly_provided_deps, handler = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(
+            ResolvedPythonAwsHandler,
+            ResolvePythonAwsHandlerRequest(original_tgt.target[PythonAwsLambdaHandlerField]),
+        ),
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
-    return InjectedDependencies(owners)
+    address = original_tgt.target.address
+    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+        owners.ambiguous,
+        address,
+        import_reference="module",
+        context=(
+            f"The python_awslambda target {address} has the field "
+            f"`handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`, which maps "
+            f"to the Python module `{module}`"
+        ),
+    )
+    maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
+    unambiguous_owners = owners.unambiguous or (
+        (maybe_disambiguated,) if maybe_disambiguated else ()
+    )
+    return InjectedDependencies(unambiguous_owners)
 
 
 class PythonAwsLambdaRuntime(StringField):
@@ -150,8 +171,8 @@ class PythonAwsLambdaRuntime(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address))
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must be of the form pythonX.Y, "
@@ -170,13 +191,14 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        InterpreterConstraintsField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
     )
     help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
-        f"{docs_url('awslambda-python')}."
+        f"{bracketed_docs_url('awslambda-python')}."
     )
 
 

@@ -11,6 +11,7 @@ from pants.core.target_types import ArchiveTarget, Files, GenericTarget, Relocat
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
     archive,
+    config_files,
     distdir,
     external_tool,
     filter_empty_sources,
@@ -19,7 +20,7 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
-from pants.goal import stats_aggregator
+from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
 
 
@@ -35,6 +36,7 @@ def rules():
         *typecheck.rules(),
         *tailor.rules(),
         # util_rules
+        *config_files.rules(),
         *distdir.rules(),
         *filter_empty_sources.rules(),
         *pants_bin.rules(),
@@ -45,6 +47,7 @@ def rules():
         *subprocess_environment.rules(),
         *source_root.rules(),
         *target_type_rules(),
+        *anonymous_telemetry.rules(),
         *stats_aggregator.rules(),
     ]
 

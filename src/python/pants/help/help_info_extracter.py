@@ -8,30 +8,15 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, cast, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
-from pants.engine.target import (
-    AsyncFieldMixin,
-    BoolField,
-    DictStringToStringField,
-    DictStringToStringSequenceField,
-    Field,
-    FloatField,
-    IntField,
-    RegisteredTargetTypes,
-    ScalarField,
-    SequenceField,
-    StringField,
-    StringSequenceField,
-    Target,
-)
+from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
-from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 from pants.util.strutil import first_paragraph
 
 
@@ -144,51 +129,32 @@ class GoalHelpInfo:
     consumed_scopes: Tuple[str, ...]  # The scopes of subsystems consumed by this goal.
 
 
+def pretty_print_type_hint(hint: Any) -> str:
+    if getattr(hint, "__origin__", None) == Union:
+        union_members = hint.__args__
+        hint_str = " | ".join(pretty_print_type_hint(member) for member in union_members)
+    # NB: Checking for GenericMeta is only for Python 3.6 because some `typing` classes like
+    # `typing.Iterable` have its type, whereas Python 3.7+ removes it. Remove this check
+    # once we drop support for Python 3.6.
+    elif isinstance(hint, type) and not str(type(hint)) == "<class 'typing.GenericMeta'>":
+        hint_str = hint.__name__
+    else:
+        hint_str = str(hint)
+    return hint_str.replace("typing.", "").replace("NoneType", "None")
+
+
 @dataclass(frozen=True)
 class TargetFieldHelpInfo:
     """A container for help information for a field in a target type."""
 
     alias: str
-    description: Optional[str]
+    description: str
     type_hint: str
     required: bool
     default: Optional[str]
 
     @classmethod
     def create(cls, field: Type[Field]) -> TargetFieldHelpInfo:
-        description: Optional[str]
-        if hasattr(field, "help"):
-            description = field.help
-        else:
-            # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
-            # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
-            # we can still generate meaningful documentation for all these custom fields without
-            # requiring the Field author to rewrite the docstring.
-            #
-            # However, if the original plugin author did not define docstring, then this means we
-            # would typically fall back to the docstring for `Field` or a template like `StringField`.
-            # This is a an awkward edge of our heuristic and it's not intentional since these core
-            # `Field` types have documentation oriented to the plugin author and not the end user
-            # filling in fields in a BUILD file.
-            description = get_docstring(
-                field,
-                flatten=True,
-                fallback_to_ancestors=True,
-                ignored_ancestors={
-                    *Field.mro(),
-                    AsyncFieldMixin,
-                    BoolField,
-                    DictStringToStringField,
-                    DictStringToStringSequenceField,
-                    FloatField,
-                    Generic,  # type: ignore[arg-type]
-                    IntField,
-                    ScalarField,
-                    SequenceField,
-                    StringField,
-                    StringSequenceField,
-                },
-            )
         raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
@@ -210,7 +176,7 @@ class TargetFieldHelpInfo:
 
         return cls(
             alias=field.alias,
-            description=description,
+            description=field.help,
             type_hint=type_hint,
             required=field.required,
             default=(
@@ -224,30 +190,22 @@ class TargetTypeHelpInfo:
     """A container for help information for a target type."""
 
     alias: str
-    summary: Optional[str]
-    description: Optional[str]
+    summary: str
+    description: str
     fields: Tuple[TargetFieldHelpInfo, ...]
 
     @classmethod
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
     ) -> TargetTypeHelpInfo:
-        description: Optional[str]
-        summary: Optional[str]
-        if hasattr(target_type, "help"):
-            description = target_type.help
-            summary = first_paragraph(description)
-        else:
-            description = get_docstring(target_type)
-            summary = get_docstring_summary(target_type)
         return cls(
             alias=target_type.alias,
-            summary=summary,
-            description=description,
+            summary=first_paragraph(target_type.help),
+            description=target_type.help,
             fields=tuple(
                 TargetFieldHelpInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)
-                if not field.alias.startswith("_") and field.deprecated_removal_version is None
+                if not field.alias.startswith("_") and field.removal_version is None
             ),
         )
 
@@ -311,7 +269,7 @@ class HelpInfoExtracter:
         name_to_target_type_info = {
             alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
             for alias, target_type in registered_target_types.aliases_to_types.items()
-            if not alias.startswith("_") and target_type.deprecated_removal_version is None
+            if not alias.startswith("_") and target_type.removal_version is None
         }
 
         return AllHelpInfo(
@@ -322,10 +280,13 @@ class HelpInfoExtracter:
 
     @staticmethod
     def compute_default(**kwargs) -> Any:
-        """Compute the default val for help display for an option registered with these kwargs.
+        """Compute the default val for help display for an option registered with these kwargs."""
+        # If the kwargs already determine a string representation of the default for use in help
+        # messages, use that.
+        default_help_repr = kwargs.get("default_help_repr")
+        if default_help_repr is not None:
+            return str(default_help_repr)  # Should already be a string, but might as well be safe.
 
-        Returns a pair (default, stringified default suitable for display).
-        """
         ranked_default = kwargs.get("default")
         fallback: Any = None
         if is_list_option(kwargs):
@@ -433,7 +394,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if kwargs.get("type") == bool:
+            if Parser.is_bool(kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:

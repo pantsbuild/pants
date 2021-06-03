@@ -35,7 +35,7 @@ py_class!(pub class PyStubCAS |py| {
   data server: StubCAS;
 
   @classmethod
-  def builder(cls) -> PyResult<PyStubCASBuilder> {
+  def builder(_cls) -> PyResult<PyStubCASBuilder> {
     let builder = StubCAS::builder();
     PyStubCASBuilder::create_instance(py, Arc::new(Mutex::new(Some(builder))))
   }

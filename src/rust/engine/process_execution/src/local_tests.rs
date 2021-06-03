@@ -2,7 +2,7 @@ use tempfile;
 use testutil;
 
 use crate::{
-  local::USER_EXECUTABLE_MODE, CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
@@ -10,14 +10,13 @@ use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
 use std;
 use std::collections::BTreeMap;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use testutil::path::find_bash;
+use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::WorkunitStore;
 
@@ -169,9 +168,9 @@ async fn output_files_one() {
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
-    .output_files(relative_paths(&["roland"]).collect()),
+    .output_files(relative_paths(&["roland.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -195,13 +194,12 @@ async fn output_dirs() {
       find_bash(),
       "-c".to_owned(),
       format!(
-        "/bin/mkdir cats && echo -n {} > {} ; echo -n {} > treats",
+        "/bin/mkdir cats && echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
         TestData::roland().string(),
-        "cats/roland",
         TestData::catnip().string()
       ),
     ])
-    .output_files(relative_paths(&["treats"]).collect())
+    .output_files(relative_paths(&["treats.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
@@ -226,12 +224,12 @@ async fn output_files_many() {
       find_bash(),
       "-c".to_owned(),
       format!(
-        "echo -n {} > cats/roland ; echo -n {} > treats",
+        "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
         TestData::roland().string(),
         TestData::catnip().string()
       ),
     ])
-    .output_files(relative_paths(&["cats/roland", "treats"]).collect()),
+    .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -255,12 +253,11 @@ async fn output_files_execution_failure() {
       find_bash(),
       "-c".to_owned(),
       format!(
-        "echo -n {} > {} ; exit 1",
-        TestData::roland().string(),
-        "roland"
+        "echo -n {} > roland.ext ; exit 1",
+        TestData::roland().string()
       ),
     ])
-    .output_files(relative_paths(&["roland"]).collect()),
+    .output_files(relative_paths(&["roland.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -283,10 +280,10 @@ async fn output_files_partial_output() {
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
     .output_files(
-      relative_paths(&["roland", "susannah"])
+      relative_paths(&["roland.ext", "susannah"])
         .into_iter()
         .collect(),
     ),
@@ -312,9 +309,9 @@ async fn output_overlapping_file_and_dir() {
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > cats/roland", TestData::roland().string()),
+      format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
     ])
-    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
@@ -358,12 +355,15 @@ async fn jdk_symlink() {
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let roland = TestData::roland().bytes();
-  std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
-    .expect("Writing temporary file");
+  std::fs::write(
+    preserved_work_tmpdir.path().join("roland.ext"),
+    roland.clone(),
+  )
+  .expect("Writing temporary file");
 
-  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()]);
+  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland.ext".to_owned()]);
   process.timeout = one_second();
-  process.description = "cat roland".to_string();
+  process.description = "cat roland.ext".to_string();
   process.jdk_home = Some(preserved_work_tmpdir.path().to_path_buf());
 
   let result = run_command_locally(process).await.unwrap();
@@ -382,15 +382,40 @@ async fn test_directory_preservation() {
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
-  let bash_contents = format!("echo -n {} > {}", TestData::roland().string(), "roland");
-  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.clone()];
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
+  // from the ./cats directory.
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let cp = which("cp").expect("No cp on $PATH.");
+  let bash_contents = format!("echo $PWD && {} roland.ext ..", cp.display());
+  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
+
+  let mut process =
+    Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
+  process.input_files = TestDirectory::nested().digest();
+  process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
-    Process::new(argv.clone()).output_files(relative_paths(&["roland"]).collect()),
+    process,
     preserved_work_root.clone(),
     false,
-    None,
-    None,
+    Some(store),
+    Some(executor),
   )
   .await;
   result.unwrap();
@@ -401,18 +426,26 @@ async fn test_directory_preservation() {
   let subdirs = testutil::file::list_dir(&preserved_work_root);
   assert_eq!(subdirs.len(), 1);
 
-  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
-  let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
-  assert!(rolands_path.exists());
+  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland.ext`
+  let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
+  assert!(&rolands_path.exists());
 
   // Ensure that when a directory is preserved, a __run.sh file is created with the process's
   // command line and environment variables.
   let run_script_path = preserved_work_root.join(&subdirs[0]).join("__run.sh");
-  assert!(run_script_path.exists());
-  let script_metadata = std::fs::metadata(&run_script_path).unwrap();
+  assert!(&run_script_path.exists());
 
-  // Ensure the script is executable.
-  assert!(USER_EXECUTABLE_MODE & script_metadata.permissions().mode() != 0);
+  std::fs::remove_file(&rolands_path).expect("Failed to remove roland.");
+
+  // Confirm the script when run directly sets up the proper CWD.
+  let mut child = std::process::Command::new(&run_script_path)
+    .spawn()
+    .expect("Failed to launch __run.sh");
+  let status = child
+    .wait()
+    .expect("Failed to gather the result of __run.sh.");
+  assert_eq!(Some(0), status.code());
+  assert!(rolands_path.exists());
 
   // Ensure the bash command line is provided.
   let bytes_quoted_command_line = bash::escape(&bash_contents);
@@ -459,11 +492,11 @@ async fn all_containing_directories_for_outputs_are_created() {
         // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
         // does not exist, but we create the containing directories for all outputs before the
         // process executes.
-        "/bin/mkdir birds/falcons && echo -n {} > cats/roland",
+        "/bin/mkdir birds/falcons && echo -n {} > cats/roland.ext",
         TestData::roland().string()
       ),
     ])
-    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["birds/falcons"]).collect()),
   )
   .await
@@ -534,7 +567,7 @@ async fn working_directory() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
   // from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
@@ -567,7 +600,7 @@ async fn working_directory() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, "roland\n".as_bytes());
+  assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);

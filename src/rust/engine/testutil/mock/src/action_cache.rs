@@ -40,7 +40,7 @@ use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
@@ -73,7 +73,7 @@ impl ActionCache for ActionCacheResponder {
     &self,
     request: Request<GetActionResultRequest>,
   ) -> Result<Response<ActionResult>, Status> {
-    delay_for(self.read_delay).await;
+    sleep(self.read_delay).await;
 
     let request = request.into_inner();
 
@@ -108,7 +108,7 @@ impl ActionCache for ActionCacheResponder {
     &self,
     request: Request<UpdateActionResultRequest>,
   ) -> Result<Response<ActionResult>, Status> {
-    delay_for(self.write_delay).await;
+    sleep(self.write_delay).await;
 
     let request = request.into_inner();
 

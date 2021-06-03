@@ -16,6 +16,6 @@ source "${REPO_ROOT}/build-support/bin/rust/calculate_engine_hash.sh"
 # shellcheck source=build-support/pants_venv
 source "${REPO_ROOT}/build-support/pants_venv"
 
-activate_pants_venv 1>&2  # Redirect to ensure that we don't interfere with stdout.
+activate_pants_venv 1>&2 # Redirect to ensure that we don't interfere with stdout.
 
 calculate_current_hash

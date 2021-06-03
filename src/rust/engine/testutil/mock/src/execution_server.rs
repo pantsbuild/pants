@@ -250,7 +250,7 @@ impl MockResponder {
     let stream = async_stream::stream! {
       for op in operations {
         if let Some(d) = op.duration {
-          tokio::time::delay_for(d).await;
+          tokio::time::sleep(d).await;
         }
 
         if let Ok(Some(op)) = op.op {
@@ -388,7 +388,7 @@ impl Operations for MockResponder {
       }) => {
         if request.name == operation_name {
           if let Some(d) = operation.duration {
-            tokio::time::delay_for(d).await;
+            tokio::time::sleep(d).await;
           }
           if let Ok(Some(op)) = operation.op {
             // Complete the channel with the op.

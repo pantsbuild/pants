@@ -64,9 +64,9 @@ impl From<std::time::Duration> for Duration {
   }
 }
 
-impl Into<std::time::Duration> for Duration {
-  fn into(self) -> std::time::Duration {
-    std::time::Duration::new(self.secs, self.nanos)
+impl From<Duration> for std::time::Duration {
+  fn from(duration: Duration) -> std::time::Duration {
+    std::time::Duration::new(duration.secs, duration.nanos)
   }
 }
 

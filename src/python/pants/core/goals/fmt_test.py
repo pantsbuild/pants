@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import ClassVar, List, Optional, Type, cast
+from typing import ClassVar, List, Optional, Type
 
 import pytest
 
@@ -23,7 +23,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Wor
 from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -146,7 +146,7 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
 def make_target(
     address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
 ) -> Target:
-    return target_cls({}, address=address or Address("", target_name="tests"))
+    return target_cls({}, address or Address("", target_name="tests"))
 
 
 def run_fmt_rule(
@@ -158,43 +158,43 @@ def run_fmt_rule(
     per_file_caching: bool,
     include_sources: bool = True,
 ) -> str:
-    console = MockConsole(use_colors=False)
-    union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
-    result: Fmt = run_rule_with_mocks(
-        fmt,
-        rule_args=[
-            console,
-            Targets(targets),
-            create_goal_subsystem(
-                FmtSubsystem, per_file_caching=per_file_caching, per_target_caching=False
-            ),
-            Workspace(rule_runner.scheduler),
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=LanguageFmtResults,
-                input_type=LanguageFmtTargets,
-                mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
-                    result_digest
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
+        result: Fmt = run_rule_with_mocks(
+            fmt,
+            rule_args=[
+                console,
+                Targets(targets),
+                create_goal_subsystem(
+                    FmtSubsystem, per_file_caching=per_file_caching, per_target_caching=False
                 ),
-            ),
-            MockGet(
-                output_type=TargetsWithSources,
-                input_type=TargetsWithSourcesRequest,
-                mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
-            ),
-            MockGet(
-                output_type=Digest,
-                input_type=MergeDigests,
-                mock=lambda _: result_digest,
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert result.exit_code == 0
-    assert not console.stdout.getvalue()
-    return cast(str, console.stderr.getvalue())
+                Workspace(rule_runner.scheduler),
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=LanguageFmtResults,
+                    input_type=LanguageFmtTargets,
+                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
+                        result_digest
+                    ),
+                ),
+                MockGet(
+                    output_type=TargetsWithSources,
+                    input_type=TargetsWithSourcesRequest,
+                    mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
+                ),
+                MockGet(
+                    output_type=Digest,
+                    input_type=MergeDigests,
+                    mock=lambda _: result_digest,
+                ),
+            ],
+            union_membership=union_membership,
+        )
+        assert result.exit_code == 0
+        assert not stdio_reader.get_stdout()
+        return stdio_reader.get_stderr()
 
 
 def assert_workspace_modified(

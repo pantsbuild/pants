@@ -61,7 +61,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
             "develop": {"cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"}},
         },
         expected_file_dep=PythonRequirementsFile(
-            {"sources": ["Pipfile.lock"]}, address=Address("", target_name="Pipfile.lock")
+            {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
             PythonRequirementLibrary(
@@ -70,7 +70,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                     "dependencies": [":Pipfile.lock"],
                     "module_mapping": {"ansicolors": ["colors"]},
                 },
-                address=Address("", target_name="ansicolors"),
+                Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
                 {
@@ -79,7 +79,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                     ],
                     "dependencies": [":Pipfile.lock"],
                 },
-                address=Address("", target_name="cachetools"),
+                Address("", target_name="cachetools"),
             ),
         ],
     )
@@ -101,7 +101,7 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
             },
         },
         expected_file_dep=PythonRequirementsFile(
-            {"sources": ["Pipfile.lock"]}, address=Address("", target_name="Pipfile.lock")
+            {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
             PythonRequirementLibrary(
@@ -109,7 +109,7 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("ansicolors[neon]>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
                 },
-                address=Address("", target_name="ansicolors"),
+                Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
                 {
@@ -118,7 +118,7 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
                     ],
                     "dependencies": [":Pipfile.lock"],
                 },
-                address=Address("", target_name="cachetools"),
+                Address("", target_name="cachetools"),
             ),
         ],
     )
@@ -144,7 +144,7 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
         {"default": {"ansicolors": {"version": ">=1.18.0"}}},
         expected_file_dep=PythonRequirementsFile(
             {"sources": ["custom/pipfile/Pipfile.lock"]},
-            address=Address("", target_name="custom_pipfile_target"),
+            Address("", target_name="custom_pipfile_target"),
         ),
         expected_targets=[
             PythonRequirementLibrary(
@@ -152,7 +152,7 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                     "dependencies": ["//:custom_pipfile_target"],
                 },
-                address=Address("", target_name="ansicolors"),
+                Address("", target_name="ansicolors"),
             ),
         ],
         pipfile_lock_relpath="custom/pipfile/Pipfile.lock",

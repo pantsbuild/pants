@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
@@ -146,20 +146,22 @@ class Typecheck(Goal):
 async def typecheck(
     console: Console, targets: Targets, union_membership: UnionMembership
 ) -> Typecheck:
-    typecheck_request_types = union_membership[TypecheckRequest]
-    requests: Iterable[StyleRequest] = tuple(
-        lint_request_type(
-            lint_request_type.field_set_type.create(target)
-            for target in targets
-            if lint_request_type.field_set_type.is_applicable(target)
-        )
-        for lint_request_type in typecheck_request_types
+    typecheck_request_types = cast(
+        "Iterable[type[StyleRequest]]", union_membership[TypecheckRequest]
     )
-    field_sets_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
+    requests = tuple(
+        typecheck_request_type(
+            typecheck_request_type.field_set_type.create(target)
+            for target in targets
+            if typecheck_request_type.field_set_type.is_applicable(target)
+        )
+        for typecheck_request_type in typecheck_request_types
+    )
+    field_sets_with_sources = await MultiGet(
         Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(request.field_sets))
         for request in requests
     )
-    valid_requests: Iterable[StyleRequest] = tuple(
+    valid_requests = tuple(
         request_cls(request)
         for request_cls, request in zip(typecheck_request_types, field_sets_with_sources)
         if request

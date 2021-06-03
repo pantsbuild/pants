@@ -70,7 +70,7 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /falcons/
+  // /falcons
   pub fn containing_falcons_dir() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
@@ -84,8 +84,8 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // birds/falcons/
-  // cats/roland
+  // birds/falcons
+  // cats/roland.ext
   pub fn nested_dir_and_file() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![
@@ -105,8 +105,8 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // animals/birds/falcons/
-  // animals/cats/roland
+  // animals/birds/falcons
+  // animals/cats/roland.ext
   pub fn double_nested_dir_and_file() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
@@ -120,11 +120,11 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /roland
+  // /roland.ext
   pub fn containing_roland() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![remexec::FileNode {
-        name: "roland".to_owned(),
+        name: "roland.ext".to_owned(),
         digest: Some((&TestData::roland().digest()).into()),
         is_executable: false,
         ..remexec::FileNode::default()
@@ -136,11 +136,11 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /robin
+  // /robin.ext
   pub fn containing_robin() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![remexec::FileNode {
-        name: "robin".to_owned(),
+        name: "robin.ext".to_owned(),
         digest: Some((&TestData::robin().digest()).into()),
         is_executable: false,
         ..remexec::FileNode::default()
@@ -152,11 +152,11 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /treats
+  // /treats.ext
   pub fn containing_treats() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![remexec::FileNode {
-        name: "treats".to_owned(),
+        name: "treats.ext".to_owned(),
         digest: Some((&TestData::catnip().digest()).into()),
         is_executable: false,
         ..remexec::FileNode::default()
@@ -168,7 +168,7 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /cats/roland
+  // /cats/roland.ext
   pub fn nested() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
@@ -182,7 +182,7 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /pets/cats/roland
+  // /pets/cats/roland.ext
   pub fn double_nested() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
@@ -196,11 +196,11 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /dnalor
+  // /dnalor.ext
   pub fn containing_dnalor() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![remexec::FileNode {
-        name: "dnalor".to_owned(),
+        name: "dnalor.ext".to_owned(),
         digest: Some((&TestData::roland().digest()).into()),
         is_executable: false,
         ..remexec::FileNode::default()
@@ -212,11 +212,11 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /roland
+  // /roland.ext
   pub fn containing_wrong_roland() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![remexec::FileNode {
-        name: "roland".to_owned(),
+        name: "roland.ext".to_owned(),
         digest: Some((&TestData::catnip().digest()).into()),
         is_executable: false,
         ..remexec::FileNode::default()
@@ -228,19 +228,19 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /roland
-  // /treats
+  // /roland.ext
+  // /treats.ext
   pub fn containing_roland_and_treats() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![
         remexec::FileNode {
-          name: "roland".to_owned(),
+          name: "roland.ext".to_owned(),
           digest: Some((&TestData::roland().digest()).into()),
           is_executable: false,
           ..remexec::FileNode::default()
         },
         remexec::FileNode {
-          name: "treats".to_owned(),
+          name: "treats.ext".to_owned(),
           digest: Some((&TestData::catnip().digest()).into()),
           is_executable: false,
           ..remexec::FileNode::default()
@@ -253,8 +253,8 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /cats/roland
-  // /treats
+  // /cats/roland.ext
+  // /treats.ext
   pub fn recursive() -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
@@ -262,7 +262,7 @@ impl TestDirectory {
         digest: Some((&TestDirectory::containing_roland().digest()).into()),
       }],
       files: vec![remexec::FileNode {
-        name: "treats".to_owned(),
+        name: "treats.ext".to_owned(),
         digest: Some((&TestData::catnip().digest()).into()),
         ..remexec::FileNode::default()
       }],
@@ -273,19 +273,19 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /feed (executable)
-  // /food
+  // /feed.ext (executable)
+  // /food.ext
   pub fn with_mixed_executable_files() -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![
         remexec::FileNode {
-          name: "feed".to_owned(),
+          name: "feed.ext".to_owned(),
           digest: Some((&TestData::catnip().digest()).into()),
           is_executable: true,
           ..remexec::FileNode::default()
         },
         remexec::FileNode {
-          name: "food".to_owned(),
+          name: "food.ext".to_owned(),
           digest: Some((&TestData::catnip().digest()).into()),
           is_executable: false,
           ..remexec::FileNode::default()

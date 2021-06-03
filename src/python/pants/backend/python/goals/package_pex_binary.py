@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
     PexShebangField,
-    PexUnzipField,
+    PexStripEnvField,
     PexZipSafeField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -44,9 +44,8 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
@@ -64,27 +63,14 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     inherit_path: PexInheritPathField
     shebang: PexShebangField
     zip_safe: PexZipSafeField
+    strip_env: PexStripEnvField
     platforms: PythonPlatformsField
-    unzip: PexUnzipField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
 
-    @memoized_property
+    @property
     def _execution_mode(self) -> PexExecutionMode:
-        if self.unzip.value is True:
-            if self.execution_mode.value not in (None, PexExecutionMode.UNZIP.value):
-                raise Exception(
-                    f"The deprecated {PexUnzipField.alias} field is set to `True` but the "
-                    f"{PexExecutionModeField.alias} field contradicts this by requesting"
-                    f"`{self.execution_mode.value!r}`. Correct this by only specifying a value for "
-                    f"one field or the other, preferring the {PexExecutionModeField.alias} field."
-                )
-            return PexExecutionMode.UNZIP
-        return (
-            PexExecutionMode.ZIPAPP
-            if self.execution_mode.value is None
-            else PexExecutionMode(self.execution_mode.value)
-        )
+        return PexExecutionMode(self.execution_mode.value)
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
@@ -100,6 +86,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
             args.append("--not-zip-safe")
+        if self.strip_env.value is False:
+            args.append("--no-strip-pex-env")
         if self._execution_mode is PexExecutionMode.UNZIP:
             args.append("--unzip")
         if self._execution_mode is PexExecutionMode.VENV:
@@ -133,7 +121,7 @@ async def package_pex_binary(
             "are not able to load files within the binary itself; instead, they read from the "
             "current working directory."
             "\n\nInstead, use `resources` targets or wrap this `pex_binary` in an `archive`. See "
-            f"{docs_url('resources')}."
+            f"{bracketed_docs_url('resources')}."
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 

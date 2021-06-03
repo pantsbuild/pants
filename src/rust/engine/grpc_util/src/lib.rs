@@ -36,6 +36,7 @@ use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, Meta
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 pub mod prost;
+pub mod retry;
 
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
 pub fn create_endpoint(
@@ -63,7 +64,7 @@ pub fn create_tls_config(root_ca_certs: Option<Vec<u8>>) -> Result<ClientConfig,
   // Must set HTTP/2 as ALPN protocol otherwise cannot connect over TLS to gRPC servers.
   // Unfortunately, this is not a default value and, moreover, Tonic does not provide
   // any helper function to encapsulate this knowledge.
-  tls_config.set_protocols(&[Vec::from(&"h2"[..])]);
+  tls_config.set_protocols(&[Vec::from("h2")]);
 
   // Add the root store.
   match root_ca_certs {
@@ -135,4 +136,8 @@ pub fn headers_to_interceptor_fn(
     }
     Ok(req)
   })
+}
+
+pub fn status_to_str(status: tonic::Status) -> String {
+  format!("{:?}: {:?}", status.code(), status.message())
 }

@@ -1,4 +1,4 @@
-use super::{EntryType, ShrinkBehavior, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
+use super::{EntryType, ShrinkBehavior};
 
 use std::collections::BinaryHeap;
 use std::path::Path;
@@ -10,7 +10,7 @@ use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
-use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
+use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use workunit_store::ObservationMetric;
 
 #[derive(Debug, Clone)]
@@ -33,47 +33,33 @@ impl ByteStore {
     executor: task_executor::Executor,
     path: P,
   ) -> Result<ByteStore, String> {
-    Self::new_with_lease_time(executor, path, DEFAULT_LEASE_TIME)
+    Self::new_with_options(executor, path, super::LocalOptions::default())
   }
 
-  pub fn new_with_lease_time<P: AsRef<Path>>(
+  pub fn new_with_options<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    lease_time: Duration,
+    options: super::LocalOptions,
   ) -> Result<ByteStore, String> {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
-        // The size value bounds the total size of all shards, but it also bounds the per item
-        // size to `max_size / ShardedLmdb::NUM_SHARDS`.
-        //
-        // We want these stores to be allowed to grow to a large multiple of the `StoreGCService`
-        // size target (see DEFAULT_LOCAL_STORE_GC_TARGET_BYTES), in case it is a very long time
-        // between GC runs. It doesn't reflect space allocated on disk, or RAM allocated (it may
-        // be reflected in VIRT but not RSS).
-        //
-        // However! We set them lower than we'd otherwise choose for a few reasons:
-        // 1. we see tests on travis fail because they can't allocate virtual memory if there
-        //    are too many open Stores at the same time.
-        // 2. macOS creates core dumps that apparently include MMAP'd pages, and setting this too
-        //    high will use up an unnecessary amount of disk if core dumps are enabled.
-        //
         file_dbs: ShardedLmdb::new(
           files_root,
-          // We set this larger than we do other stores in order to avoid applying too low a bound
-          // on the size of stored files.
-          16 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          options.files_max_size_bytes,
           executor.clone(),
-          lease_time,
+          options.lease_time,
+          options.shard_count,
         )
         .map(Arc::new),
         directory_dbs: ShardedLmdb::new(
           directories_root,
-          2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          options.directories_max_size_bytes,
           executor.clone(),
-          lease_time,
+          options.lease_time,
+          options.shard_count,
         )
         .map(Arc::new),
         executor,
@@ -283,21 +269,16 @@ impl ByteStore {
   /// blocking, this accepts a function that views a slice rather than returning a clone of the
   /// data. The upshot is that the database is able to provide slices directly into shared memory.
   ///
-  /// The provided function is guaranteed to be called in a context where it is safe to block.
-  ///
-  pub async fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  pub async fn load_bytes_with<T: Send + 'static, F: FnMut(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
     digest: Digest,
-    f: F,
+    mut f: F,
   ) -> Result<Option<T>, String> {
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging
       // snapshots) to work without needing to first store the empty snapshot.
-      //
-      // To maintain the guarantee that the given function is called in a blocking context, we
-      // spawn it as a task.
-      return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
+      return Ok(Some(f(&[])));
     }
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -310,15 +291,23 @@ impl ByteStore {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
-    };
-
-    dbs?.load_bytes_with(digest.hash, move |bytes| {
+    }?;
+    dbs
+      .load_bytes_with(digest.hash, move |bytes| {
         if bytes.len() == digest.size_bytes {
-            Ok(f(bytes))
+          Ok(f(bytes))
         } else {
-            Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
+          Err(format!(
+            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                sha256! Underlying bytes: {:?}",
+            digest,
+            bytes.len(),
+            bytes
+          ))
         }
-    }).await
+      })
+      .await
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {

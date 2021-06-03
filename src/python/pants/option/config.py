@@ -620,10 +620,20 @@ class TomlSerializer:
         for section, section_values in self.parsed.items():
             # With TOML, we store dict values as strings to avoid ambiguity between sections/option
             # scopes vs. dict values.
-            section_values = {
-                option: str(option_value) if isinstance(option_value, dict) else option_value
+            def normalize_section_value(option, option_value) -> Tuple[str, Any]:
+                option_value = str(option_value) if isinstance(option_value, dict) else option_value
+                if option.endswith(".add"):
+                    option = option.rsplit(".", 1)[0]
+                    option_value = f"+{option_value!r}"
+                elif option.endswith(".remove"):
+                    option = option.rsplit(".", 1)[0]
+                    option_value = f"-{option_value!r}"
+                return option, option_value
+
+            section_values = dict(
+                normalize_section_value(option, option_value)
                 for option, option_value in section_values.items()
-            }
+            )
 
             def add_section_values(
                 section_component: str,
