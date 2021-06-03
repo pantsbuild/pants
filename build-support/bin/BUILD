@@ -13,5 +13,5 @@ pex_binary(name="check_inits", entry_point="check_inits.py")
 pex_binary(name="deploy_to_s3", entry_point="deploy_to_s3.py")
 pex_binary(name="generate_github_workflows", entry_point="generate_github_workflows.py")
 pex_binary(name="generate_docs", entry_point="generate_docs.py", dependencies=[":docs_templates"])
-pex_binary(name="reversion", entry_point="reversion.py",)
-pex_binary(name="packages", entry_point="packages.py")  # TODO: rename to `release.py` after removing `release.sh`.
+pex_binary(name="release_helper", entry_point="release_helper.py")
+pex_binary(name="reversion", entry_point="reversion.py")
