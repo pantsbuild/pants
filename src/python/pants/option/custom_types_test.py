@@ -19,17 +19,14 @@ def test_memory_size() -> None:
     assert memory_size("1GiB") == 1_073_741_824
     assert memory_size(" 1  GiB ") == 1_073_741_824
     assert memory_size("1.22GiB") == 1_309_965_025
-    assert memory_size("1GB") == 1_000_000_000
 
     assert memory_size("1MiB") == 1_048_576
     assert memory_size(" 1  MiB ") == 1_048_576
     assert memory_size("1.4MiB") == 1_468_006
-    assert memory_size("1MB") == 1_000_000
 
     assert memory_size("1KiB") == 1024
     assert memory_size(" 1  KiB ") == 1024
     assert memory_size("1.4KiB") == 1433
-    assert memory_size("1kB") == 1000
 
     assert memory_size("10B") == 10
     assert memory_size(" 10  B ") == 10
@@ -39,17 +36,11 @@ def test_memory_size() -> None:
     assert memory_size(" 10 ") == 10
     assert memory_size("10.4") == 10
 
-    # Capitalization matters:
-    with pytest.raises(ParseError):
-        memory_size("1gib")
-    with pytest.raises(ParseError):
-        memory_size("1gb")
-
     # Must be a Bytes unit.
     with pytest.raises(ParseError):
         memory_size("1ft")
     with pytest.raises(ParseError):
-        memory_size("1Gib")
+        memory_size("1m")
 
     # Invalid input.
     with pytest.raises(ParseError):
