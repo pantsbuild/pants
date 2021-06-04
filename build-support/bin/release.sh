@@ -8,6 +8,7 @@ source "build-support/common.sh"
 
 if [[ "${USE_PY38:-false}" == "true" ]]; then
   default_python=python3.8
+  interpreter_constraint="==3.8.*"
 elif [[ "${USE_PY39:-false}" == "true" ]]; then
   default_python=python3.9
   interpreter_constraint="==3.9.*"
