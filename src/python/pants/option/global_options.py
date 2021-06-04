@@ -789,8 +789,8 @@ class GlobalOptions(Subsystem):
                 "you may miss out on some caching, whereas setting too high may over-consume "
                 "resources and may result in the operating system killing Pantsd due to memory "
                 "overconsumption (e.g. via the OOM killer).\n\n"
-                "You can suffix with `GiB`, `GB`, `MiB`, `MB`, `KiB`, `kB`, or `B` to indicate "
-                "the unit, e.g. `2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
+                "You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g. "
+                "`2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
                 "There is at most one pantsd process per workspace."
             ),
         )
