@@ -5,6 +5,9 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+
 # Defines:
 # + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
 # + MODE: Whether to run in debug or release mode.
@@ -40,8 +43,8 @@ function _build_native_code() {
 }
 
 function _build_native_code_pyo3() {
-  # NB: See Cargo.toml with regard to the `extension-module` feature.
-  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine_pyo3 || die
+  # NB: See engine_pyo3/Cargo.toml with regard to the `extension-module` feature.
+  "${REPO_ROOT}/cargo" build --features=engine_pyo3/extension-module ${MODE_FLAG} -p engine_pyo3 || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
 }
 
@@ -65,9 +68,11 @@ function bootstrap_native_code() {
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
   if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" || "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
-    echo "Building native engine"
-    local -r native_binary="$(_build_native_code)"
-    local -r native_binary_pyo3="$(_build_native_code_pyo3)"
+    banner "Building native engine..."
+    banner "Building native_engine.so"
+    local -r native_binary="$(_build_native_code)" || die
+    banner "Building native_engine_pyo3.so"
+    local -r native_binary_pyo3="$(_build_native_code_pyo3)" || die
 
     # If bootstrapping the native engine fails, don't attempt to run pants
     # afterwards.
