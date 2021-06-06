@@ -1,8 +1,5 @@
 [GLOBAL]
-# Override color support detection - we want colors and Travis supports them.
 colors = true
-# TODO: See #9924.
-dynamic_ui = false
 
 remote_cache_read = true
 remote_cache_write = true
@@ -16,6 +13,7 @@ log = true
 use_coverage = true
 
 [pytest]
+args = ["--no-header", "-vv"]
 junit_xml_dir = "dist/test-results/"
 
 [coverage-py]
@@ -25,8 +23,8 @@ report = ["raw", "xml"]
 from_env_var = "TOOLCHAIN_AUTH_TOKEN"
 org = "pantsbuild"
 ci_env_variables = [
-  "TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL",
   "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_SHA", "GITHUB_REPOSITORY",
+  "GITHUB_WORKFLOW","GITHUB_JOB",  # temporary, for debugging issues w/ restricted tokens.
 ]
 restricted_token_matches =  """{
   'GITHUB_REPOSITORY': 'pantsbuild/pants', 

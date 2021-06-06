@@ -20,7 +20,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.11.0",
+  "toolchain.pants.plugin==0.12.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -173,3 +173,6 @@ config = "@build-support/regexes/config.yaml"
 
 [toolchain-setup]
 repo = "pants"
+
+[buildsense]
+enable = false

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
@@ -15,12 +16,13 @@ from pants.core.goals.lint import (
     LintSubsystem,
     lint,
 )
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
+from pants.engine.fs import Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -138,6 +140,7 @@ def run_lint_rule(
                     LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
                 ),
                 union_membership,
+                DistDir(relpath=Path("dist")),
             ],
             mock_gets=[
                 MockGet(
@@ -152,7 +155,6 @@ def run_lint_rule(
                         field_sets if include_sources else ()
                     ),
                 ),
-                MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
             ],
             union_membership=union_membership,
         )

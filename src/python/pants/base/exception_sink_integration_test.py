@@ -5,13 +5,15 @@ import os
 import re
 import signal
 import time
+from pathlib import Path
 from textwrap import dedent
 from typing import List, Tuple
+
+import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.testutil.pants_integration_test import run_pants_with_workdir
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
@@ -74,74 +76,73 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
     assert re.search(regex_str, contents)
 
 
-def test_logs_unhandled_exception() -> None:
+def test_logs_unhandled_exception(tmp_path: Path) -> None:
     directory = "testprojects/src/python/hello/main"
-    with temporary_dir() as tmpdir:
-        pants_run = run_pants_with_workdir(
-            [
-                "--no-pantsd",
-                "list",
-                f"{directory}:this-target-does-not-exist",
-                "--backend-packages=['pants.backend.python']",
-            ],
-            workdir=tmpdir,
-            # The backtrace should be omitted when --print-stacktrace=False.
-            print_stacktrace=False,
-            hermetic=False,
+
+    pants_run = run_pants_with_workdir(
+        [
+            "--no-pantsd",
+            "list",
+            f"{directory}:this-target-does-not-exist",
+            "--backend-packages=['pants.backend.python']",
+        ],
+        workdir=tmp_path.as_posix(),
+        # The backtrace should be omitted when --print-stacktrace=False.
+        print_stacktrace=False,
+        hermetic=False,
+    )
+
+    pants_run.assert_failure()
+
+    regex = f"'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:"
+    assert re.search(regex, pants_run.stderr)
+
+    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
+    assert_unhandled_exception_log_matches(
+        pants_run.pid, read_file(pid_specific_log_file), namespace=directory
+    )
+    assert_unhandled_exception_log_matches(
+        pants_run.pid, read_file(shared_log_file), namespace=directory
+    )
+
+
+@pytest.mark.skip(reason="Flaky: https://github.com/pantsbuild/pants/issues/12108")
+def test_fails_ctrl_c_on_import(tmp_path: Path) -> None:
+    # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
+    pants_run = run_pants_with_workdir(
+        lifecycle_stub_cmdline(),
+        workdir=tmp_path.as_posix(),
+        extra_env={"_RAISE_KEYBOARDINTERRUPT_ON_IMPORT": "True"},
+    )
+    pants_run.assert_failure()
+
+    assert (
+        dedent(
+            """\
+            Interrupted by user:
+            ctrl-c during import!
+            """
         )
+        in pants_run.stderr
+    )
 
-        pants_run.assert_failure()
-
-        regex = f"'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:"
-        assert re.search(regex, pants_run.stderr)
-
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-        assert_unhandled_exception_log_matches(
-            pants_run.pid, read_file(pid_specific_log_file), namespace=directory
-        )
-        assert_unhandled_exception_log_matches(
-            pants_run.pid, read_file(shared_log_file), namespace=directory
-        )
+    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
+    assert "" == read_file(pid_specific_log_file)
+    assert "" == read_file(shared_log_file)
 
 
-def test_fails_ctrl_c_on_import() -> None:
-    with temporary_dir() as tmpdir:
-        # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
-        pants_run = run_pants_with_workdir(
-            lifecycle_stub_cmdline(),
-            workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARDINTERRUPT_ON_IMPORT": "True"},
-        )
-        pants_run.assert_failure()
+def test_fails_ctrl_c_ffi(tmp_path: Path) -> None:
+    pants_run = run_pants_with_workdir(
+        command=lifecycle_stub_cmdline(),
+        workdir=tmp_path.as_posix(),
+        extra_env={"_RAISE_KEYBOARD_INTERRUPT_FFI": "1"},
+    )
+    pants_run.assert_failure()
+    assert "KeyboardInterrupt: ctrl-c interrupted execution during FFI" in pants_run.stderr
 
-        assert (
-            dedent(
-                """\
-                Interrupted by user:
-                ctrl-c during import!
-                """
-            )
-            in pants_run.stderr
-        )
-
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-        assert "" == read_file(pid_specific_log_file)
-        assert "" == read_file(shared_log_file)
-
-
-def test_fails_ctrl_c_ffi() -> None:
-    with temporary_dir() as tmpdir:
-        pants_run = run_pants_with_workdir(
-            command=lifecycle_stub_cmdline(),
-            workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARD_INTERRUPT_FFI": "1"},
-        )
-        pants_run.assert_failure()
-        assert "KeyboardInterrupt: ctrl-c interrupted execution during FFI" in pants_run.stderr
-
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-        assert "" == read_file(pid_specific_log_file)
-        assert "" == read_file(shared_log_file)
+    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
+    assert "" == read_file(pid_specific_log_file)
+    assert "" == read_file(shared_log_file)
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):

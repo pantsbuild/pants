@@ -443,6 +443,7 @@ class Parser:
         "choices",
         "dest",
         "default",
+        "default_help_repr",
         "implicit_value",
         "metavar",
         "help",

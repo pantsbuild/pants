@@ -280,10 +280,13 @@ class HelpInfoExtracter:
 
     @staticmethod
     def compute_default(**kwargs) -> Any:
-        """Compute the default val for help display for an option registered with these kwargs.
+        """Compute the default val for help display for an option registered with these kwargs."""
+        # If the kwargs already determine a string representation of the default for use in help
+        # messages, use that.
+        default_help_repr = kwargs.get("default_help_repr")
+        if default_help_repr is not None:
+            return str(default_help_repr)  # Should already be a string, but might as well be safe.
 
-        Returns a pair (default, stringified default suitable for display).
-        """
         ranked_default = kwargs.get("default")
         fallback: Any = None
         if is_list_option(kwargs):

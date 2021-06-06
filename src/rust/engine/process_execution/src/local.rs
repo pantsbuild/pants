@@ -593,8 +593,9 @@ pub trait CapturedWorkdir {
       }
       Err(msg) if msg == "deadline has elapsed" => {
         let stdout = Bytes::from(format!(
-          "Exceeded timeout of {:?} for local process execution, {}",
-          req.timeout, req.description
+          "Exceeded timeout of {:.1} seconds when executing local process: {}",
+          req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
+          req.description
         ));
         let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 

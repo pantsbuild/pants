@@ -20,9 +20,8 @@ pex_binary(
   dependencies=[
     ':pants_loader',
   ],
-  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
-  # dependency on setuptools (for namespace package support).
-  emit_warnings=False,
+  execution_mode="unzip",
+  strip_pex_env=False,
 )
 
 python_tests(name="tests")

@@ -16,8 +16,11 @@ class Bandit(PythonToolBase):
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     default_version = "bandit>=1.6.2,<1.7"
-    # `setuptools<45` is for Python 2 support. `stevedore` is because the 3.0 release breaks Bandit.
-    default_extra_requirements = ["setuptools<45", "stevedore<3"]
+    default_extra_requirements = [
+        "setuptools<45; python_full_version == '2.7.*'",
+        "setuptools; python_version > '2.7'",
+        "stevedore<3",  # stevedore 3.0 breaks Bandit.
+    ]
     default_main = ConsoleScript("bandit")
 
     @classmethod
