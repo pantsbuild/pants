@@ -19,7 +19,7 @@ use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request, Status};
-use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -245,8 +245,8 @@ impl ByteStore {
       }
     });
 
-    // NOTE: This async closure must be boxed or else it triggers a consistent stack overflow
-    // when awaited with the `with_workunit` call below.
+    // NB: This async closure must be boxed or else it triggers a consistent stack overflow
+    // when awaited with the `in_workunit` call below.
     let result_future = Box::pin(async move {
       let response = client
         .write(Request::new(stream))
@@ -266,12 +266,11 @@ impl ByteStore {
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
       let workunit_store = workunit_store_handle.store;
-      with_workunit(
+      in_workunit!(
         workunit_store,
         workunit_name,
         workunit_metadata,
-        result_future,
-        |_, md| md,
+        |_workunit| result_future,
       )
       .await
     } else {
@@ -376,12 +375,11 @@ impl ByteStore {
     };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      with_workunit(
+      in_workunit!(
         workunit_store_handle.store,
         workunit_name,
         workunit_metadata,
-        result_future,
-        |_, md| md,
+        |_workunit| result_future,
       )
       .await
     } else {
@@ -429,12 +427,11 @@ impl ByteStore {
     };
     async {
       if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-        with_workunit(
+        in_workunit!(
           workunit_store_handle.store,
           workunit_name,
           workunit_metadata,
-          result_future,
-          |_, md| md,
+          |_workunit| result_future,
         )
         .await
       } else {

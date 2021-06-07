@@ -824,7 +824,7 @@ pub fn _start_workunit(
 
 #[macro_export]
 macro_rules! in_workunit {
-    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* }) => (
+    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* $(,)? }) => (
       {
         let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
         $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
@@ -837,6 +837,19 @@ macro_rules! in_workunit {
         })
       }
     );
+  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => (
+    {
+      let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+      $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+          let result = {
+            let $workunit = &mut $workunit;
+            $f
+          }.await;
+          $workunit.complete(None);
+          result
+        })
+    }
+  );
 }
 
 pub async fn with_workunit<F, M>(
@@ -880,6 +893,15 @@ impl RunningWorkunit {
         .entry(counter_name)
         .and_modify(|e| *e += change)
         .or_insert(change);
+    }
+  }
+
+  pub fn update_metadata<F>(&mut self, f: F)
+  where
+    F: FnOnce(WorkunitMetadata) -> WorkunitMetadata,
+  {
+    if let Some(ref mut workunit) = self.workunit {
+      workunit.metadata = f(workunit.metadata.clone())
     }
   }
 

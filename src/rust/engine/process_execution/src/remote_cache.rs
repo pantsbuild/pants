@@ -16,7 +16,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -341,7 +341,7 @@ impl CommandRunner {
   ) -> Result<(), String> {
     // Upload the action (and related data, i.e. the embedded command and input files).
     // Assumption: The Action and related data has already been stored locally.
-    with_workunit(
+    in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
@@ -349,13 +349,12 @@ impl CommandRunner {
         desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
-      crate::remote::ensure_action_uploaded(
+      |_workunit| crate::remote::ensure_action_uploaded(
         &self.store,
         command_digest,
         action_digest,
         request.input_files,
       ),
-      |_, md| md,
     )
     .await?;
 
@@ -452,7 +451,8 @@ impl crate::CommandRunner for CommandRunner {
       make_execute_request(&request, self.metadata.clone())?;
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
+    let command2 = command.clone();
+    let (command_digest, action_digest) = in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
@@ -460,8 +460,7 @@ impl crate::CommandRunner for CommandRunner {
         desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
-      crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
-      |_, md| md,
+      |_workunit| crate::remote::ensure_action_stored_locally(&self.store, &command2, &action),
     )
     .await?;
 
@@ -470,24 +469,14 @@ impl crate::CommandRunner for CommandRunner {
     let result = if self.cache_read {
       // A future to read from the cache and log the results accordingly.
       let cache_read_future = async {
-        let response = with_workunit(
-          context.workunit_store.clone(),
-          "check_action_cache".to_owned(),
-          WorkunitMetadata {
-            level: Level::Trace,
-            desc: Some(format!("check action cache for {:?}", action_digest)),
-            ..WorkunitMetadata::default()
-          },
-          crate::remote::check_action_cache(
-            action_digest,
-            &self.metadata,
-            self.platform,
-            &context,
-            self.action_cache_client.clone(),
-            self.store.clone(),
-            self.eager_fetch,
-          ),
-          |_, md| md,
+        let response = crate::remote::check_action_cache(
+          action_digest,
+          &self.metadata,
+          self.platform,
+          &context,
+          self.action_cache_client.clone(),
+          self.store.clone(),
+          self.eager_fetch,
         )
         .await;
         match response {
@@ -546,42 +535,32 @@ impl crate::CommandRunner for CommandRunner {
       let result = result.clone();
       let context2 = context.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let cache_write_future = async move {
-        context2
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteStarted, 1);
-        let write_result = command_runner
-          .update_action_cache(
-            &context2,
-            &request,
-            &result,
-            &command_runner.metadata,
-            &command,
-            action_digest,
-            command_digest,
-          )
-          .await;
-        context2
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
-        if let Err(err) = write_result {
-          command_runner.log_cache_error(err, CacheErrorType::WriteError);
-          context2
-            .workunit_store
-            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-        };
-      }
-      .boxed();
-
-      let _write_join = self.executor.spawn(with_workunit(
+      let _write_join = self.executor.spawn(in_workunit!(
         context.workunit_store,
         "remote_cache_write".to_owned(),
         WorkunitMetadata {
           level: Level::Trace,
           ..WorkunitMetadata::default()
         },
-        cache_write_future,
-        |_, md| md,
+        |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteStarted, 1);
+          let write_result = command_runner
+            .update_action_cache(
+              &context2,
+              &request,
+              &result,
+              &command_runner.metadata,
+              &command,
+              action_digest,
+              command_digest,
+            )
+            .await;
+          workunit.increment_counter(Metric::RemoteCacheWriteFinished, 1);
+          if let Err(err) = write_result {
+            command_runner.log_cache_error(err, CacheErrorType::WriteError);
+            workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          };
+        }
       ));
     }
 
