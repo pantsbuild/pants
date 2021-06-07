@@ -49,8 +49,7 @@ def test_buildroot_is_source_root(rule_runner: RuleRunner) -> None:
 
 
 def test_marker_file(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("fakerootA/SOURCE_ROOT")
-    rule_runner.create_file("fakerootB/setup.py")
+    rule_runner.write_files({"fakerootA/SOURCE_ROOT": "", "fakerootB/setup.py": ""})
     assert_roots(
         rule_runner,
         configured=[],

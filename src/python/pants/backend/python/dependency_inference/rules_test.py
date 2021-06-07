@@ -25,7 +25,7 @@ from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_infer_python_imports() -> None:
+def test_infer_python_imports(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[*import_rules(), QueryRule(InferredDependencies, [InferPythonImportDependencies])],
         target_types=[PythonLibrary, PythonRequirementLibrary],
@@ -112,6 +112,45 @@ def test_infer_python_imports() -> None:
         ],
         sibling_dependencies_inferrable=True,
     )
+
+    # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but not warn
+    # on the disambiguated one and should infer a dep.
+    caplog.clear()
+    rule_runner.create_files("src/python/ambiguous", ["dep.py", "disambiguated_via_ignores.py"])
+    rule_runner.create_file(
+        "src/python/ambiguous/main.py",
+        "import ambiguous.dep\nimport ambiguous.disambiguated_via_ignores\n",
+    )
+    rule_runner.add_to_build_file(
+        "src/python/ambiguous",
+        dedent(
+            """\
+            python_library(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_library(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_library(
+                name='main',
+                sources=['main.py'],
+                dependencies=['!./disambiguated_via_ignores.py:dep2'],
+            )
+            """
+        ),
+    )
+    assert run_dep_inference(
+        Address("src/python/ambiguous", target_name="main")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/python/ambiguous",
+                target_name="dep1",
+                relative_file_path="disambiguated_via_ignores.py",
+            )
+        ],
+        sibling_dependencies_inferrable=True,
+    )
+    assert len(caplog.records) == 1
+    assert "The target src/python/ambiguous:main imports `ambiguous.dep`" in caplog.text
+    assert "['src/python/ambiguous/dep.py:dep1', 'src/python/ambiguous/dep.py:dep2']" in caplog.text
+    assert "disambiguated_via_ignores.py" not in caplog.text
 
 
 def test_infer_python_inits() -> None:

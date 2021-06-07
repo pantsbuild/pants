@@ -9,6 +9,9 @@ import subprocess
 from textwrap import dedent
 from typing import List
 
+from common import die
+from packaging.version import Version
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Prepare the changelog for a release.")
@@ -27,11 +30,29 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def relevant_shas(prior: str) -> List[str]:
+def determine_release_branch(new_version_str: str) -> str:
+    new_version = Version(new_version_str)
+    # Use the main branch for all dev releases, and for the first rc (which creates a stable branch).
+    use_main_branch = new_version.is_devrelease or (
+        new_version.pre
+        and "rc0" == "".join(str(p) for p in new_version.pre)
+        and new_version.micro == 0
+    )
+    release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
+    branch_confirmation = input(
+        f"Have you recently pulled from upstream on the branch `{release_branch}`? "
+        "This is needed to ensure the changelog is exhaustive. [Y/n]"
+    )
+    if branch_confirmation and branch_confirmation.lower() != "y":
+        die(f"Please checkout to the branch `{release_branch}` and pull from upstream. ")
+    return release_branch
+
+
+def relevant_shas(prior: str, release_branch: str) -> List[str]:
     prior_tag = f"release_{prior}"
     return (
         subprocess.run(
-            ["git", "log", "--format=format:%H", "HEAD", f"^{prior_tag}"],
+            ["git", "log", "--format=format:%H", release_branch, f"^{prior_tag}"],
             check=True,
             stdout=subprocess.PIPE,
         )
@@ -105,8 +126,10 @@ def instructions(new_version: str) -> str:
 
 def main() -> None:
     args = create_parser().parse_args()
+    release_branch = determine_release_branch(args.new)
+
     print(instructions(args.new))
-    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior)]
+    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, release_branch)]
     print("\n\n".join(entries))
 
 

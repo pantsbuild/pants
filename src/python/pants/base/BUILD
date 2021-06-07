@@ -18,7 +18,7 @@ python_tests(
   timeout=90,
 )
 
-python_integration_tests(
+python_tests(
   name='exception_sink_integration_test',
   sources=['exception_sink_integration_test.py'],
   dependencies=[
@@ -26,16 +26,14 @@ python_integration_tests(
     'testprojects/src/python:hello_directory',
     'testprojects:pants_plugins_directory',
   ],
-  uses_pants_run=True,
   tags=['platform_specific_behavior'],
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
   # https://github.com/pantsbuild/pants/issues/8127.
   timeout=400,
 )
 
-python_integration_tests(
+python_tests(
   name='exiter_integration_test',
   sources=['exiter_integration_test.py'],
-  uses_pants_run=True,
   timeout=180,
 )

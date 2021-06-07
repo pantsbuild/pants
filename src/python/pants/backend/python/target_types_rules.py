@@ -21,8 +21,11 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
@@ -30,7 +33,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import docs_url
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
@@ -40,28 +42,14 @@ from pants.util.docutil import docs_url
 @rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
-    ep_alias = request.entry_point_field.alias
     address = request.entry_point_field.address
 
-    # TODO: factor up some of this code between python_awslambda and pex_binary once `sources` is
-    #  removed.
-
-    # This code is tricky, as we support several different schemes:
+    # We support several different schemes:
     #  1) `<none>` or `<None>` => set to `None`.
     #  2) `path.to.module` => preserve exactly.
     #  3) `path.to.module:func` => preserve exactly.
     #  4) `app.py` => convert into `path.to.app`.
     #  5) `app.py:func` => convert into `path.to.app:func`.
-
-    if ep_val is None:
-        instructions_url = docs_url(
-            "python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-        )
-        raise InvalidFieldException(
-            f"The `{ep_alias}` field is not set for the target {address}. Run "
-            f"`./pants help pex_binary` for more information on how to set the field or "
-            f"see {instructions_url}."
-        )
 
     # Case #1.
     if ep_val.module in ("<none>", "<None>"):
@@ -86,9 +74,10 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(entry_point_paths.files) != 1:
         raise InvalidFieldException(
-            f"Multiple files matched for the `{ep_alias}` {ep_val.spec!r} for the target "
-            f"{address}, but only one file expected. Are you using a glob, rather than a file "
-            f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
+            f"Multiple files matched for the `{request.entry_point_field.alias}` "
+            f"{ep_val.spec!r} for the target {address}, but only one file expected. Are you using "
+            f"a glob, rather than a file name?\n\n"
+            f"All matching files: {list(entry_point_paths.files)}."
         )
     entry_point_path = entry_point_paths.files[0]
     source_root = await Get(
@@ -113,14 +102,32 @@ async def inject_pex_binary_entry_point_dependency(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    entry_point = await Get(
-        ResolvedPexEntryPoint,
-        ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
+    explicitly_provided_deps, entry_point = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(
+            ResolvedPexEntryPoint,
+            ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
+        ),
     )
     if entry_point.val is None:
         return InjectedDependencies()
     owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
-    return InjectedDependencies(owners)
+    address = original_tgt.target.address
+    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+        owners.ambiguous,
+        address,
+        import_reference="module",
+        context=(
+            f"The pex_binary target {address} has the field "
+            f"`entry_point={repr(original_tgt.target[PexEntryPointField].value.spec)}`, which "
+            f"maps to the Python module `{entry_point.val.module}`"
+        ),
+    )
+    maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
+    unambiguous_owners = owners.unambiguous or (
+        (maybe_disambiguated,) if maybe_disambiguated else ()
+    )
+    return InjectedDependencies(unambiguous_owners)
 
 
 # -----------------------------------------------------------------------------------------------

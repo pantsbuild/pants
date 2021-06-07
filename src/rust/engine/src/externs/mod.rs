@@ -256,12 +256,12 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
 }
 
 /// Link to the Pants docs using the current version of Pants.
-pub fn docs_url(slug: &str) -> String {
+pub fn bracketed_docs_url(slug: &str) -> String {
   let gil = Python::acquire_gil();
   let py = gil.python();
   let docutil = py.import("pants.util.docutil").unwrap();
   docutil
-    .call(py, "docs_url", (slug,), None)
+    .call(py, "bracketed_docs_url", (slug,), None)
     .unwrap()
     .extract(py)
     .unwrap()
@@ -324,7 +324,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         let get = g
           .cast_as::<PyGeneratorResponseGet>(py)
           .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
-        Ok(Get::new(py, get)?)
+        Get::new(py, get)
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))

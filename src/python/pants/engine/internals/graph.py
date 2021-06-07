@@ -41,6 +41,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -69,14 +70,13 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
-    _AbstractFieldSet,
     generate_subtarget,
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -137,7 +137,7 @@ async def resolve_target(
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
+    target = target_type(target_adaptor.kwargs, address, union_membership=union_membership)
     return WrappedTarget(target)
 
 
@@ -400,24 +400,33 @@ def _log_or_raise_unmatched_owners(
     owners_not_found_behavior: OwnersNotFoundBehavior,
     ignore_option: Optional[str] = None,
 ) -> None:
-    msgs = []
-    if ignore_option:
-        option_msg = f"\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
-    else:
-        option_msg = ""
-    for file_path in file_paths:
-        msgs.append(
-            f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
-            f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-            f"field includes `{file_path}`. See {docs_url('targets')} for more "
-            f"information on target definitions.{option_msg}"
+    option_msg = (
+        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
+        if ignore_option
+        else ""
+    )
+    if len(file_paths) == 1:
+        prefix = (
+            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
+            f"Please check that there is a BUILD file in the parent directory "
+            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
         )
+    else:
+        prefix = (
+            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
+            f"Please check that there are BUILD files in each file's parent directory with a "
+            f"target whose `sources` field includes the file."
+        )
+    msg = (
+        f"{prefix} See {bracketed_docs_url('targets')} for more information on target definitions."
+        f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
+        f"{bracketed_docs_url('create-initial-build-files')}.{option_msg}"
+    )
 
     if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-        for msg in msgs:
-            logger.warning(msg)
+        logger.warning(msg)
     else:
-        raise ResolveError("\n\n".join(msgs))
+        raise ResolveError(msg)
 
 
 @rule
@@ -674,29 +683,31 @@ class TransitiveExcludesNotSupportedError(ValueError):
         )
 
 
-def parse_dependencies_field(
-    field: Dependencies,
-    *,
-    subproject_roots: Sequence[str],
-    registered_target_types: Sequence[Type[Target]],
+@rule
+async def determine_explicitly_provided_dependencies(
+    request: DependenciesRequest,
     union_membership: UnionMembership,
-) -> ParsedDependencies:
+    registered_target_types: RegisteredTargetTypes,
+    global_options: GlobalOptions,
+) -> ExplicitlyProvidedDependencies:
     parse = functools.partial(
-        AddressInput.parse, relative_to=field.address.spec_path, subproject_roots=subproject_roots
+        AddressInput.parse,
+        relative_to=request.field.address.spec_path,
+        subproject_roots=global_options.options.subproject_roots,
     )
 
     addresses: List[AddressInput] = []
     ignored_addresses: List[AddressInput] = []
-    for v in field.value or ():
+    for v in request.field.value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
             # Check if it's a transitive exclude, rather than a direct exclude.
             if v.startswith("!!"):
-                if not field.supports_transitive_excludes:
+                if not request.field.supports_transitive_excludes:
                     raise TransitiveExcludesNotSupportedError(
                         bad_value=v,
-                        address=field.address,
-                        registered_target_types=registered_target_types,
+                        address=request.field.address,
+                        registered_target_types=registered_target_types.types,
                         union_membership=union_membership,
                     )
                 v = v[2:]
@@ -707,26 +718,19 @@ def parse_dependencies_field(
             ignored_addresses.append(result)
         else:
             addresses.append(result)
-    return ParsedDependencies(addresses, ignored_addresses)
+
+    parsed_includes = await MultiGet(Get(Address, AddressInput, ai) for ai in addresses)
+    parsed_ignores = await MultiGet(Get(Address, AddressInput, ai) for ai in ignored_addresses)
+    return ExplicitlyProvidedDependencies(
+        FrozenOrderedSet(sorted(parsed_includes)), FrozenOrderedSet(sorted(parsed_ignores))
+    )
 
 
 @rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
-    request: DependenciesRequest,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
-    global_options: GlobalOptions,
+    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
-    provided = parse_dependencies_field(
-        request.field,
-        subproject_roots=global_options.options.subproject_roots,
-        registered_target_types=registered_target_types.types,
-        union_membership=union_membership,
-    )
-    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
-    ignored_addresses = set(
-        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
-    )
+    explicitly_provided = await Get(ExplicitlyProvidedDependencies, DependenciesRequest, request)
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -807,12 +811,12 @@ async def resolve_dependencies(
         addr
         for addr in (
             *subtarget_addresses,
-            *literal_addresses,
+            *explicitly_provided.includes,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
             *special_cased,
         )
-        if addr not in ignored_addresses
+        if addr not in explicitly_provided.ignores
     }
     return Addresses(sorted(result))
 
@@ -919,14 +923,14 @@ class NoApplicableTargetsException(Exception):
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
         *,
-        field_set_types: Iterable[Type[_AbstractFieldSet]],
+        field_set_types: Iterable[type[FieldSet]],
         goal_description: str,
     ) -> NoApplicableTargetsException:
         applicable_target_types = {
             target_type
             for field_set_type in field_set_types
             for target_type in field_set_type.applicable_target_types(
-                registered_target_types.types, union_membership=union_membership
+                registered_target_types.types, union_membership
             )
         }
         return cls(
@@ -955,7 +959,7 @@ class AmbiguousImplementationsException(Exception):
     def __init__(
         self,
         target: Target,
-        field_sets: Iterable[_AbstractFieldSet],
+        field_sets: Iterable[FieldSet],
         *,
         goal_description: str,
     ) -> None:
@@ -996,7 +1000,7 @@ async def find_valid_field_sets_for_target_roots(
             specs,
             union_membership,
             registered_target_types,
-            field_set_types=union_membership.union_rules[request.field_set_superclass],
+            field_set_types=union_membership[request.field_set_superclass],
             goal_description=request.goal_description,
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
@@ -1018,12 +1022,9 @@ async def find_valid_field_sets_for_target_roots(
 
 @rule
 def find_valid_field_sets(
-    request: FieldSetsPerTargetRequest,
-    union_membership: UnionMembership,
+    request: FieldSetsPerTargetRequest, union_membership: UnionMembership
 ) -> FieldSetsPerTarget:
-    field_set_types: Iterable[Type[FieldSet]] = union_membership.union_rules[
-        request.field_set_superclass
-    ]
+    field_set_types = union_membership.get(request.field_set_superclass)
     return FieldSetsPerTarget(
         (
             field_set_type.create(target)

@@ -4,7 +4,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Type, cast
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
@@ -101,10 +101,7 @@ async def run_repl(
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
-
-    implementations: Dict[str, Type[ReplImplementation]] = {
-        impl.name: impl for impl in union_membership[ReplImplementation]
-    }
+    implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
     repl_implementation_cls = implementations.get(repl_shell_name)
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())

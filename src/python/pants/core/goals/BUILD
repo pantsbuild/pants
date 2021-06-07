@@ -3,17 +3,11 @@
 
 python_library()
 
-python_tests(
-  name = "tests",
-  sources=['*_test.py', '!*_integration_test.py'],
-)
+python_tests(name="tests", sources=['*_test.py', '!*_integration_test.py'])
 
-python_integration_tests(
-  name='integration',
-  uses_pants_run=True,
-  dependencies=[
-    'testprojects/src/python:hello_directory',
-    '//:pyproject',
-  ],
+python_tests(
+  name="integration",
+  sources=["*_integration_test.py"],
+  dependencies=['testprojects/src/python:hello_directory'],
   timeout=240,
 )

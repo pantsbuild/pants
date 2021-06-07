@@ -295,13 +295,7 @@ impl CapturedWorkdir for CommandRunner {
     } else {
       workdir_path.to_owned()
     };
-    // TODO(#11406): Go back to using relative paths, rather than absolutifying them, once Rust
-    //  fixes https://github.com/rust-lang/rust/issues/80819 for macOS.
-    let argv0 = match RelativePath::new(&req.argv[0]) {
-      Ok(rel_path) => cwd.join(rel_path),
-      Err(_) => PathBuf::from(&req.argv[0]),
-    };
-    let mut command = HermeticCommand::new(argv0);
+    let mut command = HermeticCommand::new(&req.argv[0]);
     command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
@@ -573,7 +567,7 @@ pub trait CapturedWorkdir {
         let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
       }
       None => {
-        setup_run_sh_script(&req.env, &req.argv, &workdir_path)?;
+        setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
       }
     }
 
@@ -599,8 +593,9 @@ pub trait CapturedWorkdir {
       }
       Err(msg) if msg == "deadline has elapsed" => {
         let stdout = Bytes::from(format!(
-          "Exceeded timeout of {:?} for local process execution, {}",
-          req.timeout, req.description
+          "Exceeded timeout of {:.1} seconds when executing local process: {}",
+          req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
+          req.description
         ));
         let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 
@@ -646,11 +641,12 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-/// Create a file called __run.sh with the env and argv used by Pants to facilitate debugging.
+/// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
 fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
+  working_directory: &Option<RelativePath>,
   argv: &[String],
-  workdir_path: &PathBuf,
+  workdir_path: &Path,
 ) -> Result<(), String> {
   let mut env_var_strings: Vec<String> = vec![];
   for (key, value) in env.iter() {
@@ -673,15 +669,27 @@ fn setup_run_sh_script(
     full_command_line.push(arg_str);
   }
 
+  let stringified_cwd = {
+    let cwd = if let Some(ref working_directory) = working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_owned()
+    };
+    let quoted_cwd = bash::escape(&cwd);
+    str::from_utf8(&quoted_cwd)
+      .map_err(|e| format!("{:?}", e))?
+      .to_string()
+  };
+
   let stringified_command_line: String = full_command_line.join(" ");
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
 export {}
-
+cd {}
 {}
 ",
-    stringified_env_vars, stringified_command_line,
+    stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
   let full_file_path = workdir_path.join("__run.sh");

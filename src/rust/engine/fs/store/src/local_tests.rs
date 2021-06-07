@@ -1,5 +1,5 @@
 use crate::local::ByteStore;
-use crate::{EntryType, ShrinkBehavior};
+use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
 use std::path::Path;
 use std::time::Duration;
@@ -308,7 +308,7 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
     .await
     .expect("Error storing");
   store
-    .shrink(80, ShrinkBehavior::Fast)
+    .shrink(84, ShrinkBehavior::Fast)
     .expect("Error shrinking");
   let mut entries = Vec::new();
   entries.push(
@@ -412,13 +412,12 @@ async fn garbage_collect_fail_because_too_many_leases() {
     .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
-
   store
     .store_bytes(EntryType::File, TestData::roland().bytes(), false)
     .await
     .expect("Error storing");
 
-  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
+  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(164));
 
   assert_eq!(
     load_bytes(&store, EntryType::File, forty_chars.digest()).await,
@@ -568,7 +567,15 @@ pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
 }
 
 pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -> ByteStore {
-  ByteStore::new_with_lease_time(task_executor::Executor::new(), dir, lease_time).unwrap()
+  ByteStore::new_with_options(
+    task_executor::Executor::new(),
+    dir,
+    LocalOptions {
+      lease_time,
+      ..LocalOptions::default()
+    },
+  )
+  .unwrap()
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {

@@ -10,11 +10,6 @@ python_library(
   ],
 )
 
-python_library(
-  name='init',
-  sources=['__init__.py'],
-)
-
 python_distribution(
   name='pants-packaged',
   dependencies=[
@@ -46,6 +41,11 @@ python_distribution(
 resources(
   name="dummy_c",
   sources=['dummy.c'],
+)
+
+python_library(
+  name='conftest',
+  sources=['conftest.py'],
 )
 
 python_library(

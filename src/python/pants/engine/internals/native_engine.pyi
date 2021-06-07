@@ -59,7 +59,8 @@ def stdio_initialize(
     use_color: bool,
     show_target: bool,
     log_levels_by_target: dict[str, int],
-    message_regex_filters: tuple[str, ...],
+    literal_filters: tuple[str, ...],
+    regex_filters: tuple[str, ...],
     log_file: str,
 ) -> tuple[RawIOBase, TextIO, TextIO]: ...
 def stdio_thread_get_destination() -> PyStdioDestination: ...
@@ -99,19 +100,20 @@ def scheduler_create(
     tasks: PyTasks,
     types: PyTypes,
     build_root: str,
-    local_store_dir: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
     ca_certs_path: str | None,
     ignore_patterns: Sequence[str],
     use_gitignore: bool,
     remoting_options: PyRemotingOptions,
+    local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> PyScheduler: ...
 def scheduler_execute(
     scheduler: PyScheduler, session: PySession, execution_request: PyExecutionRequest
 ) -> tuple: ...
 def scheduler_metrics(scheduler: PyScheduler, session: PySession) -> dict[str, int]: ...
+def scheduler_shutdown(scheduler: PyScheduler, timeout_secs: int) -> None: ...
 def session_new_run_id(session: PySession) -> None: ...
 def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
@@ -120,7 +122,7 @@ def session_get_observation_histograms(scheduler: PyScheduler, session: PySessio
 def session_record_test_observation(
     scheduler: PyScheduler, session: PySession, value: int
 ) -> None: ...
-def session_isolated_shallow_clone(session: PySession) -> PySession: ...
+def session_isolated_shallow_clone(session: PySession, build_id: str) -> PySession: ...
 def all_counter_names() -> list[str]: ...
 def graph_len(scheduler: PyScheduler) -> int: ...
 def graph_visualize(scheduler: PyScheduler, session: PySession, path: str) -> None: ...
@@ -183,6 +185,9 @@ class PyNailgunClient:
 class PyRemotingOptions:
     def __init__(self, **kwargs: Any) -> None: ...
 
+class PyLocalStoreOptions:
+    def __init__(self, **kwargs: Any) -> None: ...
+
 class PyScheduler:
     pass
 
@@ -196,6 +201,7 @@ class PySession:
         session_values: SessionValues,
         cancellation_latch: PySessionCancellationLatch,
     ) -> None: ...
+    def cancel(self) -> None: ...
 
 class PySessionCancellationLatch:
     def __init__(self) -> None: ...
@@ -218,7 +224,10 @@ class PyStubCAS:
 class PyStdioDestination:
     pass
 
-class NailgunConnectionException(Exception):
+class PantsdConnectionException(Exception):
+    pass
+
+class PantsdClientException(Exception):
     pass
 
 class PollTimeout(Exception):

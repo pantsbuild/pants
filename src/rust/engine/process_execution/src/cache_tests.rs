@@ -48,6 +48,7 @@ fn create_cached_runner(
     max_lmdb_size,
     runtime.clone(),
     DEFAULT_LEASE_TIME,
+    1,
   )
   .unwrap();
 

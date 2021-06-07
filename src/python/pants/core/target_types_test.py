@@ -6,7 +6,7 @@ import zipfile
 from io import BytesIO
 from textwrap import dedent
 
-from pants.backend.python import target_types_rules
+from pants.backend.python import target_types_rules as python_target_type_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
@@ -160,7 +160,7 @@ def test_archive() -> None:
             *target_type_rules(),
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
-            *target_types_rules.rules(),
+            *python_target_type_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
         target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],

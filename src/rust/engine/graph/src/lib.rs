@@ -54,7 +54,7 @@ use tokio::time::sleep;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
 
-type FNV = BuildHasherDefault<FnvHasher>;
+type Fnv = BuildHasherDefault<FnvHasher>;
 
 type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
 
@@ -175,8 +175,7 @@ impl<N: Node> InnerGraph<N> {
       .expect("There should not be any negative edge weights");
 
     let mut next = dst;
-    let mut path = Vec::new();
-    path.push(next);
+    let mut path = vec![next];
     while let Some(current) = paths[next.index()] {
       path.push(current);
       if current == src {
@@ -312,7 +311,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> InvalidationResult {
     // Collect all entries that will be cleared.
-    let root_ids: HashSet<_, FNV> = self
+    let root_ids: HashSet<_, Fnv> = self
       .nodes
       .iter()
       .filter_map(|(node, &entry_id)| {
@@ -925,7 +924,7 @@ where
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
-  walked: HashSet<EntryId, FNV>,
+  walked: HashSet<EntryId, Fnv>,
   stop_walking_predicate: F,
 }
 

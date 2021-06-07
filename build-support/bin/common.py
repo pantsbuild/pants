@@ -12,9 +12,7 @@ We want to allow direct invocation of scripts for these reasons:
 1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
 2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_travis_yaml.py [args]`,
    rather than `./pants run build-support/bin:generate_travis_yaml -- [args]`.
-3) Avoid undesired dependencies on Pants for certain scripts. For example, `shellcheck.py`
-   lints the `./pants` script, and we would like the script to still work even if `./pants`
-   breaks. If we had to rely on invoking via `./pants run`, this would not be possible.
+3) Avoid undesired dependencies on Pants for certain scripts.
 
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
 may be called via `./pants run` instead of direct invocation if desired.
@@ -22,9 +20,7 @@ may be called via `./pants run` instead of direct invocation if desired.
 
 import subprocess
 import time
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Iterator, NoReturn, Tuple
+from typing import NoReturn, Tuple
 
 _SCRIPT_START_TIME = time.time()
 
@@ -66,20 +62,3 @@ def git_merge_base() -> str:
         get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
     )
     return str(process.stdout.rstrip()) if process.stdout else "main"
-
-
-@contextmanager
-def travis_section(slug: str, message: str) -> Iterator[None]:
-    travis_fold_state_path = Path("/tmp/.travis_fold_current")
-
-    def travis_fold(*, action: str, target: str) -> None:
-        print(f"travis_fold:{action}:{target}\r{_CLEAR_LINE}", end="")
-
-    travis_fold(action="start", target=slug)
-    travis_fold_state_path.write_text(slug)
-    banner(message)
-    try:
-        yield
-    finally:
-        travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
-        travis_fold_state_path.unlink()

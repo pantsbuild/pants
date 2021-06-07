@@ -10,9 +10,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import (
-    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
+    SandboxPexEnvironment,
 )
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
@@ -37,7 +37,7 @@ class PexBinary(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.34"
+    default_version = "v2.1.42"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
@@ -47,8 +47,8 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "9b1a959ccb61b3deb64ffeed43a735c7115e414f4de6f96e66adc9e7fc7a757f",
-                    "3597768",
+                    "69d6b1b1009b00dd14a3a9f19b72cff818a713ca44b3186c9b12074b2a31e51f",
+                    "3613838",
                 )
             )
             for plat in ["darwin", "linux"]
@@ -113,7 +113,7 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_binary: PexPEX,
-    pex_env: PexEnvironment,
+    pex_env: SandboxPexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -142,14 +142,11 @@ async def setup_pex_cli_process(
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
-    pex_root_path = ".cache/pex_root"
     argv = [
         pex_binary.exe,
         *cert_args,
         "--python-path",
         create_path_env_var(pex_env.interpreter_search_paths),
-        "--pex-root",
-        pex_root_path,
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
@@ -182,7 +179,7 @@ async def setup_pex_cli_process(
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches={"pex_root": pex_root_path},
+        append_only_caches=pex_env.append_only_caches,
         level=request.level,
         cache_scope=request.cache_scope,
     )

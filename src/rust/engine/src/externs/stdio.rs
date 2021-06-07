@@ -34,6 +34,8 @@
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
 )]
+// TODO: False positive for |py| in py_class!.
+#![allow(unused_variables)]
 
 use cpython::buffer::PyBuffer;
 use cpython::{exc, py_class, PyErr, PyObject, PyResult, Python};

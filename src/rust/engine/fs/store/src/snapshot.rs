@@ -319,7 +319,7 @@ pub fn osstring_as_utf8(path: OsString) -> Result<String, String> {
 // StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
 // looked up by the Digest produced by the store_by_digest method.
 // It is a separate trait so that caching implementations can be written which wrap the Store (used
-// to store the bytes) and VFS (used to read the files off disk if needed).
+// to store the bytes) and Vfs (used to read the files off disk if needed).
 pub trait StoreFileByDigest<Error> {
   fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, Error>>;
 }

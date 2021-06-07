@@ -24,7 +24,6 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonDistributionDependencies,
     PythonLibrary,
-    PythonRequirementConstraintsField,
     PythonRequirementLibrary,
     PythonRequirementsField,
     PythonTestsTimeout,
@@ -42,7 +41,6 @@ from pants.backend.python.target_types_rules import (
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
-    Field,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -54,10 +52,10 @@ from pants.util.frozendict import FrozenDict
 
 def test_timeout_validation() -> None:
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, address=Address("", target_name="tests"))
+        PythonTestsTimeout(-100, Address("", target_name="tests"))
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, address=Address("", target_name="tests"))
-    assert PythonTestsTimeout(5, address=Address("", target_name="tests")).value == 5
+        PythonTestsTimeout(0, Address("", target_name="tests"))
+    assert PythonTestsTimeout(5, Address("", target_name="tests")).value == 5
 
 
 def test_timeout_calculation() -> None:
@@ -69,7 +67,7 @@ def test_timeout_calculation() -> None:
         global_max: Optional[int] = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, address=Address("", target_name="tests"))
+        field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -97,7 +95,7 @@ def test_timeout_calculation() -> None:
     ),
 )
 def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
-    field = PexEntryPointField(entry_point, address=Address("project/dir"))
+    field = PexEntryPointField(entry_point, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
 
@@ -105,15 +103,15 @@ def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
     addr = Address("src/python/project")
 
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField(" ", address=addr)
+        PexEntryPointField(" ", addr)
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField("modue:func:who_knows_what_this_is", address=addr)
+        PexEntryPointField("modue:func:who_knows_what_this_is", addr)
     with pytest.raises(InvalidFieldException):
-        PexEntryPointField(":func", address=addr)
+        PexEntryPointField(":func", addr)
 
     ep = "custom.entry_point:"
     with caplog.at_level(logging.WARNING):
-        assert EntryPoint("custom.entry_point") == PexEntryPointField(ep, address=addr).value
+        assert EntryPoint("custom.entry_point") == PexEntryPointField(ep, addr).value
 
     assert len(caplog.record_tuples) == 1
     _, levelno, message = caplog.record_tuples[0]
@@ -134,7 +132,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
-        ep_field = PexEntryPointField(entry_point, address=addr)
+        ep_field = PexEntryPointField(entry_point, addr)
         result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
 
@@ -161,7 +159,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"))
 
 
-def test_inject_pex_binary_entry_point_dependency() -> None:
+def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
             inject_pex_binary_entry_point_dependency,
@@ -183,7 +181,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             """
         ),
     )
-    rule_runner.create_files("project", ["app.py", "self.py"])
+    rule_runner.create_file("project/app.py")
     rule_runner.add_to_build_file(
         "project",
         dedent(
@@ -191,7 +189,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             python_library(sources=['app.py'])
             pex_binary(name='first_party', entry_point='project.app')
             pex_binary(name='first_party_func', entry_point='project.app:func')
-            pex_binary(name='first_party_shorthand', entry_point='app.py:func')
+            pex_binary(name='first_party_shorthand', entry_point='app.py')
             pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
             pex_binary(name='third_party', entry_point='colors')
             pex_binary(name='third_party_func', entry_point='colors:func')
@@ -237,10 +235,55 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+    rule_runner.set_options([])
+
+    # Warn if there's ambiguity, meaning we cannot infer.
+    caplog.clear()
+    rule_runner.create_file("project/ambiguous.py")
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_library(name="dep1", sources=["ambiguous.py"])
+            python_library(name="dep2", sources=["ambiguous.py"])
+            pex_binary(name="ambiguous", entry_point="ambiguous.py")
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="ambiguous"),
+        expected=None,
+    )
+    assert len(caplog.records) == 1
+    assert (
+        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
+        "module `project.ambiguous`"
+    ) in caplog.text
+    assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
+    # warning about ambiguity.
+    caplog.clear()
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            pex_binary(
+                name="disambiguated",
+                entry_point="ambiguous.py",
+                dependencies=["!./ambiguous.py:dep2"],
+            )
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="disambiguated"),
+        expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
+    )
+    assert not caplog.records
 
 
-@pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])
-def test_requirements_and_constraints_fields(field: type[Field]) -> None:
+def test_requirements_field() -> None:
     raw_value = (
         "argparse==1.2.1",
         "configparser ; python_version<'3'",
@@ -248,28 +291,28 @@ def test_requirements_and_constraints_fields(field: type[Field]) -> None:
     )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
-    assert field(raw_value, address=Address("demo")).value == parsed_value
+    assert PythonRequirementsField(raw_value, Address("demo")).value == parsed_value
 
     # Macros can pass pre-parsed Requirement objects.
-    assert field(parsed_value, address=Address("demo")).value == parsed_value
+    assert PythonRequirementsField(parsed_value, Address("demo")).value == parsed_value
 
     # Reject invalid types.
     with pytest.raises(InvalidFieldTypeException):
-        field("sneaky_str", address=Address("demo"))
+        PythonRequirementsField("sneaky_str", Address("demo"))
     with pytest.raises(InvalidFieldTypeException):
-        field([1, 2], address=Address("demo"))
+        PythonRequirementsField([1, 2], Address("demo"))
 
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["not valid! === 3.1"], address=Address("demo"))
+        PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{field.alias}' field for the "
-        "target demo:"
+        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
+        f"field for the target demo:"
     ) in str(exc.value)
 
     # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
     with pytest.raises(InvalidFieldException) as exc:
-        field(["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo"))
+        PythonRequirementsField(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 
@@ -327,14 +370,14 @@ def test_python_distribution_dependency_injection() -> None:
     ["raw_value", "expected"],
     (
         (None, {}),
-        ({"new_dist": ["new_module"]}, {"new_dist": ("new_module",)}),
-        ({"PyYAML": ["custom_yaml"]}, {"PyYAML": ("custom_yaml",)}),
+        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
+        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
     ),
 )
 def test_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str]]
+    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
 ) -> None:
     merged = dict(DEFAULT_MODULE_MAPPING)
     merged.update(expected)
-    actual_value = ModuleMappingField(raw_value, address=Address("", target_name="tests")).value
+    actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
     assert actual_value == FrozenDict(merged)

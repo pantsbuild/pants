@@ -25,7 +25,7 @@ class AddressToDependees:
     mapping: FrozenDict[Address, FrozenOrderedSet[Address]]
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(desc="Map all targets to their dependees", level=LogLevel.DEBUG)
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
     all_expanded_targets, all_explicit_targets = await MultiGet(

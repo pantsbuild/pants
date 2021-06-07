@@ -3,12 +3,12 @@
 
 import dataclasses
 from enum import Enum
-from typing import Any, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
-from pants.help.help_info_extracter import HelpInfoExtracter, to_help_str
+from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -127,6 +127,7 @@ def test_default() -> None:
     do_test(["--foo"], {}, "None")
     do_test(["--foo"], {"type": int}, "None")
     do_test(["--foo"], {"type": int, "default": 42}, "42")
+    do_test(["--foo"], {"type": int, "default": 65536, "default_help_repr": "64KiB"}, "64KiB")
     do_test(["--foo"], {"type": list}, "[]")
     do_test(["--foo"], {"type": dict}, "{}")
     do_test(["--foo"], {"type": LogLevel}, "None")
@@ -413,3 +414,27 @@ def test_get_all_help_info():
         },
     }
     assert expected_all_help_info_dict == all_help_info_dict
+
+
+def test_pretty_print_type_hint() -> None:
+    assert pretty_print_type_hint(str) == "str"
+    assert pretty_print_type_hint(int) == "int"
+    assert pretty_print_type_hint(None) == "None"
+
+    class ExampleCls:
+        pass
+
+    assert pretty_print_type_hint(ExampleCls) == "ExampleCls"
+
+    # Transform Unions to use `|`
+    assert pretty_print_type_hint(Union[int, float]) == "int | float"
+    assert pretty_print_type_hint(Optional[int]) == "int | None"
+    # NB: `Iterable[List[ExampleCls]]` will use the full module name for `ExampleCls`. We can't
+    # easily control that because it comes from the __repr__ implementation for `typing.Iterable`.
+    example_cls_repr = (
+        f"{__name__}.{test_pretty_print_type_hint.__name__}.<locals>.{ExampleCls.__name__}"
+    )
+    assert (
+        pretty_print_type_hint(Union[Iterable[List[ExampleCls]], Optional[float], Any])
+        == f"Iterable[List[{example_cls_repr}]] | float | None | Any"
+    )

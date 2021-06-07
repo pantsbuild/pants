@@ -1,10 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple
 
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
@@ -38,19 +39,19 @@ SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 
 
 class ZipBinary(BinaryPath):
-    def create_archive_argv(self, request: "CreateArchive") -> Tuple[str, ...]:
+    def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
         return (self.path, request.output_filename, *request.snapshot.files)
 
 
 class UnzipBinary(BinaryPath):
-    def extract_archive_argv(self, *, archive_path: str, output_dir: str) -> Tuple[str, ...]:
+    def extract_archive_argv(self, archive_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` does not need to already exist.
         # The caller should validate that it's a valid `.zip` file.
-        return (self.path, archive_path, "-d", output_dir)
+        return (self.path, archive_path)
 
 
 class TarBinary(BinaryPath):
-    def create_archive_argv(self, request: "CreateArchive") -> Tuple[str, ...]:
+    def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
         #
         # We do not use `-a` (auto-set compression) because it does not work with older tar
@@ -61,10 +62,10 @@ class TarBinary(BinaryPath):
         )
         return (self.path, f"c{compression}f", request.output_filename, *request.snapshot.files)
 
-    def extract_archive_argv(self, *, archive_path: str, output_dir: str) -> Tuple[str, ...]:
+    def extract_archive_argv(self, archive_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        return (self.path, "xf", archive_path, "-C", output_dir)
+        return (self.path, "xf", archive_path)
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
@@ -179,11 +180,12 @@ async def maybe_extract_archive(
 
     input_digest = await Get(Digest, MergeDigests((digest, output_dir_digest)))
     fp = snapshot.files[0]
+    archive_path = f"../{fp}"
     if fp.endswith(".zip"):
-        argv = unzip_binary.extract_archive_argv(archive_path=fp, output_dir=output_dir)
+        argv = unzip_binary.extract_archive_argv(archive_path)
         env = {}
     elif fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
-        argv = tar_binary.extract_archive_argv(archive_path=fp, output_dir=output_dir)
+        argv = tar_binary.extract_archive_argv(archive_path)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
     else:
@@ -198,6 +200,7 @@ async def maybe_extract_archive(
             description=f"Extract {fp}",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
+            working_directory=output_dir,
         ),
     )
     strip_output_dir = await Get(Digest, RemovePrefix(result.output_digest, output_dir))

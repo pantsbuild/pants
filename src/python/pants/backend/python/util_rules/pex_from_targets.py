@@ -17,9 +17,9 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     parse_requirements_file,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
-    MaybeConstraintsFile,
-    PexInterpreterConstraints,
+    Pex,
     PexPlatforms,
     PexRequest,
     PexRequirements,
@@ -32,7 +32,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, MergeDigests
+from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -41,7 +41,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -62,7 +62,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
-    hardcoded_interpreter_constraints: PexInterpreterConstraints | None
+    hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
@@ -81,7 +81,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         direct_deps_only: bool = False,
         description: str | None = None,
     ) -> None:
@@ -137,7 +137,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> PexFromTargetsRequest:
@@ -179,11 +179,7 @@ class TwoStepPexFromTargetsRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def pex_from_targets(
-    request: PexFromTargetsRequest,
-    python_setup: PythonSetup,
-    constraints_file: MaybeConstraintsFile,
-) -> PexRequest:
+async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     if request.direct_deps_only:
         targets = await Get(Targets, Addresses(request.addresses))
         direct_deps = await MultiGet(
@@ -209,12 +205,12 @@ async def pex_from_targets(
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
-        calculated_constraints = PexInterpreterConstraints.create_from_targets(
+        calculated_constraints = InterpreterConstraints.create_from_targets(
             all_targets, python_setup
         )
         # If there are no targets, we fall back to the global constraints. This is relevant,
         # for example, when running `./pants repl` with no specs.
-        interpreter_constraints = calculated_constraints or PexInterpreterConstraints(
+        interpreter_constraints = calculated_constraints or InterpreterConstraints(
             python_setup.interpreter_constraints
         )
 
@@ -228,59 +224,90 @@ async def pex_from_targets(
     )
 
     requirements = exact_reqs
+    repository_pex: Pex | None = None
     description = request.description
 
-    if constraints_file.path:
-        constraints_file_contents = await Get(DigestContents, Digest, constraints_file.digest)
+    if python_setup.requirement_constraints:
+        constraints_file_contents = await Get(
+            DigestContents,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="the option `[python-setup].requirement_constraints`",
+            ),
+        )
         constraints_file_reqs = set(
             parse_requirements_file(
                 constraints_file_contents[0].content.decode(),
-                rel_path=constraints_file.path,
+                rel_path=python_setup.requirement_constraints,
             )
         )
 
         # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
         # packaging canonicalize for us.
         # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
-        exact_req_projects = {
-            canonicalize_project_name(Requirement.parse(req).project_name) for req in exact_reqs
-        }
+
+        url_reqs = set()  # E.g., 'foobar@ git+https://github.com/foo/bar.git@branch'
+        name_reqs = set()  # E.g., foobar>=1.2.3
+        name_req_projects = set()
+
+        for req_str in exact_reqs:
+            req = Requirement.parse(req_str)
+            if req.url:  # type: ignore[attr-defined]
+                url_reqs.add(req)
+            else:
+                name_reqs.add(req)
+                name_req_projects.add(canonicalize_project_name(req.project_name))
+
         constraint_file_projects = {
             canonicalize_project_name(req.project_name) for req in constraints_file_reqs
         }
-        unconstrained_projects = exact_req_projects - constraint_file_projects
+        # Constraints files must only contain name reqs, not URL reqs (those are already
+        # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.
+        unconstrained_projects = name_req_projects - constraint_file_projects
         if unconstrained_projects:
-            constraints_descr = (
-                f"constraints file {constraints_file.path}"
-                if python_setup.requirement_constraints
-                else f"_python_constraints target {python_setup.requirement_constraints_target}"
-            )
             logger.warning(
-                f"The {constraints_descr} does not contain entries for the following "
-                f"requirements: {', '.join(unconstrained_projects)}"
+                f"The constraints file {python_setup.requirement_constraints} does not contain "
+                f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
-            python_setup.resolve_all_constraints == ResolveAllConstraintsOption.NONDEPLOYABLES
-            and request.internal_only
-        ):
+        if python_setup.resolve_all_constraints:
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring `[python_setup].resolve_all_constraints` option because constraints "
                     "file does not cover all requirements."
                 )
             else:
-                requirements = PexRequirements(str(req) for req in constraints_file_reqs)
-                description = description or f"Resolving {python_setup.requirement_constraints}"
+                # To get a full set of requirements we must add the URL requirements to the
+                # constraints file, since the latter cannot contain URL requirements.
+                # NB: We can only add the URL requirements we know about here, i.e., those that
+                #  are transitive deps of the targets in play. There may be others in the repo.
+                #  So we may end up creating a few different repository pexes, each with identical
+                #  name requirements but different subsets of URL requirements. Fortunately since
+                #  all these repository pexes will have identical pinned versions of everything,
+                #  this is not a correctness issue, only a performance one.
+                # TODO: Address this as part of providing proper lockfile support. However we
+                #  generate lockfiles, they must be able to include URL requirements.
+                all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
+                repository_pex = await Get(
+                    Pex,
+                    PexRequest(
+                        description=f"Resolving {python_setup.requirement_constraints}",
+                        output_filename="repository.pex",
+                        internal_only=request.internal_only,
+                        requirements=PexRequirements(all_constraints),
+                        interpreter_constraints=interpreter_constraints,
+                        platforms=request.platforms,
+                        additional_args=request.additional_args,
+                    ),
+                )
     elif (
-        python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER
+        python_setup.resolve_all_constraints
         and python_setup.resolve_all_constraints_was_set_explicitly()
     ):
         raise ValueError(
-            "[python-setup].resolve_all_constraints is set to "
-            f"{python_setup.resolve_all_constraints.value}, so "
-            "either [python-setup].requirement_constraints or "
-            "[python-setup].requirement_constraints_target must also be provided."
+            "`[python-setup].resolve_all_constraints` is enabled, so "
+            "`[python-setup].requirement_constraints` must also be set."
         )
 
     return PexRequest(
@@ -292,6 +319,7 @@ async def pex_from_targets(
         main=request.main,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
+        repository_pex=repository_pex,
         additional_args=request.additional_args,
         description=description,
     )

@@ -35,16 +35,14 @@ def test_filter_field_sets(rule_runner: RuleRunner) -> None:
         # Another field to demo that we will preserve the whole FieldSet data structure.
         tags: Tags
 
-    rule_runner.create_file("f1.txt")
+    rule_runner.write_files({"f1.txt": ""})
     valid_addr = Address("", target_name="valid")
     valid_field_set = MockFieldSet(
-        valid_addr, Sources(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
+        valid_addr, Sources(["f1.txt"], valid_addr), Tags(None, valid_addr)
     )
 
     empty_addr = Address("", target_name="empty")
-    empty_field_set = MockFieldSet(
-        empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
-    )
+    empty_field_set = MockFieldSet(empty_addr, Sources(None, empty_addr), Tags(None, empty_addr))
 
     result = rule_runner.request(
         FieldSetsWithSources,
@@ -62,10 +60,10 @@ def test_filter_targets(rule_runner: RuleRunner) -> None:
         alias = "no_sources"
         core_fields = ()
 
-    rule_runner.create_file("f1.txt")
-    valid_tgt = MockTarget({Sources.alias: ["f1.txt"]}, address=Address("", target_name="valid"))
-    empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
-    invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
+    rule_runner.write_files({"f1.txt": ""})
+    valid_tgt = MockTarget({Sources.alias: ["f1.txt"]}, Address("", target_name="valid"))
+    empty_tgt = MockTarget({}, Address("", target_name="empty"))
+    invalid_tgt = MockTargetWithNoSourcesField({}, Address("", target_name="invalid"))
 
     result = rule_runner.request(
         TargetsWithSources,

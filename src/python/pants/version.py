@@ -17,7 +17,7 @@ VERSION: str = (
     pkgutil.get_data(__name__, "VERSION").decode().strip()  # type: ignore[union-attr]
 )
 
-# E.g. 2.0 or 2.2.
-MAJOR_MINOR = ".".join(VERSION.split(".")[:2])
-
 PANTS_SEMVER = Version(VERSION)
+
+# E.g. 2.0 or 2.2.
+MAJOR_MINOR = f"{PANTS_SEMVER.major}.{PANTS_SEMVER.minor}"

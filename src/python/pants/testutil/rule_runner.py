@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import multiprocessing
 import os
 import sys
@@ -14,10 +15,7 @@ from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
 
-from colors import blue, cyan, green, magenta, red, yellow
-
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -34,10 +32,15 @@ from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
-from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.global_options import (
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -105,7 +108,7 @@ class RuleRunner:
             print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
             bootstrap_args.extend(
                 [
-                    "--no-process-execution-cleanup-local-dirs",
+                    "--no-process-execution-local-cleanup",
                     f"--local-execution-root-dir={root_dir}",
                 ]
             )
@@ -141,14 +144,16 @@ class RuleRunner:
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
-        local_store_dir = global_options.local_store_dir
+        dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, self.environment)
+        local_store_options = LocalStoreOptions.from_options(global_options)
         if isolated_local_store:
             if root_dir:
                 lmdb_store_dir = root_dir / "lmdb_store"
                 lmdb_store_dir.mkdir()
-                local_store_dir = str(lmdb_store_dir)
+                store_dir = str(lmdb_store_dir)
             else:
-                local_store_dir = safe_mkdtemp(prefix="lmdb_store.")
+                store_dir = safe_mkdtemp(prefix="lmdb_store.")
+            local_store_options = dataclasses.replace(local_store_options, store_dir=store_dir)
 
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
@@ -158,13 +163,13 @@ class RuleRunner:
                 self.build_root, global_options
             ),
             use_gitignore=False,
-            local_store_dir=local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(options, self.environment),
+            execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(
@@ -186,8 +191,8 @@ class RuleRunner:
         return os.path.join(self.build_root, ".pants.d")
 
     @property
-    def rules(self) -> FrozenOrderedSet[Rule]:
-        return self.build_config.rules
+    def rules(self) -> FrozenOrderedSet[Rule | UnionRule]:
+        return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:
@@ -297,27 +302,29 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: bytes | str = "", mode: str = "w") -> str:
+    def create_file(
+        self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
+    ) -> str:
         """Writes to a file under the buildroot.
 
         :API: public
 
-        relpath:  The relative path to the file from the build root.
+        relpath: The relative path to the file from the build root.
         contents: A string containing the contents of the file - '' by default..
-        mode:     The mode to write to the file in - over-write by default.
+        mode: The mode to write to the file in - over-write by default.
         """
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
-        self._invalidate_for(relpath)
+        self._invalidate_for(str(relpath))
         return path
 
-    def create_files(self, path: str, files: Iterable[str]) -> None:
+    def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
         :API: public
 
-         path:  The relative path to the file from the build root.
+         path: The relative path to the file from the build root.
          files: List of file names.
         """
         for f in files:
@@ -340,8 +347,19 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
+    def write_files(self, files: Mapping[str | PurePath, str]) -> None:
+        """Write the files to the build root.
+
+        :API: public
+        """
+        for path, content in files.items():
+            self.create_file(path, content)
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
-        """Makes a snapshot from a map of file name to file content."""
+        """Makes a snapshot from a map of file name to file content.
+
+        :API: public
+        """
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
@@ -355,14 +373,17 @@ class RuleRunner:
 
         This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
         for each file.
+
+        :API: public
         """
         return self.make_snapshot({fp: "" for fp in files})
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
 
-        This requires that the target actually exists, i.e. that you called
-        `rule_runner.add_to_build_file()`.
+        This requires that the target actually exists, i.e. that you set up its BUILD file.
+
+        :API: public
         """
         return self.request(WrappedTarget, [address]).target
 
@@ -529,46 +550,3 @@ class StdioReader:
     def get_stderr(self) -> str:
         """Return all data that has been flushed to stderr so far."""
         return self._stderr.read_text()
-
-
-class MockConsole:
-    """An implementation of pants.engine.console.Console which captures output."""
-
-    @deprecated("2.5.0.dev0", hint_message="Use the mock_console contextmanager instead.")
-    def __init__(self, use_colors=True):
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-        self.use_colors = use_colors
-
-    def write_stdout(self, payload):
-        self.stdout.write(payload)
-
-    def write_stderr(self, payload):
-        self.stderr.write(payload)
-
-    def print_stdout(self, payload):
-        print(payload, file=self.stdout)
-
-    def print_stderr(self, payload):
-        print(payload, file=self.stderr)
-
-    def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
-        return color(text) if self.use_colors else text
-
-    def blue(self, text: str) -> str:
-        return self._safe_color(text, blue)
-
-    def cyan(self, text: str) -> str:
-        return self._safe_color(text, cyan)
-
-    def green(self, text: str) -> str:
-        return self._safe_color(text, green)
-
-    def magenta(self, text: str) -> str:
-        return self._safe_color(text, magenta)
-
-    def red(self, text: str) -> str:
-        return self._safe_color(text, red)
-
-    def yellow(self, text: str) -> str:
-        return self._safe_color(text, yellow)

@@ -10,17 +10,25 @@ from typing import List, Optional, Tuple, Type
 
 import pytest
 
+from pants.backend.python.goals import package_pex_binary
+from pants.backend.python.target_types import PexBinary, PythonLibrary
+from pants.backend.python.target_types_rules import rules as python_target_type_rules
+from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import (
+    BuildPackageDependenciesRequest,
+    BuiltPackageDependencies,
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
     EnrichedTestResult,
+    RuntimePackageDependenciesField,
     ShowOutput,
     Test,
     TestDebugRequest,
     TestFieldSet,
     TestSubsystem,
+    build_runtime_package_dependencies,
     run_tests,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -37,6 +45,7 @@ from pants.engine.fs import (
     Digest,
     FileContent,
     MergeDigests,
+    Snapshot,
     Workspace,
 )
 from pants.engine.process import InteractiveProcess, InteractiveRunner
@@ -48,7 +57,13 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    mock_console,
+    run_rule_with_mocks,
+)
 from pants.util.logging import LogLevel
 
 
@@ -108,7 +123,7 @@ def rule_runner() -> RuleRunner:
 def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address=address)
+    return MockTarget({}, address)
 
 
 def run_test_rule(
@@ -373,3 +388,38 @@ def test_streaming_output_failure() -> None:
     assert_failure_streamed(
         output_setting=ShowOutput.NONE, expected_message="demo_test failed (exit code 1)."
     )
+
+
+def test_runtime_package_dependencies() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            build_runtime_package_dependencies,
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *python_target_type_rules(),
+            QueryRule(BuiltPackageDependencies, [BuildPackageDependenciesRequest]),
+        ],
+        target_types=[PythonLibrary, PexBinary],
+    )
+    rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+
+    rule_runner.write_files(
+        {
+            "src/py/main.py": "",
+            "src/py/BUILD": dedent(
+                """\
+                python_library()
+                pex_binary(name='main', entry_point='main.py')
+                """
+            ),
+        }
+    )
+    # Include an irrelevant target that cannot be built with `./pants package`.
+    input_field = RuntimePackageDependenciesField(["src/py", "src/py:main"], Address("fake"))
+    result = rule_runner.request(
+        BuiltPackageDependencies, [BuildPackageDependenciesRequest(input_field)]
+    )
+    assert len(result) == 1
+    built_package = result[0]
+    snapshot = rule_runner.request(Snapshot, [built_package.digest])
+    assert snapshot.files == ("src.py/main.pex",)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import itertools
+import logging
 import os.path
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -45,11 +46,14 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Core Field abstractions
@@ -114,16 +118,16 @@ class Field:
     required: ClassVar[bool] = False
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[Optional[str]] = None
-    deprecated_removal_hint: ClassVar[Optional[str]] = None
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
 
     @final
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         self._check_deprecated(raw_value, address)
-        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
+        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any optional validation and/or hydration here. For example, you may want
@@ -139,20 +143,17 @@ class Field:
 
     @classmethod
     def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.deprecated_removal_version or address.is_file_target or raw_value is None:
+        if not cls.removal_version or address.is_file_target or raw_value is None:
             return
-        if not cls.deprecated_removal_hint:
+        if not cls.removal_hint:
             raise ValueError(
-                f"You specified `deprecated_removal_version` for {cls}, but not "
-                "the class property `deprecated_removal_hint`."
+                f"You specified `removal_version` for {cls}, but not the class property "
+                "`removal_hint`."
             )
         warn_or_error(
-            removal_version=cls.deprecated_removal_version,
-            deprecated_entity_description=f"the {repr(cls.alias)} field",
-            hint=(
-                f"Using the `{cls.alias}` field in the target {address}. "
-                f"{cls.deprecated_removal_hint}"
-            ),
+            cls.removal_version,
+            entity=f"the {repr(cls.alias)} field",
+            hint=(f"Using the `{cls.alias}` field in the target {address}. " f"{cls.removal_hint}"),
         )
 
     def __repr__(self) -> str:
@@ -222,8 +223,8 @@ class AsyncFieldMixin(Field):
     """
 
     @final  # type: ignore[misc]
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        super().__init__(raw_value, address=address)
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
+        super().__init__(raw_value, address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
         self._unfreeze_instance()  # type: ignore[attr-defined]
@@ -272,41 +273,40 @@ class Target:
 
     # Subclasses must define these
     alias: ClassVar[str]
-    core_fields: ClassVar[Tuple[Type[Field], ...]]
+    core_fields: ClassVar[tuple[type[Field], ...]]
     help: ClassVar[str]
 
     # Subclasses may define these.
-    deprecated_removal_version: ClassVar[Optional[str]] = None
-    deprecated_removal_hint: ClassVar[Optional[str]] = None
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: Tuple[Type[Field], ...]
-    field_values: FrozenDict[Type[Field], Field]
+    plugin_fields: tuple[type[Field], ...]
+    field_values: FrozenDict[type[Field], Field]
 
     @final
     def __init__(
         self,
-        unhydrated_values: Dict[str, Any],
-        *,
+        unhydrated_values: dict[str, Any],
         address: Address,
+        *,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
-        union_membership: Optional[UnionMembership] = None,
+        union_membership: UnionMembership | None = None,
     ) -> None:
-        if self.deprecated_removal_version and not address.is_file_target:
-            if not self.deprecated_removal_hint:
+        if self.removal_version and not address.is_file_target:
+            if not self.removal_hint:
                 raise ValueError(
-                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
-                    "the class property `deprecated_removal_hint`."
+                    f"You specified `removal_version` for {self.__class__}, but not "
+                    "the class property `removal_hint`."
                 )
             warn_or_error(
-                removal_version=self.deprecated_removal_version,
-                deprecated_entity_description=f"the {repr(self.alias)} target type",
+                self.removal_version,
+                entity=f"the {repr(self.alias)} target type",
                 hint=(
-                    f"Using the `{self.alias}` target type for {address}. "
-                    f"{self.deprecated_removal_hint}"
+                    f"Using the `{self.alias}` target type for {address}. " f"{self.removal_hint}"
                 ),
             )
 
@@ -322,10 +322,10 @@ class Target:
                     f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
-            field_values[field_type] = field_type(value, address=address)
+            field_values[field_type] = field_type(value, address)
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
-            field_values[field_type] = field_type(raw_value=None, address=address)
+            field_values[field_type] = field_type(None, address)
         self.field_values = FrozenDict(
             sorted(
                 field_values.items(),
@@ -335,12 +335,12 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> Tuple[Type[Field], ...]:
+    def field_types(self) -> tuple[type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
     @final
     @memoized_classproperty
-    def _plugin_field_cls(cls) -> Type:
+    def _plugin_field_cls(cls) -> type:
         # NB: We ensure that each Target subtype has its own `PluginField` class so that
         # registering a plugin field doesn't leak across target types.
 
@@ -458,7 +458,7 @@ class Target:
         result = self._maybe_get(field)
         if result is not None:
             return result
-        return field(raw_value=default_raw_value, address=self.address)
+        return field(default_raw_value, self.address)
 
     @final
     @classmethod
@@ -739,7 +739,7 @@ def generate_subtarget(
     target_cls = type(build_target)
     return target_cls(
         generated_target_fields,
-        address=generate_subtarget_address(build_target.address, full_file_name=full_file_name),
+        generate_subtarget_address(build_target.address, full_file_name=full_file_name),
         union_membership=union_membership,
     )
 
@@ -749,46 +749,14 @@ def generate_subtarget(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class _AbstractFieldSet(EngineAwareParameter, ABC):
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-
-    @final
-    @classmethod
-    def is_applicable(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @final
-    @classmethod
-    def applicable_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    def debug_hint(self) -> str:
-        return self.address.spec
-
-    def __repr__(self) -> str:
-        # We use a short repr() because this often shows up in stack traces. We don't need any of
-        # the field information because we can ask a user to send us their BUILD file.
-        return f"{self.__class__.__name__}(address={self.address})"
-
-
 def _get_field_set_fields_from_target(
-    field_set: Type[_AbstractFieldSet], target: Target
-) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
+    field_set: type[FieldSet], target: Target
+) -> dict[str, Field]:
+    all_expected_fields: dict[str, type[Field]] = {
         dataclass_field.name: dataclass_field.type
         for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)
     }
-
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -800,7 +768,8 @@ def _get_field_set_fields_from_target(
 _FS = TypeVar("_FS", bound="FieldSet")
 
 
-class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
+@dataclass(frozen=True)
+class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     """An ad hoc set of fields from a target which are used by rules.
 
     Subclasses should declare all the fields they consume as dataclass attributes. They should also
@@ -810,6 +779,9 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
+    You can optionally set implement the classmethod `opt_out` so that targets have a
+    mechanism to not match with the FieldSet even if they have the `required_fields` registered.
+
     For example:
 
         @dataclass(frozen=True)
@@ -818,6 +790,10 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
 
             sources: FortranSources
             fortran_version: FortranVersion
+
+            @classmethod
+            def opt_out(cls, tgt: Target) -> bool:
+                return tgt.get(MaybeSkipFortranTestsField).value
 
     This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
@@ -833,26 +809,65 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
         print(field_set.sources)
     """
 
+    required_fields: ClassVar[tuple[type[Field], ...]]
+
+    address: Address
+
     @classmethod
-    def create(cls: Type[_FS], tgt: Target) -> _FS:
+    def opt_out(cls, tgt: Target) -> bool:
+        """If `True`, the target will not match with the field set, even if it has the FieldSet's
+        `required_fields`.
+
+        Note: this method is not intended to categorically opt out a target type from a
+        FieldSet, i.e. to always opt out based solely on the target type. While it is possible to
+        do, some error messages will incorrectly suggest that that target is compatible with the
+        FieldSet. Instead, if you need this feature, please ask us to implement it. See
+        https://github.com/pantsbuild/pants/pull/12002 for discussion.
+        """
+        return False
+
+    @final
+    @classmethod
+    def is_applicable(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields) and not cls.opt_out(tgt)
+
+    @final
+    @classmethod
+    def applicable_target_types(
+        cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
+    ) -> tuple[type[Target], ...]:
+        return tuple(
+            tgt_type
+            for tgt_type in target_types
+            if tgt_type.class_has_fields(cls.required_fields, union_membership)
+        )
+
+    @final
+    @classmethod
+    def create(cls: type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
             address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
         )
 
+    def debug_hint(self) -> str:
+        return self.address.spec
 
-_AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
+    def __repr__(self) -> str:
+        # We use a short repr() because this often shows up in stack traces. We don't need any of
+        # the field information because we can ask a user to send us their BUILD file.
+        return f"{self.__class__.__name__}(address={self.address})"
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetRootsToFieldSets(Generic[_AFS]):
-    mapping: FrozenDict[Target, Tuple[_AFS, ...]]
+class TargetRootsToFieldSets(Generic[_FS]):
+    mapping: FrozenDict[Target, tuple[_FS, ...]]
 
-    def __init__(self, mapping: Mapping[Target, Iterable[_AFS]]) -> None:
+    def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
         self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
 
     @memoized_property
-    def field_sets(self) -> Tuple[_AFS, ...]:
+    def field_sets(self) -> tuple[_FS, ...]:
         return tuple(
             itertools.chain.from_iterable(
                 field_sets_per_target for field_sets_per_target in self.mapping.values()
@@ -860,7 +875,7 @@ class TargetRootsToFieldSets(Generic[_AFS]):
         )
 
     @memoized_property
-    def targets(self) -> Tuple[Target, ...]:
+    def targets(self) -> tuple[Target, ...]:
         return tuple(self.mapping.keys())
 
 
@@ -872,8 +887,8 @@ class NoApplicableTargetsBehavior(Enum):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetRootsToFieldSetsRequest(Generic[_AFS]):
-    field_set_superclass: Type[_AFS]
+class TargetRootsToFieldSetsRequest(Generic[_FS]):
+    field_set_superclass: type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
@@ -882,7 +897,7 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
 
     def __init__(
         self,
-        field_set_superclass: Type[_AFS],
+        field_set_superclass: type[_FS],
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
@@ -896,25 +911,25 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FieldSetsPerTarget(Generic[_AFS]):
+class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
-    collection: Tuple[Tuple[_AFS, ...], ...]
+    collection: tuple[tuple[_FS, ...], ...]
 
-    def __init__(self, collection: Iterable[Iterable[_AFS]]):
+    def __init__(self, collection: Iterable[Iterable[_FS]]):
         self.collection = tuple(tuple(iterable) for iterable in collection)
 
     @memoized_property
-    def field_sets(self) -> Tuple[_AFS, ...]:
+    def field_sets(self) -> tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FieldSetsPerTargetRequest(Generic[_AFS]):
-    field_set_superclass: Type[_AFS]
-    targets: Tuple[Target, ...]
+class FieldSetsPerTargetRequest(Generic[_FS]):
+    field_set_superclass: type[_FS]
+    targets: tuple[Target, ...]
 
-    def __init__(self, field_set_superclass: Type[_AFS], targets: Iterable[Target]):
+    def __init__(self, field_set_superclass: type[_FS], targets: Iterable[Target]):
         self.field_set_superclass = field_set_superclass
         self.targets = tuple(targets)
 
@@ -1016,8 +1031,8 @@ class ScalarField(Generic[T], Field):
     default: ClassVar[Optional[T]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> Optional[T]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> Optional[T]:
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
             raise InvalidFieldTypeException(
                 address,
@@ -1031,28 +1046,32 @@ class ScalarField(Generic[T], Field):
 class BoolField(Field):
     """A field whose value is a boolean.
 
-    If subclasses do not set the class property `required = True` or `default`, the value will
-    default to None. This can be useful to represent three states: unspecified, False, and True.
-
-        class ZipSafe(BoolField):
-            alias = "zip_safe"
-            default = True
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
     """
 
-    value: Optional[bool]
-    default: ClassVar[Optional[bool]] = None
+    value: bool
+    default: ClassVar[bool]
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, bool):
+    def compute_value(cls, raw_value: bool, address: Address) -> bool:  # type: ignore[override]
+        value_or_default = super().compute_value(raw_value, address)
+        if not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="a boolean",
+                address, cls.alias, raw_value, expected_type="a boolean"
             )
         return value_or_default
+
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type = bool
+    expected_type_description = "a boolean or None"
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
+        return super().compute_value(raw_value, address)
 
 
 class IntField(ScalarField[int]):
@@ -1060,8 +1079,8 @@ class IntField(ScalarField[int]):
     expected_type_description = "an integer"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        return super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        return super().compute_value(raw_value, address)
 
 
 class FloatField(ScalarField[float]):
@@ -1069,8 +1088,8 @@ class FloatField(ScalarField[float]):
     expected_type_description = "a float"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[float], *, address: Address) -> Optional[float]:
-        return super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[float], address: Address) -> Optional[float]:
+        return super().compute_value(raw_value, address)
 
 
 class StringField(ScalarField[str]):
@@ -1085,8 +1104,8 @@ class StringField(ScalarField[str]):
     valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
             valid_choices = set(
                 cls.valid_choices
@@ -1126,9 +1145,9 @@ class SequenceField(Generic[T], Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], *, address: Address
+        cls, raw_value: Optional[Iterable[Any]], address: Address
     ) -> Optional[Tuple[T, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         try:
@@ -1149,9 +1168,9 @@ class StringSequenceField(SequenceField[str]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address=address)
+        return super().compute_value(raw_value, address)
 
 
 class DictStringToStringField(Field):
@@ -1160,9 +1179,9 @@ class DictStringToStringField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, str]], *, address: Address
+        cls, raw_value: Optional[Dict[str, str]], address: Address
     ) -> Optional[FrozenDict[str, str]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         invalid_type_exception = InvalidFieldTypeException(
@@ -1181,9 +1200,9 @@ class DictStringToStringSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
     ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
         invalid_type_exception = InvalidFieldTypeException(
@@ -1242,7 +1261,7 @@ class Sources(StringSequenceField, AsyncFieldMixin):
                     else repr(self.expected_file_extensions[0])
                 )
                 raise InvalidFieldException(
-                    f"The {repr(self.alias)} field in target {self.address} must only contain "
+                    f"The {repr(self.alias)} field in target {self.address} can only contain "
                     f"files that end in {expected}, but it had these files: {sorted(bad_files)}."
                     f"\n\nMaybe create a `resources()` or `files()` target and include it in the "
                     f"`dependencies` field?"
@@ -1574,6 +1593,88 @@ class DependenciesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
+@dataclass(frozen=True)
+class ExplicitlyProvidedDependencies:
+    """The literal addresses from a BUILD file `dependencies` field.
+
+    Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
+    consider dependency injection and inference and apply ignores. However, this type can be
+    useful particularly within inference/injection rules to see if a user already explicitly
+    provided a dependency.
+
+    Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
+
+    Note that the `includes` are not filtered based on the `ignores`: this type preserves exactly
+    what was in the BUILD file.
+    """
+
+    includes: FrozenOrderedSet[Address]
+    ignores: FrozenOrderedSet[Address]
+
+    @memoized_method
+    def any_are_covered_by_includes(self, addresses: tuple[Address, ...]) -> bool:
+        """Return True if every address is in the explicitly provided includes.
+
+        Note that if the input addresses are file addresses, they will still be marked as covered if
+        their original BUILD target is in the explicitly provided includes.
+        """
+        return any(
+            addr in self.includes or addr.maybe_convert_to_build_target() in self.includes
+            for addr in addresses
+        )
+
+    @memoized_method
+    def remaining_after_ignores(self, addresses: tuple[Address, ...]) -> frozenset[Address]:
+        """All addresses that are not covered by the explicitly provided ignores.
+
+        Note that if the input addresses are file addresses, they will still be marked as covered if
+        their original BUILD target is in the explicitly provided ignores.
+        """
+        return frozenset(
+            addr
+            for addr in addresses
+            if (
+                addr not in self.ignores
+                and addr.maybe_convert_to_build_target() not in self.ignores
+            )
+        )
+
+    def maybe_warn_of_ambiguous_dependency_inference(
+        self,
+        ambiguous_addresses: tuple[Address, ...],
+        original_address: Address,
+        *,
+        context: str,
+        import_reference: str,
+    ) -> None:
+        """If the module is ambiguous and the user did not disambiguate via explicitly provided
+        dependencies, warn that dependency inference will not be used."""
+        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
+            return
+        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
+        if len(remaining_after_ignores) <= 1:
+            return
+        logger.warning(
+            f"{context}, but Pants cannot safely infer a dependency because more than one target "
+            f"owns this {import_reference}, so it is ambiguous which to use: "
+            f"{sorted(addr.spec for addr in remaining_after_ignores)}."
+            f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
+            f"field of {original_address}, or ignore the ones you do not want by prefixing "
+            f"with `!` or `!!` so that one or no targets are left."
+            f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
+            f"targets so that only 1 target owns this {import_reference}. Refer to "
+            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+        )
+
+    def disambiguated_via_ignores(self, ambiguous_addresses: tuple[Address, ...]) -> Address | None:
+        """If exactly one of the input addresses remains after considering the explicitly provided
+        ignores, return it because it is disambiguated."""
+        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
+            return None
+        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
+        return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
+
+
 @union
 @dataclass(frozen=True)
 class InjectDependenciesRequest(EngineAwareParameter, ABC):
@@ -1716,7 +1817,7 @@ class Tags(StringSequenceField):
     alias = "tags"
     help = (
         "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        "with 'integration_test' so that you could run `./pants --tags='integration_test' test ::` "
+        "with 'integration_test' so that you could run `./pants --tag='integration_test' test ::` "
         "to only run on targets with that tag."
     )
 

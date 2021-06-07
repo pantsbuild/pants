@@ -100,6 +100,49 @@ def shell_str(s: str) -> str:
     return s
 
 
+def memory_size(s: str | int | float) -> int:
+    """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.
+
+    :API: public
+    """
+    if isinstance(s, (int, float)):
+        return int(s)
+    if not s:
+        raise ParseError("Missing value.")
+
+    original = s
+    s = s.lower().strip()
+
+    try:
+        return int(float(s))
+    except ValueError:
+        pass
+
+    invalid = ParseError(
+        f"Invalid value: `{original}`. Expected either a bare number or a number with one of "
+        f"`GiB`, `MiB`, `KiB`, or `B`."
+    )
+
+    def convert_to_bytes(power_of_2) -> int:
+        try:
+            return int(float(s[:-3]) * (2 ** power_of_2))  # type: ignore[index]
+        except TypeError:
+            raise invalid
+
+    if s.endswith("gib"):
+        return convert_to_bytes(30)
+    elif s.endswith("mib"):
+        return convert_to_bytes(20)
+    elif s.endswith("kib"):
+        return convert_to_bytes(10)
+    elif s.endswith("b"):
+        try:
+            return int(float(s[:-1]))
+        except TypeError:
+            raise invalid
+    raise invalid
+
+
 def _convert(val, acceptable_types):
     """Ensure that val is one of the acceptable types, converting it if needed.
 

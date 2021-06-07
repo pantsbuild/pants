@@ -1,15 +1,18 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 import errno
 import logging
 import os
+import subprocess
+import sys
 import unittest
 import unittest.mock
 from contextlib import contextmanager
+from textwrap import dedent
 
 import psutil
 import pytest
+from _pytest.tmpdir import TempdirFactory
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import temporary_dir
@@ -334,3 +337,34 @@ class TestProcessManager(unittest.TestCase):
         self.pm.pre_fork()
         self.pm.post_fork_child()
         self.pm.post_fork_parent()
+
+
+def test_process_name_setproctitle_integration(tmpdir_factory: TempdirFactory) -> None:
+    buildroot = tmpdir_factory.mktemp("buildroot")
+    manager_name = "Bob"
+    process_name = f"{manager_name} [{buildroot}]"
+    metadata_base_dir = tmpdir_factory.mktemp(".pids")
+
+    subprocess.check_call(
+        args=[
+            sys.executable,
+            "-c",
+            dedent(
+                f"""\
+                from setproctitle import setproctitle as set_process_title
+
+                from pants.pantsd.process_manager import ProcessManager
+
+
+                set_process_title({process_name!r})
+                pm = ProcessManager({manager_name!r}, metadata_base_dir="{metadata_base_dir}")
+                pm.write_pid()
+                pm.write_process_name()
+                """
+            ),
+        ],
+        env=dict(PYTHONPATH=os.pathsep.join(sys.path)),
+    )
+
+    pm = ProcessManager(manager_name, metadata_base_dir=str(metadata_base_dir))
+    assert process_name == pm.process_name

@@ -12,12 +12,14 @@ from enum import Enum
 from textwrap import dedent
 from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
 from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -33,15 +35,15 @@ from pants.engine.target import (
     ScalarField,
     SecondaryOwnerMixin,
     Sources,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
+    TriBoolField,
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,8 @@ logger = logging.getLogger(__name__)
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py", ".pyi")
+    # Note that Python scripts often have no file ending.
+    expected_file_extensions = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
@@ -64,7 +67,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\nSee "
-        f"{docs_url('python-interpreter-compatibility')}."
+        f"{bracketed_docs_url('python-interpreter-compatibility')}."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
@@ -196,25 +199,20 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
     required = True
+    value: EntryPoint
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[EntryPoint]:
-        ep = super().compute_value(raw_value, address=address)
-        if ep is None:
-            raise InvalidFieldException(
-                f"An entry point must be specified for {address}. It must indicate a Python module "
-                "by name or path and an optional nullary function in that module separated by a "
-                "colon, i.e.: module_name_or_path(':'function_name)?"
-            )
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> EntryPoint:
+        value = super().compute_value(raw_value, address)
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         try:
-            return EntryPoint.parse(ep, provenance=f"for {address}")
+            return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
             raise InvalidFieldException(str(e))
 
     @property
     def filespec(self) -> Filespec:
-        if not self.value:
-            return {"includes": []}
         if not self.value.module.endswith(".py"):
             return {"includes": []}
         full_glob = os.path.join(self.address.spec_path, self.value.module)
@@ -263,17 +261,16 @@ class PexInheritPathField(StringField):
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], *, address: Address
+        cls, raw_value: Optional[Union[str, bool]], address: Address
     ) -> Optional[str]:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
-        return super().compute_value(raw_value, address=address)
+        return super().compute_value(raw_value, address)
 
 
 class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
-    value: bool
     help = (
         "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
         "not zip safe, it will be written to disk prior to execution. You may need to mark "
@@ -281,10 +278,22 @@ class PexZipSafeField(BoolField):
     )
 
 
+class PexStripEnvField(BoolField):
+    alias = "strip_pex_env"
+    default = True
+    help = (
+        "Whether or not to strip the PEX runtime environment of `PEX*` environment variables.\n\n"
+        "Most applications have no need for the `PEX*` environment variables that are used to "
+        "control PEX startup; so these variables are scrubbed from the environment by Pex before "
+        "transferring control to the application by default. This prevents any subprocesses that "
+        "happen to execute other PEX files from inheriting these control knob values since most "
+        "would be undesired; e.g.: PEX_MODULE or PEX_PATH."
+    )
+
+
 class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
-    value: bool
     help = (
         "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
         "can use less memory in RAM-constrained environments."
@@ -294,7 +303,6 @@ class PexAlwaysWriteCacheField(BoolField):
 class PexIgnoreErrorsField(BoolField):
     alias = "ignore_errors"
     default = False
-    value: bool
     help = "Should PEX ignore when it cannot resolve dependencies?"
 
 
@@ -308,7 +316,7 @@ class PexShebangField(StringField):
     )
 
 
-class PexEmitWarningsField(BoolField):
+class PexEmitWarningsField(TriBoolField):
     alias = "emit_warnings"
     help = (
         "Whether or not to emit PEX warnings at runtime.\n\nThe default is determined by the "
@@ -331,6 +339,7 @@ class PexExecutionModeField(StringField):
     alias = "execution_mode"
     valid_choices = PexExecutionMode
     expected_type = str
+    default = PexExecutionMode.ZIPAPP.value
     help = (
         "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in "
         f"{PexExecutionMode.ZIPAPP.value!r} mode (See: https://www.python.org/dev/peps/pep-0441/). "
@@ -345,25 +354,9 @@ class PexExecutionModeField(StringField):
     )
 
 
-class PexUnzipField(BoolField):
-    alias = "unzip"
-    default = False
-    value: bool
-    deprecated_removal_version = "2.5.0.dev1"
-    deprecated_removal_hint = (
-        f"Use {PexExecutionModeField.alias}={PexExecutionMode.UNZIP.value!r} to enable "
-        f"{PexExecutionMode.UNZIP.value!r} mode instead."
-    )
-    help = (
-        "Whether to have the PEX unzip itself into the PEX_ROOT before running.\n\nEnabling unzip "
-        "mode can provide lower startup latencies for most PEX files; even on first run."
-    )
-
-
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
-    value: bool
     help = (
         "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included, the "
         "generated PEX file can be executed with `PEX_TOOLS=1 <pex file> --help` to gain access "
@@ -376,23 +369,24 @@ class PexBinary(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        InterpreterConstraintsField,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,
         PexInheritPathField,
         PexZipSafeField,
+        PexStripEnvField,
         PexAlwaysWriteCacheField,
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
-        PexUnzipField,
         PexExecutionModeField,
         PexIncludeToolsField,
     )
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
         "self-contained executable files that contain a complete Python environment capable of "
-        f"running the target. For more information, see {docs_url('pex-files')}."
+        f"running the target. For more information, see {bracketed_docs_url('pex-files')}."
     )
 
 
@@ -417,28 +411,16 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonRuntimePackageDependencies(SpecialCasedDependencies):
-    alias = "runtime_package_dependencies"
-    help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
-    )
-
-
 class PythonTestsTimeout(IntField):
     alias = "timeout"
     help = (
-        "A timeout (in seconds) which covers the total runtime of all tests in this target.\n\n"
+        "A timeout (in seconds) used by each test file belonging to this target.\n\n"
         "This only applies if the option `--pytest-timeouts` is set to True."
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "
@@ -461,6 +443,16 @@ class PythonTestsTimeout(IntField):
         return result
 
 
+class PythonTestsExtraEnvVars(StringSequenceField):
+    alias = "extra_env_vars"
+    help = (
+        "Additional environment variables to include in test processes. "
+        "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+        "`ENV_VAR` to copy the value of a variable in Pants's own environment. "
+        "This will be merged with and override values from [test].extra_env_vars."
+    )
+
+
 class PythonTests(Target):
     alias = "python_tests"
     core_fields = (
@@ -468,13 +460,14 @@ class PythonTests(Target):
         InterpreterConstraintsField,
         PythonTestsSources,
         PythonTestsDependencies,
-        PythonRuntimePackageDependencies,
         PythonTestsTimeout,
+        RuntimePackageDependenciesField,
+        PythonTestsExtraEnvVars,
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
-        f"be included in the `dependencies` field.\n\nSee {docs_url('python-test-goal')}."
+        f"be included in the `dependencies` field.\n\nSee {bracketed_docs_url('python-test-goal')}."
     )
 
 
@@ -543,9 +536,9 @@ class _RequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Tuple[Requirement, ...]:
-        value = super().compute_value(raw_value, address=address)
+        value = super().compute_value(raw_value, address)
         if value is None:
             return ()
         invalid_type_error = InvalidFieldTypeException(
@@ -585,8 +578,8 @@ class PythonRequirementsField(_RequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
-        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
-        "'bar<=3 ; python_version<'3']."
+        "A sequence of pip-style requirement strings, e.g. `['foo==1.8', "
+        "\"bar<=3 ; python_version<'3'\"]`."
     )
 
 
@@ -596,16 +589,21 @@ class ModuleMappingField(DictStringToStringSequenceField):
         "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
         '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
-        "used for Pants to be able to infer dependencies in BUILD files."
+        "used to infer dependencies."
     )
     value: FrozenDict[str, Tuple[str, ...]]
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        provided_mapping = super().compute_value(raw_value, address=address)
-        return FrozenDict({**DEFAULT_MODULE_MAPPING, **(provided_mapping or {})})
+        provided_mapping = super().compute_value(raw_value, address)
+        return FrozenDict(
+            {
+                **DEFAULT_MODULE_MAPPING,
+                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
+            }
+        )
 
 
 class PythonRequirementLibrary(Target):
@@ -616,7 +614,7 @@ class PythonRequirementLibrary(Target):
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
         "already, you can instead use the macro `python_requirements()` to convert each "
         "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{docs_url('python-third-party-dependencies')}."
+        f"{bracketed_docs_url('python-third-party-dependencies')}."
     )
 
 
@@ -657,23 +655,6 @@ class PythonRequirementsFile(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `_python_constraints` target
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonRequirementConstraintsField(_RequirementSequenceField):
-    alias = "constraints"
-    required = True
-    help = "A list of pip-style requirement strings, e.g. `my_dist==4.2.1`."
-
-
-class PythonRequirementConstraints(Target):
-    alias = "_python_constraints"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraintsField)
-    help = "A private helper target for inlined requirements constraints, used by macros."
-
-
-# -----------------------------------------------------------------------------------------------
 # `python_distribution` target
 # -----------------------------------------------------------------------------------------------
 
@@ -690,14 +671,12 @@ class PythonProvidesField(ScalarField, ProvidesField):
     required = True
     help = (
         "The setup.py kwargs for the external artifact built from this target.\n\nSee "
-        f"{docs_url('python-distributions')}."
+        f"{bracketed_docs_url('python-distributions')}."
     )
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[PythonArtifact], *, address: Address
-    ) -> PythonArtifact:
-        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+        return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
 class SetupPyCommandsField(StringSequenceField):
@@ -710,7 +689,7 @@ class SetupPyCommandsField(StringSequenceField):
         "The runtime commands to invoke setup.py with to create the distribution, e.g. "
         '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
         "will just create a chroot with a setup() function.\n\nSee "
-        f"{docs_url('python-distributions')}."
+        f"{bracketed_docs_url('python-distributions')}."
     )
 
 

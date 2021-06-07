@@ -124,10 +124,11 @@ class SchedulerService(PantsService):
     def _check_memory_usage(self):
         memory_usage_in_bytes = psutil.Process(self._pid).memory_info()[0]
         if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
+            bytes_per_mib = 1_048_576
             raise Exception(
-                f"pantsd process {self._pid} was using "
-                f"{memory_usage_in_bytes} bytes of memory (above the limit of "
-                f"{self._max_memory_usage_in_bytes} bytes)."
+                f"pantsd process {self._pid} was using {memory_usage_in_bytes / bytes_per_mib:.2f} "
+                f"MiB of memory (above the `--pantsd-max-memory-usage` limit of "
+                f"{self._max_memory_usage_in_bytes / bytes_per_mib:.2f} MiB)."
             )
 
     def _check_invalidation_watcher_liveness(self):
@@ -155,3 +156,4 @@ class SchedulerService(PantsService):
                 # Watcher failed for some reason
                 self._logger.critical(f"The scheduler was invalidated: {e!r}")
                 self.terminate()
+        self._scheduler_session.cancel()

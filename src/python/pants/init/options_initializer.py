@@ -1,11 +1,13 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import logging
 import sys
 from contextlib import contextmanager
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Tuple
 
 import pkg_resources
 
@@ -22,6 +24,7 @@ from pants.init.extension_loader import (
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.errors import UnknownFlagsError
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -58,9 +61,7 @@ def _initialize_build_configuration(
 
 
 def create_bootstrap_scheduler(
-    options_bootstrapper: OptionsBootstrapper,
-    env: CompleteEnvironment,
-    executor: Optional[PyExecutor] = None,
+    options_bootstrapper: OptionsBootstrapper, executor: PyExecutor | None = None
 ) -> BootstrapScheduler:
     bc_builder = BuildConfiguration.Builder()
     # To load plugins, we only need access to the Python/PEX rules.
@@ -71,13 +72,10 @@ def create_bootstrap_scheduler(
     bc_builder.allow_unknown_options()
     return BootstrapScheduler(
         EngineInitializer.setup_graph(
-            options_bootstrapper,
+            options_bootstrapper.bootstrap_options.for_global_scope(),
             bc_builder.create(),
-            executor=executor,
-            env=env,
-            # TODO: We set local_only to avoid invoking remote execution auth plugins. They should
-            # be loaded via rules using the bootstrap Scheduler in the future.
-            local_only=True,
+            DynamicRemoteOptions.disabled(),
+            executor,
         ).scheduler
     )
 
@@ -98,12 +96,9 @@ class OptionsInitializer:
     def __init__(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        env: CompleteEnvironment,
-        executor: Optional[PyExecutor] = None,
+        executor: PyExecutor | None = None,
     ) -> None:
-        self._bootstrap_scheduler = create_bootstrap_scheduler(
-            options_bootstrapper, env, executor=executor
-        )
+        self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
 
     def build_config_and_options(

@@ -22,14 +22,14 @@ from pants.engine.streaming_workunit_handler import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 
 logger = logging.getLogger(__name__)
 
 
 _bugout_access_token = "3ae76900-9a68-4a87-a127-7c9f179d7272"
 _bugout_journal_id = "801e9b3c-6b03-40a7-870f-5b25d326da66"
-_telemetry_docs_url = docs_url("anonymous-telemetry")
+_telemetry_docs_url = bracketed_docs_url("anonymous-telemetry")
 _telemetry_docs_referral = f"See {_telemetry_docs_url} for details"
 
 
@@ -162,8 +162,13 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                     system_tags
                     + [
                         f"pants_version:{telemetry_data.get('pants_version')}",
+                        f"repo:{repo_id}",
+                        f"user:{telemetry_data.get('user_id', 'UNKNOWN')}",
+                        f"machine:{telemetry_data.get('machine_id', 'UNKNOWN')}",
+                        f"duration:{telemetry_data.get('duration', '0')}",
+                        f"outcome:{telemetry_data.get('outcome', 'UNKNOWN')}",
                     ]
-                    + [f"goal:{goal}" for goal in telemetry_data.get("goals", [])]
+                    + [f"goal:{goal}" for goal in telemetry_data.get("standard_goals", [])]
                 )
 
                 report = Report(

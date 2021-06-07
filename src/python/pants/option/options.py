@@ -355,7 +355,7 @@ class Options:
             if explicit_keys:
                 warn_or_error(
                     removal_version=si.removal_version,
-                    deprecated_entity_description=f"scope {scope}",
+                    entity=f"scope {scope}",
                     hint=si.removal_hint,
                 )
 
@@ -381,7 +381,7 @@ class Options:
                     removal_version=self.known_scope_to_info[
                         scope
                     ].deprecated_scope_removal_version,
-                    deprecated_entity_description=f"scope {deprecated_scope}",
+                    entity=f"scope {deprecated_scope}",
                     hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
                 )
 

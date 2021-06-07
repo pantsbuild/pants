@@ -3,7 +3,7 @@
 
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -21,7 +21,9 @@ class PythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
+async def create_python_repl_request(
+    repl: PythonRepl, pex_env: WorkspacePexEnvironment
+) -> ReplRequest:
     requirements_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -56,7 +58,7 @@ class IPythonRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_ipython_repl_request(
-    repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
+    repl: IPythonRepl, ipython: IPython, pex_env: WorkspacePexEnvironment
 ) -> ReplRequest:
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in ipython_request.

@@ -3,10 +3,14 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+env:
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
+  RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
     env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -32,15 +36,27 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.49.0-*
+        path: '~/.rustup/toolchains/1.52.1-*
 
           ~/.rustup/update-hashes
 
@@ -92,17 +108,23 @@ jobs:
 
         '
     - name: Run smoke tests
-      run: './pants help goals
-
-        ./pants list ::
+      run: './pants list ::
 
         ./pants roots
+
+        ./pants help goals
 
         ./pants help targets
 
         ./pants help subsystems
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-bootstrap-linux
+        path: .pants.d/pants.log
     - name: Upload native_engine.so
       uses: actions/upload-artifact@v2
       with:
@@ -122,11 +144,14 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.8.3
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 40
   bootstrap_pants_macos:
     env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
-    name: Bootstrap Pants, test Rust (MacOS)
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
     - name: Check out code
@@ -151,15 +176,27 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.49.0-*
+        path: '~/.rustup/toolchains/1.52.1-*
 
           ~/.rustup/update-hashes
 
@@ -225,11 +262,11 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.8.3
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 40
   lint_python:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
-    name: Lint Python
+    name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
@@ -255,10 +292,22 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -280,13 +329,19 @@ jobs:
         ./pants lint typecheck ::
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-lint
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.8.3
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 30
   test_python_linux:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -313,10 +368,22 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
@@ -338,15 +405,22 @@ jobs:
       run: './pants test ::
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-linux
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.8.3
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 60
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
-      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
-    name: Test Python (MacOS)
+    name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
     steps:
@@ -372,10 +446,22 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
@@ -397,10 +483,18 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-macos
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
-        - 3.8.3
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 40
 name: Daily Extended Python Testing
 'on':
   schedule:

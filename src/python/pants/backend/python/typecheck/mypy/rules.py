@@ -8,11 +8,12 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
+from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -24,23 +25,16 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
-from pants.core.util_rules import pants_bin
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
@@ -54,12 +48,16 @@ class MyPyFieldSet(FieldSet):
 
     sources: PythonSources
 
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipMyPyField).value
+
 
 @dataclass(frozen=True)
 class MyPyPartition:
-    field_set_addresses: FrozenOrderedSet[Address]
+    root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     python_version_already_configured: bool
 
 
@@ -69,17 +67,16 @@ class MyPyRequest(TypecheckRequest):
 
 def generate_argv(
     mypy: MyPy,
-    *,
     typechecked_venv_pex: VenvPex,
+    *,
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={typechecked_venv_pex.python.argv0}"]
+    args = [f"--python-executable={typechecked_venv_pex.python.argv0}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
         args.append(f"--python-version={python_version}")
-    args.extend(mypy.args)
     args.append(f"@{file_list_path}")
     return tuple(args)
 
@@ -102,20 +99,12 @@ def check_and_warn_if_python_version_configured(
         logger.warning(
             f"You set {formatted_configured}. Normally, Pants would automatically set this for you "
             "based on your code's interpreter constraints "
-            f"({docs_url('python-interpreter-compatibility')}). Instead, it will "
+            f"({bracketed_docs_url('python-interpreter-compatibility')}). Instead, it will "
             "use what you set.\n\n(Automatically setting the option allows Pants to partition your "
             "targets by their constraints, so that, for example, you can run MyPy on Python 2-only "
             "code and Python 3-only code at the same time. This feature may no longer work.)"
         )
     return bool(configured)
-
-
-def config_path_globs(mypy: MyPy) -> PathGlobs:
-    return PathGlobs(
-        globs=[mypy.config] if mypy.config else [],
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        description_of_origin="the option `--mypy-config`",
-    )
 
 
 def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
@@ -169,29 +158,31 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             mypy.options.is_default("interpreter_constraints")
             and partition.interpreter_constraints.requires_python38_or_newer()
         )
-        else PexInterpreterConstraints(mypy.interpreter_constraints)
+        else InterpreterConstraints(mypy.interpreter_constraints)
     )
 
-    plugin_sources_request = Get(
+    plugin_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
     )
-    typechecked_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition.closure)
+    closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
+    roots_sources_get = Get(
+        SourceFiles, SourceFilesRequest(tgt.get(PythonSources) for tgt in partition.root_targets)
     )
 
-    requirements_pex_request = Get(
+    requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
-            (addr for addr in partition.field_set_addresses),
+            (tgt.address for tgt in partition.root_targets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,
         ),
     )
+
     # TODO(John Sirois): Scope the extra requirements to the partition.
     #  Right now we just use a global set of extra requirements and these might not be compatible
     #  with all partitions. See: https://github.com/pantsbuild/pants/issues/11556
-    mypy_extra_requirements_pex_request = Get(
+    mypy_extra_requirements_pex_get = Get(
         Pex,
         PexRequest(
             output_filename="mypy_extra_requirements.pex",
@@ -200,7 +191,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
-    mypy_pex_request = Get(
+    mypy_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="mypy.pex",
@@ -211,32 +202,31 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         ),
     )
 
-    config_digest_request = Get(Digest, PathGlobs, config_path_globs(mypy))
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
 
     (
         plugin_sources,
-        typechecked_sources,
+        closure_sources,
+        roots_sources,
         mypy_pex,
         requirements_pex,
         mypy_extra_requirements_pex,
-        config_digest,
+        config_files,
     ) = await MultiGet(
-        plugin_sources_request,
-        typechecked_sources_request,
-        mypy_pex_request,
-        requirements_pex_request,
-        mypy_extra_requirements_pex_request,
-        config_digest_request,
+        plugin_sources_get,
+        closure_sources_get,
+        roots_sources_get,
+        mypy_pex_get,
+        requirements_pex_get,
+        mypy_extra_requirements_pex_get,
+        config_files_get,
     )
 
-    typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
+    python_files = determine_python_files(roots_sources.snapshot.files)
     file_list_path = "__files.txt"
-    python_files = "\n".join(
-        determine_python_files(typechecked_sources.source_files.snapshot.files)
-    )
     file_list_digest_request = Get(
         Digest,
-        CreateDigest([FileContent(file_list_path, python_files.encode())]),
+        CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())]),
     )
 
     typechecked_venv_pex_request = Get(
@@ -259,18 +249,19 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             [
                 file_list_digest,
                 plugin_sources.source_files.snapshot.digest,
-                typechecked_srcs_snapshot.digest,
+                closure_sources.source_files.snapshot.digest,
                 typechecked_venv_pex.digest,
-                config_digest,
+                config_files.snapshot.digest,
             ]
         ),
     )
 
     all_used_source_roots = sorted(
-        set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
+        set(itertools.chain(plugin_sources.source_roots, closure_sources.source_roots))
     )
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
+        "MYPYPATH": ":".join(all_used_source_roots),
     }
 
     result = await Get(
@@ -279,13 +270,13 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             mypy_pex,
             argv=generate_argv(
                 mypy,
-                typechecked_venv_pex=typechecked_venv_pex,
+                typechecked_venv_pex,
                 file_list_path=file_list_path,
                 python_version=python_version,
             ),
             input_digest=merged_input_files,
             extra_env=env,
-            description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
+            description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -306,7 +297,8 @@ async def mypy_typecheck(
     # targets run together and all Python 3 targets run together. We can only do this by setting
     # the `--python-version` option, but we allow the user to set it as a safety valve. We warn if
     # they've set the option.
-    config_content = await Get(DigestContents, PathGlobs, config_path_globs(mypy))
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
+    config_content = await Get(DigestContents, Digest, config_files.snapshot.digest)
     python_version_configured = check_and_warn_if_python_version_configured(
         config=next(iter(config_content), None), args=mypy.args
     )
@@ -321,9 +313,9 @@ async def mypy_typecheck(
 
     interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
-        interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+        interpreter_constraints = InterpreterConstraints.create_from_targets(
             transitive_targets.closure, python_setup
-        ) or PexInterpreterConstraints(mypy.interpreter_constraints)
+        ) or InterpreterConstraints(mypy.interpreter_constraints)
         interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
             transitive_targets
         )
@@ -332,10 +324,10 @@ async def mypy_typecheck(
     for interpreter_constraints, all_transitive_targets in sorted(
         interpreter_constraints_to_transitive_targets.items()
     ):
-        combined_roots: OrderedSet[Address] = OrderedSet()
+        combined_roots: OrderedSet[Target] = OrderedSet()
         combined_closure: OrderedSet[Target] = OrderedSet()
         for transitive_targets in all_transitive_targets:
-            combined_roots.update(tgt.address for tgt in transitive_targets.roots)
+            combined_roots.update(transitive_targets.roots)
             combined_closure.update(transitive_targets.closure)
         partitions.append(
             MyPyPartition(
@@ -356,6 +348,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
-        *pants_bin.rules(),
         *pex_from_targets.rules(),
     ]

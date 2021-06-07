@@ -75,7 +75,7 @@ async fn list_directory() {
     .path()
     .join("directory")
     .join(digest_to_filepath(&test_directory.digest()));
-  assert_eq!(vec!["roland"], file::list_dir(&virtual_dir));
+  assert_eq!(vec!["roland.ext"], file::list_dir(&virtual_dir));
 }
 
 #[tokio::test]
@@ -103,7 +103,7 @@ async fn read_file_from_directory() {
     .path()
     .join("directory")
     .join(digest_to_filepath(&test_directory.digest()))
-    .join("roland");
+    .join("roland.ext");
   assert_eq!(test_bytes.bytes(), file::contents(&roland));
   assert!(!file::is_executable(&roland));
 }
@@ -143,8 +143,11 @@ async fn list_recursive_directory() {
     .path()
     .join("directory")
     .join(digest_to_filepath(&recursive_directory.digest()));
-  assert_eq!(vec!["cats", "treats"], file::list_dir(&virtual_dir));
-  assert_eq!(vec!["roland"], file::list_dir(&virtual_dir.join("cats")));
+  assert_eq!(vec!["cats", "treats.ext"], file::list_dir(&virtual_dir));
+  assert_eq!(
+    vec!["roland.ext"],
+    file::list_dir(&virtual_dir.join("cats"))
+  );
 }
 
 #[tokio::test]
@@ -182,11 +185,11 @@ async fn read_file_from_recursive_directory() {
     .path()
     .join("directory")
     .join(digest_to_filepath(&recursive_directory.digest()));
-  let treats = virtual_dir.join("treats");
+  let treats = virtual_dir.join("treats.ext");
   assert_eq!(treat_bytes.bytes(), file::contents(&treats));
   assert!(!file::is_executable(&treats));
 
-  let roland = virtual_dir.join("cats").join("roland");
+  let roland = virtual_dir.join("cats").join("roland.ext");
   assert_eq!(test_bytes.bytes(), file::contents(&roland));
   assert!(!file::is_executable(&roland));
 }
@@ -216,9 +219,9 @@ async fn files_are_correctly_executable() {
     .path()
     .join("directory")
     .join(digest_to_filepath(&directory.digest()));
-  assert_eq!(vec!["feed", "food"], file::list_dir(&virtual_dir));
-  assert!(file::is_executable(&virtual_dir.join("feed")));
-  assert!(!file::is_executable(&virtual_dir.join("food")));
+  assert_eq!(vec!["feed.ext", "food.ext"], file::list_dir(&virtual_dir));
+  assert!(file::is_executable(&virtual_dir.join("feed.ext")));
+  assert!(!file::is_executable(&virtual_dir.join("food.ext")));
 }
 
 pub fn digest_to_filepath(digest: &hashing::Digest) -> String {

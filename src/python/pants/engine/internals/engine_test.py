@@ -291,7 +291,8 @@ class WorkunitTracker(WorkunitsCallback):
 def new_run_tracker() -> RunTracker:
     # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only
     # actually directly consumes bootstrap options.
-    return RunTracker(create_options_bootstrapper([]).bootstrap_options)
+    ob = create_options_bootstrapper([])
+    return RunTracker(ob.args, ob.bootstrap_options)
 
 
 @pytest.fixture

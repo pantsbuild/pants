@@ -161,3 +161,18 @@ def first_paragraph(s: str) -> str:
         (i for i, line in enumerate(lines) if line.strip() == ""), len(lines)
     )
     return " ".join(lines[:first_blank_line_index])
+
+
+# This is more conservative that it necessarily need be. In practice POSIX filesystems
+# support any printable character except the path separator (forward slash), but it's
+# better to be over-cautious.
+
+# TODO: <> may not be safe in Windows paths. When we support Windows we will probably
+#  want to detect that here and be more restrictive on that platform. But we do want
+#  to support <> where possible, because they appear in target partition descriptions
+#  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
+_non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
+
+
+def path_safe(s: str) -> str:
+    return _non_path_safe_re.sub("_", s)

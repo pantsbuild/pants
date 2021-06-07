@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -32,6 +33,7 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
 from pants.option.arg_splitter import HelpRequest
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -73,12 +75,16 @@ class LocalPantsRunner:
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
-        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
-            options_bootstrapper, build_config, env
-        )
+        if scheduler is None:
+            dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, env)
+            bootstrap_options = options.bootstrap_option_values()
+            assert bootstrap_options is not None
+            scheduler = EngineInitializer.setup_graph(
+                bootstrap_options, build_config, dynamic_remote_options
+            )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
-        return graph_scheduler_helper.new_session(
+        return scheduler.new_session(
             run_id,
             dynamic_ui=global_options.dynamic_ui,
             use_colors=global_options.get("colors", True),
@@ -109,12 +115,12 @@ class LocalPantsRunner:
         :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
-        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper, env)
+        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
         build_config, options = options_initializer.build_config_and_options(
             options_bootstrapper, env, raise_=True
         )
 
-        run_tracker = RunTracker(options)
+        run_tracker = RunTracker(options_bootstrapper.args, options)
         union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
@@ -217,14 +223,28 @@ class LocalPantsRunner:
         )
         return tuple(wcf.callback_factory() for wcf in workunits_callback_factories)
 
-    def run(self, start_time: float) -> ExitCode:
-        spec_parser = SpecsParser(get_buildroot())
-        specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
-        self.run_tracker.start(run_start_time=start_time, specs=specs)
+    def _run_inner(self) -> ExitCode:
+        goals = tuple(self.options.goals)
+        if self.options.help_request:
+            return self._print_help(self.options.help_request)
+        if not goals:
+            return PANTS_SUCCEEDED_EXIT_CODE
 
+        try:
+            return self._perform_run(goals)
+        except Exception as e:
+            ExceptionSink.log_exception(e)
+            return PANTS_FAILED_EXIT_CODE
+        except KeyboardInterrupt:
+            print("Interrupted by user.\n", file=sys.stderr)
+            return PANTS_FAILED_EXIT_CODE
+
+    def run(self, start_time: float) -> ExitCode:
         with maybe_profiled(self.profile_path):
+            spec_parser = SpecsParser(get_buildroot())
+            specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
+            self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()
-            goals = tuple(self.options.goals)
 
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
@@ -236,19 +256,12 @@ class LocalPantsRunner:
                 pantsd=global_options.pantsd,
             )
             with streaming_reporter:
-                if self.options.help_request:
-                    return self._print_help(self.options.help_request)
-                if not goals:
-                    return PANTS_SUCCEEDED_EXIT_CODE
-
+                engine_result = PANTS_FAILED_EXIT_CODE
                 try:
-                    engine_result = self._perform_run(goals)
-                except Exception as e:
-                    ExceptionSink.log_exception(e)
-                    engine_result = PANTS_FAILED_EXIT_CODE
+                    engine_result = self._run_inner()
+                finally:
+                    metrics = self.graph_session.scheduler_session.metrics()
+                    self.run_tracker.set_pantsd_scheduler_metrics(metrics)
+                    self.run_tracker.end_run(engine_result)
 
-                metrics = self.graph_session.scheduler_session.metrics()
-                self.run_tracker.set_pantsd_scheduler_metrics(metrics)
-                self.run_tracker.end_run(engine_result)
-
-            return engine_result
+                return engine_result

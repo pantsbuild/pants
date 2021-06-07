@@ -156,6 +156,8 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
++ Nathan Levesque
++ Neeraj Kashyap
 + Neil Sanchala
 + Nicholas Santos
 + Nik Shkrob
@@ -223,4 +225,5 @@ Created by running `./build-support/bin/contributors.sh`.
 + Yuhan GUO
 + Yujie Chen
 + billybecker
++ hephex
 + Ólafur Páll Geirsson

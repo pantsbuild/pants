@@ -27,6 +27,43 @@ Jobs = Dict[str, Any]
 Env = Dict[str, str]
 
 
+# ----------------------------------------------------------------------
+# Constants
+# ----------------------------------------------------------------------
+
+
+NATIVE_ENGINE_SO_FILES = [
+    "src/python/pants/engine/internals/native_engine.so",
+    "src/python/pants/engine/internals/native_engine.so.metadata",
+]
+
+# We don't specify patch versions so that we get the latest, which comes pre-installed:
+#  https://github.com/actions/setup-python#available-versions-of-python
+PYTHON37_VERSION = "3.7"
+PYTHON38_VERSION = "3.8"
+PYTHON39_VERSION = "3.9"
+
+LINUX_VERSION = "ubuntu-20.04"
+MACOS_VERSION = "macos-10.15"
+
+DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
+DONT_SKIP_WHEELS = (
+    "github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')"
+)
+
+
+# NB: This overrides `pants.ci.toml`.
+DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
+# Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+# intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
+
+
+# ----------------------------------------------------------------------
+# Actions
+# ----------------------------------------------------------------------
+
+
 def checkout() -> Sequence[Step]:
     """Get prior commits and the commit message."""
     return [
@@ -67,21 +104,34 @@ def checkout() -> Sequence[Step]:
     ]
 
 
-def pants_virtualenv_cache() -> Sequence[Step]:
-    return [
-        {
-            "name": "Cache Pants Virtualenv",
-            "uses": "actions/cache@v2",
-            "with": {
-                "path": "~/.cache/pants/pants_dev_deps\n",
-                "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}\n",
-            },
-        }
-    ]
+def setup_toolchain_auth() -> Step:
+    return {
+        "name": "Setup toolchain auth",
+        "if": "github.event_name != 'pull_request'",
+        "run": dedent(
+            """\
+            echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+            """
+        ),
+    }
 
 
-def pants_config_files() -> Env:
-    return {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.remote-cache.toml']"}
+def pants_virtualenv_cache() -> Step:
+    return {
+        "name": "Cache Pants Virtualenv",
+        "uses": "actions/cache@v2",
+        "with": {
+            "path": "~/.cache/pants/pants_dev_deps\n",
+            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}\n",
+        },
+    }
+
+
+def global_env() -> Env:
+    return {
+        "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "RUST_BACKTRACE": "all",
+    }
 
 
 def rust_channel() -> str:
@@ -90,13 +140,19 @@ def rust_channel() -> str:
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
 
-NATIVE_ENGINE_SO_FILES = [
-    "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine.so.metadata",
-]
+def install_rustup() -> Step:
+    return {
+        "name": "Install rustup",
+        "run": dedent(
+            """\
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
+            echo "PATH=${PATH}:${HOME}/.cargo/bin" >> $GITHUB_ENV
+            """
+        ),
+    }
 
 
-def bootstrap_caches() -> Sequence[Step]:
+def rust_caches() -> Sequence[Step]:
     return [
         {
             "name": "Cache Rust toolchain",
@@ -115,7 +171,13 @@ def bootstrap_caches() -> Sequence[Step]:
                 "restore-keys": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
             },
         },
-        *pants_virtualenv_cache(),
+    ]
+
+
+def bootstrap_caches() -> Sequence[Step]:
+    return [
+        *rust_caches(),
+        pants_virtualenv_cache(),
         {
             "name": "Get Engine Hash",
             "id": "get-engine-hash",
@@ -133,34 +195,26 @@ def bootstrap_caches() -> Sequence[Step]:
     ]
 
 
-def native_engine_so_upload() -> Sequence[Step]:
-    return [
-        {
-            "name": "Upload native_engine.so",
-            "uses": "actions/upload-artifact@v2",
-            "with": {
-                "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
-            },
+def native_engine_so_upload() -> Step:
+    return {
+        "name": "Upload native_engine.so",
+        "uses": "actions/upload-artifact@v2",
+        "with": {
+            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "\n".join(NATIVE_ENGINE_SO_FILES),
         },
-    ]
+    }
 
 
-def native_engine_so_download() -> Sequence[Step]:
-    return [
-        {
-            "name": "Download native_engine.so",
-            "uses": "actions/download-artifact@v2",
-            "with": {
-                "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "src/python/pants/engine/internals/",
-            },
+def native_engine_so_download() -> Step:
+    return {
+        "name": "Download native_engine.so",
+        "uses": "actions/download-artifact@v2",
+        "with": {
+            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "src/python/pants/engine/internals/",
         },
-    ]
-
-
-PYTHON37_VERSION = "3.7.10"
-PYTHON38_VERSION = "3.8.3"
+    }
 
 
 def setup_primary_python() -> Sequence[Step]:
@@ -169,28 +223,46 @@ def setup_primary_python() -> Sequence[Step]:
             "name": "Set up Python ${{ matrix.python-version }}",
             "uses": "actions/setup-python@v2",
             "with": {"python-version": "${{ matrix.python-version }}"},
-        }
-    ]
-
-
-def expose_all_pythons() -> Sequence[Step]:
-    return [
+        },
         {
-            "name": "Expose Pythons",
-            "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
-        }
+            "name": "Tell Pants to use Python ${{ matrix.python-version }}",
+            "run": dedent(
+                """\
+                echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+                echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
+                """
+            ),
+        },
     ]
 
 
-def test_workflow_jobs(primary_python_version: str) -> Jobs:
+def expose_all_pythons() -> Step:
     return {
+        "name": "Expose Pythons",
+        "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+    }
+
+
+def upload_log_artifacts(name: str) -> Step:
+    return {
+        "name": "Upload pants.log",
+        "uses": "actions/upload-artifact@v2",
+        "if": "always()",
+        "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
+    }
+
+
+def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+    jobs = {
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
-            "runs-on": "ubuntu-20.04",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "runs-on": LINUX_VERSION,
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -198,15 +270,16 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                     "name": "Run smoke tests",
                     "run": dedent(
                         """\
-                        ./pants help goals
                         ./pants list ::
                         ./pants roots
+                        ./pants help goals
                         ./pants help targets
                         ./pants help subsystems
                         """
                     ),
                 },
-                *native_engine_so_upload(),
+                upload_log_artifacts(name="bootstrap-linux"),
+                native_engine_so_upload(),
                 {
                     "name": "Test and Lint Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -218,88 +291,172 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                         ./cargo test --all --tests -- --nocapture
                         """
                     ),
-                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "if": DONT_SKIP_RUST,
                 },
             ],
         },
         "test_python_linux": {
             "name": "Test Python (Linux)",
-            "runs-on": "ubuntu-20.04",
+            "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "timeout-minutes": 60,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                expose_all_pythons(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
+                upload_log_artifacts(name="python-test-linux"),
             ],
         },
         "lint_python": {
-            "name": "Lint Python",
-            "runs-on": "ubuntu-20.04",
+            "name": "Lint Python and Shell",
+            "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "timeout-minutes": 30,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
                 },
+                upload_log_artifacts(name="lint"),
             ],
         },
         "bootstrap_pants_macos": {
-            "name": "Bootstrap Pants, test Rust (MacOS)",
-            "runs-on": "macos-10.15",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "name": "Bootstrap Pants, test Rust (macOS)",
+            "runs-on": MACOS_VERSION,
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                *native_engine_so_upload(),
+                native_engine_so_upload(),
                 {
                     "name": "Test Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
                     # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
                     # pass on GHA MacOS containers.
                     "run": "./cargo test --tests -- --nocapture",
-                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "if": DONT_SKIP_RUST,
                     "env": {"TMPDIR": "${{ runner.temp }}"},
                 },
             ],
         },
         "test_python_macos": {
-            "name": "Test Python (MacOS)",
-            "runs-on": "macos-10.15",
+            "name": "Test Python (macOS)",
+            "runs-on": MACOS_VERSION,
             "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {
-                # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-                # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-                "ARCHFLAGS": "-arch x86_64",
-                **pants_config_files(),
-            },
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "env": MACOS_ENV,
+            "timeout-minutes": 40,
             "steps": [
                 *checkout(),
+                setup_toolchain_auth(),
                 *setup_primary_python(),
-                *expose_all_pythons(),
-                *pants_virtualenv_cache(),
-                *native_engine_so_download(),
+                expose_all_pythons(),
+                pants_virtualenv_cache(),
+                native_engine_so_download(),
                 {
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
                 },
+                upload_log_artifacts(name="python-test-macos"),
             ],
         },
     }
+    if not cron:
+
+        def build_wheels_step(*, is_macos: bool) -> Step:
+            step = {
+                "name": "Build wheels and fs_util",
+                "run": dedent(
+                    # We use MODE=debug on PR builds to speed things up, given that those are only
+                    # smoke tests of our release process.
+                    """\
+                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                    ./build-support/bin/release.sh build-wheels
+                    USE_PY38=true ./build-support/bin/release.sh build-wheels
+                    USE_PY39=true ./build-support/bin/release.sh build-wheels
+                    ./build-support/bin/release.sh build-fs-util
+                    """
+                ),
+                "if": DONT_SKIP_WHEELS,
+                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"},
+            }
+            if is_macos:
+                step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
+            return step
+
+        deploy_to_s3_step = {
+            "name": "Deploy to S3",
+            "run": "./build-support/bin/deploy_to_s3.py",
+            "if": "github.event_name == 'push'",
+            "env": {
+                "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+                "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
+            },
+        }
+        jobs.update(
+            {
+                "build_wheels_linux": {
+                    "name": "Build wheels and fs_util (Linux)",
+                    "runs-on": LINUX_VERSION,
+                    "container": "quay.io/pypa/manylinux2014_x86_64:latest",
+                    "timeout-minutes": 65,
+                    "env": DISABLE_REMOTE_CACHE_ENV,
+                    "steps": [
+                        *checkout(),
+                        install_rustup(),
+                        {
+                            "name": "Expose Pythons",
+                            "run": (
+                                'echo "PATH=${PATH}:'
+                                "/opt/python/cp37-cp37m/bin:"
+                                "/opt/python/cp38-cp38/bin:"
+                                '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
+                            ),
+                        },
+                        setup_toolchain_auth(),
+                        build_wheels_step(is_macos=False),
+                        upload_log_artifacts(name="wheels-linux"),
+                        deploy_to_s3_step,
+                    ],
+                },
+                "build_wheels_macos": {
+                    "name": "Build wheels and fs_util (macOS)",
+                    "runs-on": MACOS_VERSION,
+                    "timeout-minutes": 65,
+                    "env": DISABLE_REMOTE_CACHE_ENV,
+                    "steps": [
+                        *checkout(),
+                        setup_toolchain_auth(),
+                        expose_all_pythons(),
+                        # NB: We only cache Rust, but not `native_engine.so` and the Pants
+                        # virtualenv. This is because we must build both these things with Python
+                        # multiple Python versions, whereas that caching assumes only one primary
+                        # Python version (marked via matrix.strategy).
+                        *rust_caches(),
+                        build_wheels_step(is_macos=True),
+                        upload_log_artifacts(name="wheels-macos"),
+                        deploy_to_s3_step,
+                    ],
+                },
+            }
+        )
+    return jobs
 
 
 # ----------------------------------------------------------------------
@@ -332,7 +489,8 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "on": ["push", "pull_request"],
-            "jobs": test_workflow_jobs(PYTHON37_VERSION),
+            "jobs": test_workflow_jobs([PYTHON37_VERSION], cron=False),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )
@@ -341,7 +499,8 @@ def generate() -> dict[Path, str]:
             "name": "Daily Extended Python Testing",
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(PYTHON38_VERSION),
+            "jobs": test_workflow_jobs([PYTHON38_VERSION, PYTHON39_VERSION], cron=True),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )

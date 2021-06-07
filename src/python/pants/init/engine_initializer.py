@@ -15,7 +15,6 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
@@ -30,8 +29,14 @@ from pants.engine.streaming_workunit_handler import rules as streaming_workunit_
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions, GlobalOptions
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
@@ -163,25 +168,22 @@ class EngineInitializer:
 
     @staticmethod
     def setup_graph(
-        options_bootstrapper: OptionsBootstrapper,
+        bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
-        env: CompleteEnvironment,
-        executor: Optional[PyExecutor] = None,
-        local_only: bool = False,
+        dynamic_remote_options: DynamicRemoteOptions,
+        executor: PyExecutor | None = None,
     ) -> GraphScheduler:
         build_root = get_buildroot()
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        options = options_bootstrapper.full_options(build_configuration)
-        assert bootstrap_options is not None
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
-        execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
+        execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
+        local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
             executor=executor,
             pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
-            local_store_dir=bootstrap_options.local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
@@ -198,7 +200,7 @@ class EngineInitializer:
         executor: PyExecutor,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
-        local_store_dir: str,
+        local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str] = None,
@@ -280,7 +282,6 @@ class EngineInitializer:
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root,
-            local_store_dir=ensure_absolute_path(local_store_dir),
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
@@ -288,6 +289,7 @@ class EngineInitializer:
             union_membership=union_membership,
             executor=executor,
             execution_options=execution_options,
+            local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=native_engine_visualize_to,
         )

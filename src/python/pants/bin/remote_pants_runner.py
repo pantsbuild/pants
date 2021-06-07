@@ -11,7 +11,7 @@ from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import NailgunConnectionException
+from pants.engine.internals.native_engine import PantsdConnectionException
 from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -132,10 +132,8 @@ class RemotePantsRunner:
                     return native_engine.nailgun_client_create(executor, port).execute(
                         command, args, modified_env
                     )
-
-                # NailgunConnectionException represents a failure connecting to pantsd, so we retry
-                # up to the retry limit.
-                except NailgunConnectionException as e:
+                # Retry if we failed to connect to Pantsd.
+                except PantsdConnectionException as e:
                     if attempt > retries:
                         raise self.Fallback(e)
 

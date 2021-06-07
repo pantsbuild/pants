@@ -34,10 +34,6 @@ pub fn big_file_fingerprint() -> Fingerprint {
     .unwrap()
 }
 
-pub fn big_file_digest() -> Digest {
-  Digest::new(big_file_fingerprint(), big_file_bytes().len())
-}
-
 pub fn big_file_bytes() -> Bytes {
   let mut f = File::open(
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -97,18 +93,18 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 /// Create a new store with a remote CAS.
 ///
 fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
-  Store::with_remote(
-    task_executor::Executor::new(),
-    dir,
-    cas_address,
-    None,
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap()
+  Store::local_only(task_executor::Executor::new(), dir)
+    .unwrap()
+    .into_with_remote(
+      cas_address,
+      None,
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap()
 }
 
 #[tokio::test]
@@ -783,7 +779,7 @@ async fn upload_missing_file_in_directory() {
   assert_eq!(
     error,
     format!(
-      "Failed to upload digest {:?}: Not found",
+      "Failed to upload File {:?}: Not found in local store.",
       TestData::roland().digest()
     ),
     "Bad error message"
@@ -837,18 +833,18 @@ async fn instance_name_upload() {
     .await
     .expect("Error storing catnip locally");
 
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    Some("dark-tower".to_owned()),
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      Some("dark-tower".to_owned()),
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
@@ -864,18 +860,18 @@ async fn instance_name_download() {
     .file(&TestData::roland())
     .build();
 
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    Some("dark-tower".to_owned()),
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      Some("dark-tower".to_owned()),
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   assert_eq!(
     store_with_remote
@@ -913,18 +909,18 @@ async fn auth_upload() {
 
   let mut headers = BTreeMap::new();
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    None,
-    None,
-    headers,
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      headers,
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
@@ -942,18 +938,18 @@ async fn auth_download() {
 
   let mut headers = BTreeMap::new();
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    None,
-    None,
-    headers,
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      headers,
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   assert_eq!(
     store_with_remote
@@ -1072,17 +1068,17 @@ async fn materialize_directory() {
     .await
     .expect("Error materializing");
 
-  assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats"]);
+  assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
   assert_eq!(
-    file_contents(&materialize_dir.path().join("treats")),
+    file_contents(&materialize_dir.path().join("treats.ext")),
     catnip.bytes()
   );
   assert_eq!(
     list_dir(&materialize_dir.path().join("cats")),
-    vec!["roland"]
+    vec!["roland.ext"]
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("cats").join("roland")),
+    file_contents(&materialize_dir.path().join("cats").join("roland.ext")),
     roland.bytes()
   );
 }
@@ -1110,17 +1106,20 @@ async fn materialize_directory_executable() {
     .await
     .expect("Error materializing");
 
-  assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
   assert_eq!(
-    file_contents(&materialize_dir.path().join("feed")),
+    list_dir(materialize_dir.path()),
+    vec!["feed.ext", "food.ext"]
+  );
+  assert_eq!(
+    file_contents(&materialize_dir.path().join("feed.ext")),
     catnip.bytes()
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("food")),
+    file_contents(&materialize_dir.path().join("food.ext")),
     catnip.bytes()
   );
-  assert!(is_executable(&materialize_dir.path().join("feed")));
-  assert!(!is_executable(&materialize_dir.path().join("food")));
+  assert!(is_executable(&materialize_dir.path().join("feed.ext")));
+  assert!(!is_executable(&materialize_dir.path().join("food.ext")));
 }
 
 #[tokio::test]
@@ -1171,12 +1170,12 @@ async fn contents_for_directory() {
     file_contents,
     vec![
       FileContent {
-        path: PathBuf::from("cats").join("roland"),
+        path: PathBuf::from("cats").join("roland.ext"),
         content: roland.bytes(),
         is_executable: false,
       },
       FileContent {
-        path: PathBuf::from("treats"),
+        path: PathBuf::from("treats.ext"),
         content: catnip.bytes(),
         is_executable: false,
       },
@@ -1413,7 +1412,7 @@ async fn materialize_directory_metadata_all_local() {
             metadata: local.clone(),
             child_directories: btreemap!{},
             child_files: btreemap!{
-              "roland".to_owned() => local.clone(),
+              "roland.ext".to_owned() => local.clone(),
             },
           }
         },
@@ -1472,7 +1471,7 @@ async fn materialize_directory_metadata_mixed() {
       .get("cats")
       .unwrap()
       .child_files
-      .get("roland")
+      .get("roland.ext")
       .unwrap()
   );
 }
@@ -1494,7 +1493,7 @@ async fn explicitly_overwrites_already_existing_file() {
   }
 
   let dir_to_write_to = tempfile::tempdir().unwrap();
-  let file_path: PathBuf = [dir_to_write_to.path(), Path::new("some_filename")]
+  let file_path: PathBuf = [dir_to_write_to.path(), Path::new("some_filename.ext")]
     .iter()
     .collect();
 
@@ -1504,7 +1503,7 @@ async fn explicitly_overwrites_already_existing_file() {
   assert_eq!(file_contents, b"XXX".to_vec());
 
   let cas_file = TestData::new("abc123");
-  let contents_dir = test_file_with_arbitrary_content("some_filename", &cas_file);
+  let contents_dir = test_file_with_arbitrary_content("some_filename.ext", &cas_file);
   let cas = StubCAS::builder()
     .directory(&contents_dir)
     .file(&cas_file)

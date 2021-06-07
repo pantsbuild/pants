@@ -206,13 +206,14 @@ async fn main() {
     .clone()
     .unwrap_or_else(Store::default_path);
 
+  let local_only_store =
+    Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
   let store = match (&args.server, &args.cas_server) {
     (_, Some(cas_server)) => {
-      let root_ca_certs = if let Some(ref path) = args.cas_root_ca_cert_file {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+      let root_ca_certs = args
+        .cas_root_ca_cert_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
       let mut headers = BTreeMap::new();
       if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
@@ -224,9 +225,7 @@ async fn main() {
         );
       }
 
-      Store::with_remote(
-        executor.clone(),
-        local_store_path,
+      local_only_store.into_with_remote(
         &cas_server,
         args.remote_instance_name.clone(),
         root_ca_certs,
@@ -237,10 +236,10 @@ async fn main() {
         3,
       )
     }
-    (None, None) => Store::local_only(executor.clone(), local_store_path),
+    (None, None) => Ok(local_only_store),
     _ => panic!("Can't specify --server without --cas-server"),
   }
-  .expect("Error making store");
+  .expect("Error making remote store");
 
   let (mut request, process_metadata) = make_request(&store, &args)
     .await
@@ -256,11 +255,9 @@ async fn main() {
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
-      let root_ca_certs = if let Some(path) = args.execution_root_ca_cert_file {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+      let root_ca_certs = args
+        .execution_root_ca_cert_file
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =
