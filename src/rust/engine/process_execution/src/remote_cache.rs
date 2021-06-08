@@ -559,6 +559,8 @@ impl crate::CommandRunner for CommandRunner {
             workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
           };
         }
+        // NB: We must box the future to avoid a stack overflow.
+        .boxed()
       ));
     }
 

@@ -245,8 +245,7 @@ impl ByteStore {
       }
     });
 
-    // NB: This async closure must be boxed or else it triggers a consistent stack overflow
-    // when awaited with the `in_workunit` call below.
+    // NB: We must box the future to avoid a stack overflow.
     let result_future = Box::pin(async move {
       let response = client
         .write(Request::new(stream))
