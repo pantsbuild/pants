@@ -24,6 +24,7 @@ from pants.base.build_environment import (
 )
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
 from pants.option.custom_types import dir_option, memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -1419,6 +1420,17 @@ class GlobalOptions(Subsystem):
             else 4 * bootstrap_options.rule_threads_core
         )
         return PyExecutor(
+            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
+        )
+
+    @staticmethod
+    def create_py_executor_pyo3(bootstrap_options: OptionValueContainer) -> PyExecutorPyO3:
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return PyExecutorPyO3(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
 

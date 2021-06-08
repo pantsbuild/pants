@@ -90,7 +90,6 @@ def execution_add_root_select(
     param_vals: Sequence,
     product: type,
 ) -> None: ...
-def nailgun_client_create(executor: PyExecutor, port: int) -> PyNailgunClient: ...
 def nailgun_server_await_shutdown(server: PyNailgunServer) -> None: ...
 def nailgun_server_create(
     executor: PyExecutor, port: int, runner: RawFdRunner
@@ -179,9 +178,6 @@ class PyGeneratorResponseGetMulti:
 class PyNailgunServer:
     pass
 
-class PyNailgunClient:
-    def execute(self, command: str, args: list[str], env: dict[str, str]) -> int: ...
-
 class PyRemotingOptions:
     def __init__(self, **kwargs: Any) -> None: ...
 
@@ -213,12 +209,6 @@ class PyTypes:
     def __init__(self, **kwargs: Any) -> None: ...
 
 class PyStdioDestination:
-    pass
-
-class PantsdConnectionException(Exception):
-    pass
-
-class PantsdClientException(Exception):
     pass
 
 class PollTimeout(Exception):
