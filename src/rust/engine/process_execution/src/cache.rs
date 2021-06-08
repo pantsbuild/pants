@@ -121,6 +121,7 @@ impl crate::CommandRunner for CommandRunner {
         }
         Ok(result)
       }
+      .boxed()
     )
     .await
   }
