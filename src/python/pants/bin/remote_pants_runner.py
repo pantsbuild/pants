@@ -10,8 +10,7 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
-from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PantsdConnectionException
+from pants.engine.internals.native_engine_pyo3 import PantsdConnectionException, PyNailgunClient
 from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -101,7 +100,7 @@ class RemotePantsRunner:
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
-        executor = GlobalOptions.create_py_executor(global_options)
+        executor = GlobalOptions.create_py_executor_pyo3(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
@@ -129,9 +128,7 @@ class RemotePantsRunner:
             # We ignore keyboard interrupts because the nailgun client will handle them.
             with STTYSettings.preserved(), interrupts_ignored():
                 try:
-                    return native_engine.nailgun_client_create(executor, port).execute(
-                        command, args, modified_env
-                    )
+                    return PyNailgunClient(port, executor).execute(command, args, modified_env)
                 # Retry if we failed to connect to Pantsd.
                 except PantsdConnectionException as e:
                     if attempt > retries:

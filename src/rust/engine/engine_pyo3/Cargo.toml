@@ -19,6 +19,7 @@ default = []
 
 [dependencies]
 hashing = { path = "../hashing" }
+nailgun = { path = "../nailgun" }
 parking_lot = "0.11"
 # We must disable the `auto-initialize` feature because we do not enable `extension-module` normally
 # (see above comment in `features`), so `auto-initialize` would try to link to a static Python interpreter during
