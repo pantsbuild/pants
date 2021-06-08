@@ -808,7 +808,7 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
 }
 
 ///
-/// NB: Public for macro usage: prefer using `in_workunit!`.
+/// NB: Public for macro usage: use the `in_workunit!` macro.
 ///
 pub fn _start_workunit(
   workunit_store: WorkunitStore,
@@ -832,7 +832,7 @@ macro_rules! in_workunit {
             let $workunit = &mut $workunit;
             async move { $( $body )* }
           }.await;
-          $workunit.complete(None);
+          $workunit.complete();
           result
         })
       }
@@ -845,32 +845,11 @@ macro_rules! in_workunit {
             let $workunit = &mut $workunit;
             $f
           }.await;
-          $workunit.complete(None);
+          $workunit.complete();
           result
         })
     }
   );
-}
-
-pub async fn with_workunit<F, M>(
-  workunit_store: WorkunitStore,
-  name: String,
-  initial_metadata: WorkunitMetadata,
-  f: F,
-  final_metadata_fn: M,
-) -> F::Output
-where
-  F: Future,
-  M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
-{
-  let (store_handle, mut running) = _start_workunit(workunit_store, name, initial_metadata.clone());
-  scope_task_workunit_store_handle(Some(store_handle), async move {
-    let result = f.await;
-    let final_metadata = final_metadata_fn(&result, initial_metadata);
-    running.complete(Some(final_metadata));
-    result
-  })
-  .await
 }
 
 pub struct RunningWorkunit {
@@ -905,11 +884,8 @@ impl RunningWorkunit {
     }
   }
 
-  pub fn complete(&mut self, final_metadata: Option<WorkunitMetadata>) {
-    if let Some(mut workunit) = self.workunit.take() {
-      if let Some(final_metadata) = final_metadata {
-        workunit.metadata = final_metadata;
-      }
+  pub fn complete(&mut self) {
+    if let Some(workunit) = self.workunit.take() {
       self.store.complete_workunit(workunit);
     }
   }
