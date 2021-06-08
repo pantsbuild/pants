@@ -22,4 +22,13 @@ def bracketed_docs_url(slug: str) -> str:
     that those prevent any linkification at all from happening on readme.com, so we switched
     to parens, but didn't update the name to prevent churn.
     """
-    return f"(https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug})"
+    return f"({unbracketed_docs_url(slug)})"
+
+
+def unbracketed_docs_url(slug: str) -> str:
+    """Link to the Pants docs using the current version of Pants.
+
+    Returned URL is _not_ surrounded by parentheses. This should only be used in error messages. Use
+    `bracketed_docs_url` for help messages so that linkifiers work correctly.
+    """
+    return f"https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug}"
