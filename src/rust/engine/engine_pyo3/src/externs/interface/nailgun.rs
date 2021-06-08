@@ -27,7 +27,7 @@ impl PyNailgunClient {
     }
   }
 
-  fn execute(&self, command: String, args: Vec<String>, env: &PyDict) -> PyResult<i32> {
+  fn execute(&self, command: String, args: Vec<String>, env: &PyDict, py: Python) -> PyResult<i32> {
     use nailgun::NailgunClientError;
 
     let env_list: Vec<(String, String)> = env
@@ -36,14 +36,16 @@ impl PyNailgunClient {
       .map(|kv_pair| kv_pair.extract::<(String, String)>())
       .collect::<Result<Vec<_>, _>>()?;
 
-    self
-      .executor
-      .block_on(nailgun::client_execute(self.port, command, args, env_list))
-      .map_err(|e| match e {
-        NailgunClientError::PreConnect(err_str) => PantsdConnectionException::new_err(err_str),
-        NailgunClientError::PostConnect(err_str) => PantsdClientException::new_err(err_str),
-        NailgunClientError::BrokenPipe => PyBrokenPipeError::new_err(""),
-        NailgunClientError::KeyboardInterrupt => PyKeyboardInterrupt::new_err(""),
-      })
+    py.allow_threads(|| {
+      self
+        .executor
+        .block_on(nailgun::client_execute(self.port, command, args, env_list))
+        .map_err(|e| match e {
+          NailgunClientError::PreConnect(err_str) => PantsdConnectionException::new_err(err_str),
+          NailgunClientError::PostConnect(err_str) => PantsdClientException::new_err(err_str),
+          NailgunClientError::BrokenPipe => PyBrokenPipeError::new_err(""),
+          NailgunClientError::KeyboardInterrupt => PyKeyboardInterrupt::new_err(""),
+        })
+    })
   }
 }
