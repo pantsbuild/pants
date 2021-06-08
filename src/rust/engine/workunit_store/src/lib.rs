@@ -191,7 +191,6 @@ pub struct WorkunitStore {
   log_starting_workunits: bool,
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
-  metrics_data: MetricsData,
   observation_data: ObservationsData,
 }
 
@@ -515,7 +514,6 @@ impl WorkunitStore {
       // installed.
       streaming_workunit_data: StreamingWorkunitData::new(),
       heavy_hitters_data: HeavyHittersData::new(),
-      metrics_data: MetricsData::default(),
       observation_data: ObservationsData::default(),
     }
   }
@@ -599,15 +597,6 @@ impl WorkunitStore {
     let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
 
-    {
-      // If the workunit used the legacy increment_counters API, replace the workunit's counters.
-      let mut counters = self.metrics_data.counters.lock();
-      match counters.entry(span_id) {
-        Entry::Vacant(_) => {}
-        Entry::Occupied(entry) => workunit.counters = entry.remove(),
-      }
-    }
-
     let tx = self.streaming_workunit_data.msg_tx.lock();
     tx.send(StoreMsg::Completed(
       span_id,
@@ -684,26 +673,6 @@ impl WorkunitStore {
     self
       .streaming_workunit_data
       .with_latest_workunits(max_verbosity, f)
-  }
-
-  pub fn increment_counter(&self, counter_name: Metric, change: u64) {
-    let store_handle = expect_workunit_store_handle();
-    if let Some(span_id) = store_handle.parent_id {
-      let mut counters = self.metrics_data.counters.lock();
-      counters
-        .entry(span_id)
-        .and_modify(|entry_for_map| {
-          entry_for_map
-            .entry(counter_name)
-            .and_modify(|e| *e += change)
-            .or_insert(change);
-        })
-        .or_insert_with(|| {
-          let mut m = HashMap::new();
-          m.insert(counter_name, change);
-          m
-        });
-    }
   }
 
   ///
@@ -895,19 +864,6 @@ impl Drop for RunningWorkunit {
   fn drop(&mut self) {
     if let Some(workunit) = self.workunit.take() {
       self.store.cancel_workunit(workunit);
-    }
-  }
-}
-
-#[derive(Clone)]
-struct MetricsData {
-  counters: Arc<Mutex<HashMap<SpanId, HashMap<Metric, u64>>>>,
-}
-
-impl Default for MetricsData {
-  fn default() -> MetricsData {
-    MetricsData {
-      counters: Arc::new(Mutex::new(HashMap::new())),
     }
   }
 }

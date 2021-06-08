@@ -503,12 +503,10 @@ impl crate::CommandRunner for CommandRunner {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
             let lookup_elapsed = cache_lookup_start.elapsed();
-            context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+            // workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
             if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
               let time_saved = time_saved.as_millis() as u64;
-              context
-                .workunit_store
-                .increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+              // workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
               context
                 .workunit_store
                 .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
@@ -522,7 +520,7 @@ impl crate::CommandRunner for CommandRunner {
           }
         }
         local_result = &mut local_execution_future => {
-          context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+          // workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
           local_result?
         }
       }
