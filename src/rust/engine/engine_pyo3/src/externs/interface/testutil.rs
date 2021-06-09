@@ -10,8 +10,14 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use testutil_mock::{StubCAS, StubCASBuilder};
 
+pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+  m.add_class::<PyStubCAS>()?;
+  m.add_class::<PyStubCASBuilder>()?;
+  Ok(())
+}
+
 #[pyclass]
-pub struct PyStubCASBuilder {
+struct PyStubCASBuilder {
   builder: Arc<Mutex<Option<StubCASBuilder>>>,
 }
 
@@ -43,7 +49,7 @@ impl PyStubCASBuilder {
 }
 
 #[pyclass]
-pub struct PyStubCAS {
+struct PyStubCAS {
   stub_cas: StubCAS,
 }
 

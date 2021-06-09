@@ -4,14 +4,15 @@
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
+mod nailgun;
 mod testutil;
 
 #[pymodule]
-fn native_engine_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
-  m.add_class::<PyExecutor>()?;
+fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
+  self::nailgun::register(py, m)?;
+  self::testutil::register(m)?;
 
-  m.add_class::<self::testutil::PyStubCAS>()?;
-  m.add_class::<self::testutil::PyStubCASBuilder>()?;
+  m.add_class::<PyExecutor>()?;
 
   Ok(())
 }

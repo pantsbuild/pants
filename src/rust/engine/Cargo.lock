@@ -694,6 +694,7 @@ version = "0.0.1"
 dependencies = [
  "hashing",
  "mock",
+ "nailgun",
  "parking_lot",
  "pyo3",
  "task_executor",
