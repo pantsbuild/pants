@@ -80,9 +80,8 @@ class RelocatedFilesSrcField(StringField):
     required = True
     help = (
         "The original prefix that you want to replace, such as `src/resources`.\n\nYou can set "
-        "this field to `"
-        "` to preserve the original path; the value in the `dest` field will "
-        "then be added to the beginning of this original path."
+        "this field to the empty string to preserve the original path; the value in the `dest` "
+        "field will then be added to the beginning of this original path."
     )
 
 
@@ -91,8 +90,8 @@ class RelocatedFilesDestField(StringField):
     required = True
     help = (
         "The new prefix that you want to add to the beginning of the path, such as `data`.\n\nYou "
-        'can set this field to "" to avoid adding any new values to the path; the value in the '
-        "`src` field will then be stripped, rather than replaced."
+        "can set this field to the empty string to avoid adding any new values to the path; the "
+        "value in the `src` field will then be stripped, rather than replaced."
     )
 
 
