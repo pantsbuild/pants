@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterable, Sequence, Tuple
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, Snapshot
-from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine_pyo3 import PyStdioDestination
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
@@ -245,7 +245,7 @@ class _InnerHandler(threading.Thread):
         )
         # Get the parent thread's logging destination. Note that this thread has not yet started
         # as we are only in the constructor.
-        self.logging_destination = native_engine.stdio_thread_get_destination()
+        self.logging_destination = PyStdioDestination.get_for_thread()
 
     def poll_workunits(self, *, finished: bool) -> None:
         workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
@@ -259,7 +259,7 @@ class _InnerHandler(threading.Thread):
 
     def run(self) -> None:
         # First, set the thread's logging destination to the parent thread's, meaning the console.
-        native_engine.stdio_thread_set_destination(self.logging_destination)
+        self.logging_destination.set_for_thread()
         while not self.stop_request.isSet():  # type: ignore[attr-defined]
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)

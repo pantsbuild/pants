@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Dict, Iterator, cast
 
 import pants.util.logging as pants_logging
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine_pyo3 as native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.docutil import unbracketed_docs_url
