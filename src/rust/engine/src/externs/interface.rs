@@ -81,6 +81,8 @@ use crate::{
   Tasks, Types, Value,
 };
 
+mod testutil;
+
 py_exception!(native_engine, PollTimeout);
 py_exception!(native_engine, PantsdConnectionException);
 py_exception!(native_engine, PantsdClientException);
@@ -436,6 +438,9 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
   m.add_class::<PyStdioDestination>(py)?;
+
+  m.add_class::<self::testutil::PyStubCAS>(py)?;
+  m.add_class::<self::testutil::PyStubCASBuilder>(py)?;
 
   Ok(())
 });

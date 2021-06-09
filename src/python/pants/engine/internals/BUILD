@@ -23,13 +23,13 @@ python_tests(
 
 python_library(
   name='native',
-  sources=['native_engine.pyi', 'native_engine_pyo3.pyi'],
+  sources=['native_engine.pyi'],
   dependencies=[':native_engine'],
 )
 
 resources(
   name='native_engine',
-  sources=['native_engine.so', 'native_engine_pyo3.so', 'native_engine.so.metadata'],
+  sources=['native_engine.so', 'native_engine.so.metadata'],
 )
 
 resources(

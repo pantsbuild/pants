@@ -34,7 +34,6 @@ Env = Dict[str, str]
 
 NATIVE_ENGINE_SO_FILES = [
     "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine_pyo3.so",
     "src/python/pants/engine/internals/native_engine.so.metadata",
 ]
 

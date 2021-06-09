@@ -102,8 +102,6 @@ jobs:
           '
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine_pyo3.so
-
           src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
       run: './pants --version
@@ -132,8 +130,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: 'src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
@@ -245,8 +241,6 @@ jobs:
           '
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine_pyo3.so
-
           src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
       run: './pants --version
@@ -257,8 +251,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: 'src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
