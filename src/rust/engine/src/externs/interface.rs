@@ -41,13 +41,11 @@
 /// The engine crate contains some cpython interop which we use, notably externs which are functions
 /// and types from Python which we can read from our Rust. This particular wrapper crate is just for
 /// how we expose ourselves back to Python.
-use std::any::Any;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
-use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -90,12 +88,6 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "teardown_dynamic_ui",
     py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
-  )?;
-
-  m.add(
-    py,
-    "maybe_set_panic_handler",
-    py_fn!(py, maybe_set_panic_handler()),
   )?;
 
   m.add(
@@ -1407,39 +1399,6 @@ fn rule_subgraph_visualize(
       })
       .map(|()| None)
   })
-}
-
-pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
-  match payload
-    .downcast_ref::<String>()
-    .cloned()
-    .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
-  {
-    Some(ref s) => format!("panic at '{}'", s),
-    None => format!("Non-string panic payload at {:p}", payload),
-  }
-}
-
-/// Set up a panic handler, unless RUST_BACKTRACE is set.
-fn maybe_set_panic_handler(_: Python) -> PyUnitResult {
-  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
-    return Ok(None);
-  }
-  panic::set_hook(Box::new(|panic_info| {
-    let payload = panic_info.payload();
-    let mut panic_str = generate_panic_string(payload);
-
-    if let Some(location) = panic_info.location() {
-      let panic_location_str = format!(", {}:{}", location.file(), location.line());
-      panic_str.push_str(&panic_location_str);
-    }
-
-    error!("{}", panic_str);
-
-    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-    error!("{}", panic_file_bug_str);
-  }));
-  Ok(None)
 }
 
 fn garbage_collect_store(

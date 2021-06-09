@@ -8,6 +8,9 @@ mod nailgun;
 mod stdio;
 mod testutil;
 
+#[cfg(test)]
+mod stdio_tests;
+
 #[pymodule]
 fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
   self::nailgun::register(py, m)?;

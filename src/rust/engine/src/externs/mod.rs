@@ -11,8 +11,6 @@
 pub mod engine_aware;
 pub mod fs;
 mod interface;
-#[cfg(test)]
-mod interface_tests;
 
 use std::collections::BTreeMap;
 use std::convert::AsRef;

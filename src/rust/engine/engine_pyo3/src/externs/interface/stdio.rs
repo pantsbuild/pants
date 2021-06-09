@@ -1,7 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::any::Any;
 use std::collections::hash_map::HashMap;
+use std::panic;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -17,6 +19,7 @@ use pyo3::wrap_pyfunction;
 use regex::Regex;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+  m.add_function(wrap_pyfunction!(maybe_set_panic_handler, m)?)?;
   m.add_function(wrap_pyfunction!(flush_log, m)?)?;
   m.add_function(wrap_pyfunction!(write_log, m)?)?;
   m.add_function(wrap_pyfunction!(set_per_run_log_path, m)?)?;
@@ -25,6 +28,39 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_function(wrap_pyfunction!(stdio_thread_console_clear, m)?)?;
   m.add_class::<PyStdioDestination>()?;
   Ok(())
+}
+
+pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
+  match payload
+    .downcast_ref::<String>()
+    .cloned()
+    .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
+  {
+    Some(ref s) => format!("panic at '{}'", s),
+    None => format!("Non-string panic payload at {:p}", payload),
+  }
+}
+
+/// Set up a panic handler, unless RUST_BACKTRACE is set.
+#[pyfunction]
+fn maybe_set_panic_handler() {
+  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
+    return;
+  }
+  panic::set_hook(Box::new(|panic_info| {
+    let payload = panic_info.payload();
+    let mut panic_str = generate_panic_string(payload);
+
+    if let Some(location) = panic_info.location() {
+      let panic_location_str = format!(", {}:{}", location.file(), location.line());
+      panic_str.push_str(&panic_location_str);
+    }
+
+    log::error!("{}", panic_str);
+
+    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
+    log::error!("{}", panic_file_bug_str);
+  }));
 }
 
 #[pyfunction]

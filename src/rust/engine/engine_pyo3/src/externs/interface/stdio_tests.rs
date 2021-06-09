@@ -1,6 +1,9 @@
-use crate::externs::interface::generate_panic_string;
+// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::any::Any;
+
+use crate::externs::interface::stdio::generate_panic_string;
 
 #[test]
 fn test_panic_string() {
