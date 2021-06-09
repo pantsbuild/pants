@@ -693,10 +693,15 @@ name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
  "hashing",
+ "libc",
+ "log 0.4.11",
+ "logging",
  "mock",
  "nailgun",
  "parking_lot",
  "pyo3",
+ "regex",
+ "stdio",
  "task_executor",
 ]
 

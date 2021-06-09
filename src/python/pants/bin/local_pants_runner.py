@@ -15,7 +15,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine_pyo3 as native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues

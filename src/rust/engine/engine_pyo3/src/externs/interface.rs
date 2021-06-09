@@ -5,24 +5,19 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
 mod nailgun;
+mod stdio;
 mod testutil;
+
+#[cfg(test)]
+mod stdio_tests;
 
 #[pymodule]
 fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
+  self::nailgun::register(py, m)?;
+  self::stdio::register(m)?;
+  self::testutil::register(m)?;
+
   m.add_class::<PyExecutor>()?;
-
-  m.add(
-    "PantsdConnectionException",
-    py.get_type::<self::nailgun::PantsdConnectionException>(),
-  )?;
-  m.add(
-    "PantsdClientException",
-    py.get_type::<self::nailgun::PantsdClientException>(),
-  )?;
-  m.add_class::<self::nailgun::PyNailgunClient>()?;
-
-  m.add_class::<self::testutil::PyStubCAS>()?;
-  m.add_class::<self::testutil::PyStubCASBuilder>()?;
 
   Ok(())
 }

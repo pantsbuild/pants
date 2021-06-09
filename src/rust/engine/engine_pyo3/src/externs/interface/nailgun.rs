@@ -8,11 +8,24 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use task_executor::Executor;
 
+pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+  m.add(
+    "PantsdConnectionException",
+    py.get_type::<PantsdConnectionException>(),
+  )?;
+  m.add(
+    "PantsdClientException",
+    py.get_type::<PantsdClientException>(),
+  )?;
+  m.add_class::<PyNailgunClient>()?;
+  Ok(())
+}
+
 create_exception!(native_engine_pyo3, PantsdConnectionException, PyException);
 create_exception!(native_engine_pyo3, PantsdClientException, PyException);
 
 #[pyclass]
-pub struct PyNailgunClient {
+struct PyNailgunClient {
   port: u16,
   executor: Executor,
 }

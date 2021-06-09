@@ -41,13 +41,11 @@
 /// The engine crate contains some cpython interop which we use, notably externs which are functions
 /// and types from Python which we can read from our Rust. This particular wrapper crate is just for
 /// how we expose ourselves back to Python.
-use std::any::Any;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
-use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -63,13 +61,10 @@ use futures::future::FutureExt;
 use futures::future::{self, TryFutureExt};
 use futures::Future;
 use hashing::Digest;
-use log::{self, debug, error, warn, Log};
-use logging::logger::PANTS_LOGGER;
-use logging::{Logger, PythonLogLevel};
+use log::{self, debug, error, warn};
+use logging::PythonLogLevel;
 use process_execution::RemoteCacheWarningsBehavior;
-use regex::Regex;
 use rule_graph::{self, RuleGraph};
-use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, Metric, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
@@ -91,67 +86,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "stdio_initialize",
-    py_fn!(
-      py,
-      stdio_initialize(
-        a: u64,
-        b: bool,
-        c: bool,
-        d: bool,
-        e: PyDict,
-        f: Vec<String>,
-        g: Vec<String>,
-        h: String
-      )
-    ),
-  )?;
-  m.add(
-    py,
-    "stdio_thread_console_set",
-    py_fn!(
-      py,
-      stdio_thread_console_set(stdin_fileno: i32, stdout_fileno: i32, stderr_fileno: i32)
-    ),
-  )?;
-  m.add(
-    py,
-    "stdio_thread_console_clear",
-    py_fn!(py, stdio_thread_console_clear()),
-  )?;
-  m.add(
-    py,
-    "stdio_thread_get_destination",
-    py_fn!(py, stdio_thread_get_destination()),
-  )?;
-  m.add(
-    py,
-    "stdio_thread_set_destination",
-    py_fn!(py, stdio_thread_set_destination(a: PyStdioDestination)),
-  )?;
-
-  m.add(py, "flush_log", py_fn!(py, flush_log()))?;
-  m.add(
-    py,
-    "write_log",
-    py_fn!(py, write_log(msg: String, level: u64, target: String)),
-  )?;
-  m.add(
-    py,
-    "set_per_run_log_path",
-    py_fn!(py, set_per_run_log_path(a: Option<String>)),
-  )?;
-
-  m.add(
-    py,
     "teardown_dynamic_ui",
     py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
-  )?;
-
-  m.add(
-    py,
-    "maybe_set_panic_handler",
-    py_fn!(py, maybe_set_panic_handler()),
   )?;
 
   m.add(
@@ -415,8 +351,6 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PyDigest>(py)?;
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
-  m.add_class::<PyStdioDestination>(py)?;
-
   Ok(())
 });
 
@@ -490,10 +424,6 @@ py_class!(pub class PyExecutor |py| {
 
 py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
-});
-
-py_class!(class PyStdioDestination |py| {
-  data destination: Arc<stdio::Destination>;
 });
 
 // Represents configuration related to process execution strategies.
@@ -1471,39 +1401,6 @@ fn rule_subgraph_visualize(
   })
 }
 
-pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
-  match payload
-    .downcast_ref::<String>()
-    .cloned()
-    .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
-  {
-    Some(ref s) => format!("panic at '{}'", s),
-    None => format!("Non-string panic payload at {:p}", payload),
-  }
-}
-
-/// Set up a panic handler, unless RUST_BACKTRACE is set.
-fn maybe_set_panic_handler(_: Python) -> PyUnitResult {
-  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
-    return Ok(None);
-  }
-  panic::set_hook(Box::new(|panic_info| {
-    let payload = panic_info.payload();
-    let mut panic_str = generate_panic_string(payload);
-
-    if let Some(location) = panic_info.location() {
-      let panic_location_str = format!(", {}:{}", location.file(), location.line());
-      panic_str.push_str(&panic_location_str);
-    }
-
-    error!("{}", panic_str);
-
-    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-    error!("{}", panic_file_bug_str);
-  }));
-  Ok(None)
-}
-
 fn garbage_collect_store(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1794,106 +1691,6 @@ fn default_cache_path(py: Python) -> CPyResult<String> {
     })
 }
 
-fn stdio_initialize(
-  py: Python,
-  level: u64,
-  show_rust_3rdparty_logs: bool,
-  use_color: bool,
-  show_target: bool,
-  log_levels_by_target: PyDict,
-  literal_filters: Vec<String>,
-  regex_filters: Vec<String>,
-  log_file: String,
-) -> CPyResult<PyTuple> {
-  let log_levels_by_target = log_levels_by_target
-    .items(py)
-    .iter()
-    .map(|(k, v)| {
-      let k: String = k.extract(py).unwrap();
-      let v: u64 = v.extract(py).unwrap();
-      (k, v)
-    })
-    .collect::<HashMap<_, _>>();
-  let regex_filters = regex_filters
-    .iter()
-    .map(|re| {
-      Regex::new(re).map_err(|e| {
-        PyErr::new::<exc::Exception, _>(
-          py,
-          format!(
-            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
-            e,
-          )
-        )
-      })
-    })
-    .collect::<Result<Vec<Regex>, _>>()?;
-
-  Logger::init(
-    level,
-    show_rust_3rdparty_logs,
-    use_color,
-    show_target,
-    log_levels_by_target,
-    literal_filters,
-    regex_filters,
-    PathBuf::from(log_file),
-  )
-  .map_err(|s| {
-    PyErr::new::<exc::Exception, _>(py, (format!("Could not initialize logging: {}", s),))
-  })?;
-
-  Ok(PyTuple::new(
-    py,
-    &[
-      externs::stdio::py_stdio_read()?.into_object(),
-      externs::stdio::py_stdio_write(true)?.into_object(),
-      externs::stdio::py_stdio_write(false)?.into_object(),
-    ],
-  ))
-}
-
-fn stdio_thread_console_set(
-  _: Python,
-  stdin_fileno: i32,
-  stdout_fileno: i32,
-  stderr_fileno: i32,
-) -> PyUnitResult {
-  let destination = stdio::new_console_destination(stdin_fileno, stdout_fileno, stderr_fileno);
-  stdio::set_thread_destination(destination);
-  Ok(None)
-}
-
-fn stdio_thread_console_clear(_: Python) -> PyUnitResult {
-  stdio::get_destination().console_clear();
-  Ok(None)
-}
-
-fn stdio_thread_get_destination(py: Python) -> CPyResult<PyStdioDestination> {
-  let dest = stdio::get_destination();
-  PyStdioDestination::create_instance(py, dest)
-}
-
-fn stdio_thread_set_destination(py: Python, stdio_destination: PyStdioDestination) -> PyUnitResult {
-  stdio::set_thread_destination(stdio_destination.destination(py).clone());
-  Ok(None)
-}
-
-// TODO: Needs to be thread-local / associated with the Console.
-fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
-  py.allow_threads(|| {
-    PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
-    Ok(None)
-  })
-}
-
-fn write_log(py: Python, msg: String, level: u64, target: String) -> PyUnitResult {
-  py.allow_threads(|| {
-    Logger::log_from_python(&msg, level, &target).expect("Error logging message");
-    Ok(None)
-  })
-}
-
 fn teardown_dynamic_ui(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1906,13 +1703,6 @@ fn teardown_dynamic_ui(
       });
       Ok(None)
     })
-  })
-}
-
-fn flush_log(py: Python) -> PyUnitResult {
-  py.allow_threads(|| {
-    PANTS_LOGGER.flush();
-    Ok(None)
   })
 }
 

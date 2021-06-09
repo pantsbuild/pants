@@ -16,7 +16,7 @@ from setproctitle import setproctitle as set_process_title
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, native_engine_pyo3
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
@@ -183,7 +183,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
             )
-            native_engine.maybe_set_panic_handler()
+            native_engine_pyo3.maybe_set_panic_handler()
 
             self._initialize_metadata()
 
