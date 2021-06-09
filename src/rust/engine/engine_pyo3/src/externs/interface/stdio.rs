@@ -28,8 +28,8 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 }
 
 #[pyfunction]
-fn flush_log(py: Python) {
-  py.allow_threads(|| PANTS_LOGGER.flush())
+fn flush_log() {
+  PANTS_LOGGER.flush()
 }
 
 #[pyfunction]
@@ -94,16 +94,14 @@ fn stdio_initialize(
 }
 
 #[pyfunction]
-fn stdio_thread_console_set(stdin_fileno: i32, stdout_fileno: i32, stderr_fileno: i32, py: Python) {
-  py.allow_threads(|| {
-    let destination = stdio::new_console_destination(stdin_fileno, stdout_fileno, stderr_fileno);
-    stdio::set_thread_destination(destination);
-  })
+fn stdio_thread_console_set(stdin_fileno: i32, stdout_fileno: i32, stderr_fileno: i32) {
+  let dest = stdio::new_console_destination(stdin_fileno, stdout_fileno, stderr_fileno);
+  stdio::set_thread_destination(dest)
 }
 
 #[pyfunction]
-fn stdio_thread_console_clear(py: Python) {
-  py.allow_threads(|| stdio::get_destination().console_clear());
+fn stdio_thread_console_clear() {
+  stdio::get_destination().console_clear()
 }
 
 #[pyclass]
@@ -114,14 +112,14 @@ struct PyStdioDestination {
 #[pymethods]
 impl PyStdioDestination {
   #[classmethod]
-  fn get_for_thread(_cls: &PyType, py: Python) -> Self {
-    py.allow_threads(|| Self {
+  fn get_for_thread(_cls: &PyType) -> Self {
+    Self {
       dest: stdio::get_destination(),
-    })
+    }
   }
 
-  fn set_for_thread(&self, py: Python) {
-    py.allow_threads(|| stdio::set_thread_destination(self.dest.clone()))
+  fn set_for_thread(&self) {
+    stdio::set_thread_destination(self.dest.clone())
   }
 }
 
@@ -155,16 +153,14 @@ impl PyStdioRead {
     Ok(read)
   }
 
-  fn fileno(&self, py: Python) -> PyResult<i32> {
-    py.allow_threads(|| {
-      stdio::get_destination()
-        .stdin_as_raw_fd()
-        .map_err(PyException::new_err)
-    })
+  fn fileno(&self) -> PyResult<i32> {
+    stdio::get_destination()
+      .stdin_as_raw_fd()
+      .map_err(PyException::new_err)
   }
 
-  fn isatty(&self, py: Python) -> bool {
-    _is_atty(self.fileno(py))
+  fn isatty(&self) -> bool {
+    _is_atty(self.fileno())
   }
 
   #[getter]
@@ -193,29 +189,27 @@ struct PyStdioWrite {
 impl PyStdioWrite {
   fn write(&self, payload: &str, py: Python) {
     py.allow_threads(|| {
-      let destination = stdio::get_destination();
+      let dest = stdio::get_destination();
       if self.is_stdout {
-        destination.write_stdout(payload.as_bytes());
+        dest.write_stdout(payload.as_bytes());
       } else {
-        destination.write_stderr(payload.as_bytes());
+        dest.write_stderr(payload.as_bytes());
       }
     });
   }
 
-  fn fileno(&self, py: Python) -> PyResult<i32> {
-    py.allow_threads(|| {
-      let destination = stdio::get_destination();
-      let fd = if self.is_stdout {
-        destination.stdout_as_raw_fd()
-      } else {
-        destination.stderr_as_raw_fd()
-      };
-      fd.map_err(PyException::new_err)
-    })
+  fn fileno(&self) -> PyResult<i32> {
+    let dest = stdio::get_destination();
+    let fd = if self.is_stdout {
+      dest.stdout_as_raw_fd()
+    } else {
+      dest.stderr_as_raw_fd()
+    };
+    fd.map_err(PyException::new_err)
   }
 
-  fn isatty(&self, py: Python) -> bool {
-    _is_atty(self.fileno(py))
+  fn isatty(&self) -> bool {
+    _is_atty(self.fileno())
   }
 
   fn flush(&self) {
