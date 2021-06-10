@@ -13,7 +13,8 @@ REQUIREMENTS=(
 
 # NB: We house these outside the working copy to avoid needing to gitignore them, but also to
 # dodge https://github.com/hashicorp/vagrant/issues/12057.
-venv_dir_prefix="${HOME}/.cache/pants/pants_dev_deps/$(uname)"
+platform=$(uname -mps | sed 's/ /./g')
+venv_dir_prefix="${HOME}/.cache/pants/pants_dev_deps/${platform}"
 
 function venv_dir() {
   py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
