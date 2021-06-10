@@ -18,7 +18,7 @@ class Pylint(PythonToolBase):
     options_scope = "pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
-    default_version = "pylint>=2.8.2,<2.9"
+    default_version = "pylint>=2.6.2,<2.7"
     default_main = ConsoleScript("pylint")
 
     @classmethod

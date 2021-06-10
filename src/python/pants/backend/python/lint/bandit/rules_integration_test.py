@@ -43,7 +43,7 @@ def run_bandit(
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.python.lint.bandit",
-            "--bandit-version=bandit==1.6.2",
+            "--bandit-version=bandit>=1.7.0,<1.8",
             *(extra_args or ()),
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
