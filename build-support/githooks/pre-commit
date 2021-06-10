@@ -57,9 +57,6 @@ else
   echo "* Skipping import/lint checks in partial working copy."
 fi
 
-echo "* Checking shell scripts via our custom linter"
-./build-support/bin/check_shell.sh || exit 1
-
 echo "* Checking __init__.py files"
 ./build-support/bin/check_inits.py || exit 1
 

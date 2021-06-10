@@ -24,6 +24,7 @@ from pants.base.build_environment import (
 )
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
 from pants.option.custom_types import dir_option, memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -34,13 +35,9 @@ from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
-
-
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
 
 
 # The time that leases are acquired for in the local store. Configured on the Python side
@@ -417,7 +414,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    process_execution_local_parallelism=_CPU_COUNT,
+    process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
@@ -793,8 +790,8 @@ class GlobalOptions(Subsystem):
                 "you may miss out on some caching, whereas setting too high may over-consume "
                 "resources and may result in the operating system killing Pantsd due to memory "
                 "overconsumption (e.g. via the OOM killer).\n\n"
-                "You can suffix with `GiB`, `GB`, `MiB`, `MB`, `KiB`, `kB`, or `B` to indicate "
-                "the unit, e.g. `2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
+                "You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g. "
+                "`2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
                 "There is at most one pantsd process per workspace."
             ),
         )
@@ -842,7 +839,7 @@ class GlobalOptions(Subsystem):
         register(
             rule_threads_core,
             type=int,
-            default=max(2, _CPU_COUNT // 2),
+            default=max(2, CPU_COUNT // 2),
             default_help_repr="max(2, #cores/2)",
             advanced=True,
             help=(
@@ -1423,6 +1420,17 @@ class GlobalOptions(Subsystem):
             else 4 * bootstrap_options.rule_threads_core
         )
         return PyExecutor(
+            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
+        )
+
+    @staticmethod
+    def create_py_executor_pyo3(bootstrap_options: OptionValueContainer) -> PyExecutorPyO3:
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return PyExecutorPyO3(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
 

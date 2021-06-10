@@ -39,7 +39,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Arc;
-use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
+use workunit_store::{in_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::{Digest, EMPTY_FINGERPRINT};
@@ -563,25 +563,6 @@ impl CommandRunner for BoundedCommandRunner {
           ..WorkunitMetadata::default()
         };
 
-        let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
-                                old_metadata| match result {
-          Err(_) => old_metadata,
-          Ok(FallibleProcessResultWithPlatform {
-            stdout_digest,
-            stderr_digest,
-            exit_code,
-            ..
-          }) => WorkunitMetadata {
-            stdout: Some(*stdout_digest),
-            stderr: Some(*stderr_digest),
-            user_metadata: vec![(
-              "exit_code".to_string(),
-              UserMetadataItem::ImmediateId(*exit_code as i64),
-            )],
-            ..old_metadata
-          },
-        };
-
         for (_, process) in req.0.iter_mut() {
           if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
             let execution_slot = format!("{}", concurrency_id);
@@ -591,23 +572,38 @@ impl CommandRunner for BoundedCommandRunner {
           }
         }
 
-        with_workunit(
+        in_workunit!(
           context.workunit_store.clone(),
           name,
           metadata,
-          async move { inner.0.run(req, context).await },
-          metadata_updater,
+          |workunit| async move {
+            let res = inner.0.run(req, context).await;
+            if let Ok(FallibleProcessResultWithPlatform {
+              stdout_digest,
+              stderr_digest,
+              exit_code,
+              ..
+            }) = res
+            {
+              workunit.update_metadata(|initial| WorkunitMetadata {
+                stdout: Some(stdout_digest),
+                stderr: Some(stderr_digest),
+                user_metadata: vec![(
+                  "exit_code".to_string(),
+                  UserMetadataItem::ImmediateId(exit_code as i64),
+                )],
+                ..initial
+              })
+            }
+            res
+          },
         )
       })
     };
 
-    with_workunit(
-      context.workunit_store,
-      name,
-      outer_metadata,
-      bounded_fut,
-      |_, metadata| metadata,
-    )
+    in_workunit!(context.workunit_store, name, outer_metadata, |_workunit| {
+      bounded_fut
+    })
     .await
   }
 

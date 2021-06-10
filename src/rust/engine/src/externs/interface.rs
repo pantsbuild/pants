@@ -56,8 +56,8 @@ use std::time::Duration;
 use async_latch::AsyncLatch;
 use cpython::{
   exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyBytes, PyClone, PyDict,
-  PyErr, PyInt, PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python,
-  PythonObject, ToPyObject,
+  PyErr, PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
+  ToPyObject,
 };
 use futures::future::FutureExt;
 use futures::future::{self, TryFutureExt};
@@ -81,26 +81,11 @@ use crate::{
   Tasks, Types, Value,
 };
 
-mod testutil;
-
 py_exception!(native_engine, PollTimeout);
-py_exception!(native_engine, PantsdConnectionException);
-py_exception!(native_engine, PantsdClientException);
 
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
     .unwrap();
-
-  m.add(
-    py,
-    "PantsdClientException",
-    py.get_type::<PantsdClientException>(),
-  )?;
-  m.add(
-    py,
-    "PantsdConnectionException",
-    py.get_type::<PantsdConnectionException>(),
-  )?;
 
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
@@ -214,12 +199,6 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "graph_visualize",
     py_fn!(py, graph_visualize(a: PyScheduler, b: PySession, d: String)),
-  )?;
-
-  m.add(
-    py,
-    "nailgun_client_create",
-    py_fn!(py, nailgun_client_create(a: PyExecutor, b: u16)),
   )?;
 
   m.add(
@@ -420,7 +399,6 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyExecutionStrategyOptions>(py)?;
   m.add_class::<PyExecutor>(py)?;
   m.add_class::<PyNailgunServer>(py)?;
-  m.add_class::<PyNailgunClient>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
   m.add_class::<PyLocalStoreOptions>(py)?;
   m.add_class::<PyResult>(py)?;
@@ -438,9 +416,6 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
   m.add_class::<PyStdioDestination>(py)?;
-
-  m.add_class::<self::testutil::PyStubCAS>(py)?;
-  m.add_class::<self::testutil::PyStubCASBuilder>(py)?;
 
   Ok(())
 });
@@ -673,46 +648,6 @@ py_class!(class PyNailgunServer |py| {
     }
 });
 
-py_class!(class PyNailgunClient |py| {
-  data executor: PyExecutor;
-  data port: u16;
-
-  def execute(&self, command: String, args: Vec<String>, env: PyDict) -> CPyResult<PyInt> {
-    use nailgun::NailgunClientError;
-
-    let env_list: Vec<(String, String)> = env
-    .items(py)
-    .into_iter()
-    .map(|(k, v): (PyObject, PyObject)| -> Result<(String, String), PyErr> {
-      let k: String = k.extract::<String>(py)?;
-      let v: String = v.extract::<String>(py)?;
-      Ok((k, v))
-    })
-    .collect::<Result<Vec<_>, _>>()?;
-
-    let port = *self.port(py);
-    let executor_ptr = self.executor(py);
-
-    with_executor(py, executor_ptr, |executor| {
-      executor.block_on(nailgun::client_execute(
-        port,
-        command,
-        args,
-        env_list,
-      )).map(|code| code.to_py_object(py)).map_err(|e| match e{
-        NailgunClientError::PreConnect(err_str) => PyErr::new::<PantsdConnectionException, _>(py, (err_str,)),
-        NailgunClientError::PostConnect(err_str) => PyErr::new::<PantsdClientException, _>(py, (err_str,)),
-        NailgunClientError::BrokenPipe => {
-          PyErr::new::<exc::BrokenPipeError, _>(py, NoArgs)
-        }
-        NailgunClientError::KeyboardInterrupt => {
-          PyErr::new::<exc::KeyboardInterrupt, _>(py, NoArgs)
-        }
-      })
-    })
-  }
-});
-
 py_class!(class PyExecutionRequest |py| {
     data execution_request: RefCell<ExecutionRequest>;
     def __new__(
@@ -799,14 +734,6 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
 
 // TODO: It's not clear how to return "nothing" (None) in a CPyResult, so this is a placeholder.
 type PyUnitResult = CPyResult<Option<bool>>;
-
-fn nailgun_client_create(
-  py: Python,
-  executor_ptr: PyExecutor,
-  port: u16,
-) -> CPyResult<PyNailgunClient> {
-  PyNailgunClient::create_instance(py, executor_ptr, port)
-}
 
 fn nailgun_server_create(
   py: Python,

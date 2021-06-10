@@ -9,8 +9,6 @@ import re
 from enum import Enum
 from typing import Dict, Iterable, List, Pattern, Sequence
 
-import pint
-
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
@@ -103,7 +101,7 @@ def shell_str(s: str) -> str:
 
 
 def memory_size(s: str | int | float) -> int:
-    """A string or number that normalizes into the number of bytes.
+    """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.
 
     :API: public
     """
@@ -112,23 +110,37 @@ def memory_size(s: str | int | float) -> int:
     if not s:
         raise ParseError("Missing value.")
 
-    ureg = pint.UnitRegistry()
-    invalid_suffix = ParseError(
-        f"Invalid suffix for `{s}`. Expected either a bare number or one of `GB`, `GiB`, `MB`, "
-        f"`MiB`, `kB`, `KiB`, or `B`."
-    )
-    try:
-        parsed = ureg(s)
-    except pint.UndefinedUnitError:
-        raise invalid_suffix
+    original = s
+    s = s.lower().strip()
 
-    if isinstance(parsed, (int, float)):
-        return int(parsed)
     try:
-        parsed.ito("byte")
-    except pint.DimensionalityError:
-        raise invalid_suffix
-    return int(parsed.magnitude)
+        return int(float(s))
+    except ValueError:
+        pass
+
+    invalid = ParseError(
+        f"Invalid value: `{original}`. Expected either a bare number or a number with one of "
+        f"`GiB`, `MiB`, `KiB`, or `B`."
+    )
+
+    def convert_to_bytes(power_of_2) -> int:
+        try:
+            return int(float(s[:-3]) * (2 ** power_of_2))  # type: ignore[index]
+        except TypeError:
+            raise invalid
+
+    if s.endswith("gib"):
+        return convert_to_bytes(30)
+    elif s.endswith("mib"):
+        return convert_to_bytes(20)
+    elif s.endswith("kib"):
+        return convert_to_bytes(10)
+    elif s.endswith("b"):
+        try:
+            return int(float(s[:-1]))
+        except TypeError:
+            raise invalid
+    raise invalid
 
 
 def _convert(val, acceptable_types):

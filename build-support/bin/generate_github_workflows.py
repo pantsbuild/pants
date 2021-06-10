@@ -34,6 +34,7 @@ Env = Dict[str, str]
 
 NATIVE_ENGINE_SO_FILES = [
     "src/python/pants/engine/internals/native_engine.so",
+    "src/python/pants/engine/internals/native_engine_pyo3.so",
     "src/python/pants/engine/internals/native_engine.so.metadata",
 ]
 
@@ -387,10 +388,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     # smoke tests of our release process.
                     """\
                     [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh -n
-                    USE_PY38=true ./build-support/bin/release.sh -n
-                    USE_PY39=true ./build-support/bin/release.sh -n
-                    ./build-support/bin/release.sh -f
+                    ./build-support/bin/release.sh build-wheels
+                    USE_PY38=true ./build-support/bin/release.sh build-wheels
+                    USE_PY39=true ./build-support/bin/release.sh build-wheels
+                    ./build-support/bin/release.sh build-fs-util
                     """
                 ),
                 "if": DONT_SKIP_WHEELS,

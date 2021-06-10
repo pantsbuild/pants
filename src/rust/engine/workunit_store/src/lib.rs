@@ -191,7 +191,6 @@ pub struct WorkunitStore {
   log_starting_workunits: bool,
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
-  metrics_data: MetricsData,
   observation_data: ObservationsData,
 }
 
@@ -515,7 +514,6 @@ impl WorkunitStore {
       // installed.
       streaming_workunit_data: StreamingWorkunitData::new(),
       heavy_hitters_data: HeavyHittersData::new(),
-      metrics_data: MetricsData::default(),
       observation_data: ObservationsData::default(),
     }
   }
@@ -585,7 +583,7 @@ impl WorkunitStore {
     self.complete_workunit_impl(workunit, time)
   }
 
-  fn cancel_workunit(&self, workunit: &Workunit) {
+  fn cancel_workunit(&self, workunit: Workunit) {
     workunit.log_workunit_state(true);
     self
       .heavy_hitters_data
@@ -599,21 +597,12 @@ impl WorkunitStore {
     let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
 
-    let workunit_counters = {
-      let mut counters = self.metrics_data.counters.lock();
-      match counters.entry(span_id) {
-        Entry::Vacant(_) => HashMap::new(),
-        Entry::Occupied(entry) => entry.remove(),
-      }
-    };
-    workunit.counters = workunit_counters.clone();
-
     let tx = self.streaming_workunit_data.msg_tx.lock();
     tx.send(StoreMsg::Completed(
       span_id,
       new_metadata.clone(),
       end_time,
-      workunit_counters.clone(),
+      workunit.counters.clone(),
     ))
     .unwrap();
 
@@ -625,7 +614,7 @@ impl WorkunitStore {
         span_id,
         new_metadata,
         end_time,
-        workunit_counters,
+        workunit.counters.clone(),
       ))
       .unwrap();
 
@@ -684,26 +673,6 @@ impl WorkunitStore {
     self
       .streaming_workunit_data
       .with_latest_workunits(max_verbosity, f)
-  }
-
-  pub fn increment_counter(&self, counter_name: Metric, change: u64) {
-    let store_handle = expect_workunit_store_handle();
-    if let Some(span_id) = store_handle.parent_id {
-      let mut counters = self.metrics_data.counters.lock();
-      counters
-        .entry(span_id)
-        .and_modify(|entry_for_map| {
-          entry_for_map
-            .entry(counter_name)
-            .and_modify(|e| *e += change)
-            .or_insert(change);
-        })
-        .or_insert_with(|| {
-          let mut m = HashMap::new();
-          m.insert(counter_name, change);
-          m
-        });
-    }
   }
 
   ///
@@ -807,69 +776,94 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
-pub async fn with_workunit<F, M>(
+///
+/// NB: Public for macro usage: use the `in_workunit!` macro.
+///
+pub fn _start_workunit(
   workunit_store: WorkunitStore,
   name: String,
   initial_metadata: WorkunitMetadata,
-  f: F,
-  final_metadata_fn: M,
-) -> F::Output
-where
-  F: Future,
-  M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
-{
+) -> (WorkunitStoreHandle, RunningWorkunit) {
   let mut store_handle = expect_workunit_store_handle();
   let span_id = SpanId::new();
   let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
-  let mut workunit =
-    workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
-  let mut guard = CanceledWorkunitGuard::new(&workunit_store, workunit.clone());
-  scope_task_workunit_store_handle(Some(store_handle), async move {
-    let result = f.await;
-    let final_metadata = final_metadata_fn(&result, initial_metadata);
-    workunit.metadata = final_metadata;
-    workunit_store.complete_workunit(workunit);
-    guard.not_canceled();
-    result
-  })
-  .await
+  let workunit = workunit_store.start_workunit(span_id, name, parent_id, initial_metadata);
+  (store_handle, RunningWorkunit::new(workunit_store, workunit))
 }
 
-struct CanceledWorkunitGuard {
+#[macro_export]
+macro_rules! in_workunit {
+    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* $(,)? }) => (
+      {
+        let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+        $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+          let result = {
+            let $workunit = &mut $workunit;
+            async move { $( $body )* }
+          }.await;
+          $workunit.complete();
+          result
+        })
+      }
+    );
+  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => (
+    {
+      let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+      $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+          let result = {
+            let $workunit = &mut $workunit;
+            $f
+          }.await;
+          $workunit.complete();
+          result
+        })
+    }
+  );
+}
+
+pub struct RunningWorkunit {
   store: WorkunitStore,
   workunit: Option<Workunit>,
 }
 
-impl CanceledWorkunitGuard {
-  fn new(store: &WorkunitStore, workunit: Workunit) -> CanceledWorkunitGuard {
-    CanceledWorkunitGuard {
-      store: store.clone(),
+impl RunningWorkunit {
+  fn new(store: WorkunitStore, workunit: Workunit) -> RunningWorkunit {
+    RunningWorkunit {
+      store,
       workunit: Some(workunit),
     }
   }
 
-  fn not_canceled(&mut self) {
-    self.workunit = None;
+  pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
+    if let Some(ref mut workunit) = self.workunit {
+      workunit
+        .counters
+        .entry(counter_name)
+        .and_modify(|e| *e += change)
+        .or_insert(change);
+    }
   }
-}
 
-impl Drop for CanceledWorkunitGuard {
-  fn drop(&mut self) {
-    if let Some(workunit) = &self.workunit {
-      self.store.cancel_workunit(workunit);
+  pub fn update_metadata<F>(&mut self, f: F)
+  where
+    F: FnOnce(WorkunitMetadata) -> WorkunitMetadata,
+  {
+    if let Some(ref mut workunit) = self.workunit {
+      workunit.metadata = f(workunit.metadata.clone())
+    }
+  }
+
+  pub fn complete(&mut self) {
+    if let Some(workunit) = self.workunit.take() {
+      self.store.complete_workunit(workunit);
     }
   }
 }
 
-#[derive(Clone)]
-struct MetricsData {
-  counters: Arc<Mutex<HashMap<SpanId, HashMap<Metric, u64>>>>,
-}
-
-impl Default for MetricsData {
-  fn default() -> MetricsData {
-    MetricsData {
-      counters: Arc::new(Mutex::new(HashMap::new())),
+impl Drop for RunningWorkunit {
+  fn drop(&mut self) {
+    if let Some(workunit) = self.workunit.take() {
+      self.store.cancel_workunit(workunit);
     }
   }
 }

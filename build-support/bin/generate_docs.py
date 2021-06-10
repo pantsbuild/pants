@@ -79,6 +79,18 @@ def html_safe(s: str) -> str:
     return _backtick_re.sub(r"<code>\1</code>", html.escape(s))
 
 
+def description_safe(s: str) -> str:
+    """Escapes special characters in description text.
+
+    Descriptions are generally treated as plain text, not as markdown. But readme.com still renders
+    indented lines as blockquotes, so we must take care not to html-quote inside those.
+    """
+    safe_lines = [line if line.startswith("    ") else html_safe(line) for line in s.splitlines()]
+    safe_lines_str = "\n".join(safe_lines)
+    # Mark as a paragraph to render as plain text, rather than markdown. The spaces matter.
+    return f"<p> {safe_lines_str} </p>"
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
     parser.add_argument(
@@ -218,11 +230,9 @@ class ReferenceGenerator:
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
-                # Description is not rendered as markdown, so we don't want to escape
-                # markdown special characters here (or the escapes will be visible).
-                field["description"] = html_safe(str(field["description"]))
+                field["description"] = description_safe(str(field["description"]))
             target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
-            target["description"] = html_safe(str(target["description"]))
+            target["description"] = description_safe(str(target["description"]))
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 

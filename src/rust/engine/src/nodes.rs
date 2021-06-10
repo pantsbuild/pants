@@ -39,7 +39,7 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  with_workunit, ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  in_workunit, ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -1297,13 +1297,8 @@ impl Node for NodeKey {
 
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
-      message: None,
       level: self.workunit_level(),
-      blocked: false,
-      stdout: None,
-      stderr: None,
-      artifacts: Vec::new(),
-      user_metadata: Vec::new(),
+      ..WorkunitMetadata::default()
     };
     let metadata2 = metadata.clone();
 
@@ -1401,15 +1396,17 @@ impl Node for NodeKey {
       (result, final_metadata)
     };
 
-    with_workunit(
+    in_workunit!(
       workunit_store_handle.store,
       workunit_name,
       metadata,
-      result_future,
-      |result, _| result.1.clone(),
+      |workunit| async move {
+        let (res, final_metadata) = result_future.await;
+        workunit.update_metadata(|_| final_metadata);
+        res
+      }
     )
     .await
-    .0
   }
 
   fn cacheable(&self) -> bool {

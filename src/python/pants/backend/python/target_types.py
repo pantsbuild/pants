@@ -375,6 +375,7 @@ class PexBinary(Target):
         PexPlatformsField,
         PexInheritPathField,
         PexZipSafeField,
+        PexStripEnvField,
         PexAlwaysWriteCacheField,
         PexIgnoreErrorsField,
         PexShebangField,
