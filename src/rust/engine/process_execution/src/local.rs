@@ -80,7 +80,13 @@ impl CommandRunner {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
-        let mut dir_glob = PathBuf::from(p).into_os_string();
+        let mut dir_glob = {
+          let mut dir = PathBuf::from(p).into_os_string();
+          if dir.is_empty() {
+            dir.push(".")
+          }
+          dir
+        };
         let dir = dir_glob.clone();
         dir_glob.push("/**");
         vec![dir, dir_glob]
@@ -543,19 +549,21 @@ pub trait CapturedWorkdir {
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
+      let root = if let Some(ref working_directory) = req.working_directory {
+        workdir_path.join(working_directory)
+      } else {
+        workdir_path.clone()
+      };
       // Use no ignore patterns, because we are looking for explicitly listed paths.
       let posix_fs = Arc::new(
-        fs::PosixFS::new(
-          workdir_path.clone(),
-          fs::GitignoreStyleExcludes::empty(),
-          executor.clone(),
-        )
-        .map_err(|err| {
-          format!(
-            "Error making posix_fs to fetch local process execution output files: {}",
-            err
-          )
-        })?,
+        fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
+          |err| {
+            format!(
+              "Error making posix_fs to fetch local process execution output files: {}",
+              err
+            )
+          },
+        )?,
       );
       CommandRunner::construct_output_snapshot(
         store.clone(),

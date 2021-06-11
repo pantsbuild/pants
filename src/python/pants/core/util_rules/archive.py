@@ -170,10 +170,10 @@ async def maybe_extract_archive(
     digest: Digest, tar_binary: TarBinary, unzip_binary: UnzipBinary
 ) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
-    output_dir = "__output"
+    extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
         Get(Snapshot, Digest, digest),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+        Get(Digest, CreateDigest([Directory(extract_archive_dir)])),
     )
     if len(snapshot.files) != 1:
         return ExtractedArchive(digest)
@@ -199,12 +199,11 @@ async def maybe_extract_archive(
             input_digest=input_digest,
             description=f"Extract {fp}",
             level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
-            working_directory=output_dir,
+            output_directories=(".",),
+            working_directory=extract_archive_dir,
         ),
     )
-    strip_output_dir = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
-    return ExtractedArchive(strip_output_dir)
+    return ExtractedArchive(result.output_digest)
 
 
 def rules():
