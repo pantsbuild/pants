@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import (
     BinaryNotFoundError,
     BinaryPath,
