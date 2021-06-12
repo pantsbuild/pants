@@ -9,7 +9,7 @@ use hashing::EMPTY_DIGEST;
 use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
 use std;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
@@ -567,8 +567,8 @@ async fn working_directory() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
-  // from the ./cats directory.
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
+  // then run from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
@@ -586,6 +586,7 @@ async fn working_directory() {
 
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
+  process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
   process.input_files = TestDirectory::nested().digest();
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
@@ -603,7 +604,10 @@ async fn working_directory() {
   assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::containing_roland().digest()
+  );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
