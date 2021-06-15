@@ -560,6 +560,22 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if !hit_cache && result.exit_code == 0 && self.cache_write {
+      // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
+      // counter is recorded, given that the cache write is async and may still be executing after
+      // the Pants session has finished and workunits are no longer processed.
+      //
+      // TODO(#11688): remove this workunit once we have tailing tasks.
+      in_workunit!(
+        context.workunit_store.clone(),
+        "remote_cache_write_setup".to_owned(),
+        WorkunitMetadata {
+          level: Level::Trace,
+          ..WorkunitMetadata::default()
+        },
+        |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
+        }
+      ).await;
       let command_runner = self.clone();
       let result = result.clone();
       let context2 = context.clone();
@@ -572,7 +588,6 @@ impl crate::CommandRunner for CommandRunner {
           ..WorkunitMetadata::default()
         },
         |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
           let write_result = command_runner
             .update_action_cache(
               &context2,
