@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-import multiprocessing
 import os
 import sys
 from contextlib import contextmanager
@@ -63,9 +62,10 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
-_EXECUTOR = PyExecutor(
-    core_threads=multiprocessing.cpu_count(), max_threads=multiprocessing.cpu_count() * 4
-)
+# Use the ~minimum possible parallelism since integration tests using RuleRunner will already be run
+# by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so 2 is the
+# minimum, but, via trial and error, 3 minimizes test times on average.
+_EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
 
 
 @dataclass(frozen=True)
