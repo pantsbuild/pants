@@ -67,7 +67,8 @@ class InterpreterConstraintsField(StringSequenceField):
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\nSee "
-        f"{bracketed_docs_url('python-interpreter-compatibility')}."
+        f"{bracketed_docs_url('python-interpreter-compatibility')} for how these interpreter "
+        f"constraints are merged with the constraints of dependencies."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
@@ -664,14 +665,25 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+class PythonDistributionInterpreterConstraints(InterpreterConstraintsField):
+    help = InterpreterConstraintsField.help + (
+        "\n\nFor now, Pants will not set `python_requires` for you in the generated setup.py. "
+        "Instead, manually set it in the `provides=setup_py()` field."
+    )
+
+
 class PythonProvidesField(ScalarField, ProvidesField):
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
     help = (
-        "The setup.py kwargs for the external artifact built from this target.\n\nSee "
-        f"{bracketed_docs_url('python-distributions')}."
+        "The setup.py kwargs for the external artifact built from this target.\n\nYou must define "
+        "`name`. You can also set almost any keyword argument accepted by setup.py in the "
+        "`setup_py()` constructor: "
+        "(https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args)."
+        f"\n\nSee {bracketed_docs_url('plugins-setup-py')} for how to write a plugin to "
+        f"dynamically generate kwargs."
     )
 
     @classmethod
@@ -688,8 +700,7 @@ class SetupPyCommandsField(StringSequenceField):
     help = (
         "The runtime commands to invoke setup.py with to create the distribution, e.g. "
         '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
-        "will just create a chroot with a setup() function.\n\nSee "
-        f"{bracketed_docs_url('python-distributions')}."
+        "will just create a chroot with a setup() function."
     )
 
 
@@ -697,8 +708,12 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        PythonDistributionInterpreterConstraints,
         PythonDistributionDependencies,
         PythonProvidesField,
         SetupPyCommandsField,
     )
-    help = "A publishable Python setuptools distribution (e.g. an sdist or wheel)."
+    help = (
+        "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "
+        f"{bracketed_docs_url('python-distributions')}."
+    )
