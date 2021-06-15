@@ -572,7 +572,7 @@ impl crate::CommandRunner for CommandRunner {
           ..WorkunitMetadata::default()
         },
         |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteStarted, 1);
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
           let write_result = command_runner
             .update_action_cache(
               &context2,
@@ -584,10 +584,12 @@ impl crate::CommandRunner for CommandRunner {
               command_digest,
             )
             .await;
-          workunit.increment_counter(Metric::RemoteCacheWriteFinished, 1);
-          if let Err(err) = write_result {
-            command_runner.log_cache_error(err, CacheErrorType::WriteError);
-            workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          match write_result {
+            Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+            Err(err) => {
+              command_runner.log_cache_error(err, CacheErrorType::WriteError);
+              workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+            }
           };
         }
         // NB: We must box the future to avoid a stack overflow.
