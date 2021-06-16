@@ -146,7 +146,11 @@ impl Scheduler {
     let core = self.core.clone();
     self.core.executor.block_on(async move {
       // Confirm that our InvalidationWatcher is still alive.
-      core.watcher.is_valid().await
+      if let Some(watcher) = &core.watcher {
+        watcher.is_valid().await
+      } else {
+        Ok(())
+      }
     })
   }
 

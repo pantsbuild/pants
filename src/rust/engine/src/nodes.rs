@@ -1309,13 +1309,15 @@ impl Node for NodeKey {
       // fails, and prefer that error message if so (because we have little control over the
       // error messages of the watch API).
       let maybe_watch = if let Some(path) = self.fs_subject() {
-        let abs_path = context.core.build_root.join(path);
-        context
-          .core
-          .watcher
-          .watch(abs_path)
-          .map_err(|e| Context::mk_error(&e))
-          .await
+        if let Some(watcher) = &context.core.watcher {
+          let abs_path = context.core.build_root.join(path);
+          watcher
+            .watch(abs_path)
+            .map_err(|e| Context::mk_error(&e))
+            .await
+        } else {
+          Ok(())
+        }
       } else {
         Ok(())
       };

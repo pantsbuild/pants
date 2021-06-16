@@ -199,6 +199,9 @@ class Scheduler:
             remote_parallelism=execution_options.process_execution_remote_parallelism,
         )
 
+
+        # watch filesystem config here!
+
         self._py_scheduler = native_engine.scheduler_create(
             executor,
             tasks,
@@ -209,6 +212,7 @@ class Scheduler:
             ca_certs_path,
             ignore_patterns,
             use_gitignore,
+            True,  # watch_filesystem
             remoting_options,
             py_local_store_options,
             exec_stategy_opts,
