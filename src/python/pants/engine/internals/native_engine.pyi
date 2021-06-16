@@ -104,6 +104,7 @@ def scheduler_create(
     ca_certs_path: str | None,
     ignore_patterns: Sequence[str],
     use_gitignore: bool,
+    watch_filesystem: bool,
     remoting_options: PyRemotingOptions,
     local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,

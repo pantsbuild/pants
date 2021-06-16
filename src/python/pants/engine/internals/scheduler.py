@@ -116,6 +116,7 @@ class Scheduler:
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
         validate_reachability: bool = True,
+        watch_filesystem: bool = True,
     ) -> None:
         """
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
@@ -132,6 +133,7 @@ class Scheduler:
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
           is always a fatal error.
+        :param watch_filesystem: False if filesystem watching should be disabled.
         """
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
@@ -209,6 +211,7 @@ class Scheduler:
             ca_certs_path,
             ignore_patterns,
             use_gitignore,
+            watch_filesystem,
             remoting_options,
             py_local_store_options,
             exec_stategy_opts,
