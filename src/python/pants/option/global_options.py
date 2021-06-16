@@ -1222,7 +1222,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             advanced=True,
-            help="Set to False if Pants should not watch the filesystem for changes. `pantsd` may not be enabled."
+            help="Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop` "
+            "may not be enabled."
         )
 
 
