@@ -33,6 +33,14 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import docs_url
 
 
+class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
+    deprecated_removal_version = "2.7.0.dev0"
+    deprecated_removal_hint = (
+        "The `interpreter_constraints` field does not do anything for `python_awslambda` targets. "
+        "Use the `runtime` field instead to choose the Python interpreter."
+    )
+
+
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
@@ -190,7 +198,7 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        InterpreterConstraintsField,
+        DeprecatedAwsLambdaInterpreterConstraints,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
