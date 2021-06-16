@@ -190,6 +190,7 @@ class EngineInitializer:
             build_root=build_root,
             include_trace_on_error=bootstrap_options.print_stacktrace,
             native_engine_visualize_to=bootstrap_options.native_engine_visualize_to,
+            watch_filesystem=bootstrap_options.watch_filesystem,
         )
 
     @staticmethod
@@ -207,6 +208,7 @@ class EngineInitializer:
         build_root: Optional[str] = None,
         include_trace_on_error: bool = True,
         native_engine_visualize_to: Optional[str] = None,
+        watch_filesystem: bool = True, 
     ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
 
@@ -292,6 +294,7 @@ class EngineInitializer:
             local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=native_engine_visualize_to,
+            watch_filesystem=watch_filesystem,
         )
 
         return GraphScheduler(scheduler, goal_map)

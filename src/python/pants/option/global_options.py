@@ -1217,6 +1217,15 @@ class GlobalOptions(Subsystem):
             help="Overall timeout in seconds for each remote execution request from time of submission",
         )
 
+        register(
+            "--watch-filesystem",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Set to False if Pants should not watch the filesystem for changes. `pantsd` may not be enabled."
+        )
+
+
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -1380,6 +1389,12 @@ class GlobalOptions(Subsystem):
             raise OptionsError(
                 "The `--remote-cache-write` option requires also setting "
                 "`--remote-store-address` or to work properly."
+            )
+
+        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
+            raise OptionsError(
+                "The `--no-watch-filesystem` option may not be set if "
+                "`--pantsd` or `--loop` is set."
             )
 
         def validate_remote_address(opt_name: str) -> None:
