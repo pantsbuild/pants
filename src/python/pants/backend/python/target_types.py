@@ -665,13 +665,6 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonDistributionInterpreterConstraints(InterpreterConstraintsField):
-    help = InterpreterConstraintsField.help + (
-        "\n\nFor now, Pants will not set `python_requires` for you in the generated setup.py. "
-        "Instead, manually set it in the `provides=setup_py()` field."
-    )
-
-
 class PythonProvidesField(ScalarField, ProvidesField):
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
@@ -680,7 +673,7 @@ class PythonProvidesField(ScalarField, ProvidesField):
     help = (
         "The setup.py kwargs for the external artifact built from this target.\n\nYou must define "
         "`name`. You can also set almost any keyword argument accepted by setup.py in the "
-        "`setup_py()` constructor: "
+        "`setup()` function: "
         "(https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args)."
         f"\n\nSee {bracketed_docs_url('plugins-setup-py')} for how to write a plugin to "
         f"dynamically generate kwargs."
@@ -708,7 +701,6 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        PythonDistributionInterpreterConstraints,
         PythonDistributionDependencies,
         PythonProvidesField,
         SetupPyCommandsField,
