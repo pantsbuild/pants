@@ -110,27 +110,8 @@ class JavacCompile(JvmCompile):
         distribution = self._local_jvm_distribution(settings)
 
         javac_args = []
-
-        if settings.args:
-            settings_args = settings.args
-            if any("$JAVA_HOME" in a for a in settings.args):
-                logger.debug(
-                    'Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'.format(
-                        distribution.home
-                    )
-                )
-                settings_args = (a.replace("$JAVA_HOME", distribution.home) for a in settings.args)
-            javac_args.extend(settings_args)
-
-            javac_args.extend(
-                [
-                    # TODO: support -release
-                    "-source",
-                    str(settings.source_level),
-                    "-target",
-                    str(settings.target_level),
-                ]
-            )
+        javac_args.extend(settings.javac_source_target_args(distribution))
+        javac_args.extend(distribution.substitute_home(settings.args))
 
         if self.execution_strategy == self.ExecutionStrategy.hermetic:
             javac_args.extend(

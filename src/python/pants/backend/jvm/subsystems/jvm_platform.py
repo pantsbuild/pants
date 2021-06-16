@@ -366,6 +366,24 @@ class JvmPlatformSettings:
         self._by_default = by_default
         self._validate_source_target()
 
+    def javac_source_target_args(self, distribution):
+        if distribution.version < Revision(9):
+            return [
+                "-source",
+                str(self.source_level),
+                "-target",
+                str(self.target_level),
+            ]
+        else:
+            return ["--release", str(self.release_level)]
+
+    @property
+    def release_level(self):
+        # NB release expects just 8 and not 1.8
+        if self.target_level.components[0] == 1:
+            return Revision(self.target_level.components[1])
+        return self.target_level
+
     def _validate_source_target(self):
         if self.source_level > self.target_level:
             if self.by_default:

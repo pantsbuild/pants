@@ -73,10 +73,6 @@ class BaseZincCompile(JvmCompile):
         while arg_index < len(args):
             arg_index += validate(arg_index)
 
-    def _get_zinc_arguments(self, settings):
-        distribution = self._get_jvm_distribution()
-        return self._format_zinc_arguments(settings, distribution)
-
     @staticmethod
     def _format_zinc_arguments(settings, distribution):
         """Extracts and formats the zinc arguments given in the jvm platform settings.
@@ -87,23 +83,16 @@ class BaseZincCompile(JvmCompile):
         :param settings: The jvm platform settings from which to extract the arguments.
         :type settings: :class:`JvmPlatformSettings`
         """
-        zinc_args = [
-            "-C-source",
-            f"-C{settings.source_level}",
-            "-C-target",
-            f"-C{settings.target_level}",
-        ]
-        if settings.args:
-            settings_args = settings.args
-            if any("$JAVA_HOME" in a for a in settings.args):
-                logger.debug(
-                    'Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'.format(
-                        distribution.home
-                    )
-                )
-                settings_args = (a.replace("$JAVA_HOME", distribution.home) for a in settings.args)
-            zinc_args.extend(settings_args)
-        return zinc_args
+        args = list(settings.args)
+        # if source, target or release is already specified, then don't generate args for them.
+        if all(a not in ("-C-source", "-C-target", "-C--release") for a in args):
+            args.extend(f"-C{arg}" for arg in settings.javac_source_target_args(distribution))
+        # we could inject scala target/release here too, but I think it's unnecessary, because we
+        # can cover that in args.
+        # if we did, it'd look something like
+        # - check for -S-release and -S-target:... in args
+        # - if they aren't there, set some up depending on the distribution.
+        return distribution.substitute_home(args)
 
     @classmethod
     def implementation_version(cls):
@@ -419,6 +408,7 @@ class BaseZincCompile(JvmCompile):
                 jar_file,
             ]
         )
+
         diag_out = self._diagnostics_out(ctx)
         if diag_out:
             zinc_args.extend(["-diag", diag_out])
@@ -470,7 +460,11 @@ class BaseZincCompile(JvmCompile):
             )
 
         zinc_args.extend(args)
-        zinc_args.extend(self._get_zinc_arguments(settings))
+        zinc_args.extend(
+            self._format_zinc_arguments(
+                ctx.target.platform, self._get_jvm_distribution(ctx.target.platform)
+            )
+        )
         zinc_args.append("-transactional")
 
         compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(
@@ -511,10 +505,13 @@ class BaseZincCompile(JvmCompile):
 
         self._verify_zinc_classpath(
             absolute_classpath,
+            self._get_jvm_distribution(ctx.target.platform),
             allow_dist=(self.execution_strategy != self.ExecutionStrategy.hermetic),
         )
         # TODO: Investigate upstream_analysis for hermetic compiles
-        self._verify_zinc_classpath(upstream_analysis.keys())
+        self._verify_zinc_classpath(
+            upstream_analysis.keys(), self._get_jvm_distribution(ctx.target.platform)
+        )
 
         zinc_args = self.create_zinc_args(
             ctx,
@@ -619,7 +616,8 @@ class BaseZincCompile(JvmCompile):
             args=[f"@{ctx.args_file}"],
             workunit_name=self.name(),
             workunit_labels=[WorkUnitLabel.COMPILER],
-            dist=self._zinc.dist,
+            # TODO may also want to ensure that it is a jdk here
+            dist=self._get_jvm_distribution(ctx.target.platform),
         )
         if exit_code != 0:
             raise self.ZincCompileError("Zinc compile failed.", exit_code=exit_code)
@@ -699,6 +697,7 @@ class BaseZincCompile(JvmCompile):
             scala_boot_classpath = [
                 classpath_entry.path for classpath_entry in scalac_classpath_entries
             ] + [
+                # NB these will fail on 9+, they also assume we found a jdk, which may not be the case.
                 # We include rt.jar on the scala boot classpath because the compiler usually gets its
                 # contents from the VM it is executing in, but not in the case of a native image. This
                 # resolves a `object java.lang.Object in compiler mirror not found.` error.
@@ -715,7 +714,6 @@ class BaseZincCompile(JvmCompile):
             ]
         else:
             native_image_snapshots = []
-            # TODO: Lean on distribution for the bin/java appending here
             image_specific_argv = (
                 [".jdk/bin/java"] + jvm_options + ["-cp", zinc_relpath, Zinc.ZINC_COMPILE_MAIN]
             )
@@ -757,7 +755,7 @@ class BaseZincCompile(JvmCompile):
             output_directories=output_directories,
             description=f"zinc compile for {ctx.target.address.spec}",
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=merged_local_only_scratch_inputs,
-            jdk_home=self._zinc.underlying_dist.home,
+            jdk_home=self._get_jvm_distribution(ctx.target.platform).underlying_home,
             is_nailgunnable=True,
         )
         res = self.context.execute_process_synchronously_or_raise(
@@ -818,11 +816,10 @@ class BaseZincCompile(JvmCompile):
         """
         return [self._zinc.zinc.path]
 
-    def _verify_zinc_classpath(self, classpath, allow_dist=True):
+    def _verify_zinc_classpath(self, classpath, dist, allow_dist=True):
         def is_outside(path, putative_parent):
             return os.path.relpath(path, putative_parent).startswith(os.pardir)
 
-        dist = self._zinc.dist
         for path in classpath:
             if not os.path.isabs(path):
                 raise TaskError(

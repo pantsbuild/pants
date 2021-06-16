@@ -517,7 +517,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                         scheduler=self.context._scheduler
                     )
 
-                    distribution = self._get_jvm_distribution()
+                    distribution = self._get_jvm_distribution(target.platform)
 
                     def hermetic_digest_classpath():
                         jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(

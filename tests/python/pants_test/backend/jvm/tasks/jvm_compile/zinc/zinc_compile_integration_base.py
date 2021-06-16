@@ -596,3 +596,79 @@ class BaseZincCompileIntegrationTest:
             "examples/src/scala/org/pantsbuild/example/hello/exe", extra_args=extra_args
         ):
             pass
+
+    def test_differing_platforms(self):
+        with temporary_dir() as cache_dir, self.temporary_workdir() as workdir, temporary_dir(
+            root_dir=get_buildroot()
+        ) as src_dir:
+
+            config = {
+                "cache.compile.rsc": {"write_to": [cache_dir], "read_from": [cache_dir]},
+                "jvm-platform": {
+                    "platforms": {
+                        "six": {"source": "6", "target": "6"},
+                        "seven": {"source": "7", "target": "7"},
+                    },
+                    "default_platform": "seven",
+                },
+            }
+
+            srcfile = os.path.join(src_dir, "org", "pantsbuild", "cachetest", "A.java")
+            buildfile = os.path.join(src_dir, "org", "pantsbuild", "cachetest", "BUILD")
+
+            self.create_file(
+                srcfile,
+                dedent(
+                    """
+                    package org.pantsbuild.cachetest;
+                    class A {
+                      public static void main(String[] args) {
+                        // 0b000 syntax is only on java 7+
+                        System.out.println("only-on-7 "+0b101);
+                      }
+                    }
+                    """
+                ),
+            )
+            self.create_file(
+                buildfile,
+                dedent(
+                    """
+                    java_library(name='a',
+                                 sources=['A.java'])
+                    jvm_binary(name='bin',
+                               main='org.pantsbuild.cachetest.A',
+                               dependencies=[':a'])
+                    """
+                ),
+            )
+
+            cachetest_bin_spec = os.path.join(
+                os.path.basename(src_dir), "org", "pantsbuild", "cachetest:bin"
+            )
+            cachetest_spec = cachetest_bin_spec
+
+            # Compiles :a with java 7, and succeeds
+            pants_run = self.run_pants_with_workdir(
+                ["compile", cachetest_spec], workdir, config=config
+            )
+            self.assert_success(pants_run)
+            self.create_file(
+                buildfile,
+                dedent(
+                    """
+                    java_library(name='a',
+                                 platform='six',
+                                 sources=['A.java'])
+                    jvm_binary(name='bin',
+                               main='org.pantsbuild.cachetest.A',
+                               dependencies=[':a'])
+                    """
+                ),
+            )
+            # Forcing the platform to 6, should fail, because 6 doesn't support binary literals.
+            pants_run = self.run_pants_with_workdir(
+                ["compile", cachetest_spec], workdir, config=config
+            )
+            self.assert_failure(pants_run)
+            self.assertIn("binary literals are not supported in -source 1.6", pants_run.stdout_data)
