@@ -1223,9 +1223,8 @@ class GlobalOptions(Subsystem):
             default=True,
             advanced=True,
             help="Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop` "
-            "may not be enabled."
+            "may not be enabled.",
         )
-
 
     @classmethod
     def register_options(cls, register):
