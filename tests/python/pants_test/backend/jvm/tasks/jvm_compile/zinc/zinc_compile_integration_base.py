@@ -609,7 +609,7 @@ class BaseZincCompileIntegrationTest:
                         "six": {"source": "6", "target": "6"},
                         "seven": {"source": "7", "target": "7"},
                     },
-                    "default_platform": "six",
+                    "default_platform": "seven",
                 },
             }
 
@@ -623,7 +623,8 @@ class BaseZincCompileIntegrationTest:
                     package org.pantsbuild.cachetest;
                     class A {
                       public static void main(String[] args) {
-                        System.out.println("hello");
+                        // 0b000 syntax is only on java 7+
+                        System.out.println("only-on-7 "+0b101);
                       }
                     }
                     """
@@ -647,21 +648,27 @@ class BaseZincCompileIntegrationTest:
             )
             cachetest_spec = cachetest_bin_spec
 
-            # Cache values A.class
-            self.run_run(cachetest_spec, config, workdir)
-
+            # Compiles :a with java 7, and succeeds
+            pants_run = self.run_pants_with_workdir(
+                ["compile", cachetest_spec], workdir, config=config
+            )
+            self.assert_success(pants_run)
             self.create_file(
                 buildfile,
                 dedent(
                     """
                     java_library(name='a',
-                                 platform='seven',
+                                 platform='six',
                                  sources=['A.java'])
                     jvm_binary(name='bin',
                                main='org.pantsbuild.cachetest.A',
-                               platform='seven',
                                dependencies=[':a'])
                     """
                 ),
             )
-            self.run_run(cachetest_bin_spec, config, workdir)
+            # Forcing the platform to 6, should fail, because 6 doesn't support binary literals.
+            pants_run = self.run_pants_with_workdir(
+                ["compile", cachetest_spec], workdir, config=config
+            )
+            self.assert_failure(pants_run)
+            self.assertIn("binary literals are not supported in -source 1.6", pants_run.stdout_data)
