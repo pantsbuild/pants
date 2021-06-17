@@ -173,3 +173,16 @@ def test_multiget_invalid_Nones() -> None:
         next(
             MultiGet(None, Get(AClass, BClass()), None, None).__await__()  # type: ignore[call-overload]
         )
+
+
+# N.B.: MultiGet takes either:
+# 1. One homogenous Get collection.
+# 2. Up to 10 homogeneous or heterogeneous Gets
+# 3. 11 or more homogenous Gets.
+#
+# Here we test that the runtime actually accepts 11 or more Gets. This is really just a regression
+# test that checks MultiGet retains a trailing *args slot.
+@pytest.mark.parametrize("count", list(range(1, 20)))
+def test_homogenous(count) -> None:
+    gets = tuple(Get(AClass, BClass()) for _ in range(count))
+    assert gets == next(MultiGet(*gets).__await__())

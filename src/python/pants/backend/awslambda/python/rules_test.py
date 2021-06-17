@@ -56,32 +56,28 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
 
 
 def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/python/foo/bar/hello_world.py",
-        dedent(
-            """
-            def handler(event, context):
-                print('Hello, World!')
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_library(name='lib')
+
+                python_awslambda(
+                    name='lambda',
+                    dependencies=[':lib'],
+                    handler='foo.bar.hello_world:handler',
+                    runtime='python3.7',
+                )
+                """
+            ),
+        }
     )
-
-    rule_runner.add_to_build_file(
-        "src/python/foo/bar",
-        dedent(
-            """
-            python_library(name='lib')
-
-            python_awslambda(
-                name='lambda',
-                dependencies=[':lib'],
-                handler='foo.bar.hello_world:handler',
-                runtime='python3.7',
-            )
-            """
-        ),
-    )
-
     zip_file_relpath, content = create_python_awslambda(
         rule_runner, Address("src/python/foo/bar", target_name="lambda")
     )
@@ -93,49 +89,46 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
 
 
 def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.create_file("assets/f.txt")
-    rule_runner.add_to_build_file(
-        "assets",
-        dedent(
-            """\
-            files(name='files', sources=['f.txt'])
-            relocated_files(
-                name='relocated',
-                files_targets=[':files'],
-                src='assets',
-                dest='new_assets',
-            )
+    rule_runner.write_files(
+        {
+            "assets/f.txt": "",
+            "assets/BUILD": dedent(
+                """\
+                files(name='files', sources=['f.txt'])
+                relocated_files(
+                    name='relocated',
+                    files_targets=[':files'],
+                    src='assets',
+                    dest='new_assets',
+                )
 
-            # Resources are fine.
-            resources(name='resources', sources=['f.txt'])
-            """
-        ),
-    )
-    rule_runner.create_file("src/py/project/__init__.py")
-    rule_runner.create_file(
-        "src/py/project/app.py",
-        """\
-        def handler(event, context):
-            print('Hello, World!')
-        """,
-    )
-    rule_runner.add_to_build_file(
-        "src/py/project",
-        dedent(
-            """\
-            python_library(
-                name='lib',
-                dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
-            )
+                # Resources are fine.
+                resources(name='resources', sources=['f.txt'])
+                """
+            ),
+            "src/py/project/__init__.py": "",
+            "src/py/project/app.py": dedent(
+                """\
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_library(
+                    name='lib',
+                    dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
+                )
 
-            python_awslambda(
-                name='lambda',
-                dependencies=[':lib'],
-                handler='foo.bar.hello_world:handler',
-                runtime='python3.7',
-            )
-            """
-        ),
+                python_awslambda(
+                    name='lambda',
+                    dependencies=[':lib'],
+                    handler='foo.bar.hello_world:handler',
+                    runtime='python3.7',
+                )
+                """
+            ),
+        }
     )
 
     assert not caplog.records

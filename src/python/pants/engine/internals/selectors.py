@@ -278,6 +278,24 @@ async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> Tuple[_Output, ...
 
 @overload
 async def MultiGet(  # noqa: F811
+    __get0: Get[_Output, _Input],
+    __get1: Get[_Output, _Input],
+    __get2: Get[_Output, _Input],
+    __get3: Get[_Output, _Input],
+    __get4: Get[_Output, _Input],
+    __get5: Get[_Output, _Input],
+    __get6: Get[_Output, _Input],
+    __get7: Get[_Output, _Input],
+    __get8: Get[_Output, _Input],
+    __get9: Get[_Output, _Input],
+    __get10: Get[_Output, _Input],
+    *__gets: Get[_Output, _Input],
+) -> Tuple[_Output, ...]:
+    ...
+
+
+@overload
+async def MultiGet(  # noqa: F811
     __get0: Get[_Out0, _In0],
     __get1: Get[_Out1, _In1],
     __get2: Get[_Out2, _In2],
@@ -392,6 +410,7 @@ async def MultiGet(  # noqa: F811
     __arg7: Optional[Get[_Out7, _In7]] = None,
     __arg8: Optional[Get[_Out8, _In8]] = None,
     __arg9: Optional[Get[_Out9, _In9]] = None,
+    *__args: Get[_Output, _Input],
 ) -> Union[
     Tuple[_Output, ...],
     Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9],
@@ -426,9 +445,8 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
-        if any((__arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9)):
-            raise ValueError()
         return await _MultiGet(tuple(__arg0))
 
     if (
@@ -442,9 +460,22 @@ async def MultiGet(  # noqa: F811
         and isinstance(__arg7, Get)
         and isinstance(__arg8, Get)
         and isinstance(__arg9, Get)
+        and all(isinstance(arg, Get) for arg in __args)
     ):
         return await _MultiGet(
-            (__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9)
+            (
+                __arg0,
+                __arg1,
+                __arg2,
+                __arg3,
+                __arg4,
+                __arg5,
+                __arg6,
+                __arg7,
+                __arg8,
+                __arg9,
+                *__args,
+            )
         )
 
     if (
@@ -458,6 +489,7 @@ async def MultiGet(  # noqa: F811
         and isinstance(__arg7, Get)
         and isinstance(__arg8, Get)
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet(
             (__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8)
@@ -474,6 +506,7 @@ async def MultiGet(  # noqa: F811
         and isinstance(__arg7, Get)
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
@@ -488,6 +521,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
 
@@ -502,6 +536,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
 
@@ -516,6 +551,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
 
@@ -530,6 +566,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
 
@@ -544,6 +581,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1, __arg2))
 
@@ -558,6 +596,7 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0, __arg1))
 
@@ -572,10 +611,11 @@ async def MultiGet(  # noqa: F811
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
+        and not __args
     ):
         return await _MultiGet((__arg0,))
 
-    args = __arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9
+    args = __arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9, *__args
 
     def render_arg(arg: Any) -> Optional[str]:
         if arg is None:
@@ -620,9 +660,10 @@ async def MultiGet(  # noqa: F811
             collect the results in a homogenous tuple when all are complete.
 
             The 2nd form supports executing heterogeneous Gets in parallel and collecting them in a
-            heterogenous tuple when all are complete. Currently up to 10 heterogenous Gets can be
+            heterogeneous tuple when all are complete. Currently up to 10 heterogeneous Gets can be
             passed while still tracking their output types for type-checking by MyPy and similar
-            type checkers.
+            type checkers. If more than 10 Gets are passed, type checking will enforce the Gets are
+            homogeneous.
             """
         )
     )

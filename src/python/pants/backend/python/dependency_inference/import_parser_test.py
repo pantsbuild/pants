@@ -1,8 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import List, Optional
 
 import pytest
 
@@ -13,7 +14,7 @@ from pants.backend.python.dependency_inference.import_parser import (
 )
 from pants.backend.python.target_types import PythonLibrary, PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import (
@@ -39,24 +40,30 @@ def rule_runner() -> RuleRunner:
 
 def assert_imports_parsed(
     rule_runner: RuleRunner,
-    content: Optional[str],
+    content: str | None,
     *,
-    expected_explicit: List[str],
-    expected_string: List[str],
+    expected: list[str],
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
-):
-    if content:
-        rule_runner.create_file(filename, content)
+    string_imports: bool = True,
+) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    rule_runner.add_to_build_file("project", "python_library(sources=['**/*.py'])")
+    files = {"project/BUILD": "python_library(sources=['**/*.py'])"}
+    if content is not None:
+        files[filename] = content
+    rule_runner.write_files(files)  # type: ignore[arg-type]
     tgt = rule_runner.get_target(Address("project"))
     imports = rule_runner.request(
         ParsedPythonImports,
-        [ParsePythonImportsRequest(tgt[PythonSources], PexInterpreterConstraints([constraints]))],
+        [
+            ParsePythonImportsRequest(
+                tgt[PythonSources],
+                InterpreterConstraints([constraints]),
+                string_imports=string_imports,
+            )
+        ],
     )
-    assert set(imports.explicit_imports) == set(expected_explicit)
-    assert set(imports.string_imports) == set(expected_string)
+    assert list(imports) == sorted(expected)
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -91,7 +98,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(
         rule_runner,
         content,
-        expected_explicit=[
+        expected=[
             "__future__.print_function",
             "os",
             "os.path",
@@ -106,7 +113,6 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "subprocess23",
             "pkg_resources",
         ],
-        expected_string=[],
     )
 
 
@@ -124,13 +130,12 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
         rule_runner,
         content,
         filename=f"project/util/{basename}",
-        expected_explicit=[
+        expected=[
             "project.util.sibling",
             "project.util.sibling.Nibling",
             "project.util.subdir.child.Child",
             "project.parent.Parent",
         ],
-        expected_string=[],
     )
 
 
@@ -147,6 +152,7 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             'a.b.c.d.e.f.g.Baz',
             'a.b_c.d._bar',
             'a.b2.c.D',
+            'a.b.c_狗',
 
             # Invalid strings
             '..a.b.c.d',
@@ -167,8 +173,7 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(
         rule_runner,
         content,
-        expected_explicit=[],
-        expected_string=[
+        expected=[
             "a.b.d",
             "a.b2.d",
             "a.b.c.Foo",
@@ -177,28 +182,29 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             "a.b.c.d.e.f.g.Baz",
             "a.b_c.d._bar",
             "a.b2.c.D",
+            "a.b.c_狗",
         ],
     )
+    assert_imports_parsed(rule_runner, content, string_imports=False, expected=[])
 
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, content="x =", expected_explicit=[], expected_string=[])
+    assert_imports_parsed(rule_runner, content="x =", expected=[])
 
 
 def test_handle_unicode(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(
-        rule_runner, content="x = 'äbç'", expected_explicit=[], expected_string=[]
-    )
+    assert_imports_parsed(rule_runner, content="x = 'äbç'", expected=[])
 
 
 def test_gracefully_handle_no_sources(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, content=None, expected_explicit=[], expected_string=[])
+    assert_imports_parsed(rule_runner, content=None, expected=[])
 
 
 @skip_unless_python27_present
 def test_works_with_python2(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
+        # -*- coding: utf-8 -*-
         print "Python 2 lives on."
 
         import demo
@@ -209,19 +215,24 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
+        importlib.import_module(u"dep.from.str_狗")
+
+        b"\\xa0 a non-utf8 string, make sure we ignore it"
         """
     )
     assert_imports_parsed(
         rule_runner,
         content,
         constraints="==2.7.*",
-        expected_explicit=[
+        expected=[
             "demo",
+            "dep.from.bytes",
+            "dep.from.str",
+            "dep.from.str_狗",
             "project.demo.Demo",
             "pkg_resources",
             "treat.as.a.regular.import.not.a.string.import",
         ],
-        expected_string=["dep.from.bytes", "dep.from.str"],
     )
 
 
@@ -246,13 +257,13 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.8",
-        expected_explicit=[
+        expected=[
             "demo",
+            "dep.from.str",
             "project.demo.Demo",
             "pkg_resources",
             "treat.as.a.regular.import.not.a.string.import",
         ],
-        expected_string=["dep.from.str"],
     )
 
 
@@ -279,11 +290,11 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.9",
-        expected_explicit=[
+        expected=[
             "demo",
+            "dep.from.str",
             "project.demo.Demo",
             "pkg_resources",
             "treat.as.a.regular.import.not.a.string.import",
         ],
-        expected_string=["dep.from.str"],
     )

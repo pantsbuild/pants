@@ -119,6 +119,7 @@ class WorkunitsCallback(ABC):
         """
 
     @property
+    @abstractmethod
     def can_finish_async(self) -> bool:
         """Can this callback finish its work in the background after the Pants run has already
         completed?
@@ -128,7 +129,6 @@ class WorkunitsCallback(ABC):
         which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
         slowing down Pants from finishing the run.
         """
-        return False
 
 
 @dataclass(frozen=True)
@@ -185,7 +185,7 @@ class StreamingWorkunitHandler:
         pantsd: bool,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ) -> None:
-        scheduler = scheduler.isolated_shallow_clone()
+        scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
         self.callbacks = callbacks
         self.context = StreamingWorkunitContext(
             _scheduler=scheduler,

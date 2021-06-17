@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, TypeVar, cast
+from typing import ClassVar, Optional, Tuple, Type, TypeVar, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
@@ -196,7 +196,7 @@ async def fmt(
     union_membership: UnionMembership,
 ) -> Fmt:
     language_target_collection_types = union_membership[LanguageFmtTargets]
-    language_target_collections: Iterable[LanguageFmtTargets] = tuple(
+    language_target_collections = tuple(
         language_target_collection_type(
             Targets(
                 target
@@ -206,7 +206,7 @@ async def fmt(
         )
         for language_target_collection_type in language_target_collection_types
     )
-    targets_with_sources: Iterable[TargetsWithSources] = await MultiGet(
+    targets_with_sources = await MultiGet(
         Get(
             TargetsWithSources,
             TargetsWithSourcesRequest(language_target_collection.targets),
@@ -216,7 +216,7 @@ async def fmt(
     # NB: We must convert back the generic TargetsWithSources objects back into their
     # corresponding LanguageFmtTargets, e.g. back to PythonFmtTargets, in order for the union
     # rule to work.
-    valid_language_target_collections: Iterable[LanguageFmtTargets] = tuple(
+    valid_language_target_collections = tuple(
         language_target_collection_cls(
             Targets(
                 target
@@ -246,7 +246,7 @@ async def fmt(
             for language_target_collection in valid_language_target_collections
         )
 
-    individual_results: List[FmtResult] = list(
+    individual_results = list(
         itertools.chain.from_iterable(
             language_result.results for language_result in per_language_results
         )

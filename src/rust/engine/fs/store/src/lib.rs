@@ -48,6 +48,7 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use serde_derive::Serialize;
+use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -58,21 +59,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
+use crate::remote::ByteStoreError;
+use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::status_to_str;
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::Tree;
 
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
-
-///
-/// This is the target number of bytes which should be present in all combined LMDB store files
-/// after garbage collection. We almost certainly want to make this configurable.
-///
-/// Because LMDB is sharded (by ShardedLmdb::NUM_SHARDS), this value also bounds the maximum size
-/// of individual items in the store: see the relevant calls to `ShardedLmdb::new` for more info.
-///
-pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
 
 mod local;
 #[cfg(test)]
@@ -81,6 +76,28 @@ pub mod local_tests;
 mod remote;
 #[cfg(test)]
 mod remote_tests;
+
+pub struct LocalOptions {
+  pub files_max_size_bytes: usize,
+  pub directories_max_size_bytes: usize,
+  pub lease_time: Duration,
+  pub shard_count: u8,
+}
+
+///
+/// NB: These defaults are intended primarily for use in tests: high level code should expose
+/// explicit settings in most cases.
+///
+impl Default for LocalOptions {
+  fn default() -> Self {
+    Self {
+      files_max_size_bytes: 16 * 4 * GIGABYTES,
+      directories_max_size_bytes: 2 * 4 * GIGABYTES,
+      lease_time: DEFAULT_LEASE_TIME,
+      shard_count: 16,
+    }
+  }
+}
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -183,6 +200,38 @@ enum RootOrParentMetadataBuilder {
   ),
 }
 
+#[derive(Clone, Debug)]
+struct RemoteStore {
+  store: remote::ByteStore,
+  in_flight_uploads: Arc<parking_lot::Mutex<HashSet<Digest>>>,
+}
+
+impl RemoteStore {
+  fn new(store: remote::ByteStore) -> Self {
+    Self {
+      store,
+      in_flight_uploads: Arc::new(parking_lot::Mutex::new(HashSet::new())),
+    }
+  }
+
+  fn reserve_uploads(&self, candidates: HashSet<Digest>) -> HashSet<Digest> {
+    let mut active_uploads = self.in_flight_uploads.lock();
+    let to_upload = candidates
+      .difference(&active_uploads)
+      .cloned()
+      .collect::<HashSet<_>>();
+    active_uploads.extend(&to_upload);
+    to_upload
+  }
+
+  fn release_uploads(&self, uploads: HashSet<Digest>) {
+    self
+      .in_flight_uploads
+      .lock()
+      .retain(|d| !uploads.contains(d));
+  }
+}
+
 ///
 /// A content-addressed store of file contents, and Directories.
 ///
@@ -198,7 +247,7 @@ enum RootOrParentMetadataBuilder {
 #[derive(Debug, Clone)]
 pub struct Store {
   local: local::ByteStore,
-  remote: Option<remote::ByteStore>,
+  remote: Option<RemoteStore>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -237,6 +286,17 @@ impl Store {
     })
   }
 
+  pub fn local_only_with_options<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+    options: LocalOptions,
+  ) -> Result<Store, String> {
+    Ok(Store {
+      local: local::ByteStore::new_with_options(executor, path, options)?,
+      remote: None,
+    })
+  }
+
   ///
   /// Converts this (copy of) a Store to local only by dropping the remote half.
   ///
@@ -251,12 +311,11 @@ impl Store {
   }
 
   ///
-  /// Make a store which uses local storage, and if it is missing a value which it tries to load,
-  /// will attempt to back-fill its local storage from a remote CAS.
+  /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
+  /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn with_remote<P: AsRef<Path>>(
-    executor: task_executor::Executor,
-    path: P,
+  pub fn into_with_remote(
+    self,
     cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
@@ -266,8 +325,8 @@ impl Store {
     rpc_retries: usize,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(executor, path)?,
-      remote: Some(remote::ByteStore::new(
+      local: self.local,
+      remote: Some(RemoteStore::new(remote::ByteStore::new(
         cas_address,
         instance_name,
         root_ca_certs,
@@ -275,7 +334,7 @@ impl Store {
         chunk_size_bytes,
         upload_timeout,
         rpc_retries,
-      )?),
+      )?)),
     })
   }
 
@@ -456,8 +515,21 @@ impl Store {
     match (maybe_local_value, maybe_remote) {
       (Some(value_result), _) => value_result.map(|res| Some((res, LoadMetadata::Local))),
       (None, None) => Ok(None),
-      (None, Some(remote)) => {
-        let maybe_bytes = remote.load_bytes_with(digest, Ok).await?;
+      (None, Some(remote_store)) => {
+        let remote = remote_store.store.clone();
+        let maybe_bytes = retry_call(
+          remote,
+          |remote| async move { remote.load_bytes_with(digest, Ok).await },
+          |err| match err {
+            ByteStoreError::Grpc(status) => status_is_retryable(status),
+            _ => false,
+          },
+        )
+        .await
+        .map_err(|err| match err {
+          ByteStoreError::Grpc(status) => status_to_str(status),
+          ByteStoreError::Other(msg) => msg,
+        })?;
 
         match maybe_bytes {
           Some(bytes) => {
@@ -491,15 +563,15 @@ impl Store {
   ) -> BoxFuture<'static, Result<UploadSummary, String>> {
     let start_time = Instant::now();
 
-    let remote = if let Some(ref remote) = self.remote {
-      remote
+    let remote_store = if let Some(ref remote) = self.remote {
+      remote.clone()
     } else {
       return futures::future::err("Cannot ensure remote has blobs without a remote".to_owned())
         .boxed();
     };
 
     let store = self.clone();
-    let remote = remote.clone();
+    let remote = remote_store.store.clone();
     async move {
       let ingested_digests = store
         .expand_digests(digests.iter(), LocalMissingBehavior::Fetch)
@@ -512,31 +584,42 @@ impl Store {
           remote.list_missing_digests(request).await?
         };
 
-      let uploaded_digests = future::try_join_all(
-        digests_to_upload
-          .into_iter()
-          .map(|digest| {
-            let entry_type = ingested_digests[&digest];
-            let local = store.local.clone();
-            let remote = remote.clone();
-
-            async move {
-              let executor = local.executor().clone();
-              let maybe_upload = local
-                .load_bytes_with(entry_type, digest, move |bytes| {
-                  // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
-                  executor.block_on(remote.store_bytes(bytes))
-                })
-                .await?;
-              match maybe_upload {
-                Some(res) => res,
-                None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
+      let uploaded_digests = {
+        // Here we best-effort avoid uploading common blobs multiple times. If a blob is generated
+        // that many downstream actions depend on, we would otherwise get an expanded set of digests
+        // from each of those actions that includes the new blob. If those actions all execute in a
+        // time window smaller than the time taken to upload the blob, the effort would be
+        // duplicated leading to both wasted resources locally buffering up the blob as well as
+        // wasted effort on the remote server depending on its handling of this.
+        let to_upload = remote_store.reserve_uploads(digests_to_upload);
+        let uploaded_digests_result = future::try_join_all(
+          to_upload
+            .clone()
+            .into_iter()
+            .map(|digest| {
+              let entry_type = ingested_digests[&digest];
+              let local = store.local.clone();
+              let remote = remote.clone();
+              async move {
+                // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
+                // to disk to be independent of the remote store wire chunk size.
+                if digest.size_bytes > remote.chunk_size_bytes() {
+                  Self::store_large_blob_remote(local, remote, entry_type, digest).await
+                } else {
+                  Self::store_small_blob_remote(local, remote, entry_type, digest).await
+                }
               }
-            }
-          })
-          .collect::<Vec<_>>(),
-      )
-      .await?;
+              .map_ok(move |()| digest)
+            })
+            .collect::<Vec<_>>(),
+        )
+        .await;
+        // We release the uploads whether or not they actually succeeded. Future checks for large
+        // uploads will issue `find_missing_blobs_request`s that will eventually reconcile our
+        // accounting. In the mean-time we error on the side of at least once semantics.
+        remote_store.release_uploads(to_upload);
+        uploaded_digests_result?
+      };
 
       let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
       let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.size_bytes);
@@ -550,6 +633,66 @@ impl Store {
       })
     }
     .boxed()
+  }
+
+  async fn store_small_blob_remote(
+    local: local::ByteStore,
+    remote: remote::ByteStore,
+    entry_type: EntryType,
+    digest: Digest,
+  ) -> Result<(), String> {
+    // We need to copy the bytes into memory so that they may be used safely in an async
+    // future. While this unfortunately increases memory consumption, we prioritize
+    // being able to run `remote.store_bytes()` as async.
+    //
+    // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
+    // that used `Executor.block_on`, which avoided the clone but was blocking.
+    let maybe_bytes = local
+      .load_bytes_with(entry_type, digest, move |bytes| {
+        Bytes::copy_from_slice(bytes)
+      })
+      .await?;
+    match maybe_bytes {
+      Some(bytes) => remote.store_bytes(bytes).await,
+      None => Err(format!(
+        "Failed to upload {entry_type:?} {digest:?}: Not found in local store.",
+        entry_type = entry_type,
+        digest = digest
+      )),
+    }
+  }
+
+  async fn store_large_blob_remote(
+    local: local::ByteStore,
+    remote: remote::ByteStore,
+    entry_type: EntryType,
+    digest: Digest,
+  ) -> Result<(), String> {
+    remote
+      .store_buffered(digest, |mut buffer| async {
+        let result = local
+          .load_bytes_with(entry_type, digest, move |bytes| {
+            buffer.write_all(bytes).map_err(|e| {
+              format!(
+                "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
+                entry_type = entry_type,
+                digest = digest,
+                err = e
+              )
+            })
+          })
+          .await?;
+        match result {
+          None => Err(format!(
+            "Failed to upload {entry_type:?} {digest:?}: Not found in local store.",
+            entry_type = entry_type,
+            digest = digest
+          )),
+          Some(Err(err)) => Err(err),
+          Some(Ok(())) => Ok(()),
+        }
+      })
+      .await
   }
 
   ///
@@ -617,13 +760,12 @@ impl Store {
     let result = self
       .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
       .await?;
-    if result.is_some() {
-      Ok(())
-    } else {
-      Err(format!(
-        "File {:?} did not exist in the store.",
-        file_digest
-      ))
+    match result {
+      Some(_) => Ok(()),
+      None => {
+        log::debug!("Missing file digest from remote store: {:?}", file_digest);
+        Err("File did not exist in the remote store.".to_owned())
+      }
     }
   }
 
@@ -644,12 +786,27 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = remote
-      .load_bytes_with(tree_digest, |b| {
-        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-        Ok(tree)
-      })
-      .await?;
+    let tree_opt = retry_call(
+      remote,
+      |remote| async move {
+        remote
+          .store
+          .load_bytes_with(tree_digest, |b| {
+            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
+            Ok(tree)
+          })
+          .await
+      },
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        _ => false,
+      },
+    )
+    .await
+    .map_err(|err| match err {
+      ByteStoreError::Grpc(status) => status_to_str(status),
+      ByteStoreError::Other(msg) => msg,
+    })?;
 
     let tree = match tree_opt {
       Some(t) => t,
@@ -795,8 +952,7 @@ impl Store {
   ) -> BoxFuture<'static, Result<HashMap<Digest, EntryType>, String>> {
     self
       .walk(digest, |_, _, digest, directory| {
-        let mut digest_types = Vec::new();
-        digest_types.push((digest, EntryType::Directory));
+        let mut digest_types = vec![(digest, EntryType::Directory)];
         for file in &directory.files {
           let file_digest = try_future!(require_digest(file.digest.as_ref()));
           digest_types.push((file_digest, EntryType::File));

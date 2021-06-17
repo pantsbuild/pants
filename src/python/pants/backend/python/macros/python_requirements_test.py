@@ -68,7 +68,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
         ),
         expected_file_dep=PythonRequirementsFile(
             {"sources": ["requirements.txt"]},
-            address=Address("", target_name="requirements.txt"),
+            Address("", target_name="requirements.txt"),
         ),
         expected_targets=[
             PythonRequirementLibrary(
@@ -77,28 +77,28 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                     "module_mapping": {"ansicolors": ["colors"]},
                 },
-                address=Address("", target_name="ansicolors"),
+                Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Django==3.2 ; python_version>'3'")],
                 },
-                address=Address("", target_name="Django"),
+                Address("", target_name="Django"),
             ),
             PythonRequirementLibrary(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Un_Normalized_PROJECT")],
                 },
-                address=Address("", target_name="Un-Normalized-PROJECT"),
+                Address("", target_name="Un-Normalized-PROJECT"),
             ),
             PythonRequirementLibrary(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
                 },
-                address=Address("", target_name="pip"),
+                Address("", target_name="pip"),
             ),
         ],
     )
@@ -106,9 +106,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
 
 def test_invalid_req(rule_runner: RuleRunner) -> None:
     """Test that we give a nice error message."""
-    fake_file_tgt = PythonRequirementsFile(
-        {"sources": ["doesnt matter"]}, address=Address("doesnt_matter")
-    )
+    fake_file_tgt = PythonRequirementsFile({"sources": ["doesnt matter"]}, Address("doesnt_matter"))
     with pytest.raises(ExecutionError) as exc:
         assert_python_requirements(
             rule_runner,
@@ -141,7 +139,7 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
         requirements_txt_relpath="subdir/requirements.txt",
         expected_file_dep=PythonRequirementsFile(
             {"sources": ["subdir/requirements.txt"]},
-            address=Address("", target_name="subdir_requirements.txt"),
+            Address("", target_name="subdir_requirements.txt"),
         ),
         expected_targets=[
             PythonRequirementLibrary(
@@ -149,7 +147,7 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
                     "dependencies": [":subdir_requirements.txt"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                 },
-                address=Address("", target_name="ansicolors"),
+                Address("", target_name="ansicolors"),
             ),
         ],
     )

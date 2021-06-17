@@ -281,3 +281,16 @@ def test_toml_serializer() -> None:
         "cache": {"java": {"o": ""}},
         "inception": {"nested": {"nested-again": {"one-more": {"o": ""}}}},
     }
+
+
+def test_toml_serializer_add_remove() -> None:
+    original_values: Dict = {
+        "GLOBAL": {
+            "backend_packages.add": ["added"],
+        },
+    }
+    assert TomlSerializer(original_values).normalize() == {
+        "GLOBAL": {
+            "backend_packages": "+['added']",
+        },
+    }

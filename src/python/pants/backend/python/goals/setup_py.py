@@ -23,13 +23,8 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     SetupPyCommandsField,
 )
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
@@ -66,10 +61,11 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
@@ -92,7 +88,7 @@ class OwnershipError(Exception):
 
     def __init__(self, msg: str):
         super().__init__(
-            f"{msg} See {docs_url('python-distributions')} for "
+            f"{msg} See {bracketed_docs_url('python-distributions')} for "
             f"how python_library targets are mapped to distributions."
         )
 
@@ -289,7 +285,7 @@ class RunSetupPyRequest:
     """A request to run a setup.py command."""
 
     exported_target: ExportedTarget
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     chroot: SetupPyChroot
     args: Tuple[str, ...]
 
@@ -364,7 +360,7 @@ async def package_python_dist(
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
-    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+    interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     )
     chroot = await Get(
@@ -416,11 +412,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             output_filename="setuptools.pex",
             internal_only=True,
             requirements=PexRequirements(setuptools.all_requirements),
-            interpreter_constraints=(
-                req.interpreter_constraints
-                if setuptools.options.is_default("interpreter_constraints")
-                else PexInterpreterConstraints(setuptools.interpreter_constraints)
-            ),
+            interpreter_constraints=req.interpreter_constraints,
         ),
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
@@ -448,7 +440,7 @@ async def determine_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
-    setup_kwargs_requests = union_membership.get(SetupKwargsRequest)  # type: ignore[misc]
+    setup_kwargs_requests = union_membership.get(SetupKwargsRequest)
     applicable_setup_kwargs_requests = tuple(
         request for request in setup_kwargs_requests if request.is_applicable(target)
     )
@@ -467,7 +459,7 @@ async def determine_setup_kwargs(
             "precise so that only one implementation is applicable for this target."
         )
     setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))
+    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
 
 
 @rule
@@ -477,9 +469,11 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([exported_target.target.address])),
+        Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest([exported_target.target.address]),
+        ),
     )
-
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
@@ -490,7 +484,6 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
         Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
     )
-
     # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
     # explicitly provided or generated via a user's plugin, we add additional kwargs based on the
     # resolved requirements and sources.
@@ -617,9 +610,9 @@ async def get_requirements(
     setup_py_generation: SetupPyGeneration,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
+        TransitiveTargets,
+        TransitiveTargetsRequest([dep_owner.exported_target.target.address]),
     )
-
     ownable_tgts = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
     ]
@@ -639,9 +632,25 @@ async def get_requirements(
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
+
+    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    uneval_trans_excl = [
+        tgt.get(Dependencies).unevaluated_transitive_excludes for tgt in transitive_targets.closure
+    ]
+    if uneval_trans_excl:
+        nested_trans_excl = await MultiGet(
+            Get(Targets, UnparsedAddressInputs, unparsed) for unparsed in uneval_trans_excl
+        )
+        transitive_excludes = FrozenOrderedSet(
+            itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
+        )
+
+    direct_deps_chained = FrozenOrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
+
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
-        for tgt in itertools.chain.from_iterable(direct_deps_tgts)
+        for tgt in direct_deps_with_excl
         if tgt.has_field(PythonRequirementsField)
     )
     req_strs = list(reqs)
@@ -654,7 +663,6 @@ async def get_requirements(
         f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
-
     return ExportedTargetRequirements(req_strs)
 
 

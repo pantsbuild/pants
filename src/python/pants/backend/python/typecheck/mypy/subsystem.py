@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Tuple, cast
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 
@@ -15,7 +16,7 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.800"
+    default_version = "mypy==0.812"
     default_main = ConsoleScript("mypy")
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
     # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
@@ -30,7 +31,7 @@ class MyPy(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} lint`.",
+            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} typecheck`.",
         )
         register(
             "--args",
@@ -44,8 +45,26 @@ class MyPy(PythonToolBase):
         register(
             "--config",
             type=file_option,
+            default=None,
             advanced=True,
-            help="Path to `mypy.ini` or alternative MyPy config file",
+            help=(
+                "Path to a config file understood by MyPy "
+                "(https://mypy.readthedocs.io/en/stable/config_file.html).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during "
+                "runs (`mypy.ini`, `.mypy.ini`, and `setup.cfg`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
         )
         register(
             "--source-plugins",
@@ -66,12 +85,23 @@ class MyPy(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
     @property
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        # Refer to https://mypy.readthedocs.io/en/stable/config_file.html.
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"{self.options_scope}.config",
+            discovery=cast(bool, self.options.config_discovery),
+            check_existence=["mypy.ini", ".mypy.ini"],
+            check_content={"setup.cfg": b"[mypy"},
+        )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

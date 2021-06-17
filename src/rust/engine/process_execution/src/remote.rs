@@ -20,6 +20,7 @@ use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
+use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -43,7 +44,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::headers_to_interceptor_fn;
+use grpc_util::retry::{retry_call, status_is_retryable};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -207,7 +208,7 @@ impl CommandRunner {
         .get_capabilities(request)
         .await
         .map(|r| r.into_inner())
-        .map_err(rpcerror_to_string)
+        .map_err(status_to_str)
     };
 
     self
@@ -491,16 +492,14 @@ impl CommandRunner {
             ));
           };
 
-          return Ok(
-            populate_fallible_execution_result(
-              self.store.clone(),
-              action_result,
-              self.platform,
-              false,
-            )
-            .await
-            .map_err(ExecutionError::Fatal)?,
-          );
+          return populate_fallible_execution_result(
+            self.store.clone(),
+            action_result,
+            self.platform,
+            false,
+          )
+          .await
+          .map_err(ExecutionError::Fatal);
         }
 
         rpc_status
@@ -585,11 +584,11 @@ impl CommandRunner {
           .workunit_store
           .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
+        let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
         let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
         debug!("delaying {:?} before retry", sleep_time);
-        tokio::time::delay_for(sleep_time).await;
+        tokio::time::sleep(sleep_time).await;
       }
 
       let rpc_result = match current_operation_name {
@@ -967,7 +966,9 @@ pub fn make_execute_request(
 
   if matches!(
     req.cache_scope,
-    ProcessCacheScope::Never | ProcessCacheScope::PerRestart
+    ProcessCacheScope::PerSession
+      | ProcessCacheScope::PerRestartAlways
+      | ProcessCacheScope::PerRestartSuccessful
   ) {
     command
       .environment_variables
@@ -1380,19 +1381,27 @@ pub async fn check_action_cache(
     .workunit_store
     .increment_counter(Metric::RemoteCacheRequests, 1);
 
-  let request = remexec::GetActionResultRequest {
-    action_digest: Some(action_digest.into()),
-    instance_name: metadata
-      .instance_name
-      .as_ref()
-      .cloned()
-      .unwrap_or_else(String::new),
-    ..remexec::GetActionResultRequest::default()
-  };
+  let client = action_cache_client.as_ref().clone();
+  let action_result_response = retry_call(
+    client,
+    move |mut client| {
+      let request = remexec::GetActionResultRequest {
+        action_digest: Some(action_digest.into()),
+        instance_name: metadata
+          .instance_name
+          .as_ref()
+          .cloned()
+          .unwrap_or_else(String::new),
+        ..remexec::GetActionResultRequest::default()
+      };
 
-  let mut client = action_cache_client.as_ref().clone();
-  let request = apply_headers(Request::new(request), &context.build_id);
-  let action_result_response = client.get_action_result(request).await;
+      let request = apply_headers(Request::new(request), &context.build_id);
+
+      async move { client.get_action_result(request).await }
+    },
+    status_is_retryable,
+  )
+  .await;
 
   match action_result_response {
     Ok(action_result) => {
@@ -1425,7 +1434,7 @@ pub async fn check_action_cache(
         context
           .workunit_store
           .increment_counter(Metric::RemoteCacheReadErrors, 1);
-        Err(rpcerror_to_string(status))
+        Err(status_to_str(status))
       }
     },
   }
@@ -1474,10 +1483,6 @@ pub fn format_error(error: &StatusProto) -> String {
     x => format!("{:?}", x),
   };
   format!("{}: {}", error_code, error.message)
-}
-
-pub(crate) fn rpcerror_to_string(status: Status) -> String {
-  format!("{:?}: {:?}", status.code(), status.message(),)
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {

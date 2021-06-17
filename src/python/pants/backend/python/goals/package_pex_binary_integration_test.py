@@ -35,36 +35,34 @@ def rule_runner() -> RuleRunner:
 
 def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    rule_runner.create_file("assets/f.txt")
-    rule_runner.add_to_build_file(
-        "assets",
-        dedent(
-            """\
-            files(name='files', sources=['f.txt'])
-            relocated_files(
-                name='relocated',
-                files_targets=[':files'],
-                src='assets',
-                dest='new_assets',
-            )
+    rule_runner.write_files(
+        {
+            "assets/f.txt": "",
+            "assets/BUILD": dedent(
+                """\
+                files(name='files', sources=['f.txt'])
+                relocated_files(
+                    name='relocated',
+                    files_targets=[':files'],
+                    src='assets',
+                    dest='new_assets',
+                )
 
-            # Resources are fine.
-            resources(name='resources', sources=['f.txt'])
-            """
-        ),
-    )
-    rule_runner.create_file("src/py/project/__init__.py")
-    rule_runner.create_file("src/py/project/app.py", "print('hello')")
-    rule_runner.add_to_build_file(
-        "src/py/project",
-        dedent(
-            """\
-            pex_binary(
-                dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
-                entry_point="none",
-            )
-            """
-        ),
+                # Resources are fine.
+                resources(name='resources', sources=['f.txt'])
+                """
+            ),
+            "src/py/project/__init__.py": "",
+            "src/py/project/app.py": "print('hello')",
+            "src/py/project/BUILD": dedent(
+                """\
+                pex_binary(
+                    dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
+                    entry_point="none",
+                )
+                """
+            ),
+        }
     )
     tgt = rule_runner.get_target(Address("src/py/project"))
     field_set = PexBinaryFieldSet.create(tgt)

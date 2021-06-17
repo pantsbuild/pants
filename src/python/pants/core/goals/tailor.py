@@ -144,6 +144,17 @@ class PutativeTarget:
     def address(self) -> Address:
         return Address(self.path, target_name=self.name)
 
+    def realias(self, new_alias: str | None) -> PutativeTarget:
+        """A copy of this object with the alias replaced to the given alias.
+
+        Returns this object if the alias is None or is identical to this objects existing alias.
+        """
+        return (
+            self
+            if (new_alias is None or new_alias == self.type_alias)
+            else dataclasses.replace(self, type_alias=new_alias)
+        )
+
     def rename(self, new_name: str) -> PutativeTarget:
         """A copy of this object with the name replaced to the given name."""
         # We assume that a rename imposes an explicit "name=" kwarg, overriding any previous
@@ -210,9 +221,23 @@ class TailorSubsystem(GoalSubsystem):
             help="The indent to use when auto-editing BUILD files.",
         )
 
+        register(
+            "--alias-mapping",
+            advanced=True,
+            type=dict,
+            help="A mapping from standard target type to custom type to use instead. The custom "
+            "type can be a custom target type or a macro that offers compatible functionality "
+            "to the one it replaces (see https://www.pantsbuild.org/docs/macros).",
+        )
+
     @property
     def build_file_indent(self) -> str:
         return cast(str, self.options.build_file_indent)
+
+    def alias_for(self, standard_type: str) -> str | None:
+        # The get() could return None, but casting to str | None errors.
+        # This cast suffices to avoid typecheck errors.
+        return cast(str, self.options.alias_mapping.get(standard_type))
 
 
 class Tailor(Goal):
@@ -239,7 +264,7 @@ class AllOwnedSources(DeduplicatedCollection[str]):
     """All files in the project already owned by targets."""
 
 
-@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
+@rule(desc="Determine all files already owned by targets", level=LogLevel.DEBUG)
 async def determine_all_owned_sources() -> AllOwnedSources:
     all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
     all_sources_paths = await MultiGet(
@@ -343,7 +368,7 @@ def make_content_str(
     return "\n\n".join(new_content) + "\n"
 
 
-@rule(desc="Edit BUILD files with new targets")
+@rule(desc="Edit BUILD files with new targets", level=LogLevel.DEBUG)
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     ptgts_by_build_file = group_by_build_file(req.putative_targets)
     # There may be an existing *directory* whose name collides with that of a BUILD file
@@ -392,6 +417,9 @@ async def tailor(
         for req_type in putative_target_request_types
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)
+    putative_targets = PutativeTargets(
+        pt.realias(tailor_subsystem.alias_for(pt.type_alias)) for pt in putative_targets
+    )
     fixed_names_ptgts = await Get(UniquelyNamedPutativeTargets, PutativeTargets, putative_targets)
     fixed_sources_ptgts = await MultiGet(
         Get(DisjointSourcePutativeTarget, PutativeTarget, ptgt)

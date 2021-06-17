@@ -10,15 +10,12 @@ from io import StringIO
 from pathlib import PurePath
 from typing import List, Optional, Tuple, cast
 
+import toml
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -31,14 +28,15 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
 )
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
-    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     Snapshot,
@@ -48,6 +46,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
+from pants.source.source_root import AllSourceRoots
 from pants.util.logging import LogLevel
 
 """
@@ -99,7 +98,7 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage>=5.0.3,<5.1"
+    default_version = "coverage[toml]>=5.0.3,<5.1"
     default_main = ConsoleScript("coverage")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
@@ -141,7 +140,36 @@ class CoverageSubsystem(PythonToolBase):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to `.coveragerc` or alternative coverage config file",
+            help=(
+                "Path to an INI or TOML config file understood by coverage.py "
+                "(https://coverage.readthedocs.io/en/stable/config.html).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                f"this option if the config is located in a non-standard location.\n\n"
+                "To use a TOML config file, you should add the `toml` library to "
+                "`[pytest].pytest_plugins`."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include any relevant config files during runs "
+                "(`.coveragerc`, `setup.cfg`, `tox.ini`, and `pyproject.toml`)."
+                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+                f"non-standard location."
+            ),
+        )
+        register(
+            "--global-report",
+            type=bool,
+            default=False,
+            help=(
+                "If true, Pants will generate a global coverage report.\n\nThe global report will "
+                "include all Python source files in the workspace and not just those depended on "
+                "by the tests that were run."
+            ),
         )
 
     @property
@@ -157,8 +185,27 @@ class CoverageSubsystem(PythonToolBase):
         return PurePath(self.options.output_dir)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        # Refer to https://coverage.readthedocs.io/en/stable/config.html.
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
+            check_existence=[".coveragerc"],
+            check_content={
+                "setup.cfg": b"[coverage:",
+                "tox.ini": b"[coverage:]",
+                "pyproject.toml": b"[tool.coverage",
+            },
+        )
+
+    @property
+    def global_report(self) -> bool:
+        return cast(bool, self.options.global_report)
 
 
 @dataclass(frozen=True)
@@ -174,6 +221,7 @@ class PytestCoverageDataCollection(CoverageDataCollection):
 @dataclass(frozen=True)
 class CoverageConfig:
     digest: Digest
+    path: str
 
 
 def _validate_and_update_config(
@@ -185,7 +233,8 @@ def _validate_and_update_config(
     relative_files_str = run_section.get("relative_files", "True")
     if relative_files_str.lower() != "true":
         raise ValueError(
-            f"relative_files under the 'run' section must be set to True. config file: {config_path}"
+            "relative_files under the 'run' section must be set to True in the config "
+            f"file {config_path}"
         )
     coverage_config.set("run", "relative_files", "True")
     omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
@@ -194,25 +243,66 @@ def _validate_and_update_config(
     run_section["omit"] = "\n".join(omit_elements)
 
 
-@rule
-async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
-    coverage_config = configparser.ConfigParser()
-    if coverage.config:
-        config_contents = await Get(
-            DigestContents,
-            PathGlobs(
-                globs=(coverage.config,),
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the option `--{coverage.options_scope}-config`",
-            ),
+class InvalidCoverageConfigError(Exception):
+    pass
+
+
+def _update_config(fc: FileContent) -> FileContent:
+    if PurePath(fc.path).suffix == ".toml":
+        try:
+            all_config = toml.loads(fc.content.decode())
+        except toml.TomlDecodeError as exc:
+            raise InvalidCoverageConfigError(
+                f"Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix "
+                f"the config or update `[coverage-py].config` and/or "
+                f"`[coverage-py].config_discovery`.\n\nParse error: {repr(exc)}"
+            )
+        tool = all_config.setdefault("tool", {})
+        coverage = tool.setdefault("coverage", {})
+        run = coverage.setdefault("run", {})
+        run["relative_files"] = True
+        if "pytest.pex/*" not in run.get("omit", []):
+            run["omit"] = [*run.get("omit", []), "pytest.pex/*"]
+        return FileContent(fc.path, toml.dumps(all_config).encode())
+
+    cp = configparser.ConfigParser()
+    try:
+        cp.read_string(fc.content.decode())
+    except configparser.Error as exc:
+        raise InvalidCoverageConfigError(
+            f"Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix "
+            f"the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`."
+            f"\n\nParse error: {repr(exc)}"
         )
-        coverage_config.read_string(config_contents[0].content.decode())
-    _validate_and_update_config(coverage_config, coverage.config)
-    config_stream = StringIO()
-    coverage_config.write(config_stream)
-    config_content = config_stream.getvalue()
-    digest = await Get(Digest, CreateDigest([FileContent(".coveragerc", config_content.encode())]))
-    return CoverageConfig(digest)
+    run_section = "coverage:run" if fc.path in ("tox.ini", "setup.cfg") else "run"
+    if not cp.has_section(run_section):
+        cp.add_section(run_section)
+    cp.set(run_section, "relative_files", "True")
+    omit_elements = cp[run_section].get("omit", "").split("\n") or ["\n"]
+    if "pytest.pex/*" not in omit_elements:
+        omit_elements.append("pytest.pex/*")
+    cp.set(run_section, "omit", "\n".join(omit_elements))
+    stream = StringIO()
+    cp.write(stream)
+    return FileContent(fc.path, stream.getvalue().encode())
+
+
+@rule
+async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, coverage.config_request)
+    if config_files.snapshot.files:
+        digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+        file_content = _update_config(digest_contents[0])
+    else:
+        cp = configparser.ConfigParser()
+        cp.add_section("run")
+        cp.set("run", "relative_files", "True")
+        cp.set("run", "omit", "\npytest.pex/*")
+        stream = StringIO()
+        cp.write(stream)
+        file_content = FileContent(".coveragerc", stream.getvalue().encode())
+    digest = await Get(Digest, CreateDigest([file_content]))
+    return CoverageConfig(digest, file_content.path)
 
 
 @dataclass(frozen=True)
@@ -228,7 +318,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
             output_filename="coverage.pex",
             internal_only=True,
             requirements=PexRequirements(coverage.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(coverage.interpreter_constraints),
             main=coverage.main,
         ),
     )
@@ -242,29 +332,101 @@ class MergedCoverageData:
 
 @rule(desc="Merge Pytest coverage data", level=LogLevel.DEBUG)
 async def merge_coverage_data(
-    data_collection: PytestCoverageDataCollection, coverage_setup: CoverageSetup
+    data_collection: PytestCoverageDataCollection,
+    coverage_setup: CoverageSetup,
+    coverage: CoverageSubsystem,
+    source_roots: AllSourceRoots,
 ) -> MergedCoverageData:
-    if len(data_collection) == 1:
+    if len(data_collection) == 1 and not coverage.global_report:
         return MergedCoverageData(data_collection[0].digest)
-    # We prefix each .coverage file with its corresponding address to avoid collisions.
-    coverage_digests = await MultiGet(
-        Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        for data in data_collection
-    )
-    input_digest = await Get(Digest, MergeDigests(coverage_digests))
-    prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
+
+    coverage_digest_gets = []
+    coverage_data_file_paths = []
+    for data in data_collection:
+        # We prefix each .coverage file with its corresponding address to avoid collisions.
+        coverage_digest_gets.append(
+            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
+        )
+        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
+
+    if coverage.global_report:
+        global_coverage_base_dir = PurePath("__global_coverage__")
+
+        global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
+        global_coverage_config_content = toml.dumps(
+            {
+                "tool": {
+                    "coverage": {
+                        "run": {
+                            "relative_files": True,
+                            "source": list(source_root.path for source_root in source_roots),
+                        }
+                    }
+                }
+            }
+        ).encode()
+
+        no_op_exe_py_path = global_coverage_base_dir / "no-op-exe.py"
+
+        all_sources_digest, no_op_exe_py_digest, global_coverage_config_digest = await MultiGet(
+            Get(
+                Digest,
+                PathGlobs(globs=[f"{source_root.path}/**/*.py" for source_root in source_roots]),
+            ),
+            Get(Digest, CreateDigest([FileContent(path=str(no_op_exe_py_path), content=b"")])),
+            Get(
+                Digest,
+                CreateDigest(
+                    [
+                        FileContent(
+                            path=str(global_coverage_config_path),
+                            content=global_coverage_config_content,
+                        ),
+                    ]
+                ),
+            ),
+        )
+        extra_sources_digest = await Get(
+            Digest, MergeDigests((all_sources_digest, no_op_exe_py_digest))
+        )
+        input_digest = await Get(
+            Digest, MergeDigests((extra_sources_digest, global_coverage_config_digest))
+        )
+        result = await Get(
+            ProcessResult,
+            VenvPexProcess(
+                coverage_setup.pex,
+                argv=("run", "--rcfile", str(global_coverage_config_path), str(no_op_exe_py_path)),
+                input_digest=input_digest,
+                output_files=(".coverage",),
+                description="Create base global Pytest coverage report.",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        coverage_digest_gets.append(
+            Get(
+                Digest, AddPrefix(digest=result.output_digest, prefix=str(global_coverage_base_dir))
+            )
+        )
+        coverage_data_file_paths.append(str(global_coverage_base_dir / ".coverage"))
+    else:
+        extra_sources_digest = EMPTY_DIGEST
+
+    input_digest = await Get(Digest, MergeDigests(await MultiGet(coverage_digest_gets)))
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             coverage_setup.pex,
-            argv=("combine", *prefixes),
+            argv=("combine", *sorted(coverage_data_file_paths)),
             input_digest=input_digest,
             output_files=(".coverage",),
-            description=f"Merge {len(prefixes)} Pytest coverage reports.",
+            description=f"Merge {len(coverage_data_file_paths)} Pytest coverage reports.",
             level=LogLevel.DEBUG,
         ),
     )
-    return MergedCoverageData(result.output_digest)
+    return MergedCoverageData(
+        await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest)))
+    )
 
 
 @rule(desc="Generate Pytest coverage reports", level=LogLevel.DEBUG)
@@ -321,7 +483,7 @@ async def generate_coverage_reports(
         pex_processes.append(
             VenvPexProcess(
                 coverage_setup.pex,
-                argv=(report_type.report_name,),
+                argv=(report_type.report_name, f"--rcfile={coverage_config.path}"),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=(output_file,) if output_file else None,

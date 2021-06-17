@@ -16,7 +16,7 @@ from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.vcs.git import Git
 
 
@@ -90,7 +90,7 @@ class Changed(Subsystem):
     options_scope = "changed"
     help = (
         "Tell Pants to detect what files and targets have changed from Git.\n\nSee "
-        f"{docs_url('advanced-target-selection')}."
+        f"{bracketed_docs_url('advanced-target-selection')}."
     )
 
     @classmethod

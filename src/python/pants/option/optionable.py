@@ -13,7 +13,6 @@ from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty
-from pants.util.objects import get_docstring_summary
 
 
 async def _construct_optionable(optionable_factory):
@@ -125,10 +124,6 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         dependent subsystem scopes.
         """
         return re.sub(r"\.", "-", cls.options_scope)
-
-    @classmethod
-    def get_description(cls) -> Optional[str]:
-        return get_docstring_summary(cls)
 
     @classmethod
     def register_options(cls, register):

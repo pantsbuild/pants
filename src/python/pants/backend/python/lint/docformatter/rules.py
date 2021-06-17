@@ -4,25 +4,20 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -33,6 +28,10 @@ class DocformatterFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipDocformatterField).value
 
 
 class DocformatterRequest(PythonFmtRequest, LintRequest):
@@ -65,7 +64,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
             output_filename="docformatter.pex",
             internal_only=True,
             requirements=PexRequirements(docformatter.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
             main=docformatter.main,
         ),
     )
@@ -133,5 +132,4 @@ def rules():
         UnionRule(PythonFmtRequest, DocformatterRequest),
         UnionRule(LintRequest, DocformatterRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

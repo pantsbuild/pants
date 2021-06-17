@@ -14,8 +14,7 @@ from pants.vcs.git import Git
 class GitTest(unittest.TestCase):
     @staticmethod
     def init_repo(remote_name, remote):
-        # TODO (peiyu) clean this up, use `git_util.initialize_repo`.
-        subprocess.check_call(["git", "init"])
+        subprocess.check_call(["git", "init", "--initial-branch=main"])
         subprocess.check_call(["git", "config", "user.email", "you@example.com"])
         subprocess.check_call(["git", "config", "user.name", "Your Name"])
         subprocess.check_call(["git", "config", "commit.gpgSign", "false"])
@@ -24,7 +23,7 @@ class GitTest(unittest.TestCase):
     def setUp(self):
         self.origin = safe_mkdtemp()
         with pushd(self.origin):
-            subprocess.check_call(["git", "init", "--bare"])
+            subprocess.check_call(["git", "init", "--bare", "--initial-branch=main"])
 
         self.gitdir = safe_mkdtemp()
         self.worktree = safe_mkdtemp()
@@ -56,8 +55,8 @@ class GitTest(unittest.TestCase):
             subprocess.check_call(["git", "commit", "-am", "initial commit with decode -> \x81b"])
             self.initial_rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip()
             subprocess.check_call(["git", "tag", "first"])
-            subprocess.check_call(["git", "push", "--tags", "depot", "master"])
-            subprocess.check_call(["git", "branch", "--set-upstream-to", "depot/master"])
+            subprocess.check_call(["git", "push", "--tags", "depot", "main"])
+            subprocess.check_call(["git", "branch", "--set-upstream-to", "depot/main"])
 
             with safe_open(self.readme_file, "wb") as readme:
                 readme.write("Hello World.\u2764".encode())
@@ -68,12 +67,12 @@ class GitTest(unittest.TestCase):
         self.clone2 = safe_mkdtemp()
         with pushd(self.clone2):
             self.init_repo("origin", self.origin)
-            subprocess.check_call(["git", "pull", "--tags", "origin", "master:master"])
+            subprocess.check_call(["git", "pull", "--tags", "origin", "main:main"])
 
             with safe_open(os.path.realpath("README"), "a") as readme:
                 readme.write("--")
             subprocess.check_call(["git", "commit", "-am", "Update README 2."])
-            subprocess.check_call(["git", "push", "--tags", "origin", "master"])
+            subprocess.check_call(["git", "push", "--tags", "origin", "main"])
 
         self.git = Git(gitdir=self.gitdir, worktree=self.worktree)
 
@@ -89,7 +88,7 @@ class GitTest(unittest.TestCase):
 
         tip_sha = self.git.commit_id
         self.assertTrue(tip_sha)
-        self.assertEqual("master", self.git.branch_name)
+        self.assertEqual("main", self.git.branch_name)
 
         def edit_readme():
             with open(self.readme_file, "a") as fp:
@@ -110,7 +109,7 @@ class GitTest(unittest.TestCase):
                 clone = os.path.realpath(_clone)
 
                 self.init_repo("origin", self.origin)
-                subprocess.check_call(["git", "pull", "--tags", "origin", "master:master"])
+                subprocess.check_call(["git", "pull", "--tags", "origin", "main:main"])
 
                 def worktree_relative_to(cwd, expected):
                     # Given a cwd relative to the worktree, tests that the worktree is detected as 'expected'.
@@ -137,7 +136,7 @@ class GitTest(unittest.TestCase):
                 clone = os.path.realpath(_clone)
 
                 self.init_repo("origin", self.origin)
-                subprocess.check_call(["git", "pull", "--tags", "origin", "master:master"])
+                subprocess.check_call(["git", "pull", "--tags", "origin", "main:main"])
 
                 def worktree_relative_to(some_dir, expected):
                     # Given a directory relative to the worktree, tests that the worktree is detected as 'expected'.

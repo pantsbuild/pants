@@ -37,6 +37,7 @@ from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
+    PyLocalStoreOptions,
     PyRemotingOptions,
     PyScheduler,
     PySession,
@@ -56,7 +57,11 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import (
+    LOCAL_STORE_LEASE_TIME_SECS,
+    ExecutionOptions,
+    LocalStoreOptions,
+)
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -100,13 +105,13 @@ class Scheduler:
         ignore_patterns: List[str],
         use_gitignore: bool,
         build_root: str,
-        local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str],
         rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
+        local_store_options: LocalStoreOptions,
         executor: PyExecutor,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
@@ -116,13 +121,13 @@ class Scheduler:
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
-        :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param ca_certs_path: Path to pem file for custom CA, if needed.
         :param rules: A set of Rules which is used to compute values in the graph.
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
+        :param local_store_options: Options for the engine's LMDB store(s).
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
@@ -168,6 +173,7 @@ class Scheduler:
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
+            cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
@@ -176,13 +182,21 @@ class Scheduler:
             execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
+        py_local_store_options = PyLocalStoreOptions(
+            store_dir=local_store_options.store_dir,
+            process_cache_max_size_bytes=local_store_options.processes_max_size_bytes,
+            files_max_size_bytes=local_store_options.files_max_size_bytes,
+            directories_max_size_bytes=local_store_options.directories_max_size_bytes,
+            lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
+            shard_count=local_store_options.shard_count,
+        )
         exec_stategy_opts = PyExecutionStrategyOptions(
-            local_parallelism=execution_options.process_execution_local_parallelism,
-            remote_parallelism=execution_options.process_execution_remote_parallelism,
-            cleanup_local_dirs=execution_options.process_execution_cleanup_local_dirs,
-            use_local_cache=execution_options.process_execution_use_local_cache,
+            local_cache=execution_options.process_execution_local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
+            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_parallelism=execution_options.process_execution_local_parallelism,
+            remote_parallelism=execution_options.process_execution_remote_parallelism,
         )
 
         self._py_scheduler = native_engine.scheduler_create(
@@ -190,13 +204,13 @@ class Scheduler:
             tasks,
             types,
             build_root,
-            local_store_dir,
             local_execution_root_dir,
             named_caches_dir,
             ca_certs_path,
             ignore_patterns,
             use_gitignore,
             remoting_options,
+            py_local_store_options,
             exec_stategy_opts,
         )
 
@@ -297,6 +311,9 @@ class Scheduler:
             ),
         )
 
+    def shutdown(self, timeout_secs: int = 60) -> None:
+        native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
+
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
     pass
@@ -325,9 +342,10 @@ class SchedulerSession:
     def py_session(self) -> PySession:
         return self._py_session
 
-    def isolated_shallow_clone(self) -> SchedulerSession:
+    def isolated_shallow_clone(self, build_id: str) -> SchedulerSession:
         return SchedulerSession(
-            self._scheduler, native_engine.session_isolated_shallow_clone(self._py_session)
+            self._scheduler,
+            native_engine.session_isolated_shallow_clone(self._py_session, build_id),
         )
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
@@ -599,6 +617,9 @@ class SchedulerSession:
 
     def record_test_observation(self, value: int) -> None:
         native_engine.session_record_test_observation(self.py_scheduler, self.py_session, value)
+
+    def cancel(self) -> None:
+        self.py_session.cancel()
 
 
 def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:

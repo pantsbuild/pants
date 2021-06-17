@@ -27,17 +27,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
-use nails::Config;
-use tokio::net::TcpStream;
-use tokio::signal::unix::{signal, Signal, SignalKind};
-
 use std::io;
 use std::net::Ipv4Addr;
-use tokio::io::AsyncWriteExt;
 
 use futures::channel::mpsc;
 use futures::{try_join, SinkExt, Stream, StreamExt};
+use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
+use nails::Config;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::signal::unix::{signal, Signal, SignalKind};
 
 pub enum NailgunClientError {
   PreConnect(String),
@@ -144,10 +143,7 @@ pub async fn client_execute(
   let socket = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), port))
     .await
     .map_err(|err| {
-      NailgunClientError::PreConnect(format!(
-        "Nailgun client error connecting to localhost: {}",
-        err
-      ))
+      NailgunClientError::PreConnect(format!("Failed to connect to localhost: {}", err))
     })?;
 
   let mut child = nails::client::handle_connection(config, socket, command, async {
@@ -156,7 +152,7 @@ pub async fn client_execute(
     stdin_read
   })
   .await
-  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start remote task: {}", err)))?;
+  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start: {}", err)))?;
 
   handle_client_output(
     child.output_stream.take().unwrap(),
@@ -165,10 +161,24 @@ pub async fn client_execute(
   )
   .await?;
 
-  let exit_code: ExitCode = child
-    .wait()
-    .await
-    .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
+  let exit_code: ExitCode = child.wait().await.map_err(|err| {
+    let err_str = match err.to_string().as_str() {
+      "Client exited before the server's result could be returned." => {
+        "The pantsd process was killed during the run.\n\nIf this was not intentionally done by you, \
+          Pants may have been killed by the operating system due to memory overconsumption \
+          (i.e. OOM-killed). You can set the global option `--pantsd-max-memory-usage` to reduce \
+          Pantsd's memory consumption by retaining less in its in-memory cache \
+          (run `./pants help-advanced global`). You can also disable pantsd with the global \
+          option `--pantsd` to avoid persisting memory across Pants runs, although you will miss \
+          out on additional caching.\n\nIf neither of those help, please consider filing a \
+          GitHub issue or reaching out on Slack so that we can investigate the possible memory \
+          overconsumption (https://www.pantsbuild.org/docs/getting-help)."
+          .to_owned()
+      }
+      _ => format!("Failed during execution: {}", err),
+    };
+    NailgunClientError::PostConnect(err_str)
+  })?;
 
   Ok(exit_code.0)
 }

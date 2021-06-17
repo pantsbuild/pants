@@ -1,7 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Set, Tuple
+from collections import defaultdict
+from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -14,6 +15,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesPathsRequest, Target, Targets
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -37,12 +39,15 @@ async def map_protobuf_to_python_modules(
         for tgt in protobuf_targets
     )
 
-    modules_to_addresses: Dict[str, Tuple[Address]] = {}
-    modules_with_multiple_owners: Set[str] = set()
+    # NB: There should be only one address per module, else it's ambiguous.
+    modules_to_addresses: dict[str, tuple[Address]] = {}
+    modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
 
     def add_module(module: str, tgt: Target) -> None:
         if module in modules_to_addresses:
-            modules_with_multiple_owners.add(module)
+            modules_with_multiple_owners[module].update(
+                {*modules_to_addresses[module], tgt.address}
+            )
         else:
             modules_to_addresses[module] = (tgt.address,)
 
@@ -59,7 +64,12 @@ async def map_protobuf_to_python_modules(
     for ambiguous_module in modules_with_multiple_owners:
         modules_to_addresses.pop(ambiguous_module)
 
-    return FirstPartyPythonMappingImpl(modules_to_addresses)
+    return FirstPartyPythonMappingImpl(
+        mapping=FrozenDict(sorted(modules_to_addresses.items())),
+        ambiguous_modules=FrozenDict(
+            (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_owners.items())
+        ),
+    )
 
 
 def rules():

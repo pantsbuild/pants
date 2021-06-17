@@ -8,7 +8,8 @@ https://mypy.readthedocs.io/en/stable/.
 """
 
 from pants.backend.python.typecheck.mypy import rules as mypy_rules
+from pants.backend.python.typecheck.mypy import skip_field
 
 
 def rules():
-    return mypy_rules.rules()
+    return (*mypy_rules.rules(), *skip_field.rules())

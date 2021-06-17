@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional, Sequence
@@ -19,6 +21,7 @@ from pants.backend.python.typecheck.mypy.rules import (
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
+from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
@@ -38,6 +41,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
+            *pants_bin.rules(),
+            *config_files.rules(),
             QueryRule(TypecheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
@@ -93,12 +98,15 @@ def make_target(
     package: Optional[str] = None,
     name: str = "target",
     interpreter_constraints: Optional[str] = None,
+    dependencies: Optional[List[str]] = None,
 ) -> Target:
     if not package:
         package = PACKAGE
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     source_globs = [PurePath(source_file.path).name for source_file in source_files]
+    if not dependencies:
+        dependencies = []
     rule_runner.add_to_build_file(
         f"{package}",
         dedent(
@@ -106,6 +114,7 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
+                dependencies={dependencies},
                 interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
@@ -122,7 +131,7 @@ def run_mypy(
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
-    additional_args: Optional[List[str]] = None,
+    extra_args: Optional[List[str]] = None,
 ) -> Sequence[TypecheckResult]:
     args = list(GLOBAL_ARGS)
     if config:
@@ -132,8 +141,8 @@ def run_mypy(
         args.append(f"--mypy-args='{passthrough_args}'")
     if skip:
         args.append("--mypy-skip")
-    if additional_args:
-        args.extend(additional_args)
+    if extra_args:
+        args.extend(extra_args)
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
         TypecheckResults,
@@ -181,15 +190,26 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "checked 2 source files" in result[0].stdout
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
-    result = run_mypy(rule_runner, [target], config="[mypy]\ndisallow_any_expr = True\n")
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    ([".mypy.ini", []], ["custom_config.ini", ["--mypy-config=custom_config.ini"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": NEEDS_CONFIG_SOURCE.content.decode(),
+            f"{PACKAGE}/BUILD": "python_library()",
+            config_path: "[mypy]\ndisallow_any_expr = True\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/needs_config.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:4" in result[0].stdout
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
     result = run_mypy(rule_runner, [target], passthrough_args="--disallow-any-expr")
     assert len(result) == 1
@@ -285,10 +305,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [package_tgt],
         config=config_content,
-        additional_args=[
-            "--mypy-extra-requirements=django-stubs==1.5.0",
-            "--mypy-version=mypy==0.770",
-        ],
+        extra_args=["--mypy-extra-requirements=django-stubs==1.5.0", "--mypy-version=mypy==0.770"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -573,7 +590,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(PACKAGE, "python_library()")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
     result = run_mypy(
-        rule_runner, [tgt], additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+        rule_runner, [tgt], extra_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -602,7 +619,7 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
         ),
     )
     tgt = rule_runner.get_target(Address("", target_name="lib"))
-    result = run_mypy(rule_runner, [tgt], additional_args=["--mypy-version=mypy==0.782"])
+    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-version=mypy==0.782"])
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout
@@ -619,7 +636,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             """\
             python_requirement_library(
                 name='mypy',
-                requirements=['mypy==0.800'],
+                requirements=['mypy==0.812'],
             )
 
             python_requirement_library(
@@ -711,7 +728,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         result = run_mypy(
             rule_runner,
             [tgt],
-            additional_args=[
+            extra_args=[
                 "--mypy-source-plugins=['pants-plugins/plugins']",
                 "--source-root-patterns=['pants-plugins', 'src/python']",
             ],
@@ -727,13 +744,13 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
     # We want to ensure we don't accidentally check the source plugin itself.
-    assert "(checked 2 source files)" in result.stdout
+    assert "(checked 1 source file)" in result.stdout
 
     # We also want to ensure that running MyPy on the plugin itself still works.
     plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
-    assert "Success: no issues found in 7 source files" in result.stdout
+    assert "Success: no issues found in 2 source files" in result.stdout
 
 
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
@@ -793,7 +810,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        additional_args=[
+        extra_args=[
             "--backend-packages=pants.backend.codegen.protobuf.python",
             "--python-protobuf-mypy-plugin",
         ],
@@ -840,3 +857,26 @@ def test_warn_if_python_version_configured(caplog) -> None:
             "`--python-version` in the `--mypy-args` option."
         ),
     )
+
+
+def test_run_mypy_only_on_specified_files(rule_runner: RuleRunner) -> None:
+    # create a library that passes all mypy checks
+    good_target = make_target(
+        rule_runner=rule_runner,
+        source_files=[GOOD_SOURCE],
+        name="good",
+        dependencies=[":bad"],
+    )
+
+    # create a library that does NOT pass mypy checks
+    make_target(
+        rule_runner=rule_runner,
+        source_files=[BAD_SOURCE],
+        name="bad",
+    )
+
+    result = run_mypy(rule_runner, [good_target])
+
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout.strip()

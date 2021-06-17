@@ -1003,3 +1003,21 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
         )
 
     assert try_with_backoff(is_changed_snapshot)
+
+
+# -----------------------------------------------------------------------------------------------
+# Comparison and representation of Digests
+# -----------------------------------------------------------------------------------------------
+
+
+def test_digest_repr() -> None:
+    assert (
+        str(Digest("f" * 64, 1))
+        == "Digest('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 1)"
+    )
+
+
+def test_digest_equality() -> None:
+    assert Digest("f" * 64, 1) == Digest("f" * 64, 1)
+    assert Digest("f" * 64, 1) != Digest("f" * 64, 1000)
+    assert Digest("f" * 64, 1) != Digest("0" * 64, 1)

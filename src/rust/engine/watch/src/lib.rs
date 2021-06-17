@@ -39,6 +39,7 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
+use notify::event::Flag;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
@@ -159,6 +160,7 @@ impl InvalidationWatcher {
         };
         match event_res {
           Ok(Ok(ev)) => {
+            let flag = ev.flag();
             let paths: HashSet<_> = ev
               .paths
               .into_iter()
@@ -198,10 +200,13 @@ impl InvalidationWatcher {
               .collect();
 
             // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
-            if !paths.is_empty() {
+            if flag == Some(Flag::Rescan) {
+              debug!("notify queue overflowed: invalidating all paths");
+              invalidatable.invalidate_all("notify");
+            } else if !paths.is_empty() {
               debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
               invalidatable.invalidate(&paths, "notify");
-            };
+            }
           }
           Ok(Err(err)) => {
             if let notify::ErrorKind::PathNotFound = err.kind {
@@ -282,6 +287,7 @@ impl InvalidationWatcher {
 
 pub trait Invalidatable: Send + Sync + 'static {
   fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize;
+  fn invalidate_all(&self, caller: &str) -> usize;
 }
 
 ///

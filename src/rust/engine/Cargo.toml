@@ -100,9 +100,10 @@ default = []
 async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
-bytes = "0.5"
+bytes = "1.0"
 concrete_time = { path = "concrete_time" }
-cpython = "0.5"
+# TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
+cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
 crossbeam-channel = "0.4"
 fnv = "1.0.5"
 fs = { path = "fs" }
@@ -120,9 +121,9 @@ nailgun = { path = "nailgun" }
 num_enum = "0.4"
 parking_lot = "0.11"
 process_execution = { path = "process_execution" }
-rand = "0.6"
+rand = "0.8"
 regex = "1"
-reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
+reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
@@ -132,7 +133,8 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.1.40"
-tokio = { version = "0.2.23", features = ["macros", "rt-threaded"] }
+tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
+tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = "2.1"
@@ -146,10 +148,5 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [patch.crates-io]
-# Patch all transitive uses of Prost to refer to the version with `Bytes` support.
-# Specifically, this Prost commit: https://github.com/danburkert/prost/commit/a1cccbcee343e2c444e1cd2738c7fba2599fc391
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 # TODO: Posted as https://github.com/mitsuhiko/console/pull/93.
 console = { git = "https://github.com/pantsbuild/console", rev = "b6e9aa7ce734517691934d558d79a459609633db" }

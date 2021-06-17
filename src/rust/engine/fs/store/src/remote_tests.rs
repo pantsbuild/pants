@@ -7,7 +7,7 @@ use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
 
 use crate::remote::ByteStore;
-use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
+use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
 #[tokio::test]
@@ -67,7 +67,8 @@ async fn load_file_grpc_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
@@ -83,7 +84,8 @@ async fn load_directory_grpc_error() {
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
@@ -137,10 +139,7 @@ async fn write_file_one_chunk() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(&testdata.bytes()).await,
-    Ok(testdata.digest())
-  );
+  assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
@@ -165,10 +164,7 @@ async fn write_file_multiple_chunks() {
 
   let fingerprint = big_file_fingerprint();
 
-  assert_eq!(
-    store.store_bytes(&all_the_henries).await,
-    Ok(big_file_digest())
-  );
+  assert_eq!(store.store_bytes(all_the_henries.clone()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
@@ -182,7 +178,9 @@ async fn write_file_multiple_chunks() {
   for size in write_message_sizes.iter() {
     assert!(
       size <= &(10 * 1024),
-      format!("Size {} should have been <= {}", size, 10 * 1024)
+      "Size {} should have been <= {}",
+      size,
+      10 * 1024
     );
   }
 }
@@ -193,10 +191,7 @@ async fn write_empty_file() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(&empty_file.bytes()).await,
-    Ok(empty_file.digest())
-  );
+  assert_eq!(store.store_bytes(empty_file.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(
@@ -211,16 +206,13 @@ async fn write_file_errors() {
 
   let store = new_byte_store(&cas);
   let error = store
-    .store_bytes(&TestData::roland().bytes())
+    .store_bytes(TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Error from server"),
-    format!("Bad error message, got: {}", error)
-  );
-  assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -237,12 +229,13 @@ async fn write_connection_error() {
   )
   .unwrap();
   let error = store
-    .store_bytes(&TestData::roland().bytes())
+    .store_bytes(TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
     error.contains("dns error: failed to lookup address information"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -294,7 +287,8 @@ async fn list_missing_digests_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -323,5 +317,8 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(digest, |b| Ok(b)).await
+  store
+    .load_bytes_with(digest, |b| Ok(b))
+    .await
+    .map_err(|err| format!("{}", err))
 }

@@ -4,7 +4,7 @@ use testutil;
 use crate::{
   Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
   Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
-  VFS,
+  Vfs,
 };
 
 use async_trait::async_trait;
@@ -467,7 +467,7 @@ async fn test_basic_gitignore_functionality() {
 }
 
 ///
-/// An in-memory implementation of VFS, useful for precisely reproducing glob matching behavior for
+/// An in-memory implementation of Vfs, useful for precisely reproducing glob matching behavior for
 /// a set of file paths.
 ///
 pub struct MemFS {
@@ -516,7 +516,7 @@ impl MemFS {
 }
 
 #[async_trait]
-impl VFS<String> for Arc<MemFS> {
+impl Vfs<String> for Arc<MemFS> {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
     // The creation of a static filesystem does not allow for Links.
     Err(format!("{:?} does not exist within this filesystem.", link))

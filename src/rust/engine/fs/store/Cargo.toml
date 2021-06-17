@@ -5,10 +5,10 @@ authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
 edition = "2018"
 
 [dependencies]
-async-stream = "0.2"
+async-stream = "0.3"
 async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-bytes = "0.5"
+bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
@@ -19,16 +19,18 @@ indexmap = "1.4"
 itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
+madvise = "0.1"
+memmap = "0.7"
 parking_lot = "0.11"
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
-prost-types = "0.6"
+prost = "0.7"
+prost-types = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
-tokio-rustls = "0.14"
-tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tokio-rustls = "0.22"
+tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
@@ -39,7 +41,7 @@ maplit = "*"
 mock = { path = "../../testutil/mock" }
 num_cpus = "1"
 testutil = { path = "../../testutil" }
-tokio = { version = "0.2.23", features = ["rt-core", "macros"] }
+tokio = { version = "1.4", features = ["rt", "macros"] }
 walkdir = "2"
 
 [[bench]]

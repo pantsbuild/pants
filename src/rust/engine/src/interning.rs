@@ -8,7 +8,7 @@ use std::sync::atomic;
 use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
 
-use crate::core::{Key, Value, FNV};
+use crate::core::{Fnv, Key, Value};
 use crate::externs;
 
 ///
@@ -41,8 +41,8 @@ use crate::externs;
 ///
 #[derive(Default)]
 pub struct Interns {
-  forward_keys: Mutex<HashMap<InternKey, Key, FNV>>,
-  reverse_keys: RwLock<HashMap<Key, Value, FNV>>,
+  forward_keys: Mutex<HashMap<InternKey, Key, Fnv>>,
+  reverse_keys: RwLock<HashMap<Key, Value, Fnv>>,
   id_generator: atomic::AtomicU64,
 }
 
@@ -58,20 +58,16 @@ impl Interns {
     };
 
     py.allow_threads(|| {
-      let (key, key_was_new) = {
-        let mut forward_keys = self.forward_keys.lock();
-        if let Some(key) = forward_keys.get(&intern_key) {
-          (*key, false)
-        } else {
-          let id = self.id_generator.fetch_add(1, atomic::Ordering::SeqCst);
-          let key = Key::new(id, type_id);
-          forward_keys.insert(intern_key, key);
-          (key, true)
-        }
-      };
-      if key_was_new {
+      let mut forward_keys = self.forward_keys.lock();
+      let key = if let Some(key) = forward_keys.get(&intern_key) {
+        *key
+      } else {
+        let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
+        let key = Key::new(id, type_id);
         self.reverse_keys.write().insert(key, v);
-      }
+        forward_keys.insert(intern_key, key);
+        key
+      };
       Ok(key)
     })
   }
@@ -84,7 +80,21 @@ impl Interns {
       .read()
       .get(&k)
       .cloned()
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
+      .unwrap_or_else(|| {
+        // N.B.: This panic is effectively an assertion that `Key::new` is only ever called above in
+        // `key_insert` under an exclusive lock where it is then inserted in `reverse_keys` before
+        // exiting the lock and being returned to the caller. This ensures that all `Key`s in the
+        // wild _must_ be in `reverse_keys`. As such, the code involved in generating the panic
+        // message should be immaterial and never fire. If it does fire though, then the assertion
+        // was proven incorrect and the `Key` is not, in fact, in `reverse_keys`. Since the `Debug`
+        // impl for `Key` currently uses this very method to render the `Key` we avoid using the
+        // debug formatting for `Key` to avoid generating a panic while panicking.
+        panic!(
+          "Previously memoized object disappeared for Key {{ id: {}, type_id: {} }}!",
+          k.id(),
+          k.type_id()
+        )
+      })
   }
 }
 

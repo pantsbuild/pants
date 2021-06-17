@@ -46,7 +46,7 @@ def single_target_run(
         alias = "binary"
         core_fields = ()
 
-    target = TestBinaryTarget({}, address=address)
+    target = TestBinaryTarget({}, address)
     field_set = TestRunFieldSet.create(target)
 
     with mock_console(rule_runner.options_bootstrapper) as (console, _):

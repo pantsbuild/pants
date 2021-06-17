@@ -4,9 +4,7 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import os
-from enum import Enum
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, cast
 
@@ -17,33 +15,9 @@ from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
-
-
-class ResolveAllConstraintsOption(Enum):
-    """When to allow re-using a resolve of an entire constraints file.
-
-    This helps avoid many repeated resolves of overlapping requirement subsets,
-    at the expense of using a larger requirement set that may be strictly necessary.
-
-    Note that use of any value other than NEVER requires --requirement-constraints to be set.
-    """
-
-    # Use the strict requirement subset always.
-    NEVER = "never"
-    # Use the strict requirement subset when building deployable binaries, but use
-    # the entire constraints file otherwise (e.g., when running tests).
-    NONDEPLOYABLES = "nondeployables"
-    # Always use the entire constraints file.
-    ALWAYS = "always"
-
-
-class ResolverVersion(Enum):
-    """The resolver implementation to use when resolving Python requirements."""
-
-    PIP_LEGACY = "pip-legacy-resolver"
-    PIP_2020 = "pip-2020-resolver"
 
 
 class PythonSetup(Subsystem):
@@ -76,24 +50,23 @@ class PythonSetup(Subsystem):
                 "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
+                "\n\nMutually exclusive with `--requirement-constraints-target`."
             ),
         )
         register(
             "--resolve-all-constraints",
             advanced=True,
-            default=ResolveAllConstraintsOption.NONDEPLOYABLES,
-            type=ResolveAllConstraintsOption,
+            default=True,
+            type=bool,
             help=(
-                "If set, and the requirements of the code being operated on are a subset of the "
-                "constraints file, then the entire constraints file will be used instead of the "
-                "subset. If unset, or any requirement of the code being operated on is not in the "
-                "constraints file, each subset will be independently resolved as needed, which is "
-                "more correct - work is only invalidated if a requirement it actually depends on "
-                "changes - but also a lot slower, due to the extra resolving. "
-                "\n\n* `never` will always use proper subsets, regardless of the goal being "
-                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
-                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
-                "a single resolve."
+                "If enabled, when resolving requirements, Pants will first resolve your entire "
+                "constraints file as a single global resolve. Then, if the code uses a subset of "
+                "your constraints file, Pants will extract the relevant requirements from that "
+                "global resolve so that only what's actually needed gets used. If disabled, Pants "
+                "will not use a global resolve and will resolve each subset of your requirements "
+                "independently."
+                "\n\nUsually this option should be enabled because it can result in far fewer "
+                "resolves."
                 "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
@@ -116,20 +89,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--resolver-version",
-            advanced=True,
-            type=ResolverVersion,
-            default=ResolverVersion.PIP_2020,
-            help="The resolver implementation to use when resolving Python requirements.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Support for configuring --resolver-version and selecting pip's legacy resolver "
-                "will be removed in Pants 2.5. Refer to https://pip.pypa.io/en/latest/user_guide/"
-                "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information on the "
-                "new resolver."
-            ),
-        )
-        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -141,13 +100,14 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=multiprocessing.cpu_count() // 2,
+            default=CPU_COUNT // 2,
+            default_help_repr="#cores/2",
             advanced=True,
             help=(
-                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
                 "can run multiple subprocesses in parallel, the maximum total parallelism will be "
                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
-                "Setting this option higher may result in better parallelism, but, if set too "
+                "\n\nSetting this option higher may result in better parallelism, but, if set too "
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
@@ -157,13 +117,13 @@ class PythonSetup(Subsystem):
         return tuple(self.options.interpreter_constraints)
 
     @property
-    def requirement_constraints(self) -> Optional[str]:
+    def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
-        return cast(Optional[str], self.options.requirement_constraints)
+        return cast("str | None", self.options.requirement_constraints)
 
     @property
-    def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
-        return cast(ResolveAllConstraintsOption, self.options.resolve_all_constraints)
+    def resolve_all_constraints(self) -> bool:
+        return cast(bool, self.options.resolve_all_constraints)
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
@@ -171,10 +131,6 @@ class PythonSetup(Subsystem):
     @memoized_method
     def interpreter_search_paths(self, env: Environment):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
-
-    @property
-    def resolver_version(self) -> ResolverVersion:
-        return cast(ResolverVersion, self.options.resolver_version)
 
     @property
     def manylinux(self) -> Optional[str]:

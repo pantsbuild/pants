@@ -12,7 +12,7 @@ Live run:
     ./pants run build-support/bin/generate_docs.py -- --sync --api-key=<API_KEY>
 
 where API_KEY is your readme.io API Key, found here:
-  https://dash.readme.com/project/pants/v2.0/api-key
+  https://dash.readme.com/project/pants/v2.3/api-key
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import pkgutil
+import re
 import subprocess
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, Optional, cast
@@ -62,6 +63,22 @@ def determine_pants_version() -> str:
     return version
 
 
+_markdown_trans = str.maketrans({c: f"\\{c}" for c in "\\`*_"})
+
+
+def markdown_safe(s: str) -> str:
+    """Escapes special characters in s, so it can be used as a literal string in markdown."""
+    return html.escape(s.translate(_markdown_trans), quote=False)
+
+
+_backtick_re = re.compile(r"`([^`]*)`")
+
+
+def html_safe(s: str) -> str:
+    """Escapes special characters in s, so it can be used as a literal string in readme HTML."""
+    return _backtick_re.sub(r"<code>\1</code>", html.escape(s))
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
     parser.add_argument(
@@ -98,6 +115,7 @@ def run_pants_help_all() -> Dict:
         f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
         f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
         "--no-verify-config",
+        "--remote-auth-plugin= ",
         "help-all",
     ]
     run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
@@ -143,7 +161,8 @@ class ReferenceGenerator:
     @staticmethod
     def _link(scope: str, *, sync: bool) -> str:
         # docsite pages link to the slug, local pages to the .md source.
-        return f"reference-{scope}" if sync else f"{scope}.md"
+        url_safe_scope = scope.replace(".", "-")
+        return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
     @classmethod
     def process_options_input(cls, help_info: Dict, *, sync: bool) -> Dict:
@@ -167,8 +186,13 @@ class ReferenceGenerator:
         def munge_option(option_data):
             # Munge the default so we can display it nicely when it's multiline, while
             # still displaying it inline if it's not.
-            default_str = to_help_str(option_data["default"])
-            escaped_default_str = html.escape(default_str, quote=False)
+            default_help_repr = option_data.get("default_help_repr")
+            if default_help_repr is None:
+                default_str = to_help_str(option_data["default"])
+            else:
+                # It should already be a string, but might as well be safe.
+                default_str = to_help_str(default_help_repr)
+            escaped_default_str = markdown_safe(default_str)
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
@@ -190,11 +214,15 @@ class ReferenceGenerator:
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = html.escape(str(field["default"]), quote=False)
+                default_str = markdown_safe(str(field["default"]))
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
+                # Description is not rendered as markdown, so we don't want to escape
+                # markdown special characters here (or the escapes will be visible).
+                field["description"] = html_safe(str(field["description"]))
             target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
+            target["description"] = html_safe(str(target["description"]))
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 
@@ -412,7 +440,7 @@ class ReferenceGenerator:
         for scope, shi in sorted(subsystems.items()):
             self._create(
                 parent_doc_id=all_subsystems_doc_id,
-                slug_suffix=scope,
+                slug_suffix=scope.replace(".", "-"),
                 title=scope,
                 body=self._render_options_body(shi),
             )

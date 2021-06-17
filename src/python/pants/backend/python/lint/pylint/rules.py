@@ -5,6 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
+from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -12,9 +13,9 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
-    PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
     VenvPex,
@@ -27,16 +28,10 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -62,6 +57,10 @@ class PylintFieldSet(FieldSet):
     sources: PythonSources
     dependencies: Dependencies
 
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPylintField).value
+
 
 @dataclass(frozen=True)
 class PylintTargetSetup:
@@ -74,13 +73,13 @@ class PylintTargetSetup:
 class PylintPartition:
     field_sets: Tuple[PylintFieldSet, ...]
     targets_with_dependencies: Targets
-    interpreter_constraints: PexInterpreterConstraints
+    interpreter_constraints: InterpreterConstraints
     plugin_targets: Targets
 
     def __init__(
         self,
         target_setups: Iterable[PylintTargetSetup],
-        interpreter_constraints: PexInterpreterConstraints,
+        interpreter_constraints: InterpreterConstraints,
         plugin_targets: Iterable[Target],
     ) -> None:
         field_sets = []
@@ -99,7 +98,7 @@ class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
 
 
-def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
@@ -110,7 +109,7 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    requirements_pex_request = Get(
+    requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
@@ -129,7 +128,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         for plugin_tgt in partition.plugin_targets
         if plugin_tgt.has_field(PythonRequirementsField)
     )
-    pylint_pex_request = Get(
+    pylint_pex_get = Get(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
@@ -139,49 +138,43 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[pylint.config] if pylint.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--pylint-config`",
-        ),
-    )
-
-    prepare_plugin_sources_request = Get(
+    prepare_plugin_sources_get = Get(
         StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets)
     )
-    prepare_python_sources_request = Get(
+    prepare_python_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies)
     )
-    field_set_sources_request = Get(
+    field_set_sources_get = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
     (
         pylint_pex,
         requirements_pex,
-        config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
         field_set_sources,
     ) = await MultiGet(
-        pylint_pex_request,
-        requirements_pex_request,
-        config_digest_request,
-        prepare_plugin_sources_request,
-        prepare_python_sources_request,
-        field_set_sources_request,
+        pylint_pex_get,
+        requirements_pex_get,
+        prepare_plugin_sources_get,
+        prepare_python_sources_get,
+        field_set_sources_get,
     )
 
-    pylint_runner_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="pylint_runner.pex",
-            interpreter_constraints=partition.interpreter_constraints,
-            main=pylint.main,
-            internal_only=True,
-            pex_path=[pylint_pex, requirements_pex],
+    pylint_runner_pex, config_files = await MultiGet(
+        Get(
+            VenvPex,
+            PexRequest(
+                output_filename="pylint_runner.pex",
+                interpreter_constraints=partition.interpreter_constraints,
+                main=pylint.main,
+                internal_only=True,
+                pex_path=[pylint_pex, requirements_pex],
+            ),
+        ),
+        Get(
+            ConfigFiles, ConfigFilesRequest, pylint.config_request(field_set_sources.snapshot.dirs)
         ),
     )
 
@@ -207,7 +200,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Digest,
         MergeDigests(
             (
-                config_digest,
+                config_files.snapshot.digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.source_files.snapshot.digest,
             )
@@ -218,7 +211,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         FallibleProcessResult,
         VenvPexProcess(
             pylint_runner_pex,
-            argv=generate_args(source_files=field_set_sources, pylint=pylint),
+            argv=generate_argv(field_set_sources, pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
             description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",
@@ -268,7 +261,7 @@ async def pylint_lint(
         request.field_sets, linted_targets, per_target_dependencies
     ):
         target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
-        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
             (
                 *(
                     tgt[InterpreterConstraintsField]

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.pants_requirement import PantsRequirement
@@ -39,9 +40,9 @@ def assert_pants_requirement(
     assert target[PythonRequirementsField].value == (
         Requirement.parse(f"{expected_dist}=={pants_version()}"),
     )
-    actual_value = target[ModuleMappingField].value
-    assert isinstance(actual_value, FrozenDict)
-    assert actual_value.get(expected_dist) == (expected_module,)
+    module_mapping = target[ModuleMappingField].value
+    assert isinstance(module_mapping, FrozenDict)
+    assert module_mapping.get(canonicalize_project_name(expected_dist)) == (expected_module,)
 
 
 def test_target_name(rule_runner: RuleRunner) -> None:

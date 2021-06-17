@@ -11,7 +11,6 @@ from enum import Enum
 from textwrap import dedent
 from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -42,10 +41,15 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
-    # Cached only in memory (i.e. memoized in pantsd), but never persistently.
-    PER_RESTART = "per_restart"
-    # Never cached anywhere: will run once per Session (i.e. once per run of Pants).
-    NEVER = "never"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
+    # success vs. failure.
+    PER_RESTART_ALWAYS = "per_restart_always"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently, and only if
+    # successful.
+    PER_RESTART_SUCCESSFUL = "per_restart_successful"
+    # Will run once per Session, i.e. once per run of Pants. This happens because the engine
+    # de-duplicates identical work; the process is neither memoized in memory nor cached to disk.
+    PER_SESSION = "per_session"
 
 
 @frozen_after_init
@@ -289,7 +293,6 @@ class InteractiveProcess:
         env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
-        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
@@ -309,14 +312,6 @@ class InteractiveProcess:
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
 
-        deprecated_conditional(
-            predicate=lambda: hermetic_env is not None,
-            removal_version="2.5.0.dev0",
-            entity_description="The hermetic_env flag",
-            hint_message=(
-                "@rules should request and pass either a CompleteEnvironment or Environment as the `env`."
-            ),
-        )
         self.__post_init__()
 
     def __post_init__(self):
@@ -331,14 +326,12 @@ class InteractiveProcess:
         cls,
         process: Process,
         *,
-        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
             input_digest=process.input_digest,
-            hermetic_env=hermetic_env,
             forward_signals_to_process=forward_signals_to_process,
         )
 
@@ -554,7 +547,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             input_digest=script_digest,
             argv=[script_path, request.binary_name],
             env={"PATH": search_path},
-            cache_scope=ProcessCacheScope.PER_RESTART,
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
 
@@ -570,7 +563,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                cache_scope=ProcessCacheScope.PER_RESTART,
+                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
             ),
         )
         for path in found_paths

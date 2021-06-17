@@ -22,11 +22,11 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use bytes::buf::BufMutExt;
+use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
@@ -45,7 +45,7 @@ use workunit_store::{
 pub type NodeResult<T> = Result<T, Failure>;
 
 #[async_trait]
-impl VFS<Failure> for Context {
+impl Vfs<Failure> for Context {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
     Ok(self.get(ReadLink(link.clone())).await?.0)
   }
@@ -499,7 +499,7 @@ fn unmatched_globs_additional_context() -> Option<String> {
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {}.",
-    externs::docs_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+    externs::bracketed_docs_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
   ))
 }
 
@@ -758,7 +758,7 @@ impl StreamingDownload for NetDownload {
 }
 
 struct FileDownload {
-  stream: tokio::io::ReaderStream<tokio::fs::File>,
+  stream: tokio_util::io::ReaderStream<tokio::fs::File>,
 }
 
 impl FileDownload {
@@ -769,7 +769,7 @@ impl FileDownload {
         e, path, file_name
       )
     })?;
-    let stream = tokio::io::reader_stream(file);
+    let stream = tokio_util::io::ReaderStream::new(file);
     Ok(FileDownload { stream })
   }
 }
@@ -1424,9 +1424,11 @@ impl Node for NodeKey {
     match self {
       NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
         NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
-          ProcessCacheScope::Always | ProcessCacheScope::PerRestart => true,
-          ProcessCacheScope::Successful => process_result.0.exit_code == 0,
-          ProcessCacheScope::Never => false,
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
+          ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+            process_result.0.exit_code == 0
+          }
+          ProcessCacheScope::PerSession => false,
         },
         _ => true,
       },

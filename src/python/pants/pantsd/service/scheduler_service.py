@@ -5,6 +5,7 @@ import logging
 import time
 from typing import Optional, Tuple, cast
 
+import pint
 import psutil
 
 from pants.engine.fs import PathGlobs, Snapshot
@@ -124,10 +125,12 @@ class SchedulerService(PantsService):
     def _check_memory_usage(self):
         memory_usage_in_bytes = psutil.Process(self._pid).memory_info()[0]
         if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
+            ureg = pint.UnitRegistry()
+            memory_usage = (memory_usage_in_bytes * ureg.byte).to_compact()
+            max_memory_usage = (self._max_memory_usage_in_bytes * ureg.byte).to_compact()
             raise Exception(
-                f"pantsd process {self._pid} was using "
-                f"{memory_usage_in_bytes} bytes of memory (above the limit of "
-                f"{self._max_memory_usage_in_bytes} bytes)."
+                f"pantsd process {self._pid} was using {memory_usage:~} of memory (above the "
+                f"`--pantsd-max-memory-usage` limit of {max_memory_usage:~})."
             )
 
     def _check_invalidation_watcher_liveness(self):
@@ -155,3 +158,4 @@ class SchedulerService(PantsService):
                 # Watcher failed for some reason
                 self._logger.critical(f"The scheduler was invalidated: {e!r}")
                 self.terminate()
+        self._scheduler_session.cancel()

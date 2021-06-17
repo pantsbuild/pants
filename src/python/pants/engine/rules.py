@@ -29,20 +29,14 @@ from pants.engine.goal import Goal
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.meta import decorated_type_checkable, frozen_after_init
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-
-@decorated_type_checkable
-def side_effecting(cls):
-    """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
-    specially with respect to rule caching semantics."""
-    return side_effecting.define_instance_of(cls)
 
 
 class _RuleVisitor(ast.NodeVisitor):

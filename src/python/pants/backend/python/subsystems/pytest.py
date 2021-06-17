@@ -1,9 +1,13 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
 
-from pants.option.custom_types import file_option, shell_str
+import os.path
+from typing import Iterable, cast
+
+from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 
 
@@ -34,6 +38,8 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
+            # TODO: When updating pytest-cov to 2.12+, update the help message for
+            #  `[coverage-py].config` to not mention installing TOML.
             default=["pytest-cov>=2.10.1,<2.12"],
             help=(
                 "Requirement strings for any plugins or additional requirements you'd like to use."
@@ -77,7 +83,10 @@ class PyTest(Subsystem):
             type=str,
             default="xunit2",
             advanced=True,
-            help="The format of the generated XML file. See https://docs.pytest.org/en/latest/reference.html#confval-junit_family.",
+            help=(
+                "The format of the generated XML file. See "
+                "https://docs.pytest.org/en/latest/reference.html#confval-junit_family."
+            ),
         )
         register(
             "--execution-slot-var",
@@ -90,23 +99,19 @@ class PyTest(Subsystem):
             ),
         )
         register(
-            "--config",
-            type=file_option,
-            default=None,
+            "--config-discovery",
+            type=bool,
+            default=True,
             advanced=True,
             help=(
-                "Path to pytest.ini or alternative Pytest config file.\n\n"
-                "Pytest will attempt to auto-discover the config file,"
-                "meaning that it should typically be an ancestor of your"
-                "tests, such as in the build root.\n\nPants will not automatically"
-                " set --rootdir for you to force Pytest to pick up your config "
-                "file, but you can manually set --rootdir in [pytest].args.\n\n"
-                "Refer to https://docs.pytest.org/en/stable/customize.html#"
-                "initialization-determining-rootdir-and-configfile."
+                "If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`) "
+                "during runs. See "
+                "https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where "
+                "config files should be located for Pytest to discover them."
             ),
         )
 
-    def get_requirement_strings(self) -> Tuple[str, ...]:
+    def get_requirement_strings(self) -> tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
         return (self.options.version, *self.options.pytest_plugins)
 
@@ -115,13 +120,26 @@ class PyTest(Subsystem):
         return cast(bool, self.options.timeouts)
 
     @property
-    def timeout_default(self) -> Optional[int]:
-        return cast(Optional[int], self.options.timeout_default)
+    def timeout_default(self) -> int | None:
+        return cast("int | None", self.options.timeout_default)
 
     @property
-    def timeout_maximum(self) -> Optional[int]:
-        return cast(Optional[int], self.options.timeout_maximum)
+    def timeout_maximum(self) -> int | None:
+        return cast("int | None", self.options.timeout_maximum)
 
-    @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+        # Refer to https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for how
+        # config files are discovered.
+        check_existence = []
+        check_content = {}
+        for d in ("", *dirs):
+            check_existence.append(os.path.join(d, "pytest.ini"))
+            check_content[os.path.join(d, "pyproject.toml")] = b"[tool.pytest.ini_options]"
+            check_content[os.path.join(d, "tox.ini")] = b"[pytest]"
+            check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
+
+        return ConfigFilesRequest(
+            discovery=cast(bool, self.options.config_discovery),
+            check_existence=check_existence,
+            check_content=check_content,
+        )

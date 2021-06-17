@@ -78,7 +78,7 @@ impl AsyncSemaphore {
   }
 
   async fn acquire(&self) -> Permit<'_> {
-    let permit = self.inner.sema.acquire().await;
+    let permit = self.inner.sema.acquire().await.expect("semaphore closed");
     let id = {
       let mut available_ids = self.inner.available_ids.lock();
       available_ids

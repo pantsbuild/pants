@@ -12,8 +12,8 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
-    PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
     PexRequirements,
@@ -40,7 +40,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ async def package_python_awslambda(
         output_filename="lambdex.pex",
         internal_only=True,
         requirements=PexRequirements(lambdex.all_requirements),
-        interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
+        interpreter_constraints=InterpreterConstraints(lambdex.interpreter_constraints),
         main=lambdex.main,
     )
 
@@ -119,7 +119,7 @@ async def package_python_awslambda(
             "files targets, but Pants will not include them in the built Lambda. Filesystem APIs "
             "like `open()` are not able to load files within the binary itself; instead, they "
             "read from the current working directory."
-            f"\n\nInstead, use `resources` targets. See {docs_url('resources')}."
+            f"\n\nInstead, use `resources` targets. See {bracketed_docs_url('resources')}."
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
