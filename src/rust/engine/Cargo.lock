@@ -694,6 +694,7 @@ dependencies = [
 name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
+ "fs",
  "hashing",
  "mock",
  "nailgun",

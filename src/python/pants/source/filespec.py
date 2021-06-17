@@ -8,7 +8,7 @@ from typing import Iterable
 from typing_extensions import TypedDict
 
 from pants.engine.fs import PathGlobs
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine_pyo3 as native_engine
 
 
 class _IncludesDict(TypedDict, total=True):

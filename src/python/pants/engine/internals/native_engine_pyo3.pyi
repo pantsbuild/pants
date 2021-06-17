@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
+from pants.engine.fs import PathGlobs
+
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
+
+def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
 
 class PyNailgunClient:
     def __init__(self, port: int, executor: PyExecutor) -> None: ...

@@ -4,11 +4,13 @@
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
+mod fs;
 mod nailgun;
 mod testutil;
 
 #[pymodule]
 fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
+  self::fs::register(m)?;
   self::nailgun::register(py, m)?;
   self::testutil::register(m)?;
 

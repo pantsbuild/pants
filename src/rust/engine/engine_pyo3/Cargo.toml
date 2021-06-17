@@ -18,6 +18,7 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+fs = { path = "../fs" }
 hashing = { path = "../hashing" }
 nailgun = { path = "../nailgun" }
 parking_lot = "0.11"

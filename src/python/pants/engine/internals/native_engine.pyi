@@ -8,7 +8,6 @@ from typing import Any, Sequence, TextIO
 
 from typing_extensions import Protocol
 
-from pants.engine.fs import PathGlobs
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -30,7 +29,6 @@ class RawFdRunner(Protocol):
         stderr_fileno: int,
     ) -> int: ...
 
-def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
 def capture_snapshots(
     scheduler: PyScheduler,
     session: PySession,
