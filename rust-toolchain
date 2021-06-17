@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.52.1"
+channel = "1.53.0"
 components = [
   "cargo",
   "clippy",
