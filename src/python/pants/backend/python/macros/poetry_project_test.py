@@ -1,9 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.macros.poetry_project import (
+from pants.backend.python.macros.poetry_requirements import (
     get_max_caret,
     get_max_tilde,
     handle_dict_attr,
@@ -12,9 +13,24 @@ from pants.backend.python.macros.poetry_project import (
     parse_single_dependency,
 )
 
-# TODO: pytest parameterize for caret/tilde edge
+
+@pytest.mark.parametrize(
+    "test, exp",
+    [
+        ("1.2.3", "2.0.0"),
+        ("1.2", "2.0.0"),
+        ("1", "2.0.0"),
+        ("0.2.3", "0.3.0"),
+        ("0.0.3", "0.0.4"),
+        ("0.0", "0.1.0"),
+        ("0", "1.0.0"),
+    ],
+)
+def test_caret(test, exp) -> None:
+    assert get_max_caret("", test) == exp
 
 
+"""
 def test_max_caret_1() -> None:
     assert get_max_caret("", "1.2.3") == "2.0.0"
 
@@ -42,7 +58,17 @@ def test_max_caret_6() -> None:
 def test_max_caret_7() -> None:
     assert get_max_caret("", "0") == "1.0.0"
 
+"""
 
+
+@pytest.mark.parametrize(
+    "test, exp", [("1.2.3", "1.3.0"), ("1.2", "1.3.0"), ("1", "2.0.0"), ("0", "1.0.0")]
+)
+def test_max_tilde(test, exp) -> None:
+    assert get_max_tilde("", test) == exp
+
+
+"""
 def test_max_tilde_1() -> None:
     assert get_max_tilde("", "1.2.3") == "1.3.0"
 
@@ -57,8 +83,25 @@ def test_max_tilde_3() -> None:
 
 def test_max_tilde_4() -> None:
     assert get_max_tilde("", "0") == "1.0.0"
+"""
 
 
+@pytest.mark.parametrize(
+    "test, exp",
+    [
+        ("~1.2.3", ">=1.2.3,<1.3.0"),
+        ("^1.2.3", ">=1.2.3,<2.0.0"),
+        ("~=1.2.3", "~=1.2.3"),
+        ("1.2.3", "==1.2.3"),
+        (">1.2.3", ">1.2.3"),
+        ("~1.2, !=1.2.10", ">=1.2,<1.3.0,!=1.2.10"),
+    ],
+)
+def test_handle_str(test, exp) -> None:
+    assert handle_str_attr("foo", test) == f"foo {exp}"
+
+
+"""
 def test_handle_str_tilde() -> None:
     assert handle_str_attr("foo", "~1.2.3") == "foo >=1.2.3,<1.3.0"
 
@@ -82,38 +125,37 @@ def test_handle_one_char_operator() -> None:
 def test_handle_multiple_reqs() -> None:
     assert handle_str_attr("foo", "~1.2, !=1.2.10") == "foo >=1.2,<1.3.0,!=1.2.10"
 
-
-def test_handle_git_basic() -> None:
-    attr = {"git": "https://github.com/requests/requests.git"}
-    assert (
-        handle_dict_attr("requests", attr)
-        == "requests @ git+https://github.com/requests/requests.git"
-    )
+"""
 
 
-# TODO: conglomerate git/etc with kwargs (parameterize dict)
-def test_handle_git_branch() -> None:
-    attr = {"git": "https://github.com/requests/requests.git", "branch": "main"}
-    assert (
-        handle_dict_attr("requests", attr)
-        == "requests @ git+https://github.com/requests/requests.git@main"
-    )
+def test_handle_git() -> None:
+    def test_handle_git_basic() -> None:
+        attr = {"git": "https://github.com/requests/requests.git"}
+        assert (
+            handle_dict_attr("requests", attr)
+            == "requests @ git+https://github.com/requests/requests.git"
+        )
 
+    def test_handle_git_branch() -> None:
+        attr = {"git": "https://github.com/requests/requests.git", "branch": "main"}
+        assert (
+            handle_dict_attr("requests", attr)
+            == "requests @ git+https://github.com/requests/requests.git@main"
+        )
 
-def test_handle_git_tag() -> None:
-    attr = {"git": "https://github.com/requests/requests.git", "tag": "v1.1.1"}
-    assert (
-        handle_dict_attr("requests", attr)
-        == "requests @ git+https://github.com/requests/requests.git@v1.1.1"
-    )
+    def test_handle_git_tag() -> None:
+        attr = {"git": "https://github.com/requests/requests.git", "tag": "v1.1.1"}
+        assert (
+            handle_dict_attr("requests", attr)
+            == "requests @ git+https://github.com/requests/requests.git@v1.1.1"
+        )
 
-
-def test_handle_git_revision() -> None:
-    attr = {"git": "https://github.com/requests/requests.git", "rev": "1a2b3c4d"}
-    assert (
-        handle_dict_attr("requests", attr)
-        == "requests @ git+https://github.com/requests/requests.git#1a2b3c4d"
-    )
+    def test_handle_git_revision() -> None:
+        attr = {"git": "https://github.com/requests/requests.git", "rev": "1a2b3c4d"}
+        assert (
+            handle_dict_attr("requests", attr)
+            == "requests @ git+https://github.com/requests/requests.git#1a2b3c4d"
+        )
 
 
 def test_handle_path_arg() -> None:
@@ -131,51 +173,47 @@ def test_version_only() -> None:
     assert handle_dict_attr("foo", attr) == "foo ==1.2.3"
 
 
-def test_py_constraint_single() -> None:
-    attr = {"version": "1.2.3", "python": "3.6"}
-    assert handle_dict_attr("foo", attr) == "foo ==1.2.3;python_version == '3.6'"
+def test_py_constraints() -> None:
+    def test_py_constraint_single() -> None:
+        attr = {"version": "1.2.3", "python": "3.6"}
+        assert handle_dict_attr("foo", attr) == "foo ==1.2.3;python_version == '3.6'"
 
+    def test_py_constraint_or() -> None:
+        attr = {"version": "1.2.3", "python": "3.6 || 3.7"}
+        assert (
+            handle_dict_attr("foo", attr)
+            == "foo ==1.2.3;(python_version == '3.6') or (python_version == '3.7')"
+        )
 
-def test_py_constraint_or() -> None:
-    attr = {"version": "1.2.3", "python": "3.6 || 3.7"}
-    assert (
-        handle_dict_attr("foo", attr)
-        == "foo ==1.2.3;(python_version == '3.6') or (python_version == '3.7')"
-    )
+    def test_py_constraint_and() -> None:
+        attr = {"version": "1.2.3", "python": ">3.6,!=3.7"}
+        assert (
+            handle_dict_attr("foo", attr)
+            == "foo ==1.2.3;python_version > '3.6' and python_version != '3.7'"
+        )
 
+    def test_py_constraint_and_or() -> None:
+        attr = {"version": "1.2.3", "python": ">3.6 || 3.5,3.4"}
+        assert (
+            handle_dict_attr("foo", attr)
+            == "foo ==1.2.3;(python_version > '3.6') or (python_version == '3.5' and python_version == '3.4')"
+        )
 
-def test_py_constraint_and() -> None:
-    attr = {"version": "1.2.3", "python": ">3.6,!=3.7"}
-    assert (
-        handle_dict_attr("foo", attr)
-        == "foo ==1.2.3;python_version > '3.6' and python_version != '3.7'"
-    )
+    def test_py_constraint_tilde_caret_and_or() -> None:
+        attr = {"version": "1.2.3", "python": "~3.6 || ^3.7"}
+        assert (
+            handle_dict_attr("foo", attr)
+            == "foo ==1.2.3;(python_version >= '3.6' and python_version< '3.7') or (python_version >= '3.7' and python_version< '4.0')"
+        )
 
-
-def test_py_constraint_and_or() -> None:
-    attr = {"version": "1.2.3", "python": ">3.6 || 3.5,3.4"}
-    assert (
-        handle_dict_attr("foo", attr)
-        == "foo ==1.2.3;(python_version > '3.6') or (python_version == '3.5' and python_version == '3.4')"
-    )
-
-
-def test_py_constraint_tilde_caret_and_or() -> None:
-    attr = {"version": "1.2.3", "python": "~3.6 || ^3.7"}
-    assert (
-        handle_dict_attr("foo", attr)
-        == "foo ==1.2.3;(python_version >= '3.6' and python_version< '3.7') or (python_version >= '3.7' and python_version< '4.0')"
-    )
-
-
-def test_multi_version_const() -> None:
-    lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
-    retval = parse_single_dependency("foo", lst_attr)
-    actual_reqs = (
-        Requirement.parse("foo ==1.2.3; python_version == '3.6'"),
-        Requirement.parse("foo ==1.2.4; python_version == '3.7'"),
-    )
-    assert retval == actual_reqs
+    def test_multi_version_const() -> None:
+        lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
+        retval = parse_single_dependency("foo", lst_attr)
+        actual_reqs = (
+            Requirement.parse("foo ==1.2.3; python_version == '3.6'"),
+            Requirement.parse("foo ==1.2.4; python_version == '3.7'"),
+        )
+        assert retval == actual_reqs
 
 
 def test_extended_form() -> None:
@@ -187,7 +225,7 @@ def test_extended_form() -> None:
     markers = "platform_python_implementation == 'CPython'"
     [tool.poetry.dev-dependencies]
     """
-    retval = parse_pyproject_toml(toml_black_str)
+    retval = parse_pyproject_toml(toml_black_str, "/path/to/file")
     actual_req = {
         Requirement.parse(
             'black==19.10b0; platform_python_implementation == "CPython" and python_version == "3.6"'
@@ -222,7 +260,7 @@ def test_parse_multi_reqs() -> None:
     requires = ["poetry-core>=1.0.0"]
     build-backend = "poetry.core.masonry.api"
     """
-    retval = parse_pyproject_toml(toml_str)
+    retval = parse_pyproject_toml(toml_str, "/path/to/file")
     actual_reqs = {
         Requirement.parse("python<4.0.0,>=3.8"),
         Requirement.parse("junk@ https://github.com/myrepo/junk.whl"),

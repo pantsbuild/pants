@@ -1,4 +1,4 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 from pathlib import Path
@@ -15,16 +15,16 @@ class PoetryRequirements:
     "python_requirements_library" targets.
 
     For example, if pyproject.toml contains the following entries under
-    poetry.tool.dependencies: `foo = "~1"` and `bar = "^2.4"`,
+    poetry.tool.dependencies: `foo = ">1"` and `bar = ">2.4"`,
 
     python_requirement_library(
         name="foo",
-        requirements=["foo>=3.14"],
+        requirements=["foo>1"],
       )
 
       python_requirement_library(
         name="bar",
-        requirements=["bar>=2.7"],
+        requirements=["bar>2.4"],
       )
 
     See Poetry documentation for correct specification of pyproject.toml:
@@ -68,7 +68,9 @@ class PoetryRequirements:
         requirements_dep = f":{req_file_tgt.name}"
 
         req_file = Path(get_buildroot(), self._parse_context.rel_path, pyproject_toml_relpath)
-        requirements = parse_pyproject_toml(req_file.read_text())
+        requirements = parse_pyproject_toml(
+            req_file.read_text(), str(req_file.relative_to(get_buildroot()))
+        )
         for parsed_req in requirements:
             req_module_mapping = (
                 {parsed_req.project_name: module_mapping[parsed_req.project_name]}
