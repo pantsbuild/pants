@@ -29,7 +29,7 @@ use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::Metric;
+use workunit_store::{in_workunit, Level, Metric, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
@@ -80,7 +80,13 @@ impl CommandRunner {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
-        let mut dir_glob = PathBuf::from(p).into_os_string();
+        let mut dir_glob = {
+          let mut dir = PathBuf::from(p).into_os_string();
+          if dir.is_empty() {
+            dir.push(".")
+          }
+          dir
+        };
         let dir = dir_glob.clone();
         dir_glob.push("/**");
         vec![dir, dir_glob]
@@ -239,41 +245,47 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  /// TODO: start to create workunits for local process execution
-  ///
   async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    context
-      .workunit_store
-      .increment_counter(Metric::LocalExecutionRequests, 1);
-
     let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
-    self
-      .run_and_capture_workdir(
-        req,
-        context,
-        self.store.clone(),
-        self.executor.clone(),
-        self.cleanup_local_dirs,
-        &self.work_dir_base,
-        self.platform(),
-      )
-      .map_err(|msg| {
-        // Processes that experience no infrastructure issues should result in an "Ok" return,
-        // potentially with an exit code that indicates that they failed (with more information
-        // on stderr). Actually failing at this level indicates a failure to start or otherwise
-        // interact with the process, which would generally be an infrastructure or implementation
-        // error (something missing from the sandbox, incorrect permissions, etc).
-        //
-        // Given that this is expected to be rare, we dump the entire process definition in the
-        // error.
-        format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
-      })
-      .await
+    in_workunit!(
+      context.workunit_store.clone(),
+      "run_local_process".to_owned(),
+      WorkunitMetadata {
+        level: Level::Trace,
+        ..WorkunitMetadata::default()
+      },
+      |workunit| async move {
+        workunit.increment_counter(Metric::LocalExecutionRequests, 1);
+        self
+          .run_and_capture_workdir(
+            req,
+            context,
+            self.store.clone(),
+            self.executor.clone(),
+            self.cleanup_local_dirs,
+            &self.work_dir_base,
+            self.platform(),
+          )
+          .map_err(|msg| {
+            // Processes that experience no infrastructure issues should result in an "Ok" return,
+            // potentially with an exit code that indicates that they failed (with more information
+            // on stderr). Actually failing at this level indicates a failure to start or otherwise
+            // interact with the process, which would generally be an infrastructure or implementation
+            // error (something missing from the sandbox, incorrect permissions, etc).
+            //
+            // Given that this is expected to be rare, we dump the entire process definition in the
+            // error.
+            format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
+          })
+          .await
+      }
+    )
+    .await
   }
 }
 
@@ -537,19 +549,21 @@ pub trait CapturedWorkdir {
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
+      let root = if let Some(ref working_directory) = req.working_directory {
+        workdir_path.join(working_directory)
+      } else {
+        workdir_path.clone()
+      };
       // Use no ignore patterns, because we are looking for explicitly listed paths.
       let posix_fs = Arc::new(
-        fs::PosixFS::new(
-          workdir_path.clone(),
-          fs::GitignoreStyleExcludes::empty(),
-          executor.clone(),
-        )
-        .map_err(|err| {
-          format!(
-            "Error making posix_fs to fetch local process execution output files: {}",
-            err
-          )
-        })?,
+        fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
+          |err| {
+            format!(
+              "Error making posix_fs to fetch local process execution output files: {}",
+              err
+            )
+          },
+        )?,
       );
       CommandRunner::construct_output_snapshot(
         store.clone(),

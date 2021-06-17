@@ -37,7 +37,7 @@ use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
-  with_workunit, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunningWorkunit, SpanId, WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
@@ -569,6 +569,7 @@ impl CommandRunner {
     execute_request: ExecuteRequest,
     process: Process,
     context: &Context,
+    workunit: &mut RunningWorkunit,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     const MAX_RETRIES: u32 = 5;
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
@@ -580,9 +581,7 @@ impl CommandRunner {
     loop {
       // If we are currently retrying a request, then delay using an exponential backoff.
       if num_retries > 0 {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
+        workunit.increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
         let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
@@ -599,9 +598,7 @@ impl CommandRunner {
             "no current operation: submitting execute request: build_id={}; execute_request={:?}",
             context.build_id, &execute_request
           );
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionRPCExecute, 1);
+          workunit.increment_counter(Metric::RemoteExecutionRPCExecute, 1);
           let mut client = self.execution_client.as_ref().clone();
           let request = apply_headers(Request::new(execute_request.clone()), &context.build_id);
           client.execute(request).await
@@ -614,9 +611,7 @@ impl CommandRunner {
             "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
             context.build_id, operation_name
           );
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
+          workunit.increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
           let wait_execution_request = WaitExecutionRequest {
             name: operation_name.to_owned(),
           };
@@ -653,9 +648,7 @@ impl CommandRunner {
               // of retries allowed since the last successful connection. (There is no point in
               // continually submitting a request if ultimately futile.)
               if num_retries >= MAX_RETRIES {
-                context
-                  .workunit_store
-                  .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+                workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
                 return Err(
                   "Too many failures from server. The last event was the server disconnecting with no error given.".to_owned(),
                 );
@@ -684,9 +677,7 @@ impl CommandRunner {
         Ok(result) => return Ok(result),
         Err(err) => match err {
           ExecutionError::Fatal(e) => {
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+            workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
             return Err(e);
           }
           ExecutionError::Retryable(e) => {
@@ -695,9 +686,7 @@ impl CommandRunner {
             // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
             if num_retries >= MAX_RETRIES {
-              context
-                .workunit_store
-                .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+              workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
               return Err(format!(
                 "Too many failures from server. The last error was: {}",
                 e
@@ -719,9 +708,7 @@ impl CommandRunner {
               .await?;
           }
           ExecutionError::Timeout => {
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteExecutionTimeouts, 1);
+            workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             return populate_fallible_execution_result_for_timeout(
               &self.store,
               &process.description,
@@ -766,7 +753,7 @@ impl crate::CommandRunner for CommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
+    let (command_digest, action_digest) = in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
@@ -774,14 +761,14 @@ impl crate::CommandRunner for CommandRunner {
         desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
-      ensure_action_stored_locally(&self.store, &command, &action),
-      |_, md| md,
+      |_workunit| ensure_action_stored_locally(&self.store, &command, &action),
     )
     .await?;
 
     // Check the remote Action Cache to see if this request was already computed.
     // If so, return immediately with the result.
-    let cached_response_opt = with_workunit(
+    let context2 = context.clone();
+    let cached_response_opt = in_workunit!(
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
       WorkunitMetadata {
@@ -789,16 +776,15 @@ impl crate::CommandRunner for CommandRunner {
         desc: Some(format!("check action cache for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
-      check_action_cache(
+      |_workunit| check_action_cache(
         action_digest,
         &self.metadata,
         self.platform,
-        &context,
+        &context2,
         self.action_cache_client.clone(),
         self.store.clone(),
         false,
       ),
-      |_, md| md,
     )
     .await?;
     debug!(
@@ -810,7 +796,8 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    with_workunit(
+    let input_files = request.input_files;
+    in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
@@ -818,67 +805,60 @@ impl crate::CommandRunner for CommandRunner {
         desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
-      ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
-      |_, md| md,
+      |_workunit| ensure_action_uploaded(&store, command_digest, action_digest, input_files),
     )
     .await?;
 
     // Submit the execution request to the RE server for execution.
-    context
-      .workunit_store
-      .increment_counter(Metric::RemoteExecutionRequests, 1);
-    let result_fut = self.run_execute_request(execute_request, request, &context);
-    let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
-    let response = with_workunit(
+    let context2 = context.clone();
+    in_workunit!(
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
         ..WorkunitMetadata::default()
       },
-      timeout_fut,
-      |result, mut metadata| {
+      |workunit| async move {
+        workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
+        let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
+        let result = tokio::time::timeout(deadline_duration, result_fut).await;
         if result.is_err() {
-          metadata.level = Level::Error;
-          metadata.desc = Some(format!(
-            "remote execution timed out after {:?}",
-            deadline_duration
-          ));
+          workunit.update_metadata(|inititial| WorkunitMetadata {
+            level: Level::Error,
+            desc: Some(format!(
+              "remote execution timed out after {:?}",
+              deadline_duration
+            )),
+            ..inititial
+          })
         }
-        metadata
+
+        // Detect whether the operation ran or hit the deadline timeout.
+        match result {
+          Ok(result) => {
+            if result.is_ok() {
+              workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            } else {
+              workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            }
+            result
+          }
+          Err(_) => {
+            // The Err in this match arm originates from the timeout future.
+            debug!(
+              "remote execution for build_id={} timed out after {:?}",
+              &build_id, deadline_duration
+            );
+            workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
+            Err(format!(
+              "remote execution timed out after {:?}",
+              deadline_duration
+            ))
+          }
+        }
       },
     )
-    .await;
-
-    // Detect whether the operation ran or hit the deadline timeout.
-    match response {
-      Ok(result) => {
-        if result.is_ok() {
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionSuccess, 1);
-        } else {
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionErrors, 1);
-        }
-        result
-      }
-      Err(_) => {
-        // The Err in this match arm originates from the timeout future.
-        debug!(
-          "remote execution for build_id={} timed out after {:?}",
-          &build_id, deadline_duration
-        );
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteExecutionTimeouts, 1);
-        Err(format!(
-          "remote execution timed out after {:?}",
-          deadline_duration
-        ))
-      }
-    }
+    .await
   }
 
   // TODO: This is a copy of the same method on crate::remote::CommandRunner.
@@ -1377,67 +1357,70 @@ pub async fn check_action_cache(
   store: Store,
   eager_fetch: bool,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
-  context
-    .workunit_store
-    .increment_counter(Metric::RemoteCacheRequests, 1);
-
-  let client = action_cache_client.as_ref().clone();
-  let action_result_response = retry_call(
-    client,
-    move |mut client| {
-      let request = remexec::GetActionResultRequest {
-        action_digest: Some(action_digest.into()),
-        instance_name: metadata
-          .instance_name
-          .as_ref()
-          .cloned()
-          .unwrap_or_else(String::new),
-        ..remexec::GetActionResultRequest::default()
-      };
-
-      let request = apply_headers(Request::new(request), &context.build_id);
-
-      async move { client.get_action_result(request).await }
+  in_workunit!(
+    context.workunit_store.clone(),
+    "check_action_cache".to_owned(),
+    WorkunitMetadata {
+      level: Level::Trace,
+      desc: Some(format!("check action cache for {:?}", action_digest)),
+      ..WorkunitMetadata::default()
     },
-    status_is_retryable,
-  )
-  .await;
+    |workunit| async move {
+      workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
-  match action_result_response {
-    Ok(action_result) => {
-      let action_result = action_result.into_inner();
-      let response =
-        populate_fallible_execution_result(store.clone(), &action_result, platform, false).await?;
-      if eager_fetch {
-        future::try_join_all(vec![
-          store.ensure_local_has_file(response.stdout_digest).boxed(),
-          store.ensure_local_has_file(response.stderr_digest).boxed(),
-          store
-            .ensure_local_has_recursive_directory(response.output_directory)
-            .boxed(),
-        ])
-        .await?;
-      };
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteCacheRequestsCached, 1);
-      Ok(Some(response))
+      let client = action_cache_client.as_ref().clone();
+      let action_result_response = retry_call(
+        client,
+        move |mut client| {
+          let request = remexec::GetActionResultRequest {
+            action_digest: Some(action_digest.into()),
+            instance_name: metadata
+              .instance_name
+              .as_ref()
+              .cloned()
+              .unwrap_or_else(String::new),
+            ..remexec::GetActionResultRequest::default()
+          };
+          let request = apply_headers(Request::new(request), &context.build_id);
+          async move { client.get_action_result(request).await }
+        },
+        status_is_retryable,
+      )
+      .await;
+
+      match action_result_response {
+        Ok(action_result) => {
+          let action_result = action_result.into_inner();
+          let response =
+            populate_fallible_execution_result(store.clone(), &action_result, platform, false)
+              .await?;
+          if eager_fetch {
+            future::try_join_all(vec![
+              store.ensure_local_has_file(response.stdout_digest).boxed(),
+              store.ensure_local_has_file(response.stderr_digest).boxed(),
+              store
+                .ensure_local_has_recursive_directory(response.output_directory)
+                .boxed(),
+            ])
+            .await?;
+          };
+          workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
+          Ok(Some(response))
+        }
+        Err(status) => match status.code() {
+          Code::NotFound => {
+            workunit.increment_counter(Metric::RemoteCacheRequestsUncached, 1);
+            Ok(None)
+          }
+          _ => {
+            workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
+            Err(status_to_str(status))
+          }
+        },
+      }
     }
-    Err(status) => match status.code() {
-      Code::NotFound => {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheRequestsUncached, 1);
-        Ok(None)
-      }
-      _ => {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheReadErrors, 1);
-        Err(status_to_str(status))
-      }
-    },
-  }
+  )
+  .await
 }
 
 pub async fn store_proto_locally<P: prost::Message>(

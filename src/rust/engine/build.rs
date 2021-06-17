@@ -28,10 +28,8 @@
 #![allow(clippy::mutex_atomic)]
 
 fn main() {
-  // NB: When built with Python 3, `native_engine.so` only works with a Python 3 interpreter.
-  // When built with Python 2, it works with both Python 2 and Python 3.
-  // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
-  // when needed.
+  // NB: The native extension only works with the Python interpreter version it was built with
+  // (e.g. Python 3.7 vs 3.8).
   println!("cargo:rerun-if-env-changed=PY");
 
   if cfg!(target_os = "macos") {

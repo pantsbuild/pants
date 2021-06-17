@@ -34,7 +34,7 @@ function calculate_current_hash() {
     (
       echo "${MODE_FLAG}"
       echo "${RUST_TOOLCHAIN_CONTENTS}"
-      uname
+      uname -mps
       python --version 2>&1
       git ls-files --cached --others --exclude-standard \
         "${NATIVE_ROOT}" \

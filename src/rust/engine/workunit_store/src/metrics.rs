@@ -56,9 +56,9 @@ pub enum Metric {
   RemoteCacheRequestsCached,
   RemoteCacheRequestsUncached,
   RemoteCacheReadErrors,
+  RemoteCacheWriteAttempts,
+  RemoteCacheWriteSuccesses,
   RemoteCacheWriteErrors,
-  RemoteCacheWriteStarted,
-  RemoteCacheWriteFinished,
   RemoteCacheSpeculationLocalCompletedFirst,
   RemoteCacheSpeculationRemoteCompletedFirst,
   /// The total time saved (in milliseconds) thanks to remote cache hits instead of running the
