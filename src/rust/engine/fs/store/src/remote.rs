@@ -8,16 +8,14 @@ use std::time::{Duration, Instant};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
-use bazel_protos::{self};
 use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_interceptor_fn, status_to_str};
+use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric, WorkunitMetadata};
 
@@ -27,10 +25,9 @@ pub struct ByteStore {
   chunk_size_bytes: usize,
   upload_timeout: Duration,
   rpc_attempts: usize,
-  channel: Channel,
   interceptor: Option<Interceptor>,
-  byte_stream_client: Arc<ByteStreamClient<Channel>>,
-  cas_client: Arc<ContentAddressableStorageClient<Channel>>,
+  byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
+  cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -80,7 +77,9 @@ impl ByteStore {
 
     let endpoint =
       grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref(), &mut headers)?;
-    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
+    let channel = layered_service(tonic::transport::Channel::balance_list(
+      vec![endpoint].into_iter(),
+    ));
     let interceptor = if headers.is_empty() {
       None
     } else {
@@ -103,7 +102,6 @@ impl ByteStore {
       instance_name,
       chunk_size_bytes,
       upload_timeout,
-      channel,
       rpc_attempts: rpc_retries + 1,
       interceptor,
       byte_stream_client,

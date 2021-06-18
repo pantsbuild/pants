@@ -20,7 +20,7 @@ use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::{headers_to_interceptor_fn, status_to_str};
+use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -32,7 +32,6 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
-use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
@@ -100,13 +99,12 @@ pub struct CommandRunner {
   platform: Platform,
   store: Store,
   headers: BTreeMap<String, String>,
-  channel: Channel,
-  execution_client: Arc<ExecutionClient<Channel>>,
-  action_cache_client: Arc<ActionCacheClient<Channel>>,
+  execution_client: Arc<ExecutionClient<LayeredService>>,
+  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
   retry_interval_duration: Duration,
   capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
-  capabilities_client: Arc<CapabilitiesClient<Channel>>,
+  capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
 }
 
 enum StreamOutcome {
@@ -147,8 +145,9 @@ impl CommandRunner {
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut headers,
     )?;
-    let execution_channel =
-      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter());
+    let execution_channel = layered_service(tonic::transport::Channel::balance_list(
+      vec![execution_endpoint].into_iter(),
+    ));
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
         ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
@@ -161,7 +160,9 @@ impl CommandRunner {
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut headers,
     )?;
-    let store_channel = tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter());
+    let store_channel = layered_service(tonic::transport::Channel::balance_list(
+      vec![store_endpoint].into_iter(),
+    ));
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
@@ -178,7 +179,6 @@ impl CommandRunner {
     let command_runner = CommandRunner {
       metadata,
       headers,
-      channel: execution_channel,
       execution_client,
       action_cache_client,
       store,
@@ -1355,7 +1355,7 @@ pub async fn check_action_cache(
   metadata: &ProcessMetadata,
   platform: Platform,
   context: &Context,
-  action_cache_client: Arc<ActionCacheClient<Channel>>,
+  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   eager_fetch: bool,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
