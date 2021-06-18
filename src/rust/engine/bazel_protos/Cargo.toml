@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 bytes = "1.0"
-hashing = { path = "../../hashing" }
+hashing = { path = "../hashing" }
 prost = "0.7"
 prost-build = "0.7"
 prost-types = "0.7"

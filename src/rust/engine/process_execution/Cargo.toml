@@ -9,7 +9,7 @@ publish = false
 async-trait = "0.1"
 walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
-bazel_protos = { path = "bazel_protos" }
+bazel_protos = { path = "../bazel_protos" }
 bytes = "1.0"
 derivative = "2.1.1"
 grpc_util = { path = "../grpc_util" }
