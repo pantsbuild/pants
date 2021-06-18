@@ -287,9 +287,7 @@ impl Execution for MockResponder {
             Ok(operations) => {
               return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
-            Err(rpc_status) => {
-              Err(rpc_status)
-            }
+            Err(rpc_status) => Err(rpc_status),
           }
         } else {
           return Err(Status::invalid_argument(format!(
@@ -306,11 +304,9 @@ impl Execution for MockResponder {
         )));
       }
 
-      None => {
-        Err(Status::invalid_argument(
-          "Execute endpoint called. Did not expect this call.".to_owned(),
-        ))
-      }
+      None => Err(Status::invalid_argument(
+        "Execute endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 
@@ -335,9 +331,7 @@ impl Execution for MockResponder {
             Ok(operations) => {
               return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
-            Err(rpc_status) => {
-              Err(rpc_status)
-            }
+            Err(rpc_status) => Err(rpc_status),
           }
         } else {
           return Err(Status::invalid_argument(format!(
@@ -354,11 +348,9 @@ impl Execution for MockResponder {
         )));
       }
 
-      None => {
-        Err(Status::invalid_argument(
-          "WaitExecution endpoint called. Did not expect this call.".to_owned(),
-        ))
-      }
+      None => Err(Status::invalid_argument(
+        "WaitExecution endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 }

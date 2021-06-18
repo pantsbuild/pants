@@ -575,7 +575,8 @@ impl crate::CommandRunner for CommandRunner {
         |workunit| async move {
           workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
         }
-      ).await;
+      )
+      .await;
       let command_runner = self.clone();
       let result = result.clone();
       let context2 = context.clone();

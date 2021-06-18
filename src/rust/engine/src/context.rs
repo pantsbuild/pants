@@ -384,12 +384,12 @@ impl Core {
       GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
         .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
 
-    let watcher = if watch_filesystem { 
-      let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?; 
+    let watcher = if watch_filesystem {
+      let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
       w.start(&graph);
       Some(w)
-    } else { 
-      None 
+    } else {
+      None
     };
 
     let sessions = Sessions::new(&executor)?;
