@@ -242,18 +242,15 @@ def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str
     )
 
 
-PACKAGES = sorted(
-    {
-        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
-        # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg),
-        Package(
-            "pantsbuild.pants.testutil",
-            "src/python/pants/testutil:testutil_wheel",
-            validate_testutil_pkg,
-        ),
-    }
+# NB: This a native wheel. We expect a distinct wheel for each Python version and each
+# platform (macOS_x86 x macos_arm x linux).
+PANTS_PKG = Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg)
+TESTUTIL_PKG = Package(
+    "pantsbuild.pants.testutil",
+    "src/python/pants/testutil:testutil_wheel",
+    validate_testutil_pkg,
 )
+PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 
 
 # -----------------------------------------------------------------------------------------------
@@ -640,20 +637,46 @@ def publish() -> None:
 
     # Release.
     create_twine_venv()
+    upload_wheels_via_twine()
+    tag_release()
+    banner("Successfully released packages to PyPI and GitHub")
+
+
+def publish_apple_silicon() -> None:
+    banner("Building and publishing an Apple Silicon wheel")
+    if os.environ.get("USE_PY39") != "true":
+        die("Must set `USE_PY39=true` when building for Apple Silicon.")
+    check_clean_git_branch()
+    check_pgp()
+    check_roles()
+
+    dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
     subprocess.run(
         [
-            str(CONSTANTS.twine_venv_dir / "bin/twine"),
-            "upload",
-            "--sign",
-            f"--sign-with={get_pgp_program_name()}",
-            f"--identity={get_pgp_key_id()}",
-            "--skip-existing",  # Makes the upload idempotent.
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
+            "./pants",
+            "--concurrent",
+            f"--pants-distdir={dest_dir}",
+            "package",
+            PANTS_PKG.target,
         ],
         check=True,
     )
-    tag_release()
-    banner("Successfully released packages to PyPI and GitHub")
+    expected_whl = (
+        dest_dir
+        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
+    )
+    if not expected_whl.exists():
+        die(
+            f"Failed to find {expected_whl}. Are you running from the correct platform and "
+            f"macOS version?"
+        )
+
+    create_twine_venv()
+    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
+    upload_wheels_via_twine()
+    banner("Successfully released Apple Silicon wheel to PyPI")
 
 
 def check_clean_git_branch() -> None:
@@ -743,6 +766,21 @@ def tag_release() -> None:
     )
     subprocess.run(
         ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
+    )
+
+
+def upload_wheels_via_twine() -> None:
+    subprocess.run(
+        [
+            str(CONSTANTS.twine_venv_dir / "bin/twine"),
+            "upload",
+            "--sign",
+            f"--sign-with={get_pgp_program_name()}",
+            f"--identity={get_pgp_key_id()}",
+            "--skip-existing",  # Makes the upload idempotent.
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
+        ],
+        check=True,
     )
 
 
@@ -860,6 +898,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
+    subparsers.add_parser("publish-apple-silicon")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -875,6 +914,8 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
+    if args.command == "publish-apple-silicon":
+        publish_apple_silicon()
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
