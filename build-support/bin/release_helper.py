@@ -578,8 +578,8 @@ def build_pex(fetch: bool) -> None:
     CONSTANTS.deploy_dir.mkdir(parents=True)
 
     if fetch:
-        fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-        check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+        fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
+        check_pants_wheels_present(CONSTANTS.deploy_dir)
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -634,8 +634,8 @@ def publish() -> None:
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
-    fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-    check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
+    check_pants_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
 
     # Release.
@@ -780,7 +780,7 @@ class PrebuiltWheel(NamedTuple):
         return cls(path, quote_plus(path))
 
 
-def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
+def determine_prebuilt_wheels(*, include_3rdparty: bool) -> list[PrebuiltWheel]:
     def determine_wheels(wheel_path: str) -> list[PrebuiltWheel]:
         response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
         xml_root = ElementTree.fromstring(response.text)
@@ -792,16 +792,17 @@ def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
             )
         ]
 
-    return [
-        *determine_wheels(CONSTANTS.deploy_pants_wheels_path),
-        *determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path),
-    ]
+    res = determine_wheels(CONSTANTS.deploy_pants_wheels_path)
+    if include_3rdparty:
+        res.extend(determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path))
+    return res
 
 
 def list_prebuilt_wheels() -> None:
     print(
         "\n".join(
-            f"{CONSTANTS.binary_base_url}/{wheel.url}" for wheel in determine_prebuilt_wheels()
+            f"{CONSTANTS.binary_base_url}/{wheel.url}"
+            for wheel in determine_prebuilt_wheels(include_3rdparty=True)
         )
     )
 
@@ -811,13 +812,12 @@ def list_prebuilt_wheels() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO: possibly parallelize through httpx and asyncio.
-def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
+def fetch_prebuilt_wheels(destination_dir: str | Path, *, include_3rdparty: bool) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
     session = requests.Session()
     session.mount(CONSTANTS.binary_base_url, requests.adapters.HTTPAdapter(max_retries=4))
-    for wheel in determine_prebuilt_wheels():
+    for wheel in determine_prebuilt_wheels(include_3rdparty=include_3rdparty):
         full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
         print(f"Fetching {full_url}", file=sys.stderr)
         response = session.get(full_url)
@@ -829,7 +829,7 @@ def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
         dest.write_bytes(response.content)
 
 
-def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
+def check_pants_wheels_present(check_dir: str | Path) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
     for package in PACKAGES:
@@ -867,7 +867,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-roles")
     subparsers.add_parser("list-prebuilt-wheels")
-    subparsers.add_parser("check-prebuilt-wheels")
+    subparsers.add_parser("check-pants-wheels")
     return parser
 
 
@@ -889,10 +889,10 @@ def main() -> None:
         PackageAccessValidator.validate_all()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "check-prebuilt-wheels":
+    if args.command == "check-pants-wheels":
         with TemporaryDirectory() as tempdir:
-            fetch_prebuilt_wheels(tempdir)
-            check_prebuilt_wheels_present(tempdir)
+            fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
+            check_pants_wheels_present(tempdir)
 
 
 if __name__ == "__main__":
