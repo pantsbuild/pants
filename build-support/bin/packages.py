@@ -648,9 +648,9 @@ def publish_apple_silicon() -> None:
         check=True,
     )
     expected_whl = (
-         dest_dir
-         / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
-     )
+        dest_dir
+        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
+    )
     if not expected_whl.exists():
         die(
             f"Failed to find {expected_whl}. Are you running from the correct platform and "
