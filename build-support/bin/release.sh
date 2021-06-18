@@ -43,7 +43,7 @@ function run_packages_script() {
   )
 }
 
-_OPTS="hnftlowepq"
+_OPTS="hnftlowepqa"
 
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
@@ -66,6 +66,7 @@ function usage() {
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
+  echo " -a  Publish for Apple Silicon."
   echo
   echo "All options (except for '-d') are mutually exclusive."
 
@@ -103,6 +104,10 @@ while getopts ":${_OPTS}" opt; do
       ;;
     p)
       run_packages_script build-universal-pex
+      exit $?
+      ;;
+    a)
+      run_packages_script publish-apple-silicon
       exit $?
       ;;
     q)
