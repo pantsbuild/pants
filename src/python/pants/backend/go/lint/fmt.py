@@ -39,20 +39,17 @@ async def format_golang_targets(
     results = []
     fmt_request_types: Iterable[type[StyleRequest]] = union_membership[GoLangFmtRequest]
     for fmt_request_type in fmt_request_types:
-        result = await Get(
-            EnrichedFmtResult,
-            GoLangFmtRequest,
-            fmt_request_type(
-                (
-                    fmt_request_type.field_set_type.create(target)
-                    for target in go_fmt_targets.targets
-                    if fmt_request_type.field_set_type.is_applicable(target)
-                ),
-                prior_formatter_result=prior_formatter_result,
+        request = fmt_request_type(
+            (
+                fmt_request_type.field_set_type.create(target)
+                for target in go_fmt_targets.targets
+                if fmt_request_type.field_set_type.is_applicable(target)
             ),
+            prior_formatter_result=prior_formatter_result,
         )
-        if not result.skipped:
-            results.append(result)
+        if not request.field_sets:
+            continue
+        result = await Get(EnrichedFmtResult, GoLangFmtRequest, request)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
     return LanguageFmtResults(
