@@ -66,6 +66,7 @@ impl CommandRunner {
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
     eager_fetch: bool,
+    concurrency_limit: usize,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -78,9 +79,10 @@ impl CommandRunner {
       tls_client_config.as_ref(),
       &mut headers,
     )?;
-    let channel = layered_service(tonic::transport::Channel::balance_list(
-      vec![endpoint].into_iter(),
-    ));
+    let channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      concurrency_limit,
+    );
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
     } else {

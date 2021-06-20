@@ -68,6 +68,7 @@ impl ByteStore {
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     rpc_retries: usize,
+    rpc_concurrency_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -77,9 +78,10 @@ impl ByteStore {
 
     let endpoint =
       grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref(), &mut headers)?;
-    let channel = layered_service(tonic::transport::Channel::balance_list(
-      vec![endpoint].into_iter(),
-    ));
+    let channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      rpc_concurrency_limit,
+    );
     let interceptor = if headers.is_empty() {
       None
     } else {
@@ -93,9 +95,9 @@ impl ByteStore {
 
     let cas_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
-        ContentAddressableStorageClient::with_interceptor(channel.clone(), interceptor.clone())
+        ContentAddressableStorageClient::with_interceptor(channel, interceptor.clone())
       }
-      None => ContentAddressableStorageClient::new(channel.clone()),
+      None => ContentAddressableStorageClient::new(channel),
     });
 
     Ok(ByteStore {

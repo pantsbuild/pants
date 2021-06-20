@@ -124,6 +124,8 @@ impl CommandRunner {
     platform: Platform,
     overall_deadline: Duration,
     retry_interval_duration: Duration,
+    execution_concurrency_limit: usize,
+    cache_concurrency_limit: usize,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
     let store_use_tls = store_address.starts_with("https://");
@@ -145,9 +147,10 @@ impl CommandRunner {
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut headers,
     )?;
-    let execution_channel = layered_service(tonic::transport::Channel::balance_list(
-      vec![execution_endpoint].into_iter(),
-    ));
+    let execution_channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
+      execution_concurrency_limit,
+    );
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
         ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
@@ -160,9 +163,10 @@ impl CommandRunner {
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut headers,
     )?;
-    let store_channel = layered_service(tonic::transport::Channel::balance_list(
-      vec![store_endpoint].into_iter(),
-    ));
+    let store_channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter()),
+      cache_concurrency_limit,
+    );
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
@@ -171,9 +175,9 @@ impl CommandRunner {
 
     let capabilities_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
-        CapabilitiesClient::with_interceptor(execution_channel.clone(), interceptor.clone())
+        CapabilitiesClient::with_interceptor(execution_channel, interceptor.clone())
       }
-      None => CapabilitiesClient::new(execution_channel.clone()),
+      None => CapabilitiesClient::new(execution_channel),
     });
 
     let command_runner = CommandRunner {

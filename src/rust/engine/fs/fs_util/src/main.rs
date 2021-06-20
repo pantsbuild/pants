@@ -244,6 +244,14 @@ to this directory.",
               .required(false)
               .default_value("3")
         )
+        .arg(
+          Arg::with_name("rpc-concurrency-limit")
+              .help("Maximum concurrenct RPCs to the service.")
+              .takes_value(true)
+              .long("rpc-concurrency-limit")
+              .required(false)
+              .default_value("128")
+        )
       .get_matches(),
   ).await {
     Ok(_) => {}
@@ -316,6 +324,8 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
+            value_t!(top_match.value_of("rpc-concurrency-limit"), usize)
+              .expect("Bad rpc-concurrency-limit flag"),
           ),
           true,
         )

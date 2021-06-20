@@ -48,10 +48,9 @@ pub mod retry;
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
 pub type LayeredService = ConcurrencyLimit<Channel>;
 
-pub fn layered_service(channel: Channel) -> LayeredService {
+pub fn layered_service(channel: Channel, concurrency_limit: usize) -> LayeredService {
   ServiceBuilder::new()
-    // TODO
-    .concurrency_limit(100)
+    .concurrency_limit(concurrency_limit)
     .service(channel)
 }
 
