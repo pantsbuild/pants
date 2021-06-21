@@ -50,6 +50,7 @@ async def format_golang_targets(
         if not request.field_sets:
             continue
         result = await Get(EnrichedFmtResult, GoLangFmtRequest, request)
+        results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
     return LanguageFmtResults(
