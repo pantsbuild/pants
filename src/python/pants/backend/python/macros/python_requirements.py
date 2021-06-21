@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
+from itertools import groupby
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
@@ -69,16 +70,20 @@ class PythonRequirements:
         requirements = parse_requirements_file(
             req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
         )
-        for parsed_req in requirements:
+
+        grouped_requirements = groupby(requirements, lambda parsed_req: parsed_req.project_name)
+
+        for project_name, parsed_reqs_ in grouped_requirements:
+            parsed_reqs = list(parsed_reqs_)
             req_module_mapping = (
-                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
-                if module_mapping and parsed_req.project_name in module_mapping
+                {project_name: module_mapping[project_name]}
+                if module_mapping and project_name in module_mapping
                 else None
             )
             self._parse_context.create_object(
                 "python_requirement_library",
-                name=parsed_req.project_name,
-                requirements=[parsed_req],
+                name=project_name,
+                requirements=parsed_reqs,
                 module_mapping=req_module_mapping,
                 dependencies=[requirements_dep],
             )
