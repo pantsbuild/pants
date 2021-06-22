@@ -172,7 +172,7 @@ mod tests {
   use tonic::transport::{Channel, Server};
   use tonic::{Request, Response, Status};
 
-  use mock::tonic_util::AddrIncomingWithStream;
+  use crate::hyper::AddrIncomingWithStream;
 
   #[tokio::test]
   async fn user_agent_is_set_correctly() {
