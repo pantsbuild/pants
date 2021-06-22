@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 bytes = "1.0"
 futures = "0.3"
+hyper = "0.14"
 rustls-native-certs = "0.5"
 prost = "0.7"
 rand = "0.8"

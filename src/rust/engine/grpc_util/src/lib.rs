@@ -35,6 +35,7 @@ use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
+pub mod hyper;
 pub mod prost;
 pub mod retry;
 

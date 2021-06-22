@@ -1074,6 +1074,7 @@ version = "0.0.1"
 dependencies = [
  "bytes 1.0.1",
  "futures",
+ "hyper",
  "parking_lot",
  "prost",
  "prost-types",
@@ -1696,6 +1697,7 @@ dependencies = [
  "bazel_protos",
  "bytes 1.0.1",
  "futures",
+ "grpc_util",
  "hashing",
  "hyper",
  "log 0.4.11",
