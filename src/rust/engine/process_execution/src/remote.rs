@@ -121,7 +121,7 @@ impl CommandRunner {
     store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
     overall_deadline: Duration,
@@ -145,6 +145,7 @@ impl CommandRunner {
     let execution_endpoint = grpc_util::create_endpoint(
       &execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
+      &mut headers,
     )?;
     let execution_channel =
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter());
@@ -158,6 +159,7 @@ impl CommandRunner {
     let store_endpoint = grpc_util::create_endpoint(
       &store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
+      &mut headers,
     )?;
     let store_channel = tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter());
 

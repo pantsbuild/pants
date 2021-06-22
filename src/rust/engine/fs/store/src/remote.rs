@@ -67,7 +67,7 @@ impl ByteStore {
     cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     rpc_retries: usize,
@@ -78,7 +78,8 @@ impl ByteStore {
       None
     };
 
-    let endpoint = grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref())?;
+    let endpoint =
+      grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref(), &mut headers)?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let interceptor = if headers.is_empty() {
       None
