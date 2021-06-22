@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -17,6 +18,7 @@ use bazel_protos::gen::google::longrunning::{
 };
 use bazel_protos::require_digest;
 use futures::{FutureExt, Stream};
+use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::{
@@ -26,12 +28,9 @@ use remexec::{
   ExecuteRequest, ExecutionCapabilities, GetActionResultRequest, GetCapabilitiesRequest,
   ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
-use std::pin::Pin;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
-
-use crate::tonic_util::AddrIncomingWithStream;
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum

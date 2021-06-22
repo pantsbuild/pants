@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::tonic_util::AddrIncomingWithStream;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::build::bazel::semver::SemVer;
 use bazel_protos::gen::google::bytestream::{
@@ -13,6 +13,7 @@ use bazel_protos::gen::google::bytestream::{
 use bytes::{Bytes, BytesMut};
 use futures::stream::StreamExt;
 use futures::{FutureExt, Stream};
+use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::capabilities_server::{Capabilities, CapabilitiesServer};
@@ -24,7 +25,6 @@ use remexec::{
   CacheCapabilities, ExecutionCapabilities, FindMissingBlobsRequest, FindMissingBlobsResponse,
   GetCapabilitiesRequest, GetTreeRequest, GetTreeResponse, ServerCapabilities,
 };
-use std::pin::Pin;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use tonic::metadata::{AsciiMetadataKey, KeyAndValueRef};
 use tonic::transport::Server;
