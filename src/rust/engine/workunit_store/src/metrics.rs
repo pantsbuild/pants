@@ -72,6 +72,7 @@ pub enum Metric {
   RemoteExecutionRPCWaitExecution,
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
+  RemoteStoreMissingDigest,
 }
 
 impl Metric {
