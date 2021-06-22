@@ -36,7 +36,6 @@ readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/
 readonly NATIVE_ENGINE_RESOURCE_PYO3="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY_PYO3}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
-readonly NATIVE_ENGINE_TARGET="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 
 function _build_native_code() {
@@ -70,10 +69,10 @@ function bootstrap_native_code() {
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
-  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || \
-        ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" || \
-        ! -f "${NATIVE_CLIENT_PATH}" || \
-        "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
+  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f \
+    "${NATIVE_ENGINE_RESOURCE_PYO3}" || ! -f \
+    "${NATIVE_CLIENT_PATH}" || \
+    "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
 
     _build_native_code || die
 
