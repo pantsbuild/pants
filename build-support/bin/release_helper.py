@@ -22,7 +22,7 @@ from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
-from common import banner, die, green, travis_section
+from common import banner, die, green
 from reversion import reversion
 
 from pants.util.strutil import strip_prefix
@@ -210,13 +210,13 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
         ],
         check=True,
     )
-    run_venv_pants(["list", "src::"])
     outputted_version = run_venv_pants(["--version"])
     if outputted_version != version:
         die(
             f"Installed version of Pants ({outputted_version}) did not match requested "
             f"version ({version})!"
         )
+    run_venv_pants(["list", "src::"])
 
 
 def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
@@ -242,18 +242,15 @@ def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str
     )
 
 
-PACKAGES = sorted(
-    {
-        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
-        # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg),
-        Package(
-            "pantsbuild.pants.testutil",
-            "src/python/pants/testutil:testutil_wheel",
-            validate_testutil_pkg,
-        ),
-    }
+# NB: This a native wheel. We expect a distinct wheel for each Python version and each
+# platform (macOS_x86 x macos_arm x linux).
+PANTS_PKG = Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg)
+TESTUTIL_PKG = Package(
+    "pantsbuild.pants.testutil",
+    "src/python/pants/testutil:testutil_wheel",
+    validate_testutil_pkg,
 )
+PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 
 
 # -----------------------------------------------------------------------------------------------
@@ -420,6 +417,21 @@ def download_pex_bin() -> Iterator[Path]:
 # -----------------------------------------------------------------------------------------------
 
 
+def build_all_wheels() -> None:
+    build_pants_wheels()
+    build_3rdparty_wheels()
+    install_and_test_packages(
+        CONSTANTS.pants_unstable_version,
+        extra_pip_args=[
+            "--only-binary=:all:",
+            "-f",
+            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
+            "-f",
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+        ],
+    )
+
+
 def build_pants_wheels() -> None:
     banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
     version = CONSTANTS.pants_unstable_version
@@ -504,38 +516,39 @@ def build_3rdparty_wheels() -> None:
                 "broken?"
             )
         subprocess.run(
-            [Path(venv_tmpdir, "bin/pip"), "wheel", f"--wheel-dir={dest}", *deps],
+            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *deps],
             check=True,
         )
+        green(f"Wrote 3rdparty wheels to {dest}")
 
 
 def build_fs_util() -> None:
     # See https://www.pantsbuild.org/docs/contributions-rust for a description of fs_util. We
     # include it in our releases because it can be a useful standalone tool.
-    with travis_section("fs_util", "Building fs_util"):
-        command = ["./cargo", "build", "-p", "fs_util"]
-        release_mode = os.environ.get("MODE", "") != "debug"
-        if release_mode:
-            command.append("--release")
-        subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
-        current_os = (
-            subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
-            .stdout.decode()
-            .strip()
-        )
-        dest_dir = (
-            Path(CONSTANTS.deploy_dir)
-            / "bin"
-            / "fs_util"
-            / current_os
-            / CONSTANTS.pants_unstable_version
-        )
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(
-            f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
-            dest_dir,
-        )
-        green(f"Built fs_util at {dest_dir / 'fs_util'}.")
+    banner("Building fs_util")
+    command = ["./cargo", "build", "-p", "fs_util"]
+    release_mode = os.environ.get("MODE", "") != "debug"
+    if release_mode:
+        command.append("--release")
+    subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
+    current_os = (
+        subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
+        .stdout.decode()
+        .strip()
+    )
+    dest_dir = (
+        Path(CONSTANTS.deploy_dir)
+        / "bin"
+        / "fs_util"
+        / current_os
+        / CONSTANTS.pants_unstable_version
+    )
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
+        dest_dir,
+    )
+    green(f"Built fs_util at {dest_dir / 'fs_util'}.")
 
 
 # TODO: We should be using `./pants package` and `pex_binary` for this...If Pants is lacking in
@@ -562,8 +575,8 @@ def build_pex(fetch: bool) -> None:
     CONSTANTS.deploy_dir.mkdir(parents=True)
 
     if fetch:
-        fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-        check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+        fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
+        check_pants_wheels_present(CONSTANTS.deploy_dir)
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -618,26 +631,52 @@ def publish() -> None:
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
-    fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-    check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
+    check_pants_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
 
     # Release.
     create_twine_venv()
+    upload_wheels_via_twine()
+    tag_release()
+    banner("Successfully released packages to PyPI and GitHub")
+
+
+def publish_apple_silicon() -> None:
+    banner("Building and publishing an Apple Silicon wheel")
+    if os.environ.get("USE_PY39") != "true":
+        die("Must set `USE_PY39=true` when building for Apple Silicon.")
+    check_clean_git_branch()
+    check_pgp()
+    check_roles()
+
+    dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
     subprocess.run(
         [
-            str(CONSTANTS.twine_venv_dir / "bin/twine"),
-            "upload",
-            "--sign",
-            f"--sign-with={get_pgp_program_name()}",
-            f"--identity={get_pgp_key_id()}",
-            "--skip-existing",  # Makes the upload idempotent.
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
+            "./pants",
+            "--concurrent",
+            f"--pants-distdir={dest_dir}",
+            "package",
+            PANTS_PKG.target,
         ],
         check=True,
     )
-    tag_release()
-    banner("Successfully released packages to PyPI and GitHub")
+    expected_whl = (
+        dest_dir
+        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
+    )
+    if not expected_whl.exists():
+        die(
+            f"Failed to find {expected_whl}. Are you running from the correct platform and "
+            f"macOS version?"
+        )
+
+    create_twine_venv()
+    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
+    upload_wheels_via_twine()
+    banner("Successfully released Apple Silicon wheel to PyPI")
 
 
 def check_clean_git_branch() -> None:
@@ -730,26 +769,24 @@ def tag_release() -> None:
     )
 
 
-# -----------------------------------------------------------------------------------------------
-# Test release & dry run
-# -----------------------------------------------------------------------------------------------
-
-
-def dry_run_install() -> None:
-    banner(f"Performing a dry run release with {CONSTANTS.python_version}")
-    build_pants_wheels()
-    build_3rdparty_wheels()
-    install_and_test_packages(
-        CONSTANTS.pants_unstable_version,
-        extra_pip_args=[
-            "--only-binary=:all:",
-            "-f",
-            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
-            "-f",
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+def upload_wheels_via_twine() -> None:
+    subprocess.run(
+        [
+            str(CONSTANTS.twine_venv_dir / "bin/twine"),
+            "upload",
+            "--sign",
+            f"--sign-with={get_pgp_program_name()}",
+            f"--identity={get_pgp_key_id()}",
+            "--skip-existing",  # Makes the upload idempotent.
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],
+        check=True,
     )
-    banner(f"Dry run release succeeded with {CONSTANTS.python_version}")
+
+
+# -----------------------------------------------------------------------------------------------
+# Test release
+# -----------------------------------------------------------------------------------------------
 
 
 def test_release() -> None:
@@ -772,17 +809,6 @@ def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None 
 # -----------------------------------------------------------------------------------------------
 
 
-def validate_roles() -> None:
-    # Validate that ownership sets are exactly what we expect, even for legacy packages
-    # that we no longer publish.  Effectively we're using release time as an opportunity
-    # to do wider security validation than is strictly necessary just for releasing.
-    PackageAccessValidator.validate_all()
-
-
-def list_packages() -> None:
-    print("\n".join(package.name for package in PACKAGES))
-
-
 class PrebuiltWheel(NamedTuple):
     path: str
     url: str
@@ -792,7 +818,7 @@ class PrebuiltWheel(NamedTuple):
         return cls(path, quote_plus(path))
 
 
-def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
+def determine_prebuilt_wheels(*, include_3rdparty: bool) -> list[PrebuiltWheel]:
     def determine_wheels(wheel_path: str) -> list[PrebuiltWheel]:
         response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
         xml_root = ElementTree.fromstring(response.text)
@@ -804,16 +830,17 @@ def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
             )
         ]
 
-    return [
-        *determine_wheels(CONSTANTS.deploy_pants_wheels_path),
-        *determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path),
-    ]
+    res = determine_wheels(CONSTANTS.deploy_pants_wheels_path)
+    if include_3rdparty:
+        res.extend(determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path))
+    return res
 
 
 def list_prebuilt_wheels() -> None:
     print(
         "\n".join(
-            f"{CONSTANTS.binary_base_url}/{wheel.url}" for wheel in determine_prebuilt_wheels()
+            f"{CONSTANTS.binary_base_url}/{wheel.url}"
+            for wheel in determine_prebuilt_wheels(include_3rdparty=True)
         )
     )
 
@@ -823,13 +850,12 @@ def list_prebuilt_wheels() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO: possibly parallelize through httpx and asyncio.
-def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
+def fetch_prebuilt_wheels(destination_dir: str | Path, *, include_3rdparty: bool) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
     session = requests.Session()
     session.mount(CONSTANTS.binary_base_url, requests.adapters.HTTPAdapter(max_retries=4))
-    for wheel in determine_prebuilt_wheels():
+    for wheel in determine_prebuilt_wheels(include_3rdparty=include_3rdparty):
         full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
         print(f"Fetching {full_url}", file=sys.stderr)
         response = session.get(full_url)
@@ -841,7 +867,7 @@ def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
         dest.write_bytes(response.content)
 
 
-def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
+def check_pants_wheels_present(check_dir: str | Path) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
     for package in PACKAGES:
@@ -870,19 +896,17 @@ def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
-    subparsers.add_parser("dry-run-install")
+    subparsers.add_parser("publish-apple-silicon")
     subparsers.add_parser("test-release")
-    subparsers.add_parser("build-pants-wheels")
-    subparsers.add_parser("build-3rdparty-wheels")
+    subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-roles")
-    subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
-    subparsers.add_parser("fetch-and-check-prebuilt-wheels")
+    subparsers.add_parser("check-pants-wheels")
     return parser
 
 
@@ -890,14 +914,12 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
-    if args.command == "dry-run-install":
-        dry_run_install()
+    if args.command == "publish-apple-silicon":
+        publish_apple_silicon()
     if args.command == "test-release":
         test_release()
-    if args.command == "build-pants-wheels":
-        build_pants_wheels()
-    if args.command == "build-3rdparty-wheels":
-        build_3rdparty_wheels()
+    if args.command == "build-wheels":
+        build_all_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
     if args.command == "build-local-pex":
@@ -905,15 +927,13 @@ def main() -> None:
     if args.command == "build-universal-pex":
         build_pex(fetch=True)
     if args.command == "validate-roles":
-        validate_roles()
-    if args.command == "list-packages":
-        list_packages()
+        PackageAccessValidator.validate_all()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "fetch-and-check-prebuilt-wheels":
+    if args.command == "check-pants-wheels":
         with TemporaryDirectory() as tempdir:
-            fetch_prebuilt_wheels(tempdir)
-            check_prebuilt_wheels_present(tempdir)
+            fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
+            check_pants_wheels_present(tempdir)
 
 
 if __name__ == "__main__":

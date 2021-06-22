@@ -5,6 +5,9 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+
 # Defines:
 # + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
 # + MODE: Whether to run in debug or release mode.
@@ -28,15 +31,24 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
+readonly NATIVE_ENGINE_BINARY_PYO3="native_engine_pyo3.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
+readonly NATIVE_ENGINE_RESOURCE_PYO3="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY_PYO3}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
 readonly NATIVE_ENGINE_TARGET="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 
 function _build_native_code() {
-  # NB: See Cargo.toml with regard to the `extension-module` feature.
-  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine -p client || die
+  banner "Building native code..."
+  # NB: See Cargo.toml with regard to the `extension-module` features.
+  "${REPO_ROOT}/cargo" build \
+    --features=extension-module \
+    --features=engine_pyo3/extension-module \
+    ${MODE_FLAG} \
+    -p engine \
+    -p engine_pyo3 \
+    -p client || die
 }
 
 function bootstrap_native_code() {
@@ -44,10 +56,10 @@ function bootstrap_native_code() {
   # can result in using a stale `native_engine.so`, but we trust that the user knows what
   # they're doing.
   if [[ "${SKIP_NATIVE_ENGINE_SO_BOOTSTRAP}" == "true" ]]; then
-    if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" ]]; then
-      die "You requested to override bootstrapping native_engine.so via the env var" \
-        "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
-        "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
+    if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" ]]; then
+      die "You requested to override bootstrapping native_engine.so and native_engine_pyo3.so via the env var" \
+        "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the files do not exist at" \
+        "${NATIVE_ENGINE_RESOURCE} and ${NATIVE_ENGINE_BINARY_PYO3}. This is not safe to do."
     fi
     return
   fi
@@ -58,15 +70,22 @@ function bootstrap_native_code() {
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
-  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_CLIENT_PATH}" || \
-    "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
+  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || \
+        ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" || \
+        ! -f "${NATIVE_CLIENT_PATH}" || \
+        "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
 
-    echo "Building native code"
-    _build_native_code
+    _build_native_code || die
 
-    # If bootstrapping the native engine fails, don't attempt to run pants afterwards.
-    if [[ ! -f "${NATIVE_ENGINE_TARGET}" ]]; then
-      die "Failed to build native engine."
+    # If bootstrapping the native engine fails, don't attempt to run pants
+    # afterwards.
+    local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+    local -r native_binary_pyo3="${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
+    if [[ ! -f "${native_binary}" ]]; then
+      die "Failed to build native engine, file missing at ${native_binary}."
+    fi
+    if [[ ! -f "${native_binary_pyo3}" ]]; then
+      die "Failed to build native engine, file missing at ${native_binary_pyo3}."
     fi
 
     # If bootstrapping the native client fails, don't attempt to run pants afterwards.
@@ -80,8 +99,9 @@ function bootstrap_native_code() {
     # Create the native engine resource.
     # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
     #  process from being killed when recompiling.
-    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_PATH}"
-    cp "${NATIVE_ENGINE_TARGET}" "${NATIVE_ENGINE_RESOURCE}"
+    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}" "${NATIVE_CLIENT_PATH}"
+    cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
+    cp "${native_binary_pyo3}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
     cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
 
     # Create the accompanying metadata file.

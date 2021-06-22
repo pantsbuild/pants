@@ -362,7 +362,7 @@ async def package_python_dist(
     exported_target = ExportedTarget(transitive_targets.roots[0])
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
-    )
+    ) or InterpreterConstraints(python_setup.interpreter_constraints)
     chroot = await Get(
         SetupPyChroot,
         SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),

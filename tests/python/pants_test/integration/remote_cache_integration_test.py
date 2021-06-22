@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.internals.native_engine import PyExecutor, PyStubCAS
+from pants.engine.internals.native_engine_pyo3 import PyExecutor, PyStubCAS
 from pants.option.global_options import RemoteCacheWarningsBehavior
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_integration_test import run_pants
@@ -9,9 +9,7 @@ from pants.testutil.pants_integration_test import run_pants
 
 def test_warns_on_remote_cache_errors():
     executor = PyExecutor(core_threads=2, max_threads=4)
-    builder = PyStubCAS.builder()
-    builder.always_errors()
-    cas = builder.build(executor)
+    cas = PyStubCAS.builder().always_errors().build(executor)
 
     def run(behavior: RemoteCacheWarningsBehavior) -> str:
         pants_run = run_pants(
@@ -29,7 +27,7 @@ def test_warns_on_remote_cache_errors():
                     "remote_cache_warnings": behavior.value,
                     # NB: Our options code expects `grpc://`, which it will then convert back to
                     # `http://` before sending over FFI.
-                    "remote_store_address": cas.address().replace("http://", "grpc://"),
+                    "remote_store_address": cas.address.replace("http://", "grpc://"),
                 }
             },
         )

@@ -84,6 +84,7 @@ impl Fingerprint {
     &self.0
   }
 
+  #[allow(clippy::wrong_self_convention)]
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for &byte in &self.0 {

@@ -38,18 +38,17 @@ async def format_shell_targets(
     results = []
     fmt_request_types: Iterable[type[StyleRequest]] = union_membership[ShellFmtRequest]
     for fmt_request_type in fmt_request_types:
-        result = await Get(
-            EnrichedFmtResult,
-            ShellFmtRequest,
-            fmt_request_type(
-                (
-                    fmt_request_type.field_set_type.create(target)
-                    for target in shell_fmt_targets.targets
-                    if fmt_request_type.field_set_type.is_applicable(target)
-                ),
-                prior_formatter_result=prior_formatter_result,
+        request = fmt_request_type(
+            (
+                fmt_request_type.field_set_type.create(target)
+                for target in shell_fmt_targets.targets
+                if fmt_request_type.field_set_type.is_applicable(target)
             ),
+            prior_formatter_result=prior_formatter_result,
         )
+        if not request.field_sets:
+            continue
+        result = await Get(EnrichedFmtResult, ShellFmtRequest, request)
         results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)

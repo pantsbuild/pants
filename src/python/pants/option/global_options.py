@@ -24,6 +24,7 @@ from pants.base.build_environment import (
 )
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
 from pants.option.custom_types import dir_option, memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -789,8 +790,8 @@ class GlobalOptions(Subsystem):
                 "you may miss out on some caching, whereas setting too high may over-consume "
                 "resources and may result in the operating system killing Pantsd due to memory "
                 "overconsumption (e.g. via the OOM killer).\n\n"
-                "You can suffix with `GiB`, `GB`, `MiB`, `MB`, `KiB`, `kB`, or `B` to indicate "
-                "the unit, e.g. `2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
+                "You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g. "
+                "`2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
                 "There is at most one pantsd process per workspace."
             ),
         )
@@ -1216,6 +1217,15 @@ class GlobalOptions(Subsystem):
             help="Overall timeout in seconds for each remote execution request from time of submission",
         )
 
+        register(
+            "--watch-filesystem",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop` "
+            "may not be enabled.",
+        )
+
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -1381,6 +1391,12 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-address` or to work properly."
             )
 
+        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
+            raise OptionsError(
+                "The `--no-watch-filesystem` option may not be set if "
+                "`--pantsd` or `--loop` is set."
+            )
+
         def validate_remote_address(opt_name: str) -> None:
             valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
             address = getattr(opts, opt_name)
@@ -1419,6 +1435,17 @@ class GlobalOptions(Subsystem):
             else 4 * bootstrap_options.rule_threads_core
         )
         return PyExecutor(
+            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
+        )
+
+    @staticmethod
+    def create_py_executor_pyo3(bootstrap_options: OptionValueContainer) -> PyExecutorPyO3:
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return PyExecutorPyO3(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
 

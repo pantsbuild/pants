@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use fs::RelativePath;
+use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::{headers_to_interceptor_fn, retry::retry_call, status_to_str};
 use hashing::Digest;
@@ -16,7 +17,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -328,6 +329,87 @@ impl CommandRunner {
     Ok((action_result, digests.into_iter().collect::<Vec<_>>()))
   }
 
+  ///
+  /// Races the given local execution future against an attempt to look up the result in the cache.
+  ///
+  /// Returns a result that indicates whether we used the cache so that we can skip cache writes if
+  /// so.
+  ///
+  async fn speculate_read_action_cache(
+    &self,
+    context: Context,
+    cache_lookup_start: Instant,
+    action_digest: Digest,
+    mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
+    // A future to read from the cache and log the results accordingly.
+    let cache_read_future = async {
+      let response = crate::remote::check_action_cache(
+        action_digest,
+        &self.metadata,
+        self.platform,
+        &context,
+        self.action_cache_client.clone(),
+        self.store.clone(),
+        self.eager_fetch,
+      )
+      .await;
+      match response {
+        Ok(cached_response_opt) => {
+          log::debug!(
+            "remote cache response: digest={:?}: {:?}",
+            action_digest,
+            cached_response_opt
+          );
+          cached_response_opt
+        }
+        Err(err) => {
+          self.log_cache_error(err, CacheErrorType::ReadError);
+          None
+        }
+      }
+    }
+    .boxed();
+
+    // We speculate between reading from the remote cache vs. running locally.
+    let context2 = context.clone();
+    in_workunit!(
+      context.workunit_store.clone(),
+      "remote_cache_read_speculation".to_owned(),
+      WorkunitMetadata {
+        level: Level::Trace,
+        ..WorkunitMetadata::default()
+      },
+      |workunit| async move {
+        tokio::select! {
+          cache_result = cache_read_future => {
+            if let Some(cached_response) = cache_result {
+              let lookup_elapsed = cache_lookup_start.elapsed();
+              workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+              if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
+                let time_saved = time_saved.as_millis() as u64;
+                workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+                context2
+                  .workunit_store
+                  .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+                }
+              Ok((cached_response, true))
+            } else {
+              // Note that we don't increment a counter here, as there is nothing of note in this
+              // scenario: the remote cache did not save unnecessary local work, nor was the remote
+              // trip unusually slow such that local execution was faster.
+              local_execution_future.await.map(|res| (res, false))
+            }
+          }
+          local_result = &mut local_execution_future => {
+            workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+            local_result.map(|res| (res, false))
+          }
+        }
+      }
+    ).await
+  }
+
   /// Stores an execution result into the remote Action Cache.
   async fn update_action_cache(
     &self,
@@ -341,7 +423,7 @@ impl CommandRunner {
   ) -> Result<(), String> {
     // Upload the action (and related data, i.e. the embedded command and input files).
     // Assumption: The Action and related data has already been stored locally.
-    with_workunit(
+    in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
@@ -349,13 +431,12 @@ impl CommandRunner {
         desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
-      crate::remote::ensure_action_uploaded(
+      |_workunit| crate::remote::ensure_action_uploaded(
         &self.store,
         command_digest,
         action_digest,
         request.input_files,
       ),
-      |_, md| md,
     )
     .await?;
 
@@ -452,7 +533,8 @@ impl crate::CommandRunner for CommandRunner {
       make_execute_request(&request, self.metadata.clone())?;
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
+    let command2 = command.clone();
+    let (command_digest, action_digest) = in_workunit!(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
@@ -460,128 +542,74 @@ impl crate::CommandRunner for CommandRunner {
         desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
-      crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
-      |_, md| md,
+      |_workunit| crate::remote::ensure_action_stored_locally(&self.store, &command2, &action),
     )
     .await?;
 
-    let mut local_execution_future = self.underlying.run(req, context.clone());
-
-    let result = if self.cache_read {
-      // A future to read from the cache and log the results accordingly.
-      let cache_read_future = async {
-        let response = with_workunit(
-          context.workunit_store.clone(),
-          "check_action_cache".to_owned(),
-          WorkunitMetadata {
-            level: Level::Trace,
-            desc: Some(format!("check action cache for {:?}", action_digest)),
-            ..WorkunitMetadata::default()
-          },
-          crate::remote::check_action_cache(
-            action_digest,
-            &self.metadata,
-            self.platform,
-            &context,
-            self.action_cache_client.clone(),
-            self.store.clone(),
-            self.eager_fetch,
-          ),
-          |_, md| md,
+    let (result, hit_cache) = if self.cache_read {
+      self
+        .speculate_read_action_cache(
+          context.clone(),
+          cache_lookup_start,
+          action_digest,
+          self.underlying.run(req, context.clone()),
         )
-        .await;
-        match response {
-          Ok(cached_response_opt) => {
-            log::debug!(
-              "remote cache response: digest={:?}: {:?}",
-              action_digest,
-              cached_response_opt
-            );
-            cached_response_opt
-          }
-          Err(err) => {
-            self.log_cache_error(err, CacheErrorType::ReadError);
-            None
-          }
-        }
-      }
-      .boxed();
-
-      // We speculate between reading from the remote cache vs. running locally. If there was a
-      // cache hit, we return early because there will be no need to write to the cache. Otherwise,
-      // we run the process locally and will possibly write it to the cache later.
-      tokio::select! {
-        cache_result = cache_read_future => {
-          if let Some(cached_response) = cache_result {
-            let lookup_elapsed = cache_lookup_start.elapsed();
-            context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-            if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
-              let time_saved = time_saved.as_millis() as u64;
-              context
-                .workunit_store
-                .increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-              context
-                .workunit_store
-                .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-              }
-            return Ok(cached_response);
-          } else {
-            // Note that we don't increment a counter here, as there is nothing of note in this
-            // scenario: the remote cache did not save unnecessary local work, nor was the remote
-            // trip unusually slow such that local execution was faster.
-            local_execution_future.await?
-          }
-        }
-        local_result = &mut local_execution_future => {
-          context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
-          local_result?
-        }
-      }
+        .await?
     } else {
-      local_execution_future.await?
+      (self.underlying.run(req, context.clone()).await?, false)
     };
 
-    if result.exit_code == 0 && self.cache_write {
+    if !hit_cache && result.exit_code == 0 && self.cache_write {
+      // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
+      // counter is recorded, given that the cache write is async and may still be executing after
+      // the Pants session has finished and workunits are no longer processed.
+      //
+      // TODO(#11688): remove this workunit once we have tailing tasks.
+      in_workunit!(
+        context.workunit_store.clone(),
+        "remote_cache_write_setup".to_owned(),
+        WorkunitMetadata {
+          level: Level::Trace,
+          ..WorkunitMetadata::default()
+        },
+        |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
+        }
+      )
+      .await;
       let command_runner = self.clone();
       let result = result.clone();
       let context2 = context.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let cache_write_future = async move {
-        context2
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteStarted, 1);
-        let write_result = command_runner
-          .update_action_cache(
-            &context2,
-            &request,
-            &result,
-            &command_runner.metadata,
-            &command,
-            action_digest,
-            command_digest,
-          )
-          .await;
-        context2
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
-        if let Err(err) = write_result {
-          command_runner.log_cache_error(err, CacheErrorType::WriteError);
-          context2
-            .workunit_store
-            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-        };
-      }
-      .boxed();
-
-      let _write_join = self.executor.spawn(with_workunit(
+      let _write_join = self.executor.spawn(in_workunit!(
         context.workunit_store,
         "remote_cache_write".to_owned(),
         WorkunitMetadata {
           level: Level::Trace,
           ..WorkunitMetadata::default()
         },
-        cache_write_future,
-        |_, md| md,
+        |workunit| async move {
+          let write_result = command_runner
+            .update_action_cache(
+              &context2,
+              &request,
+              &result,
+              &command_runner.metadata,
+              &command,
+              action_digest,
+              command_digest,
+            )
+            .await;
+          match write_result {
+            Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+            Err(err) => {
+              command_runner.log_cache_error(err, CacheErrorType::WriteError);
+              workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+            }
+          };
+        }
+        // NB: We must box the future to avoid a stack overflow.
+        .boxed()
       ));
     }
 

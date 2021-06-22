@@ -36,18 +36,17 @@ async def format_python_target(
     results = []
     fmt_request_types: Iterable[type[StyleRequest]] = union_membership[PythonFmtRequest]
     for fmt_request_type in fmt_request_types:
-        result = await Get(
-            EnrichedFmtResult,
-            PythonFmtRequest,
-            fmt_request_type(
-                (
-                    fmt_request_type.field_set_type.create(target)
-                    for target in python_fmt_targets.targets
-                    if fmt_request_type.field_set_type.is_applicable(target)
-                ),
-                prior_formatter_result=prior_formatter_result,
+        request = fmt_request_type(
+            (
+                fmt_request_type.field_set_type.create(target)
+                for target in python_fmt_targets.targets
+                if fmt_request_type.field_set_type.is_applicable(target)
             ),
+            prior_formatter_result=prior_formatter_result,
         )
+        if not request.field_sets:
+            continue
+        result = await Get(EnrichedFmtResult, PythonFmtRequest, request)
         results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)

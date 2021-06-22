@@ -60,7 +60,7 @@ pub struct Core {
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
   pub vfs: PosixFS,
-  pub watcher: Arc<InvalidationWatcher>,
+  pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
   pub sessions: Sessions,
@@ -286,6 +286,7 @@ impl Core {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
     use_gitignore: bool,
+    watch_filesystem: bool,
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
     ca_certs_path: Option<PathBuf>,
@@ -383,8 +384,13 @@ impl Core {
       GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
         .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
 
-    let watcher = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-    watcher.start(&graph);
+    let watcher = if watch_filesystem {
+      let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
+      w.start(&graph);
+      Some(w)
+    } else {
+      None
+    };
 
     let sessions = Sessions::new(&executor)?;
 

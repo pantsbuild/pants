@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 async-stream = "0.3"
 async-trait = "0.1"
-bazel_protos = { path = "../../process_execution/bazel_protos" }
+bazel_protos = { path = "../../bazel_protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
 grpc_util = { path = "../../grpc_util" }
