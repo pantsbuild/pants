@@ -36,6 +36,7 @@ from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.osutil import CPU_COUNT
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +422,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_cache=True,
     # Remote store setup.
     remote_store_address=None,
-    remote_store_headers={},
+    remote_store_headers={
+        "user-agent": f"pants/{VERSION}",
+    },
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
@@ -431,7 +434,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
-    remote_execution_headers={},
+    remote_execution_headers={
+        "user-agent": f"pants/{VERSION}",
+    },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
 
