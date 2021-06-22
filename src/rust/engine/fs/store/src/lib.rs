@@ -65,6 +65,7 @@ use grpc_util::status_to_str;
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::Tree;
+use workunit_store::{get_workunit_store_handle, in_workunit, Level, Metric, WorkunitMetadata};
 
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
@@ -752,10 +753,8 @@ impl Store {
       .boxed()
   }
 
-  ///
   /// Ensure that a file is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured). Called only with the Digest of a File.
-  ///
+  /// a side effect (if one is configured). Called only with the Digest of a File.
   pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), String> {
     let result = self
       .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
@@ -764,6 +763,20 @@ impl Store {
       Some(_) => Ok(()),
       None => {
         log::debug!("Missing file digest from remote store: {:?}", file_digest);
+        if let Some(workunit_store_handle) = get_workunit_store_handle() {
+          in_workunit!(
+            workunit_store_handle.store,
+            "missing_file_counter".to_owned(),
+            WorkunitMetadata {
+              level: Level::Trace,
+              ..WorkunitMetadata::default()
+            },
+            |workunit| async move {
+              workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+            },
+          )
+          .await;
+        }
         Err("File did not exist in the remote store.".to_owned())
       }
     }
