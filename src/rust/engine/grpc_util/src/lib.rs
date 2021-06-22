@@ -27,10 +27,12 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use http::header::USER_AGENT;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
@@ -43,18 +45,31 @@ pub mod retry;
 pub fn create_endpoint(
   addr: &str,
   tls_config_opt: Option<&ClientConfig>,
+  headers: &mut BTreeMap<String, String>,
 ) -> Result<Endpoint, String> {
   let uri =
     tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
   let endpoint = Channel::builder(uri);
-  let maybe_tls_endpoint = if let Some(tls_config) = tls_config_opt {
+
+  let endpoint = if let Some(tls_config) = tls_config_opt {
     endpoint
       .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
       .map_err(|e| format!("TLS setup error: {}", e))?
   } else {
     endpoint
   };
-  Ok(maybe_tls_endpoint)
+
+  let endpoint = match headers.entry(USER_AGENT.as_str().to_owned()) {
+    Entry::Occupied(e) => {
+      let (_, user_agent) = e.remove_entry();
+      endpoint
+        .user_agent(user_agent)
+        .map_err(|e| format!("Unable to convert user-agent header: {}", e))?
+    }
+    Entry::Vacant(_) => endpoint,
+  };
+
+  Ok(endpoint)
 }
 
 /// Create a rust-tls `ClientConfig` from root CA certs, falling back to the rust-tls-native-certs
@@ -141,4 +156,91 @@ pub fn headers_to_interceptor_fn(
 
 pub fn status_to_str(status: tonic::Status) -> String {
   format!("{:?}: {:?}", status.code(), status.message())
+}
+
+#[cfg(test)]
+mod tests {
+  mod gen {
+    tonic::include_proto!("test");
+  }
+
+  use std::collections::BTreeMap;
+
+  use async_trait::async_trait;
+  use futures::FutureExt;
+  use tokio::sync::oneshot;
+  use tonic::transport::{Channel, Server};
+  use tonic::{Request, Response, Status};
+
+  use mock::tonic_util::AddrIncomingWithStream;
+
+  #[tokio::test]
+  async fn user_agent_is_set_correctly() {
+    const EXPECTED_USER_AGENT: &str = "testclient/0.0.1";
+
+    #[derive(Clone)]
+    struct UserAgentResponder;
+
+    #[async_trait]
+    impl gen::test_server::Test for UserAgentResponder {
+      async fn call(&self, request: Request<gen::Input>) -> Result<Response<gen::Output>, Status> {
+        match request.metadata().get("user-agent") {
+          Some(user_agent_value) => {
+            let user_agent = user_agent_value.to_str().map_err(|err| {
+              Status::invalid_argument(format!(
+                "Unable to convert user-agent header to string: {}",
+                err
+              ))
+            })?;
+            if user_agent.contains(EXPECTED_USER_AGENT) {
+              Ok(Response::new(gen::Output {}))
+            } else {
+              Err(Status::invalid_argument(format!(
+                "user-agent header did not contain expected value: actual={}",
+                user_agent
+              )))
+            }
+          }
+          None => Err(Status::invalid_argument("user-agent header was not set")),
+        }
+      }
+    }
+
+    let addr = "127.0.0.1:0".parse().expect("failed to parse IP address");
+    let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
+    let local_addr = incoming.local_addr();
+    let incoming = AddrIncomingWithStream(incoming);
+
+    // Setup shutdown signal handler.
+    let (_shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server.add_service(gen::test_server::TestServer::new(UserAgentResponder));
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
+
+    let mut headers = {
+      let mut h = BTreeMap::new();
+      h.insert("user-agent".to_owned(), EXPECTED_USER_AGENT.to_owned());
+      h
+    };
+
+    let endpoint = super::create_endpoint(
+      &format!("grpc://127.0.0.1:{}", local_addr.port()),
+      None,
+      &mut headers,
+    )
+    .unwrap();
+
+    let channel = Channel::balance_list(vec![endpoint].into_iter());
+
+    let mut client = gen::test_client::TestClient::new(channel);
+    if let Err(err) = client.call(gen::Input {}).await {
+      panic!("test failed: {}", err.message());
+    }
+  }
 }

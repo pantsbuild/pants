@@ -59,7 +59,7 @@ impl CommandRunner {
     store: Store,
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
@@ -72,7 +72,11 @@ impl CommandRunner {
       None
     };
 
-    let endpoint = grpc_util::create_endpoint(&action_cache_address, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(
+      &action_cache_address,
+      tls_client_config.as_ref(),
+      &mut headers,
+    )?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)

@@ -1072,11 +1072,14 @@ dependencies = [
 name = "grpc_util"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "bytes 1.0.1",
  "futures",
+ "http",
  "hyper",
  "parking_lot",
  "prost",
+ "prost-build",
  "prost-types",
  "rand 0.8.2",
  "rustls-native-certs",
@@ -1084,6 +1087,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "tonic",
+ "tonic-build",
 ]
 
 [[package]]

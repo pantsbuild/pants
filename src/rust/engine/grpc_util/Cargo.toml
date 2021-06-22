@@ -9,6 +9,7 @@ publish = false
 bytes = "1.0"
 futures = "0.3"
 hyper = "0.14"
+http = "0.2"
 rustls-native-certs = "0.5"
 prost = "0.7"
 rand = "0.8"
@@ -18,5 +19,10 @@ tokio-util = { version = "0.6", features = ["codec"] }
 tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 
 [dev-dependencies]
+async-trait = "0.1"
 parking_lot = "0.11"
 prost-types = "0.7"
+
+[build-dependencies]
+prost-build = "0.7"
+tonic-build = "0.4"
