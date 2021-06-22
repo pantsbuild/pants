@@ -65,7 +65,7 @@ use grpc_util::status_to_str;
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::Tree;
-use workunit_store::{get_workunit_store_handle, in_workunit, Level, WorkunitMetadata, Metric};
+use workunit_store::{get_workunit_store_handle, in_workunit, Level, Metric, WorkunitMetadata};
 
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
@@ -774,7 +774,8 @@ impl Store {
             |workunit| async move {
               workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
             },
-          ).await;
+          )
+          .await;
         }
         Err("File did not exist in the remote store.".to_owned())
       }
