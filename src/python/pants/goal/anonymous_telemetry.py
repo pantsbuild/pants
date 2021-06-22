@@ -10,7 +10,7 @@ import uuid
 from typing import cast
 
 from humbug.consent import HumbugConsent  # type: ignore
-from humbug.report import Modes, Report, HumbugReporter # type: ignore
+from humbug.report import Modes, Report, HumbugReporter  # type: ignore
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
