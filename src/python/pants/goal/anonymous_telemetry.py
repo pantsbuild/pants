@@ -10,7 +10,7 @@ import uuid
 from typing import cast
 
 from humbug.consent import HumbugConsent  # type: ignore
-from humbug.report import Modes, Report, Reporter  # type: ignore
+from humbug.report import Modes, Report, HumbugReporter # type: ignore
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -27,8 +27,7 @@ from pants.util.docutil import bracketed_docs_url
 logger = logging.getLogger(__name__)
 
 
-_bugout_access_token = "3ae76900-9a68-4a87-a127-7c9f179d7272"
-_bugout_journal_id = "801e9b3c-6b03-40a7-870f-5b25d326da66"
+_bugout_access_token = "974b1acc-e052-4e5f-a45e-bae928e47bb0"
 _telemetry_docs_url = bracketed_docs_url("anonymous-telemetry")
 _telemetry_docs_referral = f"See {_telemetry_docs_url} for details"
 
@@ -130,13 +129,12 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                 telemetry_data = context.run_tracker.get_anonymous_telemetry_data(repo_id)
                 # TODO: Add information about any errors that occurred.
 
-                reporter = Reporter(
+                reporter = HumbugReporter(
                     name="pantsbuild/pants",
                     # We've already established consent at this point.
                     consent=HumbugConsent(True),
                     session_id=telemetry_data.get("run_id", str(uuid.uuid4())),
                     bugout_token=_bugout_access_token,
-                    bugout_journal_id=_bugout_journal_id,
                     timeout_seconds=5,
                     # We don't want to spawn a thread in the engine, and we're
                     # already running in a background thread in pantsd.
@@ -146,15 +144,9 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                 # This is copied from humbug code, to ensure that future changes to humbug
                 # don't add tags that inadvertently violate our anonymity promise.
                 system_tags = [
-                    "humbug",
                     "source:{}".format(reporter.name),
                     "os:{}".format(reporter.system_information.os),
                     "arch:{}".format(reporter.system_information.machine),
-                    "python:{}".format(reporter.system_information.python_version_major),
-                    "python:{}.{}".format(
-                        reporter.system_information.python_version_major,
-                        reporter.system_information.python_version_minor,
-                    ),
                     "python:{}".format(reporter.system_information.python_version),
                     "session:{}".format(reporter.session_id),
                 ]
