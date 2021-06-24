@@ -18,89 +18,80 @@ from pants.base.build_environment import get_buildroot
 logger = logging.getLogger(__name__)
 
 
-def get_max_caret(proj_name: str, version: str) -> str:
-    major = "0"
-    minor = "0"
-    micro = "0"
+def get_max_caret(proj_name: str, version: str, req: str, fp: str) -> str:
+    major = 0
+    minor = 0
+    micro = 0
 
     try:
         parsed_version = Version(version)
     except InvalidVersion:
-        logger.warning(
-            f"Warning: version {version} for {proj_name} is not PEP440-compliant; this requirement"
-            f" will be left as >={version},<{version}"
+        raise InvalidVersion(
+            f"Failed to parse requirement {req} in {fp} loaded by the poetry_requirements macro.\n\nIf you believe this requirement is valid, consider opening an issue at https://github.com/pantsbuild/pants/issues so that we can update Pants's Poetry macro to support this."
         )
-        return version
 
     if parsed_version.major != 0:
-        major = str(parsed_version.major + 1)
+        major = parsed_version.major + 1
     elif parsed_version.minor != 0:
-        minor = str(parsed_version.minor + 1)
+        minor = parsed_version.minor + 1
     elif parsed_version.micro != 0:
-        micro = str(parsed_version.micro + 1)
+        micro = parsed_version.micro + 1
     else:
         base_len = len(parsed_version.base_version.split("."))
         if base_len >= 3:
-            micro = "1"
+            micro = 1
         elif base_len == 2:
-            minor = "1"
+            minor = 1
         elif base_len == 1:
-            major = "1"
+            major = 1
 
     return f"{major}.{minor}.{micro}"
 
 
-def get_max_tilde(proj_name: str, version: str) -> str:
-    major = "0"
-    minor = "0"
-    micro = "0"
+def get_max_tilde(proj_name: str, version: str, req: str, fp: str) -> str:
+    major = 0
+    minor = 0
     try:
         parsed_version = Version(version)
     except InvalidVersion:
-        logger.warning(
-            f"Warning: version {version} for {proj_name} is not PEP440-compliant; this requirement"
-            f" will be parsed as >={version},<{version}"
+        raise InvalidVersion(
+            f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the poetry_requirements macro.\n\nIf you believe this requirement is valid, consider opening an issue at https://github.com/pantsbuild/pants/issues so that we can update Pants\'s Poetry macro to support this.'
         )
-        return version
     base_len = len(parsed_version.base_version.split("."))
     if base_len >= 2:
-        minor = str(parsed_version.minor + 1)
-        major = str(parsed_version.major)
+        minor = parsed_version.minor + 1
+        major = parsed_version.major
     elif base_len == 1:
-        major = str(parsed_version.major + 1)
+        major = parsed_version.major + 1
 
-    return f"{major}.{minor}.{micro}"
+    return f"{major}.{minor}.0"
 
 
-def handle_str_attr(proj_name: str, attributes: str) -> str:
-    # kwarg for parse_python_constraint
+def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
-    comma_split_reqs = [i.strip() for i in attributes.split(",")]
+    comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
         if req[0] == "^":
-            max_ver = get_max_caret(proj_name, req[1:])
+            max_ver = get_max_caret(proj_name, req[1:], req, fp)
             min_ver = req[1:]
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
         elif req[0] == "~" and req[1] != "=":
-            max_ver = get_max_tilde(proj_name, req[1:])
+            max_ver = get_max_tilde(proj_name, req[1:], req, fp)
             min_ver = req[1:]
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
-            if req[0] not in valid_specifiers:
-                pep440_reqs.append(f"=={req}")
-            else:
-                pep440_reqs.append(req)
+            pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
     return f"{proj_name} {','.join(pep440_reqs)}"
 
 
-def parse_python_constraint(constr: str | None) -> str:
+def parse_python_constraint(constr: str | None, fp: str) -> str:
     if constr is None:
         return ""
     valid_specifiers = "<>!~= "
     or_and_split = [[j.strip() for j in i.split(",")] for i in constr.split("||")]
-    ver_parsed = [[handle_str_attr("", j) for j in i] for i in or_and_split]
+    ver_parsed = [[parse_str_version("", j, fp) for j in i] for i in or_and_split]
 
     def conv_and(lst: list[str]) -> list:
         return list(itertools.chain(*[i.split(",") for i in lst]))
@@ -121,7 +112,7 @@ def parse_python_constraint(constr: str | None) -> str:
     )
 
 
-def handle_dict_attr(proj_name: str, attributes: dict[str, str]) -> str:
+def handle_dict_attr(proj_name: str, attributes: dict[str, str], fp: str) -> str:
     def produce_match(sep: str, feat: Optional[str]) -> str:
         return f"{sep}{feat}" if feat else ""
 
@@ -142,8 +133,8 @@ def handle_dict_attr(proj_name: str, attributes: dict[str, str]) -> str:
         return f"{proj_name} @ {url_lookup}"
     if version_lookup is not None:
         markers_lookup = produce_match(";", attributes.get("markers"))
-        python_lookup = parse_python_constraint(attributes.get("python"))
-        version_parsed = handle_str_attr(proj_name, version_lookup)
+        python_lookup = parse_python_constraint(attributes.get("python"), fp)
+        version_parsed = parse_str_version(proj_name, version_lookup, fp)
         return (
             f"{version_parsed}"
             f"{markers_lookup}"
@@ -161,14 +152,19 @@ def handle_dict_attr(proj_name: str, attributes: dict[str, str]) -> str:
 
 
 def parse_single_dependency(
-    proj_name: str, attributes: str | dict[str, Any] | list[dict[str, Any]]
+    proj_name: str, attributes: str | dict[str, Any] | list[dict[str, Any]], fp: str
 ) -> tuple[Requirement, ...]:
     if isinstance(attributes, str):
-        return (Requirement.parse(handle_str_attr(proj_name, attributes)),)
+        # E.g. `foo = "~1.1~'.
+        return (Requirement.parse(parse_str_version(proj_name, attributes, fp)),)
     elif isinstance(attributes, dict):
-        return (Requirement.parse(handle_dict_attr(proj_name, attributes)),)
+        # E.g. `foo = {version = "~1.1"}`.
+        return (Requirement.parse(handle_dict_attr(proj_name, attributes, fp)),)
     elif isinstance(attributes, list):
-        return tuple([Requirement.parse(handle_dict_attr(proj_name, attr)) for attr in attributes])
+        # E.g. ` foo = [{version = "1.1","python" = "2.7"}, {version = "1.1","python" = "2.7"}]
+        return tuple(
+            Requirement.parse(handle_dict_attr(proj_name, attr, fp)) for attr in attributes
+        )
     else:
         raise AssertionError(
             (
@@ -205,7 +201,7 @@ def parse_pyproject_toml(toml_contents: str, file_path: str) -> set[Requirement]
 
     return set(
         itertools.chain.from_iterable(
-            parse_single_dependency(proj, attr)
+            parse_single_dependency(proj, attr, file_path)
             for proj, attr in {**dependencies, **dev_dependencies}.items()
         )
     )
