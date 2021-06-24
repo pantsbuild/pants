@@ -139,11 +139,9 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
     if tffmt.options.skip:
         return FmtResult.skip(formatter_name="tffmt")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
-    processes = [
-        (directory, Get(ProcessResult, Process, process))
-        for directory, process in setup.directory_to_process.items()
-    ]
-    results = await MultiGet(p[1] for p in processes)
+    results = await MultiGet(
+        Get(ProcessResult, Process, process) for process in setup.directory_to_process.values()
+    )
 
     def format(directory, output):
         if len(output.strip()) == 0:
@@ -159,10 +157,9 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
 
     stdout_content = ""
     stderr_content = ""
-    for i, result in enumerate(results):
-        process = processes[i][0]
-        stdout_content += format(process, result.stdout)
-        stderr_content += format(process, result.stderr)
+    for directory, result in zip(setup.directory_to_process.keys(), results):
+        stdout_content += format(directory, result.stdout)
+        stderr_content += format(directory, result.stderr)
 
     # Merge all of the outputs into a single output.
     output_digest = await Get(Digest, MergeDigests(r.output_digest for r in results))

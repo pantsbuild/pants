@@ -105,19 +105,17 @@ async def run_terraform_validate(
 
         directory_to_process[directory] = process
 
-    processes = [
-        (directory, Get(FallibleProcessResult, Process, process))
-        for directory, process in directory_to_process.items()
-    ]
-    results = await MultiGet(p[1] for p in processes)
+    results = await MultiGet(
+        Get(FallibleProcessResult, Process, process) for process in directory_to_process.values()
+    )
 
     lint_results = []
-    for i, result in enumerate(results):
+    for directory, result in zip(directory_to_process.keys(), results):
         lint_result = LintResult(
             exit_code=result.exit_code,
             stdout=result.stdout.decode(),
             stderr=result.stderr.decode(),
-            partition_description=f"`terraform validate` on `{processes[i][0]}`",
+            partition_description=f"`terraform validate` on `{directory}`",
         )
         lint_results.append(lint_result)
 
