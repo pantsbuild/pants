@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, List, Type
+from typing import Iterable
 
 from pants.backend.terraform.target_types import TerraformSources
 from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
@@ -34,10 +34,8 @@ async def format_terraform_targets(
     )
     prior_formatter_result = original_sources.snapshot
 
-    results: List[EnrichedFmtResult] = []
-    fmt_request_types: Iterable[Type[TerraformFmtRequest]] = union_membership.union_rules[
-        TerraformFmtRequest
-    ]
+    results = []
+    fmt_request_types: Iterable[type[StyleRequest]] = union_membership[TerraformFmtRequest]
     for fmt_request_type in fmt_request_types:
         result = await Get(
             EnrichedFmtResult,
@@ -46,6 +44,7 @@ async def format_terraform_targets(
                 (
                     fmt_request_type.field_set_type.create(target)
                     for target in terraform_fmt_targets.targets
+                    if fmt_request_type.field_set_type.is_applicable(target)
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),
