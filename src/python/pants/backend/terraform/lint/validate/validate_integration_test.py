@@ -5,9 +5,10 @@ from typing import List, Sequence
 
 import pytest
 
-from pants.backend.terraform import fmt, validate
+from pants.backend.terraform.lint import fmt
+from pants.backend.terraform.lint.validate import validate
+from pants.backend.terraform.lint.validate.validate import ValidateFieldSet, ValidateRequest
 from pants.backend.terraform.target_types import TerraformModule
-from pants.backend.terraform.validate import ValidateFieldSet, ValidateRequest
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -83,7 +84,7 @@ def run_terraform_validate(
     *,
     skip: bool = False,
 ) -> Sequence[LintResult]:
-    args = ["--backend-packages=pants.backend.experimental.terraform"]
+    args = ["--backend-packages=pants.backend.experimental.terraform.lint.validate"]
     if skip:
         args.append("--tf-validate-skip")
     rule_runner.set_options(args)

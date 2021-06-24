@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict
 
-from pants.backend.terraform.fmt import TerraformFmtRequest
+from pants.backend.terraform.lint.fmt import TerraformFmtRequest
 from pants.backend.terraform.target_types import TerraformSources
 from pants.backend.terraform.tool import TerraformTool
 from pants.core.goals.fmt import FmtResult

@@ -5,9 +5,10 @@ from typing import List, Sequence, Tuple
 
 import pytest
 
-from pants.backend.terraform import fmt, tffmt
+from pants.backend.terraform.lint import fmt
+from pants.backend.terraform.lint.tffmt import tffmt
+from pants.backend.terraform.lint.tffmt.tffmt import TffmtFieldSet, TffmtRequest
 from pants.backend.terraform.target_types import TerraformModule
-from pants.backend.terraform.tffmt import TffmtFieldSet, TffmtRequest
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
@@ -94,7 +95,7 @@ def run_tffmt(
     *,
     skip: bool = False,
 ) -> Tuple[Sequence[LintResult], FmtResult]:
-    args = ["--backend-packages=pants.backend.experimental.terraform"]
+    args = ["--backend-packages=pants.backend.experimental.terraform.lint.tffmt"]
     if skip:
         args.append("--tffmt-skip")
     rule_runner.set_options(args)
