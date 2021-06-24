@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
@@ -284,53 +284,48 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 
 def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "3rdparty/python",
-        dedent(
-            """\
-            python_requirement_library(
-              name='ansicolors',
-              requirements=['ansicolors==1.21'],
-              module_mapping={'ansicolors': ['colors']},
-            )
+    def req(tgt_name: str, req_str: str, *, module_mapping: dict[str, str] | None = None) -> str:
+        return (
+            f"python_requirement_library(name='{tgt_name}', requirements=['{req_str}'], "
+            f"module_mapping={repr(module_mapping or {})})"
+        )
 
-            python_requirement_library(
-              name='req1',
-              requirements=['req1', 'two_owners'],
-            )
-
-            python_requirement_library(
-              name='un_normalized',
-              requirements=['Un-Normalized-Project>3', 'two_owners', 'DiFFerent-than_Mapping'],
-              module_mapping={"different_THAN-mapping": ["different_than_mapping"]},
-            )
-
-            python_requirement_library(
-              name='direct_references',
-              requirements=[
-                'pip@ git+https://github.com/pypa/pip.git', 'local_dist@ file:///path/to/dist.whl',
-              ],
-            )
-            """
-        ),
+    build_file = "\n\n".join(
+        [
+            req("req", "req==1.2"),
+            req("un_normalized", "Un-Normalized-Project>3"),
+            req("file_dist", "file_dist@ file:///path/to/dist.whl"),
+            req("vcs_dist", "vcs_dist@ git+https://github.com/vcs/dist.git"),
+            req("module_mapping", "foo==1", module_mapping={"foo": ["mapped_module"]}),
+            req(
+                "module_mapping_un_normalized",
+                "DiFFerent-than_Mapping",
+                module_mapping={"different_THAN-mapping": ["module_mapping_un_normalized"]},
+            ),
+            req("ambiguous_t1", "ambiguous==1.2"),
+            req("ambiguous_t2", "ambiguous==1.3"),
+        ]
     )
+    rule_runner.write_files({"BUILD": build_file})
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
         mapping=FrozenDict(
             {
-                "colors": Address("3rdparty/python", target_name="ansicolors"),
-                "different_than_mapping": Address("3rdparty/python", target_name="un_normalized"),
-                "local_dist": Address("3rdparty/python", target_name="direct_references"),
-                "pip": Address("3rdparty/python", target_name="direct_references"),
-                "req1": Address("3rdparty/python", target_name="req1"),
-                "un_normalized_project": Address("3rdparty/python", target_name="un_normalized"),
+                "file_dist": Address("", target_name="file_dist"),
+                "mapped_module": Address("", target_name="module_mapping"),
+                "module_mapping_un_normalized": Address(
+                    "", target_name="module_mapping_un_normalized"
+                ),
+                "req": Address("", target_name="req"),
+                "un_normalized_project": Address("", target_name="un_normalized"),
+                "vcs_dist": Address("", target_name="vcs_dist"),
             }
         ),
         ambiguous_modules=FrozenDict(
             {
-                "two_owners": (
-                    Address("3rdparty/python", target_name="req1"),
-                    Address("3rdparty/python", target_name="un_normalized"),
+                "ambiguous": (
+                    Address("", target_name="ambiguous_t1"),
+                    Address("", target_name="ambiguous_t2"),
                 ),
             }
         ),
@@ -338,168 +333,134 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 
 def test_map_module_to_address(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--source-root-patterns=['source_root1', 'source_root2', '/']"])
-
     def assert_owners(
-        module: str, *, expected: list[Address], expected_ambiguous: list[Address] | None = None
+        module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
     ) -> None:
         owners = rule_runner.request(PythonModuleOwners, [PythonModule(module)])
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
-    # First check that we can map 3rd-party modules without ambiguity.
-    rule_runner.add_to_build_file(
-        "3rdparty/python",
-        dedent(
-            """\
-            python_requirement_library(
-              name='ansicolors',
-              requirements=['ansicolors==1.21'],
-              module_mapping={'ansicolors': ['colors']},
-            )
-            """
-        ),
-    )
-    assert_owners("colors.red", expected=[Address("3rdparty/python", target_name="ansicolors")])
+    rule_runner.set_options(["--source-root-patterns=['root', '/']"])
+    rule_runner.write_files(
+        {
+            # A root-level module.
+            "script.py": "",
+            "BUILD": dedent(
+                """\
+                python_library(name="script", sources=["script.py"])
+                python_requirement_library(name="valid_dep", requirements=["valid_dep"])
+                """
+            ),
+            # Normal first-party module.
+            "root/no_stub/app.py": "",
+            "root/no_stub/BUILD": "python_library()",
+            # First-party module with type stub.
+            "root/stub/app.py": "",
+            "root/stub/app.pyi": "",
+            "root/stub/BUILD": "python_library()",
+            # Package path.
+            "root/package/subdir/__init__.py": "",
+            "root/package/subdir/BUILD": "python_library()",
+            # Third-party requirement with first-party type stub.
+            "root/dep_with_stub.pyi": "",
+            "root/BUILD": dedent(
+                """\
+                python_library()
+                python_requirement_library(name="dep", requirements=["dep_with_stub"])
+                """
+            ),
+            # Ambiguity.
+            "root/ambiguous/f1.py": "",
+            "root/ambiguous/f2.py": "",
+            "root/ambiguous/f3.py": "",
+            "root/ambiguous/BUILD": dedent(
+                """\
+                # Ambiguity purely within third-party deps.
+                python_requirement_library(name='thirdparty1', requirements=['ambiguous_3rdparty'])
+                python_requirement_library(name='thirdparty2', requirements=['ambiguous_3rdparty'])
 
-    # Now test that we can handle first-party type stubs that go along with that third party
-    # requirement. Note that `colors.pyi` is at the top-level of the source root so that it strips
-    # to the module `colors`.
-    rule_runner.create_file("source_root1/colors.pyi")
-    rule_runner.add_to_build_file("source_root1", "python_library()")
+                # Ambiguity purely within first-party deps.
+                python_library(name="firstparty1", sources=["f1.py"])
+                python_library(name="firstparty2", sources=["f1.py"])
+
+                # Ambiguity within third-party, which should result in ambiguity for first-party
+                # too. These all share the module `ambiguous.f2`.
+                python_requirement_library(
+                    name='thirdparty3', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
+                )
+                python_requirement_library(
+                    name='thirdparty4', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
+                )
+                python_library(name="firstparty3", sources=["f2.py"])
+
+                # Ambiguity within first-party, which should result in ambiguity for third-party
+                # too. These all share the module `ambiguous.f3`.
+                python_library(name="firstparty4", sources=["f3.py"])
+                python_library(name="firstparty5", sources=["f3.py"])
+                python_requirement_library(
+                    name='thirdparty5', requirements=['baz'], module_mapping={'baz': ['ambiguous.f3']}
+                )
+                """
+            ),
+        }
+    )
+
+    assert_owners("pathlib", [])
+    assert_owners("typing", [])
+    assert_owners("valid_dep", [Address("", target_name="valid_dep")])
     assert_owners(
-        "colors.red",
-        expected=[
-            Address("3rdparty/python", target_name="ansicolors"),
-            Address("source_root1", relative_file_path="colors.pyi"),
+        "script.Demo", [Address("", target_name="script", relative_file_path="script.py")]
+    )
+    assert_owners("no_stub.app", expected=[Address("root/no_stub", relative_file_path="app.py")])
+    assert_owners(
+        "stub.app",
+        [
+            Address("root/stub", relative_file_path="app.py"),
+            Address("root/stub", relative_file_path="app.pyi"),
+        ],
+    )
+    assert_owners(
+        "package.subdir", [Address("root/package/subdir", relative_file_path="__init__.py")]
+    )
+    assert_owners(
+        "dep_with_stub",
+        [
+            Address("root", target_name="dep"),
+            Address("root", relative_file_path="dep_with_stub.pyi"),
         ],
     )
 
-    # But don't allow a first-party implementation with the same module name.
-    Path(rule_runner.build_root, "source_root1/colors.pyi").unlink()
-    rule_runner.create_file("source_root1/colors.py")
     assert_owners(
-        "colors.red",
-        expected=[],
+        "ambiguous_3rdparty",
+        [],
         expected_ambiguous=[
-            Address("3rdparty/python", target_name="ansicolors"),
-            Address("source_root1", relative_file_path="colors.py"),
-        ],
-    )
-
-    # Check a first party module using a module path.
-    rule_runner.create_file("source_root1/project/app.py")
-    rule_runner.create_file("source_root1/project/file2.py")
-    rule_runner.add_to_build_file("source_root1/project", "python_library()")
-    assert_owners(
-        "project.app", expected=[Address("source_root1/project", relative_file_path="app.py")]
-    )
-
-    # Now check with a type stub.
-    rule_runner.create_file("source_root1/project/app.pyi")
-    assert_owners(
-        "project.app",
-        expected=[
-            Address("source_root1/project", relative_file_path="app.py"),
-            Address("source_root1/project", relative_file_path="app.pyi"),
-        ],
-    )
-
-    # Check a package path
-    rule_runner.create_file("source_root2/project/subdir/__init__.py")
-    rule_runner.add_to_build_file("source_root2/project/subdir", "python_library()")
-    assert_owners(
-        "project.subdir",
-        expected=[Address("source_root2/project/subdir", relative_file_path="__init__.py")],
-    )
-
-    # Test a module with no owner (stdlib). This also smoke tests that we can handle when
-    # there is no parent module.
-    assert_owners("typing", expected=[])
-
-    # Test a module with a single owner with a top-level source root of ".". Also confirm we
-    # can handle when the module includes a symbol (like a class name) at the end.
-    rule_runner.create_file("script.py")
-    rule_runner.add_to_build_file("", "python_library(name='script')")
-    assert_owners(
-        "script.Demo", expected=[Address("", relative_file_path="script.py", target_name="script")]
-    )
-
-    # Ambiguous modules should be recorded.
-    rule_runner.create_files("source_root1/ambiguous", ["f1.py", "f2.py", "f3.py"])
-    rule_runner.add_to_build_file(
-        "source_root1/ambiguous",
-        dedent(
-            """\
-            # Ambiguity purely within third-party deps.
-            python_requirement_library(name='thirdparty1', requirements=['foo'])
-            python_requirement_library(name='thirdparty2', requirements=['foo'])
-
-            # Ambiguity purely within first-party deps.
-            python_library(name="firstparty1", sources=["f1.py"])
-            python_library(name="firstparty2", sources=["f1.py"])
-
-            # Ambiguity within third-party, which should result in ambiguity for first-party too.
-            # These all share the module `ambiguous.f2`.
-            python_requirement_library(
-                name='thirdparty3', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
-            )
-            python_requirement_library(
-                name='thirdparty4', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
-            )
-            python_library(name="firstparty3", sources=["f2.py"])
-
-            # Ambiguity within first-party, which should result in ambiguity for third-party too.
-            # These all share the module `ambiguous.f3`.
-            python_library(name="firstparty4", sources=["f3.py"])
-            python_library(name="firstparty5", sources=["f3.py"])
-            python_requirement_library(
-                name='thirdparty5', requirements=['baz'], module_mapping={'baz': ['ambiguous.f3']}
-            )
-            """
-        ),
-    )
-    assert_owners(
-        "foo",
-        expected=[],
-        expected_ambiguous=[
-            Address("source_root1/ambiguous", target_name="thirdparty1"),
-            Address("source_root1/ambiguous", target_name="thirdparty2"),
+            Address("root/ambiguous", target_name="thirdparty1"),
+            Address("root/ambiguous", target_name="thirdparty2"),
         ],
     )
     assert_owners(
         "ambiguous.f1",
-        expected=[],
+        [],
         expected_ambiguous=[
-            Address(
-                "source_root1/ambiguous", relative_file_path="f1.py", target_name="firstparty1"
-            ),
-            Address(
-                "source_root1/ambiguous", relative_file_path="f1.py", target_name="firstparty2"
-            ),
+            Address("root/ambiguous", relative_file_path="f1.py", target_name="firstparty1"),
+            Address("root/ambiguous", relative_file_path="f1.py", target_name="firstparty2"),
         ],
     )
     assert_owners(
         "ambiguous.f2",
-        expected=[],
+        [],
         expected_ambiguous=[
-            Address("source_root1/ambiguous", target_name="thirdparty3"),
-            Address("source_root1/ambiguous", target_name="thirdparty4"),
-            Address(
-                "source_root1/ambiguous", relative_file_path="f2.py", target_name="firstparty3"
-            ),
+            Address("root/ambiguous", target_name="thirdparty3"),
+            Address("root/ambiguous", target_name="thirdparty4"),
+            Address("root/ambiguous", relative_file_path="f2.py", target_name="firstparty3"),
         ],
     )
     assert_owners(
         "ambiguous.f3",
-        expected=[],
+        [],
         expected_ambiguous=[
-            Address("source_root1/ambiguous", target_name="thirdparty5"),
-            Address(
-                "source_root1/ambiguous", relative_file_path="f3.py", target_name="firstparty4"
-            ),
-            Address(
-                "source_root1/ambiguous", relative_file_path="f3.py", target_name="firstparty5"
-            ),
+            Address("root/ambiguous", target_name="thirdparty5"),
+            Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty4"),
+            Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty5"),
         ],
     )
