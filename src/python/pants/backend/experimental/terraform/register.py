@@ -19,7 +19,4 @@ def rules():
         *target_types_module.rules(),
         *tool.rules(),
         *fmt.rules(),
-        # NOTE: Terraform validation rules are disabled until a way is determined to expose Terrform's local
-        # state files into the Pants execution sandbox.
-        # *validate.rules(),
     ]
