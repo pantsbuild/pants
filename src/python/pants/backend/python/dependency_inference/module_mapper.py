@@ -181,11 +181,11 @@ async def map_first_party_python_targets_to_modules(
             if module in modules_to_addresses:
                 # We check if one of the targets is an implementation (.py file) and the other is
                 # a type stub (.pyi file), which we allow. Otherwise, we have ambiguity.
-                either_targets_are_type_stubs = len(modules_to_addresses[module]) == 1 and (
-                    tgt.address.filename.endswith(".pyi")
-                    or modules_to_addresses[module][0].filename.endswith(".pyi")
-                )
-                if either_targets_are_type_stubs:
+                prior_is_type_stub = len(
+                    modules_to_addresses[module]
+                ) == 1 and modules_to_addresses[module][0].filename.endswith(".pyi")
+                current_is_type_stub = tgt.address.filename.endswith(".pyi")
+                if prior_is_type_stub ^ current_is_type_stub:
                     modules_to_addresses[module].append(tgt.address)
                 else:
                     modules_with_multiple_implementations[module].update(
