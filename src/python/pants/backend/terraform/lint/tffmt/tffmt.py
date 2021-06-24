@@ -148,12 +148,12 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
             return ""
 
         return textwrap.dedent(
-            """\
+            f"""\
         Output from `terraform fmt` on files in {directory}:
-        {output}
+        {output.decode("utf-8")}
 
         """
-        ).format(directory=directory, output=output.decode("utf-8"))
+        )
 
     stdout_content = ""
     stderr_content = ""
