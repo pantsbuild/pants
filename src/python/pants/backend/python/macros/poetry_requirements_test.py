@@ -108,6 +108,7 @@ def test_py_constraints() -> None:
         "(python_version >= '3.6' and python_version< '3.7') or (python_version >= '3.7' and python_version< '4.0')",
     )
 
+
 def test_multi_version_const() -> None:
     lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
     retval = parse_single_dependency("foo", lst_attr, "")
