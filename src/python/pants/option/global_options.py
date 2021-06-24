@@ -1511,6 +1511,8 @@ class GlobalOptions(Subsystem):
                 # macros should be adapted to allow this dependency to be automatically detected.
                 "requirements.txt",
                 "3rdparty/**/requirements.txt",
+                "pyproject.toml",
+                "3rdparty/**/requirements.txt",
                 *bootstrap_options.pantsd_invalidation_globs,
             )
         )
