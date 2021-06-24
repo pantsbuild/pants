@@ -5,6 +5,7 @@ from textwrap import dedent
 from typing import Any, Dict, Iterable
 
 import pytest
+from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.poetry_requirements import (
@@ -27,6 +28,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.mark.parametrize(
     "test, exp",
     [
+        ("1.0.0-rc0", "2.0.0"),
+        ("1.2.3.dev0", "2.0.0"),
+        ("1.2.3-dev0", "2.0.0"),
+        ("1.2.3dev0", "2.0.0"),
         ("1.2.3", "2.0.0"),
         ("1.2", "2.0.0"),
         ("1", "2.0.0"),
@@ -37,19 +42,32 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
     ],
 )
 def test_caret(test, exp) -> None:
-    assert get_max_caret("", test, "", "") == exp
-
-
-@pytest.mark.parametrize(
-    "test, exp", [("1.2.3", "1.3.0"), ("1.2", "1.3.0"), ("1", "2.0.0"), ("0", "1.0.0")]
-)
-def test_max_tilde(test, exp) -> None:
-    assert get_max_tilde("", test, "", "") == exp
+    version = Version(test)
+    assert get_max_caret(version) == exp
 
 
 @pytest.mark.parametrize(
     "test, exp",
     [
+        ("1.2.3", "1.3.0"),
+        ("1.2", "1.3.0"),
+        ("1", "2.0.0"),
+        ("0", "1.0.0"),
+        ("1.2.3.rc1", "1.3.0"),
+        ("1.2.3rc1", "1.3.0"),
+        ("1.2.3-rc1", "1.3.0"),
+    ],
+)
+def test_max_tilde(test, exp) -> None:
+    version = Version(test)
+    assert get_max_tilde(version) == exp
+
+
+@pytest.mark.parametrize(
+    "test, exp",
+    [
+        ("~1.0.0rc0", ">=1.0.0,<1.1.0"),
+        ("^1.0.0rc0", ">=1.0.0,<2.0.0"),
         ("~1.2.3", ">=1.2.3,<1.3.0"),
         ("^1.2.3", ">=1.2.3,<2.0.0"),
         ("~=1.2.3", "~=1.2.3"),

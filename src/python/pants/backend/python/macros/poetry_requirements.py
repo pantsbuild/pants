@@ -18,17 +18,10 @@ from pants.base.build_environment import get_buildroot
 logger = logging.getLogger(__name__)
 
 
-def get_max_caret(proj_name: str, version: str, req: str, fp: str) -> str:
+def get_max_caret(parsed_version: Version) -> str:
     major = 0
     minor = 0
     micro = 0
-
-    try:
-        parsed_version = Version(version)
-    except InvalidVersion:
-        raise InvalidVersion(
-            f"Failed to parse requirement {req} in {fp} loaded by the poetry_requirements macro.\n\nIf you believe this requirement is valid, consider opening an issue at https://github.com/pantsbuild/pants/issues so that we can update Pants's Poetry macro to support this."
-        )
 
     if parsed_version.major != 0:
         major = parsed_version.major + 1
@@ -48,21 +41,15 @@ def get_max_caret(proj_name: str, version: str, req: str, fp: str) -> str:
     return f"{major}.{minor}.{micro}"
 
 
-def get_max_tilde(proj_name: str, version: str, req: str, fp: str) -> str:
+def get_max_tilde(parsed_version: Version) -> str:
     major = 0
     minor = 0
-    try:
-        parsed_version = Version(version)
-    except InvalidVersion:
-        raise InvalidVersion(
-            f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the poetry_requirements macro.\n\nIf you believe this requirement is valid, consider opening an issue at https://github.com/pantsbuild/pants/issues so that we can update Pants\'s Poetry macro to support this.'
-        )
     base_len = len(parsed_version.base_version.split("."))
     if base_len >= 2:
-        minor = parsed_version.minor + 1
-        major = parsed_version.major
+        minor = int(str(parsed_version.minor)) + 1
+        major = int(str(parsed_version.major))
     elif base_len == 1:
-        major = parsed_version.major + 1
+        major = int(str(parsed_version.major)) + 1
 
     return f"{major}.{minor}.0"
 
@@ -72,14 +59,24 @@ def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
     pep440_reqs = []
     comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
-        if req[0] == "^":
-            max_ver = get_max_caret(proj_name, req[1:], req, fp)
-            min_ver = req[1:]
-            pep440_reqs.append(f">={min_ver},<{max_ver}")
+        is_caret = req[0] == "^"
         # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
-        elif req[0] == "~" and req[1] != "=":
-            max_ver = get_max_tilde(proj_name, req[1:], req, fp)
-            min_ver = req[1:]
+        is_tilde = req[0] == "~" and req[1] != "="
+        if is_caret or is_tilde:
+            try:
+                parsed_version = Version(req[1:])
+            except InvalidVersion:
+                raise InvalidVersion(
+                    (
+                        f'Failed to parse requirement {proj_name} = "{req}" in {fp}'
+                        "loaded by the poetry_requirements macro.\n\nIf you believe this requirement is "
+                        "valid, consider opening an issue at https://github.com/pantsbuild/pants/issues"
+                        "so that we can update Pants's Poetry macro to support this."
+                    )
+                )
+
+            max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
+            min_ver = f"{parsed_version.base_version}"
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
