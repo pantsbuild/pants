@@ -284,7 +284,9 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 
 def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
-    def req(tgt_name: str, req_str: str, *, module_mapping: dict[str, str] | None = None) -> str:
+    def req(
+        tgt_name: str, req_str: str, *, module_mapping: dict[str, list[str]] | None = None
+    ) -> str:
         return (
             f"python_requirement_library(name='{tgt_name}', requirements=['{req_str}'], "
             f"module_mapping={repr(module_mapping or {})})"
