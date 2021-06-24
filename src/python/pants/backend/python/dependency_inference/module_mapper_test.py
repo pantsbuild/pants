@@ -36,53 +36,66 @@ def test_default_module_mapping_is_normalized() -> None:
 @pytest.mark.parametrize(
     "stripped_path,expected",
     [
-        (PurePath("top_level.py"), "top_level"),
-        (PurePath("dir", "subdir", "__init__.py"), "dir.subdir"),
-        (PurePath("dir", "subdir", "app.py"), "dir.subdir.app"),
-        (
-            PurePath("src", "python", "project", "not_stripped.py"),
-            "src.python.project.not_stripped",
-        ),
+        ("top_level.py", "top_level"),
+        ("dir/subdir/__init__.py", "dir.subdir"),
+        ("dir/subdir/app.py", "dir.subdir.app"),
+        ("src/python/project/not_stripped.py", "src.python.project.not_stripped"),
     ],
 )
-def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None:
-    assert PythonModule.create_from_stripped_path(stripped_path) == PythonModule(expected)
+def test_create_module_from_path(stripped_path: str, expected: str) -> None:
+    assert PythonModule.create_from_stripped_path(PurePath(stripped_path)) == PythonModule(expected)
 
 
 def test_first_party_modules_mapping() -> None:
     root_addr = Address("", relative_file_path="root.py")
     util_addr = Address("src/python/util", relative_file_path="strutil.py")
+    util_stubs_addr = Address("src/python/util", relative_file_path="strutil.pyi")
     test_addr = Address("tests/python/project_test", relative_file_path="test.py")
     mapping = FirstPartyPythonModuleMapping(
         mapping=FrozenDict(
-            {"root": (root_addr,), "util.strutil": (util_addr,), "project_test.test": (test_addr,)}
+            {
+                "root": (root_addr,),
+                "util.strutil": (util_addr, util_stubs_addr),
+                "project_test.test": (test_addr,),
+            }
         ),
         ambiguous_modules=FrozenDict(
             {"ambiguous": (root_addr, util_addr), "util.ambiguous": (util_addr, test_addr)}
         ),
     )
 
-    assert mapping.addresses_for_module("root") == ((root_addr,), ())
-    assert mapping.addresses_for_module("root.func") == ((root_addr,), ())
-    assert mapping.addresses_for_module("root.submodule.func") == ((), ())
+    def assert_addresses(
+        mod: str, expected: tuple[tuple[Address, ...], tuple[Address, ...]]
+    ) -> None:
+        assert mapping.addresses_for_module(mod) == expected
 
-    assert mapping.addresses_for_module("util.strutil") == ((util_addr,), ())
-    assert mapping.addresses_for_module("util.strutil.ensure_text") == ((util_addr,), ())
-    assert mapping.addresses_for_module("util") == ((), ())
+    unknown = ((), ())
 
-    assert mapping.addresses_for_module("project_test.test") == ((test_addr,), ())
-    assert mapping.addresses_for_module("project_test.test.TestDemo") == ((test_addr,), ())
-    assert mapping.addresses_for_module("project_test.test.TestDemo.method") == ((), ())
-    assert mapping.addresses_for_module("project_test") == ((), ())
-    assert mapping.addresses_for_module("project.test") == ((), ())
+    root = ((root_addr,), ())
+    assert_addresses("root", root)
+    assert_addresses("root.func", root)
+    assert_addresses("root.submodule.func", unknown)
 
-    assert mapping.addresses_for_module("ambiguous") == ((), (root_addr, util_addr))
-    assert mapping.addresses_for_module("ambiguous.func") == ((), (root_addr, util_addr))
-    assert mapping.addresses_for_module("ambiguous.submodule.func") == ((), ())
+    util = ((util_addr, util_stubs_addr), ())
+    assert_addresses("util.strutil", util)
+    assert_addresses("util.strutil.ensure_text", util)
+    assert_addresses("util", unknown)
 
-    assert mapping.addresses_for_module("util.ambiguous") == ((), (util_addr, test_addr))
-    assert mapping.addresses_for_module("util.ambiguous.Foo") == ((), (util_addr, test_addr))
-    assert mapping.addresses_for_module("util.ambiguous.Foo.method") == ((), ())
+    test = ((test_addr,), ())
+    assert_addresses("project_test.test", test)
+    assert_addresses("project_test.test.TestDemo", test)
+    assert_addresses("project_test", unknown)
+    assert_addresses("project.test", unknown)
+
+    ambiguous = ((), (root_addr, util_addr))
+    assert_addresses("ambiguous", ambiguous)
+    assert_addresses("ambiguous.func", ambiguous)
+    assert_addresses("ambiguous.submodule.func", unknown)
+
+    util_ambiguous = ((), (util_addr, test_addr))
+    assert_addresses("util.ambiguous", util_ambiguous)
+    assert_addresses("util.ambiguous.Foo", util_ambiguous)
+    assert_addresses("util.ambiguous.Foo.method", unknown)
 
 
 def test_third_party_modules_mapping() -> None:
@@ -101,28 +114,39 @@ def test_third_party_modules_mapping() -> None:
         ),
         ambiguous_modules=FrozenDict({"ambiguous": (colors_addr, pants_addr)}),
     )
-    assert mapping.address_for_module("colors") == (colors_addr, ())
-    assert mapping.address_for_module("colors.red") == (colors_addr, ())
 
-    assert mapping.address_for_module("pants") == (pants_addr, ())
-    assert mapping.address_for_module("pants.task") == (pants_addr, ())
-    assert mapping.address_for_module("pants.task.task") == (pants_addr, ())
-    assert mapping.address_for_module("pants.task.task.Task") == (pants_addr, ())
+    def assert_addresses(mod: str, expected: tuple[Address | None, tuple[Address, ...]]) -> None:
+        assert mapping.address_for_module(mod) == expected
 
-    assert mapping.address_for_module("pants.testutil") == (pants_testutil_addr, ())
-    assert mapping.address_for_module("pants.testutil.foo") == (pants_testutil_addr, ())
+    unknown = (None, ())
 
-    assert mapping.address_for_module("req.submodule") == (submodule_addr, ())
-    assert mapping.address_for_module("req.submodule.foo") == (submodule_addr, ())
-    assert mapping.address_for_module("req.another") == (None, ())
-    assert mapping.address_for_module("req") == (None, ())
+    colors = (colors_addr, ())
+    assert_addresses("colors", colors)
+    assert_addresses("colors.red", colors)
 
-    assert mapping.address_for_module("unknown") == (None, ())
-    assert mapping.address_for_module("unknown.pants") == (None, ())
+    pants = (pants_addr, ())
+    assert_addresses("pants", pants)
+    assert_addresses("pants.task", pants)
+    assert_addresses("pants.task.task", pants)
+    assert_addresses("pants.task.task.Task", pants)
 
-    assert mapping.address_for_module("ambiguous") == (None, (colors_addr, pants_addr))
-    assert mapping.address_for_module("ambiguous.foo") == (None, (colors_addr, pants_addr))
-    assert mapping.address_for_module("ambiguous.foo.bar") == (None, (colors_addr, pants_addr))
+    testutil = (pants_testutil_addr, ())
+    assert_addresses("pants.testutil", testutil)
+    assert_addresses("pants.testutil.foo", testutil)
+
+    submodule = (submodule_addr, ())
+    assert_addresses("req.submodule", submodule)
+    assert_addresses("req.submodule.foo", submodule)
+    assert_addresses("req.another", unknown)
+    assert_addresses("req", unknown)
+
+    assert_addresses("unknown", unknown)
+    assert_addresses("unknown.pants", unknown)
+
+    ambiguous = (None, (colors_addr, pants_addr))
+    assert_addresses("ambiguous", ambiguous)
+    assert_addresses("ambiguous.foo", ambiguous)
+    assert_addresses("ambiguous.foo.bar", ambiguous)
 
 
 @pytest.fixture
@@ -144,55 +168,55 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
     )
-
-    # Two modules belonging to the same target. We should generate subtargets for each file.
-    rule_runner.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
-    rule_runner.add_to_build_file("src/python/project/util", "python_library()")
-
-    # A module with two owners, meaning that neither should be resolved.
-    rule_runner.create_file("src/python/two_owners.py")
-    rule_runner.add_to_build_file("src/python", "python_library()")
-    rule_runner.create_file("build-support/two_owners.py")
-    rule_runner.add_to_build_file("build-support", "python_library()")
-
-    # A package module. Because there's only one source file belonging to the target, we should
-    # not generate subtargets.
-    rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
-    rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
-
-    # A module with both an implementation and a type stub. Even though the module is the same, we
-    # special-case it to be legal for both file targets to be inferred.
-    rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
-    rule_runner.add_to_build_file("src/python/stubs", "python_library()")
-
-    # Check that plugin mappings work. Note that we duplicate one of the files with a normal
-    # python_library(), which means neither the Protobuf nor Python targets should be used.
-    rule_runner.create_files("src/python/protos", ["f1.proto", "f2.proto", "f2_pb2.py"])
-    rule_runner.add_to_build_file(
-        "src/python/protos",
-        dedent(
-            """\
-            protobuf_library(name='protos')
-            python_library(name='py')
-            """
-        ),
-    )
-
-    # If a module is ambiguous within a particular implementation, which means that it's not used
-    # in that implementation's final mapping, it should still trigger ambiguity with another
-    # implementation. Here, we have ambiguity with the Protobuf targets, but the Python file has
-    # no ambiguity with other Python files; the Protobuf ambiguity needs to result in Python
-    # being ambiguous.
-    rule_runner.create_files("src/python/protos_ambiguous", ["f.proto", "f_pb2.py"])
-    rule_runner.add_to_build_file(
-        "src/python/protos_ambiguous",
-        dedent(
-            """\
-            protobuf_library(name='protos1')
-            protobuf_library(name='protos2')
-            python_library(name='py')
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/python/project/util/dirutil.py": "",
+            "src/python/project/util/tarutil.py": "",
+            "src/python/project/util/BUILD": "python_library()",
+            # A module with two owners, meaning that neither should be resolved.
+            "src/python/two_owners.py": "",
+            "src/python/BUILD": "python_library()",
+            "build-support/two_owners.py": "",
+            "build-support/BUILD": "python_library()",
+            # A module with two owners that are type stubs.
+            "src/python/stub_ambiguity/f.pyi": "",
+            "src/python/stub_ambiguity/BUILD": "python_library()",
+            "build-support/stub_ambiguity/f.pyi": "",
+            "build-support/stub_ambiguity/BUILD": "python_library()",
+            # A package module.
+            "tests/python/project_test/demo_test/__init__.py": "",
+            "tests/python/project_test/demo_test/BUILD": "python_library()",
+            # A module with both an implementation and a type stub. Even though the module is the
+            # same, we special-case it to be legal for both file targets to be inferred.
+            "src/python/stubs/stub.py": "",
+            "src/python/stubs/stub.pyi": "",
+            "src/python/stubs/BUILD": "python_library()",
+            # Check that plugin mappings work. Note that we duplicate one of the files with a normal
+            # python_library(), which means neither the Protobuf nor Python targets should be used.
+            "src/python/protos/f1.proto": "",
+            "src/python/protos/f2.proto": "",
+            "src/python/protos/f2_pb2.py": "",
+            "src/python/protos/BUILD": dedent(
+                """\
+                protobuf_library(name='protos')
+                python_library(name='py')
+                """
+            ),
+            # If a module is ambiguous within a particular implementation, which means that it's
+            # not used in that implementation's final mapping, it should still trigger ambiguity
+            # with another implementation. Here, we have ambiguity with the Protobuf targets, but
+            # the Python file has no ambiguity with other Python files; the Protobuf ambiguity
+            # needs to result in Python being ambiguous.
+            "src/python/protos_ambiguous/f.proto": "",
+            "src/python/protos_ambiguous/f_pb2.py": "",
+            "src/python/protos_ambiguous/BUILD": dedent(
+                """\
+                protobuf_library(name='protos1')
+                protobuf_library(name='protos2')
+                python_library(name='py')
+                """
+            ),
+        }
     )
 
     result = rule_runner.request(FirstPartyPythonModuleMapping, [])
@@ -245,6 +269,10 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                         relative_file_path="f_pb2.py",
                         target_name="py",
                     ),
+                ),
+                "stub_ambiguity.f": (
+                    Address("build-support/stub_ambiguity", relative_file_path="f.pyi"),
+                    Address("src/python/stub_ambiguity", relative_file_path="f.pyi"),
                 ),
                 "two_owners": (
                     Address("build-support", relative_file_path="two_owners.py"),
