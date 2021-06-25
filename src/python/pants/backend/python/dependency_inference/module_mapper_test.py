@@ -11,7 +11,10 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
-from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
+)
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
     PythonModule,
@@ -31,6 +34,10 @@ def test_default_module_mapping_is_normalized() -> None:
         assert k == canonicalize_project_name(
             k
         ), "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
+    for k in DEFAULT_TYPE_STUB_MODULE_MAPPING:
+        assert k == canonicalize_project_name(
+            k
+        ), "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
 
 
 @pytest.mark.parametrize(

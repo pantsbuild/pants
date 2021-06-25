@@ -15,7 +15,10 @@ from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
@@ -626,7 +629,10 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     ) -> FrozenDict[str, Tuple[str, ...]]:
         provided_mapping = super().compute_value(raw_value, address)
         return FrozenDict(
-            {canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()}
+            {
+                **DEFAULT_TYPE_STUB_MODULE_MAPPING,
+                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
+            }
         )
 
 
