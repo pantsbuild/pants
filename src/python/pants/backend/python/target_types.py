@@ -588,7 +588,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
     help = (
         "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
-        '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
+        '`{"ansicolors": ["colors"]}`.\n\nAny unspecified requirements will use the requirement '
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
         "used to infer dependencies."
     )
@@ -611,9 +611,11 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     alias = "type_stubs_module_mapping"
     help = (
         "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
-        'For example, `{"types-requests": ["requests"]}`. Any unspecified requirements will use '
-        'the requirement name without `types` as the default module, e.g. "types-requests" will '
-        'default to `["requests"]`.\n\n'
+        'For example, `{"types-requests": ["requests"]}`.\n\n'
+        "If the requirement is not specified _and_ it starts with `types-` or ends with `-types`, "
+        "the requirement will be treated as a type stub for the corresponding module, e.g. "
+        '"types-request" has the module "requests". Otherwise, the requirement is treated like a '
+        f"normal dependency (see the field {ModuleMappingField.alias}).\n\n"
         "This is used to infer dependencies for type stubs."
     )
     value: FrozenDict[str, Tuple[str, ...]]
