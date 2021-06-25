@@ -336,6 +336,12 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("ambiguous_again_stubs_t1", "ambiguous-again-stubs-types==1.2"),
             req("ambiguous_again_stubs_t2", "types-ambiguous-again-stubs==1.3"),
             req("ambiguous_again_stubs_t3", "ambiguous-again-stubs==1.3"),
+            # Only assume it's a type stubs dep if we are certain it's not an implementation.
+            req(
+                "looks_like_stubs",
+                "looks-like-stubs-types",
+                module_mapping={"looks-like-stubs-types": ["looks_like_stubs"]},
+            ),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -344,6 +350,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         mapping=FrozenDict(
             {
                 "file_dist": (Address("", target_name="file_dist"),),
+                "looks_like_stubs": (Address("", target_name="looks_like_stubs"),),
                 "mapped_module": (Address("", target_name="module_mapping"),),
                 "module_mapping_un_normalized": (
                     Address("", target_name="module_mapping_un_normalized"),

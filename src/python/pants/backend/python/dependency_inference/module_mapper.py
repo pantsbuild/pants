@@ -258,7 +258,9 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             in_stubs_map = proj_name in stubs_module_map
             starts_with_types = fallback_value.startswith("types_")
             ends_with_types = fallback_value.endswith("_types")
-            if starts_with_types or ends_with_types or in_stubs_map:
+            if proj_name not in module_map and (
+                in_stubs_map or starts_with_types or ends_with_types
+            ):
                 if in_stubs_map:
                     modules = stubs_module_map[proj_name]
                 else:
