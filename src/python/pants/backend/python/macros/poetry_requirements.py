@@ -76,7 +76,7 @@ def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
                 )
 
             max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
-            min_ver = f"{parsed_version.base_version}"
+            min_ver = f"{parsed_version.public}"
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
