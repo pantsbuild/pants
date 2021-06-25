@@ -245,6 +245,7 @@ class PoetryRequirements:
         pyproject_toml_relpath: str = "pyproject.toml",
         *,
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
+        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
     ) -> None:
         """
         :param pyproject_toml_relpath: The relpath from this BUILD file to the requirements file.
@@ -266,9 +267,15 @@ class PoetryRequirements:
             req_file.read_text(), str(req_file.relative_to(get_buildroot()))
         )
         for parsed_req in requirements:
+            proj_name = parsed_req.project_name
             req_module_mapping = (
-                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
-                if module_mapping and parsed_req.project_name in module_mapping
+                {proj_name: module_mapping[proj_name]}
+                if module_mapping and proj_name in module_mapping
+                else None
+            )
+            stubs_module_mapping = (
+                {proj_name: type_stubs_module_mapping[proj_name]}
+                if type_stubs_module_mapping and proj_name in type_stubs_module_mapping
                 else None
             )
             self._parse_context.create_object(
@@ -276,5 +283,6 @@ class PoetryRequirements:
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 module_mapping=req_module_mapping,
+                type_stubs_module_mapping=stubs_module_mapping,
                 dependencies=[requirements_dep],
             )
