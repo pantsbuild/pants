@@ -100,41 +100,44 @@ def test_first_party_modules_mapping() -> None:
 
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
+    colors_stubs_addr = Address("", target_name="types-ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
     pants_testutil_addr = Address("", target_name="pantsbuild.testutil")
     submodule_addr = Address("", target_name="submodule")
     mapping = ThirdPartyPythonModuleMapping(
         mapping=FrozenDict(
             {
-                "colors": colors_addr,
-                "pants": pants_addr,
-                "req.submodule": submodule_addr,
-                "pants.testutil": pants_testutil_addr,
+                "colors": (colors_addr, colors_stubs_addr),
+                "pants": (pants_addr,),
+                "req.submodule": (submodule_addr,),
+                "pants.testutil": (pants_testutil_addr,),
             }
         ),
         ambiguous_modules=FrozenDict({"ambiguous": (colors_addr, pants_addr)}),
     )
 
-    def assert_addresses(mod: str, expected: tuple[Address | None, tuple[Address, ...]]) -> None:
-        assert mapping.address_for_module(mod) == expected
+    def assert_addresses(
+        mod: str, expected: tuple[tuple[Address, ...], tuple[Address, ...]]
+    ) -> None:
+        assert mapping.addresses_for_module(mod) == expected
 
-    unknown = (None, ())
+    unknown = ((), ())
 
-    colors = (colors_addr, ())
+    colors = ((colors_addr, colors_stubs_addr), ())
     assert_addresses("colors", colors)
     assert_addresses("colors.red", colors)
 
-    pants = (pants_addr, ())
+    pants = ((pants_addr,), ())
     assert_addresses("pants", pants)
     assert_addresses("pants.task", pants)
     assert_addresses("pants.task.task", pants)
     assert_addresses("pants.task.task.Task", pants)
 
-    testutil = (pants_testutil_addr, ())
+    testutil = ((pants_testutil_addr,), ())
     assert_addresses("pants.testutil", testutil)
     assert_addresses("pants.testutil.foo", testutil)
 
-    submodule = (submodule_addr, ())
+    submodule = ((submodule_addr,), ())
     assert_addresses("req.submodule", submodule)
     assert_addresses("req.submodule.foo", submodule)
     assert_addresses("req.another", unknown)
@@ -143,7 +146,7 @@ def test_third_party_modules_mapping() -> None:
     assert_addresses("unknown", unknown)
     assert_addresses("unknown.pants", unknown)
 
-    ambiguous = (None, (colors_addr, pants_addr))
+    ambiguous = ((), (colors_addr, pants_addr))
     assert_addresses("ambiguous", ambiguous)
     assert_addresses("ambiguous.foo", ambiguous)
     assert_addresses("ambiguous.foo.bar", ambiguous)
@@ -285,16 +288,21 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     def req(
-        tgt_name: str, req_str: str, *, module_mapping: dict[str, list[str]] | None = None
+        tgt_name: str,
+        req_str: str,
+        *,
+        module_mapping: dict[str, list[str]] | None = None,
+        stubs_mapping: dict[str, list[str]] | None = None,
     ) -> str:
         return (
             f"python_requirement_library(name='{tgt_name}', requirements=['{req_str}'], "
-            f"module_mapping={repr(module_mapping or {})})"
+            f"module_mapping={repr(module_mapping or {})},"
+            f"type_stubs_module_mapping={repr(stubs_mapping or {})})"
         )
 
     build_file = "\n\n".join(
         [
-            req("req", "req==1.2"),
+            req("req1", "req1==1.2"),
             req("un_normalized", "Un-Normalized-Project>3"),
             req("file_dist", "file_dist@ file:///path/to/dist.whl"),
             req("vcs_dist", "vcs_dist@ git+https://github.com/vcs/dist.git"),
@@ -304,8 +312,30 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "DiFFerent-than_Mapping",
                 module_mapping={"different_THAN-mapping": ["module_mapping_un_normalized"]},
             ),
+            # We extract the module from type stub dependencies.
+            req("stubs1_types", "stubs1-types"),
+            req("stubs2_types", "types-stubs2"),
+            req("stubs3_types", "stubs3-foo", stubs_mapping={"stubs3-foo": ["stubs3"]}),
+            # A 3rd-party dependency can have both a type stub and implementation.
+            req("req2", "req2==1"),
+            req("req2_types", "types-req2==1"),
+            req("req3", "req3==1"),
+            req("req3_types", "req3-types==1"),
+            req("req4", "req4==1"),
+            req("req4_types", "req4-stubs==1", stubs_mapping={"req4-stubs": ["req4"]}),
+            # Ambiguous.
             req("ambiguous_t1", "ambiguous==1.2"),
             req("ambiguous_t2", "ambiguous==1.3"),
+            req("ambiguous_stubs_t1", "ambiguous-stubs-types==1.3"),
+            req("ambiguous_stubs_t2", "types-ambiguous-stubs==1.3"),
+            # If there's ambiguity within type stubs or within implementations, then there should
+            # be ambiguity with the other category too.
+            req("ambiguous_again_t1", "ambiguous-again==1.2"),
+            req("ambiguous_again_t2", "ambiguous-again==1.3"),
+            req("ambiguous_again_t3", "ambiguous-again-types==1.3"),
+            req("ambiguous_again_stubs_t1", "ambiguous-again-stubs-types==1.2"),
+            req("ambiguous_again_stubs_t2", "types-ambiguous-again-stubs==1.3"),
+            req("ambiguous_again_stubs_t3", "ambiguous-again-stubs==1.3"),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -313,14 +343,20 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     assert result == ThirdPartyPythonModuleMapping(
         mapping=FrozenDict(
             {
-                "file_dist": Address("", target_name="file_dist"),
-                "mapped_module": Address("", target_name="module_mapping"),
-                "module_mapping_un_normalized": Address(
-                    "", target_name="module_mapping_un_normalized"
+                "file_dist": (Address("", target_name="file_dist"),),
+                "mapped_module": (Address("", target_name="module_mapping"),),
+                "module_mapping_un_normalized": (
+                    Address("", target_name="module_mapping_un_normalized"),
                 ),
-                "req": Address("", target_name="req"),
-                "un_normalized_project": Address("", target_name="un_normalized"),
-                "vcs_dist": Address("", target_name="vcs_dist"),
+                "req1": (Address("", target_name="req1"),),
+                "req2": (Address("", target_name="req2"), Address("", target_name="req2_types")),
+                "req3": (Address("", target_name="req3"), Address("", target_name="req3_types")),
+                "req4": (Address("", target_name="req4"), Address("", target_name="req4_types")),
+                "stubs1": (Address("", target_name="stubs1_types"),),
+                "stubs2": (Address("", target_name="stubs2_types"),),
+                "stubs3": (Address("", target_name="stubs3_types"),),
+                "un_normalized_project": (Address("", target_name="un_normalized"),),
+                "vcs_dist": (Address("", target_name="vcs_dist"),),
             }
         ),
         ambiguous_modules=FrozenDict(
@@ -328,6 +364,20 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "ambiguous": (
                     Address("", target_name="ambiguous_t1"),
                     Address("", target_name="ambiguous_t2"),
+                ),
+                "ambiguous_again": (
+                    Address("", target_name="ambiguous_again_t1"),
+                    Address("", target_name="ambiguous_again_t2"),
+                    Address("", target_name="ambiguous_again_t3"),
+                ),
+                "ambiguous_again_stubs": (
+                    Address("", target_name="ambiguous_again_stubs_t1"),
+                    Address("", target_name="ambiguous_again_stubs_t2"),
+                    Address("", target_name="ambiguous_again_stubs_t3"),
+                ),
+                "ambiguous_stubs": (
+                    Address("", target_name="ambiguous_stubs_t1"),
+                    Address("", target_name="ambiguous_stubs_t2"),
                 ),
             }
         ),
@@ -351,6 +401,11 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 """\
                 python_library(name="script", sources=["script.py"])
                 python_requirement_library(name="valid_dep", requirements=["valid_dep"])
+                # Dependency with a type stub.
+                python_requirement_library(name="dep_w_stubs", requirements=["dep_w_stubs"])
+                python_requirement_library(
+                    name="dep_w_stubs-types", requirements=["dep_w_stubs-types"]
+                )
                 """
             ),
             # Normal first-party module.
@@ -375,6 +430,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             "root/ambiguous/f1.py": "",
             "root/ambiguous/f2.py": "",
             "root/ambiguous/f3.py": "",
+            "root/ambiguous/f4.pyi": "",
             "root/ambiguous/BUILD": dedent(
                 """\
                 # Ambiguity purely within third-party deps.
@@ -402,6 +458,20 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_requirement_library(
                     name='thirdparty5', requirements=['baz'], module_mapping={'baz': ['ambiguous.f3']}
                 )
+
+                # You can only write a first-party type stub for a third-party requirement if
+                # there are not third-party type stubs already.
+                python_requirement_library(
+                    name='ambiguous-stub',
+                    requirements=['ambiguous-stub'],
+                    module_mapping={"ambiguous-stub": ["ambiguous.f4"]},
+                )
+                python_requirement_library(
+                    name='ambiguous-stub-types',
+                    requirements=['ambiguous-stub-types'],
+                    type_stubs_module_mapping={"ambiguous-stub-types": ["ambiguous.f4"]},
+                )
+                python_library(name='ambiguous-stub-1stparty', sources=['f4.pyi'])
                 """
             ),
         }
@@ -410,6 +480,10 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     assert_owners("pathlib", [])
     assert_owners("typing", [])
     assert_owners("valid_dep", [Address("", target_name="valid_dep")])
+    assert_owners(
+        "dep_w_stubs",
+        [Address("", target_name="dep_w_stubs"), Address("", target_name="dep_w_stubs-types")],
+    )
     assert_owners(
         "script.Demo", [Address("", target_name="script", relative_file_path="script.py")]
     )
@@ -464,5 +538,18 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             Address("root/ambiguous", target_name="thirdparty5"),
             Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty4"),
             Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty5"),
+        ],
+    )
+    assert_owners(
+        "ambiguous.f4",
+        [],
+        expected_ambiguous=[
+            Address("root/ambiguous", target_name="ambiguous-stub"),
+            Address("root/ambiguous", target_name="ambiguous-stub-types"),
+            Address(
+                "root/ambiguous",
+                relative_file_path="f4.pyi",
+                target_name="ambiguous-stub-1stparty",
+            ),
         ],
     )

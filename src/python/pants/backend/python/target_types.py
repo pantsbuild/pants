@@ -607,9 +607,36 @@ class ModuleMappingField(DictStringToStringSequenceField):
         )
 
 
+class TypeStubsModuleMappingField(DictStringToStringSequenceField):
+    alias = "type_stubs_module_mapping"
+    help = (
+        "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
+        'For example, `{"types-requests": ["requests"]}`. Any unspecified requirements will use '
+        'the requirement name without `types` as the default module, e.g. "types-requests" will '
+        'default to `["requests"]`.\n\n'
+        "This is used to infer dependencies for type stubs."
+    )
+    value: FrozenDict[str, Tuple[str, ...]]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    ) -> FrozenDict[str, Tuple[str, ...]]:
+        provided_mapping = super().compute_value(raw_value, address)
+        return FrozenDict(
+            {canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()}
+        )
+
+
 class PythonRequirementLibrary(Target):
     alias = "python_requirement_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField, ModuleMappingField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        PythonRequirementsField,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+    )
     help = (
         "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
