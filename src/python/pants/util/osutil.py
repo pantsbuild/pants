@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 # the raw number of cores. This sometimes helps for containers to accurately report their # of
 # cores, rather than the host's.
 CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+    len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    if hasattr(os, "sched_getaffinity")
+    else os.cpu_count()
 ) or 2
 
 

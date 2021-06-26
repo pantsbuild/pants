@@ -25,3 +25,39 @@ known_first_party = ["internal_plugins", "pants", "pants_test"]
 # coverage will gather stats for it, but it doesn't correspond to a real source file,
 # so reporting will fail, unless we omit it here.
 omit = ["src/python/pants/__init__.py"]
+
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "src/python:tests/python:testprojects/src/python"
+
+no_implicit_optional = true
+implicit_reexport = false
+strict_equality = true
+
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unreachable = true
+
+pretty = true
+show_column_numbers = true
+show_error_context = true
+show_error_codes = true
+show_traceback = true
+
+[[tool.mypy.overrides]]
+module = [
+    "bs4",
+    "colors",
+    "fasteners",
+    "freezegun",
+    "hdrh",
+    "hdrh.histogram",
+    "pex.*",
+    "psutil",
+    "pystache",
+    "setproctitle",
+]
+ignore_missing_imports = true

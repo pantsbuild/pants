@@ -87,10 +87,6 @@ extra_requirements.add = [
 [isort]
 version = "isort[pyproject,colors]>=5.5.1,<5.6"
 
-[mypy]
-config = "build-support/mypy/mypy.ini"
-source_plugins = ["pants-plugins/mypy_plugins"]
-
 [shellcheck]
 args = ["--external-sources"]
 
