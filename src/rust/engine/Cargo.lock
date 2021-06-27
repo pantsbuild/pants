@@ -726,6 +726,7 @@ dependencies = [
  "mock",
  "nailgun",
  "parking_lot",
+ "petgraph 0.4.13",
  "pyo3",
  "task_executor",
 ]
