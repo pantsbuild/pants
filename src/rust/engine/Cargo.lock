@@ -695,6 +695,7 @@ dependencies = [
  "nailgun",
  "num_enum",
  "parking_lot",
+ "petgraph 0.4.13",
  "process_execution",
  "rand 0.8.2",
  "regex",
@@ -726,7 +727,6 @@ dependencies = [
  "mock",
  "nailgun",
  "parking_lot",
- "petgraph 0.4.13",
  "pyo3",
  "task_executor",
 ]

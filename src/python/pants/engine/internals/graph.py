@@ -36,6 +36,7 @@ from pants.engine.fs import (
     Snapshot,
     SpecsSnapshot,
 )
+from pants.engine.internals import native_engine
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -323,14 +324,16 @@ async def transitive_targets(dependency_mapping: _DependencyMapping) -> Transiti
 @rule
 async def coarsened_targets(address: Address) -> CoarsenedTargets:
     dependency_mapping = await Get(_DependencyMapping, TransitiveTargetsRequest([address]))
+    components = native_engine.strongly_connected_components(list(dependency_mapping))
 
-    # Run SCC.
-
-    # Build a mapping from Address to CoarsenedTargets.
-
-    # Return the relevant one.
-
-    return ...
+    # Return the relevant component.
+    # TODO: This is very inefficient. Before landing, this should apply a strategy similar to
+    # https://github.com/pantsbuild/pants/issues/11270 to share subgraphs which have already been
+    # computed.
+    for component in components:
+        if address in component:
+            return CoarsenedTargets(component)
+    raise AssertionError("No component contained the relevant Address.")
 
 
 # -----------------------------------------------------------------------------------------------
