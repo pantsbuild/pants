@@ -606,6 +606,10 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+class CoarsenedTargets(Collection[Target]):
+    """A set of Targets which cyclicly reach one another, and are thus indivisable."""
+
+
 @dataclass(frozen=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.
