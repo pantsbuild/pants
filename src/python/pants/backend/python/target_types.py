@@ -15,7 +15,10 @@ from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
@@ -588,7 +591,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
     help = (
         "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
-        '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
+        '`{"ansicolors": ["colors"]}`.\n\nAny unspecified requirements will use the requirement '
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
         "used to infer dependencies."
     )
@@ -607,9 +610,41 @@ class ModuleMappingField(DictStringToStringSequenceField):
         )
 
 
+class TypeStubsModuleMappingField(DictStringToStringSequenceField):
+    alias = "type_stubs_module_mapping"
+    help = (
+        "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
+        'For example, `{"types-requests": ["requests"]}`.\n\n'
+        "If the requirement is not specified _and_ it starts with `types-` or ends with `-types`, "
+        "the requirement will be treated as a type stub for the corresponding module, e.g. "
+        '"types-request" has the module "requests". Otherwise, the requirement is treated like a '
+        f"normal dependency (see the field {ModuleMappingField.alias}).\n\n"
+        "This is used to infer dependencies for type stubs."
+    )
+    value: FrozenDict[str, Tuple[str, ...]]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    ) -> FrozenDict[str, Tuple[str, ...]]:
+        provided_mapping = super().compute_value(raw_value, address)
+        return FrozenDict(
+            {
+                **DEFAULT_TYPE_STUB_MODULE_MAPPING,
+                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
+            }
+        )
+
+
 class PythonRequirementLibrary(Target):
     alias = "python_requirement_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField, ModuleMappingField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        PythonRequirementsField,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+    )
     help = (
         "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "

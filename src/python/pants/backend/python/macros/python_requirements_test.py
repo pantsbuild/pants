@@ -56,13 +56,21 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
     """
     assert_python_requirements(
         rule_runner,
-        "python_requirements(module_mapping={'ansicolors': ['colors']})",
+        dedent(
+            """\
+            python_requirements(
+                module_mapping={'ansicolors': ['colors']},
+                type_stubs_module_mapping={'Django-types': ['django']},
+            )
+            """
+        ),
         dedent(
             """\
             # Comment.
             --find-links=https://duckduckgo.com
             ansicolors>=1.18.0
             Django==3.2 ; python_version>'3'
+            Django-types
             Un-Normalized-PROJECT  # Inline comment.
             pip@ git+https://github.com/pypa/pip.git
             """
@@ -86,6 +94,14 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("Django==3.2 ; python_version>'3'")],
                 },
                 Address("", target_name="Django"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("Django-types")],
+                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                },
+                Address("", target_name="Django-types"),
             ),
             PythonRequirementLibrary(
                 {
