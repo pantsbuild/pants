@@ -66,6 +66,7 @@ use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
+use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
@@ -77,7 +78,7 @@ use workunit_store::{
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
+  Function, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
   Tasks, Types, Value,
 };
 
@@ -394,6 +395,15 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "ensure_remote_has_recursive",
     py_fn!(py, ensure_remote_has_recursive(a: PyScheduler, b: PyList)),
+  )?;
+
+  m.add(
+    py,
+    "strongly_connected_components",
+    py_fn!(
+      py,
+      strongly_connected_components(a: Vec<(PyObject, Vec<PyObject>)>)
+    ),
   )?;
 
   m.add_class::<PyExecutionRequest>(py)?;
@@ -828,6 +838,41 @@ fn nailgun_server_await_shutdown(py: Python, nailgun_server_ptr: PyNailgunServer
     shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
   })
+}
+
+fn strongly_connected_components(
+  py: Python,
+  adjacency_lists: Vec<(PyObject, Vec<PyObject>)>,
+) -> CPyResult<Vec<Vec<PyObject>>> {
+  let mut graph: DiGraph<Key, (), u32> = Graph::new();
+  let mut node_ids: HashMap<Key, _> = HashMap::new();
+
+  for (node, adjacency_list) in adjacency_lists {
+    let node_key = externs::key_for(node.clone_ref(py).into())?;
+    let node_id = node_ids
+      .entry(node_key)
+      .or_insert_with(|| graph.add_node(node_key))
+      .clone();
+    for dependency in adjacency_list {
+      let dependency_key = externs::key_for(dependency.clone_ref(py).into())?;
+      let dependency_id = node_ids
+        .entry(dependency_key)
+        .or_insert_with(|| graph.add_node(dependency_key));
+      graph.add_edge(node_id, *dependency_id, ());
+    }
+  }
+
+  Ok(
+    petgraph::algo::tarjan_scc(&graph)
+      .into_iter()
+      .map(|component| {
+        component
+          .into_iter()
+          .map(|node_id| externs::val_for(&graph[node_id]).consume_into_py_object(py))
+          .collect::<Vec<_>>()
+      })
+      .collect(),
+  )
 }
 
 ///
