@@ -849,10 +849,9 @@ fn strongly_connected_components(
 
   for (node, adjacency_list) in adjacency_lists {
     let node_key = externs::key_for(node.clone_ref(py).into())?;
-    let node_id = node_ids
+    let node_id = *node_ids
       .entry(node_key)
-      .or_insert_with(|| graph.add_node(node_key))
-      .clone();
+      .or_insert_with(|| graph.add_node(node_key));
     for dependency in adjacency_list {
       let dependency_key = externs::key_for(dependency.clone_ref(py).into())?;
       let dependency_id = node_ids
