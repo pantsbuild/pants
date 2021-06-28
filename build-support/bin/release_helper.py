@@ -242,18 +242,15 @@ def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str
     )
 
 
-PACKAGES = sorted(
-    {
-        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
-        # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg),
-        Package(
-            "pantsbuild.pants.testutil",
-            "src/python/pants/testutil:testutil_wheel",
-            validate_testutil_pkg,
-        ),
-    }
+# NB: This a native wheel. We expect a distinct wheel for each Python version and each
+# platform (macOS_x86 x macos_arm x linux).
+PANTS_PKG = Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg)
+TESTUTIL_PKG = Package(
+    "pantsbuild.pants.testutil",
+    "src/python/pants/testutil:testutil_wheel",
+    validate_testutil_pkg,
 )
+PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 
 
 # -----------------------------------------------------------------------------------------------
@@ -578,8 +575,8 @@ def build_pex(fetch: bool) -> None:
     CONSTANTS.deploy_dir.mkdir(parents=True)
 
     if fetch:
-        fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-        check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+        fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
+        check_pants_wheels_present(CONSTANTS.deploy_dir)
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -634,26 +631,52 @@ def publish() -> None:
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
-    fetch_prebuilt_wheels(CONSTANTS.deploy_dir)
-    check_prebuilt_wheels_present(CONSTANTS.deploy_dir)
+    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
+    check_pants_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
 
     # Release.
     create_twine_venv()
+    upload_wheels_via_twine()
+    tag_release()
+    banner("Successfully released packages to PyPI and GitHub")
+
+
+def publish_apple_silicon() -> None:
+    banner("Building and publishing an Apple Silicon wheel")
+    if os.environ.get("USE_PY39") != "true":
+        die("Must set `USE_PY39=true` when building for Apple Silicon.")
+    check_clean_git_branch()
+    check_pgp()
+    check_roles()
+
+    dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
     subprocess.run(
         [
-            str(CONSTANTS.twine_venv_dir / "bin/twine"),
-            "upload",
-            "--sign",
-            f"--sign-with={get_pgp_program_name()}",
-            f"--identity={get_pgp_key_id()}",
-            "--skip-existing",  # Makes the upload idempotent.
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
+            "./pants",
+            "--concurrent",
+            f"--pants-distdir={dest_dir}",
+            "package",
+            PANTS_PKG.target,
         ],
         check=True,
     )
-    tag_release()
-    banner("Successfully released packages to PyPI and GitHub")
+    expected_whl = (
+        dest_dir
+        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
+    )
+    if not expected_whl.exists():
+        die(
+            f"Failed to find {expected_whl}. Are you running from the correct platform and "
+            f"macOS version?"
+        )
+
+    create_twine_venv()
+    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
+    upload_wheels_via_twine()
+    banner("Successfully released Apple Silicon wheel to PyPI")
 
 
 def check_clean_git_branch() -> None:
@@ -746,6 +769,21 @@ def tag_release() -> None:
     )
 
 
+def upload_wheels_via_twine() -> None:
+    subprocess.run(
+        [
+            str(CONSTANTS.twine_venv_dir / "bin/twine"),
+            "upload",
+            "--sign",
+            f"--sign-with={get_pgp_program_name()}",
+            f"--identity={get_pgp_key_id()}",
+            "--skip-existing",  # Makes the upload idempotent.
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
+        ],
+        check=True,
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test release
 # -----------------------------------------------------------------------------------------------
@@ -780,7 +818,7 @@ class PrebuiltWheel(NamedTuple):
         return cls(path, quote_plus(path))
 
 
-def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
+def determine_prebuilt_wheels(*, include_3rdparty: bool) -> list[PrebuiltWheel]:
     def determine_wheels(wheel_path: str) -> list[PrebuiltWheel]:
         response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
         xml_root = ElementTree.fromstring(response.text)
@@ -792,16 +830,17 @@ def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
             )
         ]
 
-    return [
-        *determine_wheels(CONSTANTS.deploy_pants_wheels_path),
-        *determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path),
-    ]
+    res = determine_wheels(CONSTANTS.deploy_pants_wheels_path)
+    if include_3rdparty:
+        res.extend(determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path))
+    return res
 
 
 def list_prebuilt_wheels() -> None:
     print(
         "\n".join(
-            f"{CONSTANTS.binary_base_url}/{wheel.url}" for wheel in determine_prebuilt_wheels()
+            f"{CONSTANTS.binary_base_url}/{wheel.url}"
+            for wheel in determine_prebuilt_wheels(include_3rdparty=True)
         )
     )
 
@@ -811,13 +850,12 @@ def list_prebuilt_wheels() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO: possibly parallelize through httpx and asyncio.
-def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
+def fetch_prebuilt_wheels(destination_dir: str | Path, *, include_3rdparty: bool) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
     session = requests.Session()
     session.mount(CONSTANTS.binary_base_url, requests.adapters.HTTPAdapter(max_retries=4))
-    for wheel in determine_prebuilt_wheels():
+    for wheel in determine_prebuilt_wheels(include_3rdparty=include_3rdparty):
         full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
         print(f"Fetching {full_url}", file=sys.stderr)
         response = session.get(full_url)
@@ -829,7 +867,7 @@ def fetch_prebuilt_wheels(destination_dir: str | Path) -> None:
         dest.write_bytes(response.content)
 
 
-def check_prebuilt_wheels_present(check_dir: str | Path) -> None:
+def check_pants_wheels_present(check_dir: str | Path) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
     for package in PACKAGES:
@@ -860,6 +898,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
+    subparsers.add_parser("publish-apple-silicon")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -867,7 +906,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-roles")
     subparsers.add_parser("list-prebuilt-wheels")
-    subparsers.add_parser("check-prebuilt-wheels")
+    subparsers.add_parser("check-pants-wheels")
     return parser
 
 
@@ -875,6 +914,8 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
+    if args.command == "publish-apple-silicon":
+        publish_apple_silicon()
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
@@ -889,10 +930,10 @@ def main() -> None:
         PackageAccessValidator.validate_all()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "check-prebuilt-wheels":
+    if args.command == "check-pants-wheels":
         with TemporaryDirectory() as tempdir:
-            fetch_prebuilt_wheels(tempdir)
-            check_prebuilt_wheels_present(tempdir)
+            fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
+            check_pants_wheels_present(tempdir)
 
 
 if __name__ == "__main__":

@@ -37,15 +37,14 @@ readonly NATIVE_ENGINE_RESOURCE_PYO3="${REPO_ROOT}/src/python/pants/engine/inter
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 
 function _build_native_code() {
-  # NB: See Cargo.toml with regard to the `extension-module` feature.
-  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-}
-
-function _build_native_code_pyo3() {
-  # NB: See engine_pyo3/Cargo.toml with regard to the `extension-module` feature.
-  "${REPO_ROOT}/cargo" build --features=engine_pyo3/extension-module ${MODE_FLAG} -p engine_pyo3 || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
+  banner "Building native engine..."
+  # NB: See Cargo.toml with regard to the `extension-module` features.
+  "${REPO_ROOT}/cargo" build \
+    --features=extension-module \
+    --features=engine_pyo3/extension-module \
+    ${MODE_FLAG} \
+    -p engine \
+    -p engine_pyo3 || die
 }
 
 function bootstrap_native_code() {
@@ -68,14 +67,12 @@ function bootstrap_native_code() {
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
   if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" || "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
-    banner "Building native engine..."
-    banner "Building native_engine.so"
-    local -r native_binary="$(_build_native_code)" || die
-    banner "Building native_engine_pyo3.so"
-    local -r native_binary_pyo3="$(_build_native_code_pyo3)" || die
+    _build_native_code || die
 
     # If bootstrapping the native engine fails, don't attempt to run pants
     # afterwards.
+    local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+    local -r native_binary_pyo3="${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
     if [[ ! -f "${native_binary}" ]]; then
       die "Failed to build native engine, file missing at ${native_binary}."
     fi

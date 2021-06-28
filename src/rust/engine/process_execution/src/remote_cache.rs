@@ -59,7 +59,7 @@ impl CommandRunner {
     store: Store,
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
@@ -72,7 +72,11 @@ impl CommandRunner {
       None
     };
 
-    let endpoint = grpc_util::create_endpoint(&action_cache_address, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(
+      &action_cache_address,
+      tls_client_config.as_ref(),
+      &mut headers,
+    )?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
@@ -560,6 +564,23 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if !hit_cache && result.exit_code == 0 && self.cache_write {
+      // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
+      // counter is recorded, given that the cache write is async and may still be executing after
+      // the Pants session has finished and workunits are no longer processed.
+      //
+      // TODO(#11688): remove this workunit once we have tailing tasks.
+      in_workunit!(
+        context.workunit_store.clone(),
+        "remote_cache_write_setup".to_owned(),
+        WorkunitMetadata {
+          level: Level::Trace,
+          ..WorkunitMetadata::default()
+        },
+        |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
+        }
+      )
+      .await;
       let command_runner = self.clone();
       let result = result.clone();
       let context2 = context.clone();
@@ -572,7 +593,6 @@ impl crate::CommandRunner for CommandRunner {
           ..WorkunitMetadata::default()
         },
         |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteStarted, 1);
           let write_result = command_runner
             .update_action_cache(
               &context2,
@@ -584,10 +604,12 @@ impl crate::CommandRunner for CommandRunner {
               command_digest,
             )
             .await;
-          workunit.increment_counter(Metric::RemoteCacheWriteFinished, 1);
-          if let Err(err) = write_result {
-            command_runner.log_cache_error(err, CacheErrorType::WriteError);
-            workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          match write_result {
+            Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+            Err(err) => {
+              command_runner.log_cache_error(err, CacheErrorType::WriteError);
+              workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+            }
           };
         }
         // NB: We must box the future to avoid a stack overflow.

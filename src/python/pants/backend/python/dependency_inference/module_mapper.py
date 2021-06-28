@@ -15,6 +15,7 @@ from pants.backend.python.target_types import (
     ModuleMappingField,
     PythonRequirementsField,
     PythonSources,
+    TypeStubsModuleMappingField,
 )
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
@@ -181,11 +182,11 @@ async def map_first_party_python_targets_to_modules(
             if module in modules_to_addresses:
                 # We check if one of the targets is an implementation (.py file) and the other is
                 # a type stub (.pyi file), which we allow. Otherwise, we have ambiguity.
-                either_targets_are_type_stubs = len(modules_to_addresses[module]) == 1 and (
-                    tgt.address.filename.endswith(".pyi")
-                    or modules_to_addresses[module][0].filename.endswith(".pyi")
-                )
-                if either_targets_are_type_stubs:
+                prior_is_type_stub = len(
+                    modules_to_addresses[module]
+                ) == 1 and modules_to_addresses[module][0].filename.endswith(".pyi")
+                current_is_type_stub = tgt.address.filename.endswith(".pyi")
+                if prior_is_type_stub ^ current_is_type_stub:
                     modules_to_addresses[module].append(tgt.address)
                 else:
                     modules_with_multiple_implementations[module].update(
@@ -213,12 +214,16 @@ async def map_first_party_python_targets_to_modules(
 
 @dataclass(frozen=True)
 class ThirdPartyPythonModuleMapping:
-    mapping: FrozenDict[str, Address]
+    mapping: FrozenDict[str, tuple[Address, ...]]
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
-    def address_for_module(self, module: str) -> tuple[Address | None, tuple[Address, ...]]:
-        """Return the unambiguous owner (if any) and all ambiguous addresses."""
-        unambiguous = self.mapping.get(module)
+    def addresses_for_module(self, module: str) -> tuple[tuple[Address, ...], tuple[Address, ...]]:
+        """Return all unambiguous and ambiguous addresses.
+
+        The unambiguous addresses should be 0-2, but not more. We only expect 2 if there is both an
+        implementation and type stub with the same module name.
+        """
+        unambiguous = self.mapping.get(module, ())
         ambiguous = self.ambiguous_modules.get(module, ())
         if unambiguous or ambiguous:
             return unambiguous, ambiguous
@@ -226,40 +231,79 @@ class ThirdPartyPythonModuleMapping:
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
-            return None, ()
+            return (), ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.address_for_module(parent_module)
+        return self.addresses_for_module(parent_module)
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMapping:
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     modules_to_addresses: dict[str, Address] = {}
+    modules_to_stub_addresses: dict[str, Address] = {}
     modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
         module_map = tgt.get(ModuleMappingField).value
+        stubs_module_map = tgt.get(TypeStubsModuleMappingField).value
         for req in tgt[PythonRequirementsField].value:
-            modules = module_map.get(
-                # NB: We only use `canonicalize_project_name()` for the key, but not the fallback
-                # value, because we want to preserve `.` in the module name. See
-                # https://www.python.org/dev/peps/pep-0503/#normalized-names.
-                canonicalize_project_name(req.project_name),
-                [req.project_name.lower().replace("-", "_")],
-            )
-            for module in modules:
-                if module in modules_to_addresses:
-                    modules_with_multiple_owners[module].update(
-                        {modules_to_addresses[module], tgt.address}
-                    )
+            # NB: We don't use `canonicalize_project_name()` for the fallback value because we
+            # want to preserve `.` in the module name. See
+            # https://www.python.org/dev/peps/pep-0503/#normalized-names.
+            proj_name = canonicalize_project_name(req.project_name)
+            fallback_value = req.project_name.strip().lower().replace("-", "_")
+
+            # Handle if it's a type stub.
+            in_stubs_map = proj_name in stubs_module_map
+            starts_with_types = fallback_value.startswith("types_")
+            ends_with_types = fallback_value.endswith("_types")
+            if proj_name not in module_map and (
+                in_stubs_map or starts_with_types or ends_with_types
+            ):
+                if in_stubs_map:
+                    modules = stubs_module_map[proj_name]
                 else:
-                    modules_to_addresses[module] = tgt.address
+                    modules = (fallback_value[6:] if starts_with_types else fallback_value[:-6],)
+
+                for module in modules:
+                    if module in modules_with_multiple_owners:
+                        modules_with_multiple_owners[module].add(tgt.address)
+                    elif module in modules_to_stub_addresses:
+                        modules_with_multiple_owners[module].update(
+                            {modules_to_stub_addresses[module], tgt.address}
+                        )
+                    else:
+                        modules_to_stub_addresses[module] = tgt.address
+
+            # Else it's a normal requirement.
+            else:
+                modules = module_map.get(proj_name, (fallback_value,))
+                for module in modules:
+                    if module in modules_with_multiple_owners:
+                        modules_with_multiple_owners[module].add(tgt.address)
+                    elif module in modules_to_addresses:
+                        modules_with_multiple_owners[module].update(
+                            {modules_to_addresses[module], tgt.address}
+                        )
+                    else:
+                        modules_to_addresses[module] = tgt.address
+
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
-        modules_to_addresses.pop(module)
+        if module in modules_to_addresses:
+            modules_to_addresses.pop(module)
+        if module in modules_to_stub_addresses:
+            modules_to_stub_addresses.pop(module)
+
+    merged_mapping: DefaultDict[str, list[Address]] = defaultdict(list)
+    for k, v in modules_to_addresses.items():
+        merged_mapping[k].append(v)
+    for k, v in modules_to_stub_addresses.items():
+        merged_mapping[k].append(v)
+
     return ThirdPartyPythonModuleMapping(
-        mapping=FrozenDict(sorted(modules_to_addresses.items())),
+        mapping=FrozenDict((k, tuple(sorted(v))) for k, v in sorted(merged_mapping.items())),
         ambiguous_modules=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_owners.items())
         ),
@@ -297,7 +341,7 @@ async def map_module_to_address(
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
-    third_party_address, third_party_ambiguous = third_party_mapping.address_for_module(
+    third_party_addresses, third_party_ambiguous = third_party_mapping.addresses_for_module(
         module.module
     )
     first_party_addresses, first_party_ambiguous = first_party_mapping.addresses_for_module(
@@ -308,26 +352,29 @@ async def map_module_to_address(
     # that even if there's ambiguity purely within either third-party or first-party, all targets
     # with that module become ambiguous.
     if third_party_ambiguous or first_party_ambiguous:
-        ambiguous = {*third_party_ambiguous, *first_party_ambiguous, *first_party_addresses}
-        if third_party_address:
-            ambiguous.add(third_party_address)
+        ambiguous = {
+            *first_party_ambiguous,
+            *first_party_addresses,
+            *third_party_ambiguous,
+            *third_party_addresses,
+        }
         return PythonModuleOwners((), ambiguous=tuple(sorted(ambiguous)))
 
     # It's possible for a user to write type stubs (`.pyi` files) for their third-party
     # dependencies. We check if that happened, but we're strict in validating that there is only a
     # single third party address and a single first-party address referring to a `.pyi` file;
     # otherwise, we have ambiguous implementations.
-    if third_party_address and not first_party_addresses:
-        return PythonModuleOwners((third_party_address,))
+    if third_party_addresses and not first_party_addresses:
+        return PythonModuleOwners(third_party_addresses)
     first_party_is_type_stub = len(first_party_addresses) == 1 and first_party_addresses[
         0
     ].filename.endswith(".pyi")
-    if third_party_address and first_party_is_type_stub:
-        return PythonModuleOwners((third_party_address, *first_party_addresses))
+    if len(third_party_addresses) == 1 and first_party_is_type_stub:
+        return PythonModuleOwners((*third_party_addresses, *first_party_addresses))
     # Else, we have ambiguity between the third-party and first-party addresses.
-    if third_party_address and first_party_addresses:
+    if third_party_addresses and first_party_addresses:
         return PythonModuleOwners(
-            (), ambiguous=tuple(sorted((third_party_address, *first_party_addresses)))
+            (), ambiguous=tuple(sorted((*third_party_addresses, *first_party_addresses)))
         )
 
     # We're done with looking at third-party addresses, and now solely look at first-party, which

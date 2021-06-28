@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -17,6 +18,7 @@ use bazel_protos::gen::google::longrunning::{
 };
 use bazel_protos::require_digest;
 use futures::{FutureExt, Stream};
+use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::{
@@ -26,12 +28,9 @@ use remexec::{
   ExecuteRequest, ExecutionCapabilities, GetActionResultRequest, GetCapabilitiesRequest,
   ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
 };
-use std::pin::Pin;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
-
-use crate::tonic_util::AddrIncomingWithStream;
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum
@@ -287,9 +286,7 @@ impl Execution for MockResponder {
             Ok(operations) => {
               return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
-            Err(rpc_status) => {
-              return Err(rpc_status);
-            }
+            Err(rpc_status) => Err(rpc_status),
           }
         } else {
           return Err(Status::invalid_argument(format!(
@@ -306,11 +303,9 @@ impl Execution for MockResponder {
         )));
       }
 
-      None => {
-        return Err(Status::invalid_argument(
-          "Execute endpoint called. Did not expect this call.".to_owned(),
-        ));
-      }
+      None => Err(Status::invalid_argument(
+        "Execute endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 
@@ -335,9 +330,7 @@ impl Execution for MockResponder {
             Ok(operations) => {
               return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
-            Err(rpc_status) => {
-              return Err(rpc_status);
-            }
+            Err(rpc_status) => Err(rpc_status),
           }
         } else {
           return Err(Status::invalid_argument(format!(
@@ -354,11 +347,9 @@ impl Execution for MockResponder {
         )));
       }
 
-      None => {
-        return Err(Status::invalid_argument(
-          "WaitExecution endpoint called. Did not expect this call.".to_owned(),
-        ));
-      }
+      None => Err(Status::invalid_argument(
+        "WaitExecution endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 }

@@ -36,6 +36,7 @@ from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.osutil import CPU_COUNT
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +422,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_cache=True,
     # Remote store setup.
     remote_store_address=None,
-    remote_store_headers={},
+    remote_store_headers={
+        "user-agent": f"pants/{VERSION}",
+    },
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
@@ -431,7 +434,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
-    remote_execution_headers={},
+    remote_execution_headers={
+        "user-agent": f"pants/{VERSION}",
+    },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
 
@@ -1217,6 +1222,15 @@ class GlobalOptions(Subsystem):
             help="Overall timeout in seconds for each remote execution request from time of submission",
         )
 
+        register(
+            "--watch-filesystem",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop` "
+            "may not be enabled.",
+        )
+
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -1382,6 +1396,12 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-address` or to work properly."
             )
 
+        if not opts.watch_filesystem and (opts.pantsd or opts.loop):
+            raise OptionsError(
+                "The `--no-watch-filesystem` option may not be set if "
+                "`--pantsd` or `--loop` is set."
+            )
+
         def validate_remote_address(opt_name: str) -> None:
             valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
             address = getattr(opts, opt_name)
@@ -1496,6 +1516,8 @@ class GlobalOptions(Subsystem):
                 # macros should be adapted to allow this dependency to be automatically detected.
                 "requirements.txt",
                 "3rdparty/**/requirements.txt",
+                "pyproject.toml",
+                "3rdparty/**/pyproject.toml",
                 *bootstrap_options.pantsd_invalidation_globs,
             )
         )

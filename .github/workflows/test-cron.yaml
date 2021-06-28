@@ -56,7 +56,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.52.1-*
+        path: '~/.rustup/toolchains/1.53.0-*
 
           ~/.rustup/update-hashes
 
@@ -140,6 +140,8 @@ jobs:
       name: Test and Lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
+        ./cargo fmt --all -- --check
+
         ./cargo clippy --all
 
         ./cargo test --all --tests -- --nocapture
@@ -200,7 +202,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.52.1-*
+        path: '~/.rustup/toolchains/1.53.0-*
 
           ~/.rustup/update-hashes
 

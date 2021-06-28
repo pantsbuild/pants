@@ -36,6 +36,7 @@ use std::time::Duration;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use futures::FutureExt;
+use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
@@ -43,8 +44,6 @@ use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
 use tokio::time::sleep;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
-
-use crate::tonic_util::AddrIncomingWithStream;
 
 pub struct StubActionCache {
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,

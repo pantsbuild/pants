@@ -19,5 +19,16 @@ DEFAULT_MODULE_MAPPING = {
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs"),
     "pytest-runner": ("ptr",),
-    "setuptools": ("easy_install", "pkg_resources"),
+    "setuptools": ("easy_install", "pkg_resources", "setuptools"),
+}
+
+DEFAULT_TYPE_STUB_MODULE_MAPPING = {
+    "djangorestframework-types": ("rest_framework",),
+    "types-enum34": ("enum34",),
+    "types-protobuf": ("google.protobuf",),
+    "types-pycrypto": ("Crypto",),
+    "types-pyopenssl": ("OpenSSL",),
+    "types-pyyaml": ("yaml",),
+    "types-python-dateutil": ("dateutil",),
+    "types-setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
