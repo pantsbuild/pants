@@ -36,7 +36,6 @@ def run_goal(
                     output_file=None,
                     documented=show_documented,
                     provides=show_provides,
-                    provides_columns=provides_columns or "address,artifact_id",
                 ),
                 console,
             ],

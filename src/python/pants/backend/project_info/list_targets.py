@@ -21,10 +21,7 @@ class ListSubsystem(LineOriented, GoalSubsystem):
             "--provides",
             type=bool,
             default=False,
-            help=(
-                "List only targets that provide an artifact, displaying the columns specified by "
-                "--provides-columns."
-            ),
+            help="List only targets that provide an artifact.",
         )
         register(
             "--documented",
