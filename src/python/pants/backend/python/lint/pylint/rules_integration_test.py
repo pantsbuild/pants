@@ -305,7 +305,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 """\
                 python_requirement_library(
                     name='pylint',
-                    requirements=['pylint>=2.4.4,<2.5'],
+                    requirements=['pylint>=2.6.2,<2.7'],
                 )
 
                 python_requirement_library(
