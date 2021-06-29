@@ -20,6 +20,7 @@ from pants.backend.python.typecheck.mypy.rules import (
     determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
+from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
@@ -633,10 +634,10 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
         dedent(
-            """\
+            f"""\
             python_requirement_library(
                 name='mypy',
-                requirements=['mypy==0.812'],
+                requirements=['{MyPy.default_version}'],
             )
 
             python_requirement_library(
