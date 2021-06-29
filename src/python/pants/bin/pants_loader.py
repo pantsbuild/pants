@@ -83,12 +83,7 @@ class PantsLoader:
 
         module = importlib.import_module(module_path)
         entrypoint_fn = getattr(module, func_name)
-
-        try:
-            entrypoint_fn()
-        except TypeError:
-            print(f"{DAEMON_ENTRYPOINT} {func_name} is not callable", file=sys.stderr)
-            sys.exit(PANTS_FAILED_EXIT_CODE)
+        entrypoint_fn()
 
     @staticmethod
     def run_default_entrypoint() -> None:

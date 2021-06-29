@@ -311,6 +311,7 @@ class ExecutionOptions:
     process_execution_local_cache: bool
     process_execution_local_cleanup: bool
     process_execution_local_parallelism: int
+    process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
@@ -348,6 +349,7 @@ class ExecutionOptions:
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
             process_execution_local_cleanup=bootstrap_options.process_execution_local_cleanup,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
+            process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
@@ -420,6 +422,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
     process_execution_local_cache=True,
+    process_execution_local_enable_nailgun=False,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -1021,6 +1024,13 @@ class GlobalOptions(Subsystem):
                 "Change this value to invalidate every artifact's execution, or to prevent "
                 "process cache entries from being (re)used for different usecases or users."
             ),
+        )
+        register(
+            "--process-execution-local-enable-nailgun",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
+            advanced=True,
         )
 
         register(
