@@ -76,7 +76,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -418,9 +418,9 @@ def _log_or_raise_unmatched_owners(
             f"target whose `sources` field includes the file."
         )
     msg = (
-        f"{prefix} See {bracketed_docs_url('targets')} for more information on target definitions."
+        f"{prefix} See {doc_url('targets')} for more information on target definitions."
         f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
-        f"{bracketed_docs_url('create-initial-build-files')}.{option_msg}"
+        f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
     if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
