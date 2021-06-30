@@ -30,6 +30,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Livingston
 + Chris Pesto
 + Christopher Livingston
++ Christopher Neugebauer
 + Cody Gibb
 + Craig Schertz
 + Cristian Matache
@@ -138,6 +139,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mark Chu-Carroll
 + Mark Davis
 + Mark McBride
++ Martim Lobao
 + Mateo Rodriguez
 + Mathew Jennings
 + Mathieu Sabourin
