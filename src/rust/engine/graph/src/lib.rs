@@ -43,12 +43,13 @@ use std::path::Path;
 use std::time::Duration;
 
 use async_value::AsyncValueSender;
+use fixedbitset::FixedBitSet;
 use fnv::FnvHasher;
 use futures::future;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
-use petgraph::visit::EdgeRef;
+use petgraph::visit::{EdgeRef, VisitMap, Visitable};
 use petgraph::Direction;
 use tokio::time::sleep;
 
@@ -290,7 +291,7 @@ impl<N: Node> InnerGraph<N> {
       graph: self,
       direction: direction,
       deque: roots,
-      walked: HashSet::default(),
+      walked: self.pg.visit_map(),
       stop_walking_predicate,
     }
   }
@@ -924,7 +925,7 @@ where
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
-  walked: HashSet<EntryId, Fnv>,
+  walked: FixedBitSet,
   stop_walking_predicate: F,
 }
 
@@ -937,7 +938,7 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
       // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
       // like uncacheable nodes, which shouldn't be dirtied.
-      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
+      if !self.walked.visit(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }
 
