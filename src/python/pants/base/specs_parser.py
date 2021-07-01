@@ -85,6 +85,8 @@ class SpecsParser:
             return FilesystemIgnoreSpec(spec[1:])
         if "*" in spec:
             return FilesystemGlobSpec(spec)
+        if PurePath(spec).suffix:
+            return FilesystemLiteralSpec(self._normalize_spec_path(spec))
         spec_path = self._normalize_spec_path(spec)
         if Path(self._root_dir, spec_path).is_file():
             return FilesystemLiteralSpec(spec_path)
