@@ -22,15 +22,15 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PutativeProtobufTargetsRequest:
+class PutativeProtobufTargetsRequest(PutativeTargetsRequest):
     pass
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Protobuf targets to create")
 async def find_putative_targets(
-    _: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_proto_files = await Get(Paths, PathGlobs(["**/*.proto"]))
+    all_proto_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.proto"))
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

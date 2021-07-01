@@ -5,6 +5,13 @@ import textwrap
 
 import pytest
 
+from pants.base.specs import (
+    AddressLiteralSpec,
+    AddressSpecs,
+    FilesystemLiteralSpec,
+    FilesystemSpecs,
+    Specs,
+)
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -14,11 +21,13 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
+    PutativeTargetsSearchPaths,
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
     group_by_dir,
     make_content_str,
+    specs_to_dirs,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
@@ -29,8 +38,9 @@ from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
-class MockPutativeTargetsRequest(PutativeTargetsRequest):
-    pass
+class MockPutativeTargetsRequest:
+    def __init__(self, search_paths: PutativeTargetsSearchPaths):
+        assert search_paths.dirs == ("",)
 
 
 class FortranSources(Sources):
@@ -285,10 +295,46 @@ def test_group_by_dir() -> None:
     } == group_by_dir(paths)
 
 
+def test_specs_to_dirs() -> None:
+    assert specs_to_dirs(Specs(AddressSpecs([]), FilesystemSpecs([]))) == ("",)
+    assert specs_to_dirs(
+        Specs(AddressSpecs([AddressLiteralSpec("src/python/foo", "foo")]), FilesystemSpecs([]))
+    ) == ("src/python/foo",)
+    assert (
+        specs_to_dirs(
+            Specs(
+                AddressSpecs(
+                    [
+                        AddressLiteralSpec("src/python/foo", "foo"),
+                        AddressLiteralSpec("src/python/bar", "bar"),
+                    ]
+                ),
+                FilesystemSpecs([]),
+            )
+        )
+        == ("src/python/foo", "src/python/bar")
+    )
+
+    with pytest.raises(ValueError):
+        specs_to_dirs(
+            Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("src/python/foo.py")]))
+        )
+
+    with pytest.raises(ValueError):
+        specs_to_dirs(
+            Specs(
+                AddressSpecs([AddressLiteralSpec("src/python/bar", "notbar")]), FilesystemSpecs([])
+            )
+        )
+
+
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         workspace = Workspace(rule_runner.scheduler)
         union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
+        specs = Specs(
+            address_specs=AddressSpecs(tuple()), filesystem_specs=FilesystemSpecs(tuple())
+        )
         run_rule_with_mocks(
             tailor.tailor,
             rule_args=[
@@ -300,6 +346,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
                 console,
                 workspace,
                 union_membership,
+                specs,
             ],
             mock_gets=[
                 MockGet(

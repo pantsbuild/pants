@@ -221,12 +221,12 @@ class FilesystemSpec(Spec, metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class FilesystemLiteralSpec(FilesystemSpec):
-    """A literal file name, e.g. `foo.py`."""
+    """A literal file or directory name, e.g. `src/python/foo.py` or `src/python`."""
 
-    file: str
+    path: str
 
     def __str__(self) -> str:
-        return self.file
+        return self.path
 
 
 @dataclass(frozen=True)
