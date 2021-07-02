@@ -1083,6 +1083,7 @@ dependencies = [
  "tokio-util",
  "tonic",
  "tonic-build",
+ "tower",
 ]
 
 [[package]]

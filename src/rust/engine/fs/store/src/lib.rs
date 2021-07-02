@@ -324,6 +324,7 @@ impl Store {
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     rpc_retries: usize,
+    rpc_concurrency_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
@@ -335,6 +336,7 @@ impl Store {
         chunk_size_bytes,
         upload_timeout,
         rpc_retries,
+        rpc_concurrency_limit,
       )?)),
     })
   }

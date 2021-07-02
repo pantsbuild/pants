@@ -168,6 +168,22 @@ struct Opt {
   #[structopt(long, default_value = "3145728")]
   upload_chunk_bytes: usize,
 
+  /// Number of retries per request to the store service.
+  #[structopt(long, default_value = "3")]
+  store_rpc_retries: usize,
+
+  /// Number of concurrent requests to the store service.
+  #[structopt(long, default_value = "128")]
+  store_rpc_concurrency: usize,
+
+  /// Number of concurrent requests to the execution service.
+  #[structopt(long, default_value = "128")]
+  execution_rpc_concurrency: usize,
+
+  /// Number of concurrent requests to the cache service.
+  #[structopt(long, default_value = "128")]
+  cache_rpc_concurrency: usize,
+
   /// Whether or not to enable running the process through a Nailgun server.
   /// This will likely start a new Nailgun server as a side effect.
   #[structopt(long)]
@@ -232,8 +248,8 @@ async fn main() {
         headers,
         args.upload_chunk_bytes,
         Duration::from_secs(30),
-        // TODO: Take a command line arg.
-        3,
+        args.store_rpc_retries,
+        args.store_rpc_concurrency,
       )
     }
     (None, None) => Ok(local_only_store),
@@ -280,6 +296,8 @@ async fn main() {
             Platform::Linux,
             Duration::from_secs(args.overall_deadline_secs),
             Duration::from_millis(100),
+            args.execution_rpc_concurrency,
+            args.cache_rpc_concurrency,
           )
           .expect("Failed to make command runner"),
         )

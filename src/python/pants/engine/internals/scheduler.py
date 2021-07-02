@@ -175,14 +175,17 @@ class Scheduler:
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
+            store_rpc_concurrency=execution_options.remote_store_rpc_concurrency,
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
+            cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
             execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
+            execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
         )
         py_local_store_options = PyLocalStoreOptions(
             store_dir=local_store_options.store_dir,

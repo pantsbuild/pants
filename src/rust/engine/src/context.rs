@@ -78,11 +78,14 @@ pub struct RemotingOptions {
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
+  pub store_rpc_concurrency: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
+  pub cache_rpc_concurrency: usize,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
+  pub execution_rpc_concurrency: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -142,6 +145,7 @@ impl Core {
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
         remoting_opts.store_rpc_retries,
+        remoting_opts.store_rpc_concurrency,
       )
     } else {
       Ok(local_only)
@@ -200,6 +204,8 @@ impl Core {
             Platform::Linux,
             remoting_opts.execution_overall_deadline,
             Duration::from_millis(100),
+            remoting_opts.execution_rpc_concurrency,
+            remoting_opts.cache_rpc_concurrency,
           )?),
           exec_strategy_opts.remote_parallelism,
         ))
@@ -217,6 +223,7 @@ impl Core {
           exec_strategy_opts.remote_cache_write,
           remoting_opts.cache_warnings_behavior,
           remoting_opts.cache_eager_fetch,
+          remoting_opts.cache_rpc_concurrency,
         )?)
       } else {
         local_command_runner
