@@ -52,8 +52,7 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
     def lint_results(self) -> EnrichedLintResults:
         addresses = [config.address for config in self.field_sets]
         return EnrichedLintResults(
-            [LintResult(self.exit_code(addresses), "", "", report=None)],
-            linter_name=self.linter_name,
+            [LintResult(self.exit_code(addresses), "", "")], linter_name=self.linter_name
         )
 
 
