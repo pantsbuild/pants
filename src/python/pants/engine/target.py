@@ -46,7 +46,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
@@ -1663,7 +1663,7 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated_via_ignores(self, ambiguous_addresses: tuple[Address, ...]) -> Address | None:
