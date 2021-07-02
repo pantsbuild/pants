@@ -16,7 +16,7 @@ from _pytest.tmpdir import TempPathFactory
 
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -268,3 +268,34 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
     get_pex_request(None, resolve_all_constraints=None)
+
+
+def test_issue_12222(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "constraints.txt": "foo==1.0\nbar==1.0",
+            "BUILD": dedent(
+                """
+            python_requirement_library(name="foo",requirements=["foo"])
+            python_requirement_library(name="bar",requirements=["bar"])
+            python_library(name="lib",sources=[],dependencies=[":foo"])
+            """
+            ),
+        }
+    )
+    request = PexFromTargetsRequest(
+        [Address("", target_name="lib")],
+        output_filename="demo.pex",
+        internal_only=False,
+        platforms=PexPlatforms(["some-platform-x86_64"]),
+    )
+    rule_runner.set_options(
+        [
+            "--python-setup-requirement-constraints=constraints.txt",
+            "--python-setup-resolve-all-constraints",
+        ]
+    )
+    result = rule_runner.request(PexRequest, [request])
+
+    assert result.repository_pex is None
+    assert result.requirements == PexRequirements(["foo"])
