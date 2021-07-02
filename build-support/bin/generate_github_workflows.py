@@ -60,6 +60,8 @@ DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CA
 MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
 
 
+IS_PANTS_OWNER = "${{ github.repository_owner = pantsbuild }}"
+
 # ----------------------------------------------------------------------
 # Actions
 # ----------------------------------------------------------------------
@@ -261,6 +263,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
+            "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -302,6 +305,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": python_versions}},
             "timeout-minutes": 60,
+            "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -319,6 +323,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": python_versions}},
             "timeout-minutes": 30,
+            "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -338,6 +343,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
+            "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -363,6 +369,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": MACOS_ENV,
             "timeout-minutes": 40,
+            "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
@@ -418,6 +425,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
                     "env": DISABLE_REMOTE_CACHE_ENV,
+                    "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -441,6 +449,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "runs-on": MACOS_VERSION,
                     "timeout-minutes": 65,
                     "env": DISABLE_REMOTE_CACHE_ENV,
+                    "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
                         setup_toolchain_auth(),
@@ -522,6 +531,7 @@ def generate() -> dict[Path, str]:
             "jobs": {
                 "cancel": {
                     "runs-on": "ubuntu-latest",
+                    "if": IS_PANTS_OWNER,
                     "steps": [
                         {
                             "uses": "styfle/cancel-workflow-action@0.8.0",
@@ -544,6 +554,7 @@ def generate() -> dict[Path, str]:
             "jobs": {
                 "audit": {
                     "runs-on": "ubuntu-latest",
+                    "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
                         {
