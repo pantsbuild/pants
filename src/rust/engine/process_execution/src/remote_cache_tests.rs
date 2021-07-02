@@ -94,6 +94,7 @@ impl StoreSetup {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         1,
+        256,
       )
       .unwrap();
     StoreSetup {
@@ -140,6 +141,7 @@ fn create_cached_runner(
       true,
       RemoteCacheWarningsBehavior::FirstOnly,
       eager_fetch,
+      256,
     )
     .expect("caching command runner"),
   );
@@ -587,6 +589,7 @@ async fn make_action_result_basic() {
     true,
     RemoteCacheWarningsBehavior::FirstOnly,
     false,
+    256,
   )
   .expect("caching command runner");
 

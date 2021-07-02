@@ -31,6 +31,9 @@ use tonic::{Code, Status};
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 const RETRY_INTERVAL: Duration = Duration::from_micros(0);
+const STORE_CONCURRENCY_LIMIT: usize = 256;
+const EXEC_CONCURRENCY_LIMIT: usize = 256;
+const CACHE_CONCURRENCY_LIMIT: usize = 256;
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -866,6 +869,7 @@ async fn sends_headers() {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
+      STORE_CONCURRENCY_LIMIT,
     )
     .unwrap();
 
@@ -882,6 +886,8 @@ async fn sends_headers() {
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
+    EXEC_CONCURRENCY_LIMIT,
+    CACHE_CONCURRENCY_LIMIT,
   )
   .unwrap();
   let context = Context {
@@ -1061,6 +1067,7 @@ async fn ensure_inline_stdio_is_stored() {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
+      STORE_CONCURRENCY_LIMIT,
     )
     .unwrap();
 
@@ -1074,6 +1081,8 @@ async fn ensure_inline_stdio_is_stored() {
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
+    EXEC_CONCURRENCY_LIMIT,
+    CACHE_CONCURRENCY_LIMIT,
   )
   .unwrap();
 
@@ -1438,6 +1447,7 @@ async fn execute_missing_file_uploads_if_known() {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
+      STORE_CONCURRENCY_LIMIT,
     )
     .unwrap();
   store
@@ -1458,6 +1468,8 @@ async fn execute_missing_file_uploads_if_known() {
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
+    EXEC_CONCURRENCY_LIMIT,
+    CACHE_CONCURRENCY_LIMIT,
   )
   .unwrap();
 
@@ -1513,6 +1525,7 @@ async fn execute_missing_file_errors_if_unknown() {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
+      STORE_CONCURRENCY_LIMIT,
     )
     .unwrap();
 
@@ -1526,6 +1539,8 @@ async fn execute_missing_file_errors_if_unknown() {
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
+    EXEC_CONCURRENCY_LIMIT,
+    CACHE_CONCURRENCY_LIMIT,
   )
   .unwrap();
 
@@ -2225,6 +2240,8 @@ fn create_command_runner(
     platform,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
+    EXEC_CONCURRENCY_LIMIT,
+    CACHE_CONCURRENCY_LIMIT,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
@@ -2274,6 +2291,7 @@ pub(crate) fn make_store(
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
+      STORE_CONCURRENCY_LIMIT,
     )
     .unwrap()
 }
