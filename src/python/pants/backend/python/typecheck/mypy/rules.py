@@ -34,7 +34,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
@@ -87,8 +87,8 @@ def check_and_warn_if_python_version_configured(
     configured = []
     if config and b"python_version" in config.content:
         configured.append(
-            f"`python_version` in {config.path} (which is used because of the "
-            "`[mypy].config` option)"
+            f"`python_version` in {config.path} (which is used because of either config "
+            "autodisocvery or the `[mypy].config` option)"
         )
     if "--py2" in args:
         configured.append("`--py2` in the `--mypy-args` option")
@@ -99,7 +99,7 @@ def check_and_warn_if_python_version_configured(
         logger.warning(
             f"You set {formatted_configured}. Normally, Pants would automatically set this for you "
             "based on your code's interpreter constraints "
-            f"({bracketed_docs_url('python-interpreter-compatibility')}). Instead, it will "
+            f"({doc_url('python-interpreter-compatibility')}). Instead, it will "
             "use what you set.\n\n(Automatically setting the option allows Pants to partition your "
             "targets by their constraints, so that, for example, you can run MyPy on Python 2-only "
             "code and Python 3-only code at the same time. This feature may no longer work.)"

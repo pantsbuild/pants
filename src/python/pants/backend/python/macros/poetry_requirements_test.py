@@ -233,11 +233,19 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     """
     assert_poetry_requirements(
         rule_runner,
-        "poetry_requirements(module_mapping={'ansicolors': ['colors']})",
+        dedent(
+            """\
+            poetry_requirements(
+                module_mapping={'ansicolors': ['colors']},
+                type_stubs_module_mapping={'Django-types': ['django']},
+            )
+            """
+        ),
         dedent(
             """\
             [tool.poetry.dependencies]
             Django = {version = "3.2", python = "3"}
+            Django-types = "2"
             Un-Normalized-PROJECT = "1.0.0"
             [tool.poetry.dev-dependencies]
             ansicolors = ">=1.18.0"
@@ -262,6 +270,14 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("Django==3.2 ; python_version == '3'")],
                 },
                 address=Address("", target_name="Django"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":pyproject.toml"],
+                    "requirements": [Requirement.parse("Django-types==2")],
+                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                },
+                address=Address("", target_name="Django-types"),
             ),
             PythonRequirementLibrary(
                 {

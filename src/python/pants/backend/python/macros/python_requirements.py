@@ -50,6 +50,7 @@ class PythonRequirements:
         requirements_relpath: str = "requirements.txt",
         *,
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
+        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
     ) -> None:
         """
         :param requirements_relpath: The relpath from this BUILD file to the requirements file.
@@ -80,10 +81,16 @@ class PythonRequirements:
                 if module_mapping and project_name in module_mapping
                 else None
             )
+            stubs_module_mapping = (
+                {project_name: type_stubs_module_mapping[project_name]}
+                if type_stubs_module_mapping and project_name in type_stubs_module_mapping
+                else None
+            )
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=project_name,
                 requirements=parsed_reqs,
                 module_mapping=req_module_mapping,
+                type_stubs_module_mapping=stubs_module_mapping,
                 dependencies=[requirements_dep],
             )

@@ -6,18 +6,7 @@ freezegun==1.1.0
 # anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
 humbug==0.1.9
 
-# The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
-# for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
-#   ./pants help-all | \
-#   jq -r '
-#     .scope_to_help_info.mypy.advanced[] | select(.config_key == "version") |
-#     .value_history.ranked_values[-1].value
-#   '
-#
-mypy==0.812
-
 packaging==20.9
-pathspec==0.8.1
 pex==2.1.42
 psutil==5.8.0
 pystache==0.5.4
@@ -28,4 +17,9 @@ requests[security]>=2.25.1
 setproctitle==1.2.2
 setuptools>=56.0.0,<57.0
 toml==0.10.2
+types-freezegun==0.1.4
+types-PyYAML==5.4.3
+types-requests==2.25.0
+types-setuptools==57.0.0
+types-toml==0.1.3
 typing-extensions==3.7.4.3

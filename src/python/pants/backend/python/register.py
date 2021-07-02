@@ -19,6 +19,7 @@ from pants.backend.python.goals import (
 )
 from pants.backend.python.macros.pants_requirement import PantsRequirement
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
+from pants.backend.python.macros.poetry_requirements import PoetryRequirements
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import python_native_code
@@ -46,6 +47,7 @@ def build_file_aliases():
         objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact},
         context_aware_object_factories={
             "python_requirements": PythonRequirements,
+            "poetry_requirements": PoetryRequirements,
             "pipenv_requirements": PipenvRequirements,
             PantsRequirement.alias: PantsRequirement,
         },

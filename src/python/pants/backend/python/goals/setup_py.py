@@ -63,7 +63,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 
 class SetupPyError(Exception):
     def __init__(self, msg: str):
-        super().__init__(f"{msg} See {bracketed_docs_url('python-distributions')}.")
+        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
 
 
 class InvalidSetupPyArgs(SetupPyError):
@@ -92,6 +92,12 @@ class InvalidEntryPoint(SetupPyError):
 
 class OwnershipError(SetupPyError):
     """An error related to target ownership calculation."""
+
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg} See {doc_url('python-distributions')} for "
+            f"how python_library targets are mapped to distributions."
+        )
 
 
 class NoOwnerError(OwnershipError):

@@ -43,7 +43,6 @@ def run_bandit(
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.python.lint.bandit",
-            "--bandit-version=bandit==1.6.2",
             *(extra_args or ()),
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -110,21 +109,24 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    py2_args = [
+        "--bandit-version=bandit>=1.6.2,<1.7",
+    ]
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_bandit(rule_runner, [py2_tgt])
+    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=py2_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 0
     assert "f.py (syntax error while parsing AST from file)" in py2_result[0].stdout
 
     py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_bandit(rule_runner, [py3_tgt])
+    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=py2_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
     assert "No issues identified." in py3_result[0].stdout
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py2
     # to still fail, but Py3 should pass.
-    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt])
+    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=py2_args)
     assert len(combined_result) == 2
 
     batched_py2_result, batched_py3_result = sorted(

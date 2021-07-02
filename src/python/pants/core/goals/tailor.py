@@ -35,6 +35,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -227,7 +228,7 @@ class TailorSubsystem(GoalSubsystem):
             type=dict,
             help="A mapping from standard target type to custom type to use instead. The custom "
             "type can be a custom target type or a macro that offers compatible functionality "
-            "to the one it replaces (see https://www.pantsbuild.org/docs/macros).",
+            f"to the one it replaces (see {doc_url('macros')}).",
         )
 
     @property

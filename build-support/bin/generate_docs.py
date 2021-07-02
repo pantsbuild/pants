@@ -33,6 +33,7 @@ import requests
 from common import die
 
 from pants.help.help_info_extracter import to_help_str
+from pants.util.docutil import DocUrlMatcher, DocUrlRewriter, get_titles
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,20 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
-    version = determine_pants_version()
     args = create_parser().parse_args()
+    version = determine_pants_version()
     help_info = run_pants_help_all()
-    generator = ReferenceGenerator(args, version, help_info)
+    doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
+    logger.info("Found the following docsite URLs:")
+    for url in sorted(doc_urls):
+        logger.info(f"  {url}")
+    logger.info("Fetching titles...")
+    slug_to_title = get_titles(doc_urls)
+    logger.info("Found the following titles:")
+    for slug, title in sorted(slug_to_title.items()):
+        logger.info(f"  {slug}: {title}")
+    rewritten_help_info = rewrite_value_strs(help_info, slug_to_title)
+    generator = ReferenceGenerator(args, version, rewritten_help_info)
     if args.sync:
         generator.sync()
     else:
@@ -142,8 +153,41 @@ def run_pants_help_all() -> Dict:
     return cast(Dict, json.loads(run.stdout))
 
 
+def value_strs_iter(help_info: dict) -> Iterable[str]:
+    def _recurse(val: Any) -> Iterable[str]:
+        if isinstance(val, str):
+            yield val
+        if isinstance(val, dict):
+            for v in val.values():
+                for x in _recurse(v):
+                    yield x
+        if isinstance(val, list):
+            for v in val:
+                for x in _recurse(v):
+                    yield x
+
+    for x in _recurse(help_info):
+        yield x
+
+
+def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
+    """Return a copy of the argument with rewritten docsite URLs."""
+    rewriter = DocUrlRewriter(slug_to_title)
+
+    def _recurse(val: Any) -> Any:
+        if isinstance(val, str):
+            return rewriter.rewrite(val)
+        if isinstance(val, dict):
+            return {k: _recurse(v) for k, v in val.items()}
+        if isinstance(val, list):
+            return [_recurse(x) for x in val]
+        return val
+
+    return cast(dict, _recurse(help_info))
+
+
 class ReferenceGenerator:
-    def __init__(self, args: argparse.Namespace, version: str, help_info: Dict) -> None:
+    def __init__(self, args: argparse.Namespace, version: str, help_info: dict) -> None:
         self._args = args
         self._version = version
 
@@ -177,7 +221,7 @@ class ReferenceGenerator:
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
     @classmethod
-    def process_options_input(cls, help_info: Dict, *, sync: bool) -> Dict:
+    def process_options_input(cls, help_info: dict, *, sync: bool) -> Dict:
         scope_to_help_info = help_info["scope_to_help_info"]
 
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option

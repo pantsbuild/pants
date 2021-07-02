@@ -16,7 +16,7 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.812"
+    default_version = "mypy==0.910"
     default_main = ConsoleScript("mypy")
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
     # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
@@ -100,7 +100,7 @@ class MyPy(PythonToolBase):
             specified_option_name=f"{self.options_scope}.config",
             discovery=cast(bool, self.options.config_discovery),
             check_existence=["mypy.ini", ".mypy.ini"],
-            check_content={"setup.cfg": b"[mypy"},
+            check_content={"setup.cfg": b"[mypy", "pyproject.toml": b"[tool.mypy"},
         )
 
     @property

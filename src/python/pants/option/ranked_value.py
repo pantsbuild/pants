@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 
 @total_ordering
@@ -30,7 +30,7 @@ class Rank(Enum):
     def __lt__(self, other: Any) -> bool:
         if type(other) != Rank:
             return NotImplemented
-        return cast(bool, self._rank < other._rank)
+        return self._rank < other._rank
 
 
 Value = Union[str, int, float, None, Dict, Enum, List]

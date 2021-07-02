@@ -15,7 +15,7 @@ class Bandit(PythonToolBase):
     options_scope = "bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
-    default_version = "bandit>=1.6.2,<1.7"
+    default_version = "bandit>=1.7.0,<1.8"
     default_extra_requirements = [
         "setuptools<45; python_full_version == '2.7.*'",
         "setuptools; python_version > '2.7'",
