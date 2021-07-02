@@ -60,7 +60,7 @@ DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CA
 MACOS_ENV = {"ARCHFLAGS": "-arch x86_64"}
 
 
-IS_PANTS_OWNER = "${{ github.repository_owner == pantsbuild }}"
+IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 
 # ----------------------------------------------------------------------
 # Actions
