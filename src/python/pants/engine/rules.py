@@ -412,7 +412,7 @@ class TaskRule(Rule):
         self._output_type = output_type
         self.input_selectors = tuple(input_selectors)
         self.input_gets = tuple(input_gets)
-        self.func = func  # type: ignore[assignment] # cannot assign to a method
+        self.func = func
         self.cacheable = cacheable
         self.canonical_name = canonical_name
         self.desc = desc

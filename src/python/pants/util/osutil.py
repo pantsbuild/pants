@@ -11,12 +11,20 @@ from typing import Optional, Set
 logger = logging.getLogger(__name__)
 
 
-# We use `sched_getaffinity()` to get the number of cores available to the process, rather than
-# the raw number of cores. This sometimes helps for containers to accurately report their # of
-# cores, rather than the host's.
-CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
+def _compute_cpu_count() -> int:
+    # We use `sched_getaffinity()` to get the number of cores available to the process, rather than
+    # the raw number of cores. This sometimes helps for containers to accurately report their # of
+    # cores, rather than the host's.
+    sched_getaffinity = getattr(os, "sched_getaffinity", None)
+    if sched_getaffinity:
+        return len(sched_getaffinity(0))
+    cpu_count = os.cpu_count()
+    if cpu_count:
+        return cpu_count
+    return 2
+
+
+CPU_COUNT = _compute_cpu_count()
 
 
 OS_ALIASES = {

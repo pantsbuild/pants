@@ -40,12 +40,13 @@ def assert_python_requirements(
         Targets,
         [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
     )
+
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 
 def test_requirements_txt(rule_runner: RuleRunner) -> None:
     """This tests that we correctly create a new python_requirement_library for each entry in a
-    requirements.txt file.
+    requirements.txt file, where each dependency is unique.
 
     Some edge cases:
     * We ignore comments and options (values that start with `--`).
@@ -55,13 +56,21 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
     """
     assert_python_requirements(
         rule_runner,
-        "python_requirements(module_mapping={'ansicolors': ['colors']})",
+        dedent(
+            """\
+            python_requirements(
+                module_mapping={'ansicolors': ['colors']},
+                type_stubs_module_mapping={'Django-types': ['django']},
+            )
+            """
+        ),
         dedent(
             """\
             # Comment.
             --find-links=https://duckduckgo.com
             ansicolors>=1.18.0
             Django==3.2 ; python_version>'3'
+            Django-types
             Un-Normalized-PROJECT  # Inline comment.
             pip@ git+https://github.com/pypa/pip.git
             """
@@ -89,6 +98,14 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             PythonRequirementLibrary(
                 {
                     "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("Django-types")],
+                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                },
+                Address("", target_name="Django-types"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Un_Normalized_PROJECT")],
                 },
                 Address("", target_name="Un-Normalized-PROJECT"),
@@ -99,6 +116,55 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                     "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
                 },
                 Address("", target_name="pip"),
+            ),
+        ],
+    )
+
+
+def test_multiple_versions(rule_runner: RuleRunner) -> None:
+    """This tests that we correctly create a new python_requirement_library for each unique
+    dependency name in a requirements.txt file, grouping duplicated dependency names to handle
+    multiple requirement strings per PEP 508."""
+
+    assert_python_requirements(
+        rule_runner,
+        "python_requirements(module_mapping={'ansicolors': ['colors']})",
+        dedent(
+            """\
+            Django>=3.2
+            Django==3.2.7
+            confusedmonkey==86
+            repletewateringcan>=7
+            """
+        ),
+        expected_file_dep=PythonRequirementsFile(
+            {"sources": ["requirements.txt"]},
+            Address("", target_name="requirements.txt"),
+        ),
+        expected_targets=[
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [
+                        Requirement.parse("Django>=3.2"),
+                        Requirement.parse("Django==3.2.7"),
+                    ],
+                },
+                Address("", target_name="Django"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("confusedmonkey==86")],
+                },
+                Address("", target_name="confusedmonkey"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("repletewateringcan>=7")],
+                },
+                Address("", target_name="repletewateringcan"),
             ),
         ],
     )

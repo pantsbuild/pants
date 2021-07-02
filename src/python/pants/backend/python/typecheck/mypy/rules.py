@@ -87,8 +87,8 @@ def check_and_warn_if_python_version_configured(
     configured = []
     if config and b"python_version" in config.content:
         configured.append(
-            f"`python_version` in {config.path} (which is used because of the "
-            "`[mypy].config` option)"
+            f"`python_version` in {config.path} (which is used because of either config "
+            "autodisocvery or the `[mypy].config` option)"
         )
     if "--py2" in args:
         configured.append("`--py2` in the `--mypy-args` option")

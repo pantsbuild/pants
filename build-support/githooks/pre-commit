@@ -21,17 +21,7 @@ MERGE_BASE="$(git_merge_base)"
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &> /dev/null; then
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    # Clippy happens on a different Travis CI shard because of separate caching concerns.
-    # The TRAVIS env var is documented here:
-    #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
-    if [[ "${TRAVIS}" != "true" ]]; then
-      echo "* Running \`./cargo clippy --all\`"
-      ./cargo clippy --all || exit 1
-    fi
-    echo "* Checking formatting of Rust files"
-    ./build-support/bin/check_rust_formatting.sh || exit 1
-    echo "* Checking Rust target headers"
-    build-support/bin/check_rust_target_headers.sh || exit 1
+    ./build-support/bin/check_rust_pre_commit.sh || exit 1
   fi
 
   echo "* Checking MyPy"
@@ -40,14 +30,6 @@ if git rev-parse --verify "${MERGE_BASE}" &> /dev/null; then
   echo "* Checking linters and formatters"
   ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint ||
     die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
-
-  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
-    echo "* Checking .travis.yml generation"
-    actual_travis_yml=$(< .travis.yml)
-    expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
-    [ "${expected_travis_yml}" == "${actual_travis_yml}" ] ||
-      die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
-  fi
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
     echo "* Checking GitHub workflows generation"

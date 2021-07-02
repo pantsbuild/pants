@@ -11,7 +11,10 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
+)
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
@@ -29,6 +32,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    TypeStubsModuleMappingField,
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
@@ -377,7 +381,20 @@ def test_python_distribution_dependency_injection() -> None:
 def test_module_mapping_field(
     raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
 ) -> None:
-    merged = dict(DEFAULT_MODULE_MAPPING)
-    merged.update(expected)
     actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict(merged)
+    assert actual_value == FrozenDict({**DEFAULT_MODULE_MAPPING, **expected})
+
+
+@pytest.mark.parametrize(
+    ["raw_value", "expected"],
+    (
+        (None, {}),
+        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
+        ({"types-PyYAML": ["custom_yaml"]}, {"types-pyyaml": ("custom_yaml",)}),
+    ),
+)
+def test_type_stub_module_mapping_field(
+    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
+) -> None:
+    actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
+    assert actual_value == FrozenDict({**DEFAULT_TYPE_STUB_MODULE_MAPPING, **expected})

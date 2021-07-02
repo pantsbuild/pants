@@ -11,10 +11,10 @@ class GoLangDistribution(TemplatedExternalTool):
     name = "golang"
     help = "Official golang distribution."
 
-    default_version = "1.15.5"
+    default_version = "1.16.5"
     default_known_versions = [
-        "1.15.5|darwin|359a4334b8c8f5e3067e5a76f16419791ac3fef4613d8e8e1eac0b9719915f6d|122217003",
-        "1.15.5|linux |9a58494e8da722c3aef248c9227b0e9c528c7318309827780f16220998180a0d|120900442",
+        "1.16.5|darwin|be761716d5bfc958a5367440f68ba6563509da2f539ad1e1864bd42fe553f277|130223787",
+        "1.16.5|linux |b12c23023b68de22f74c0524f10b753e7b08b1504cb7e417eccebdd3fae49061|129049763",
     ]
     default_url_template = "https://golang.org/dl/go{version}.{platform}-amd64.tar.gz"
     default_url_platform_mapping = {
