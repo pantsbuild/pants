@@ -274,7 +274,9 @@ async def pex_from_targets(
                 f"requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.resolve_all_constraints:
+        # NB: it isn't safe to resolve against the whole constraints file if
+        # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+        if python_setup.resolve_all_constraints and not request.platforms:
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring `[python_setup].resolve_all_constraints` option because constraints "
