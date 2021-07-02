@@ -24,7 +24,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContent
+from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
@@ -158,6 +158,7 @@ def test_passing_source(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
@@ -166,6 +167,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_mixed_sources(rule_runner: RuleRunner) -> None:
@@ -176,6 +178,7 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/good.py" not in result[0].stdout
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
     assert "checked 2 source files" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -189,6 +192,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/good.py" not in result[0].stdout
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
     assert "checked 2 source files" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.parametrize(
@@ -222,6 +226,17 @@ def test_skip(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
     result = run_mypy(rule_runner, [target], skip=True)
     assert not result
+
+
+def test_report_file(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    result = run_mypy(rule_runner, [target], passthrough_args="--linecount-report=reports")
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout.strip()
+    report_files = rule_runner.request(DigestContents, [result[0].report])
+    assert len(report_files) == 1
+    assert "4 project.good" in report_files[0].content.decode()
 
 
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:

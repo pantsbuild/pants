@@ -17,7 +17,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
@@ -36,17 +36,13 @@ class LintReport:
     digest: Digest
 
 
-class InvalidLinterReportsError(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
-    partition_description: Optional[str] = None
-    report: Optional[LintReport] = None
+    partition_description: str | None = None
+    report: Digest = EMPTY_DIGEST
 
     @classmethod
     def from_fallible_process_result(
@@ -55,7 +51,7 @@ class LintResult(EngineAwareReturnType):
         *,
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
-        report: Optional[LintReport] = None,
+        report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -154,7 +150,7 @@ class LintRequest(StyleRequest):
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
 # are written under this directory. E.g.,
 # ./pants --flake8-args="--output-file=reports/report.txt" lint <target>
-LINTER_REPORT_DIR = "reports"
+REPORT_DIR = "reports"
 
 
 class LintSubsystem(GoalSubsystem):
@@ -193,7 +189,7 @@ class LintSubsystem(GoalSubsystem):
             ),
             removal_version="2.7.0.dev0",
             removal_hint=f"Edit the config file for the linter in question, or set its args via "
-            f"Pants options, to cause it to write reports under f{LINTER_REPORT_DIR} .",
+            f"Pants options, to cause it to write reports under f{REPORT_DIR} .",
         )
 
     @property
@@ -274,22 +270,20 @@ async def lint(
             subdir += "_"
         disambiguated_dirs.add(subdir)
         output_dir = str(dist_dir.relpath / "lint" / subdir)
-        workspace.write_digest(
-            digest,
-            path_prefix=output_dir,
-        )
-        logger.info(f"Wrote linter result files to {output_dir}.")
+        workspace.write_digest(digest, path_prefix=output_dir)
+        logger.info(f"Wrote linter report files to {output_dir}.")
 
     for results in all_results:
-        if len(results.results) == 1 and results.results[0].report:
-            write_report(results.results[0].report.digest, results.linter_name)
+        if len(results.results) == 1 and results.results[0].report != EMPTY_DIGEST:
+            write_report(results.results[0].report, results.linter_name.lower())
         else:
             for result in results.results:
-                if result.report:
+                if result.report != EMPTY_DIGEST:
                     write_report(
-                        result.report.digest,
+                        result.report,
                         os.path.join(
-                            results.linter_name, path_safe(result.partition_description or "all")
+                            results.linter_name.lower(),
+                            path_safe(result.partition_description or "all"),
                         ),
                     )
 

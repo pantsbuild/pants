@@ -10,25 +10,10 @@ from pants.backend.python.target_types import InterpreterConstraintsField, Pytho
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
-from pants.core.goals.lint import (
-    LINTER_REPORT_DIR,
-    LintReport,
-    LintRequest,
-    LintResult,
-    LintResults,
-)
+from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestSubset,
-    Directory,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -86,7 +71,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
     # Ensure that the empty report dir exists.
-    report_directory_digest_get = Get(Digest, CreateDigest([Directory(LINTER_REPORT_DIR)]))
+    report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
     flake8_pex, config_files, report_directory, source_files = await MultiGet(
         flake8_pex_get, config_files_get, report_directory_digest_get, source_files_get
     )
@@ -104,22 +89,12 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
             flake8_pex,
             argv=generate_argv(source_files, flake8),
             input_digest=input_digest,
-            output_directories=(LINTER_REPORT_DIR,),
+            output_directories=(REPORT_DIR,),
             description=f"Run Flake8 on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-
-    report: LintReport | None = None
-    report_snapshot = await Get(
-        Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{LINTER_REPORT_DIR}/**"]))
-    )
-    if report_snapshot.files:
-        report_snapshot = await Get(
-            Snapshot, RemovePrefix(report_snapshot.digest, LINTER_REPORT_DIR)
-        )
-        report = LintReport(report_snapshot.digest)
-
+    report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
         result,
         partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
