@@ -11,7 +11,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Set, Tuple, Type, cast
 
-from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptyDescendantAddresses, Specs
+from pants.base.specs import (
+    AddressSpecs,
+    AscendantAddresses,
+    MaybeEmptyDescendantAddresses,
+    Spec,
+    Specs,
+)
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -427,16 +433,23 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
     # of the target with the same name as the directory of the BUILD file.
     # Note that we can't tell the difference between the user specifying foo/bar and the
     # user specifying foo/bar:bar, so we will consider the latter a "directory spec" too.
-    if (
-        any(specs.filesystem_specs.includes)
-        or any(specs.filesystem_specs.ignores)
-        or any(specs.address_specs.globs)
-        or any(
-            spec.target_component != os.path.basename(spec.path_component)
-            for spec in specs.address_specs.literals
+    dir_specs = []
+    other_specs: list[Spec] = [
+        *specs.filesystem_specs.includes,
+        *specs.filesystem_specs.ignores,
+        *specs.address_specs.globs,
+    ]
+    for spec in specs.address_specs.literals:
+        if spec.target_component == os.path.basename(spec.path_component):
+            dir_specs.append(spec)
+        else:
+            other_specs.append(spec)
+    if other_specs:
+        raise ValueError(
+            "The tailor goal only accepts literal directories as arguments, but you "
+            f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
+            "specify no arguments to run against the entire repository."
         )
-    ):
-        raise ValueError("The tailor goal only accepts literal directories as arguments.")
     # No specs at all means search the entire repo (represented by ("",)).
     return tuple(spec.path_component for spec in specs.address_specs.literals) or ("",)
 
