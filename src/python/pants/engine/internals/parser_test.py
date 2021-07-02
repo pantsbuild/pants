@@ -7,7 +7,7 @@ import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
 
@@ -37,7 +37,7 @@ def test_unrecogonized_symbol() -> None:
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
             "If you expect to see more symbols activated in the below list,"
-            f" refer to {bracketed_docs_url('enabling-backends')} for all available"
+            f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
             f"All registered symbols: ['caof', {fmt_extra_sym}'obj', 'prelude', 'tgt']"
         )

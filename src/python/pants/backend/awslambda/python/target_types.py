@@ -30,7 +30,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 
 
 class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
@@ -205,8 +205,8 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaRuntime,
     )
     help = (
-        "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
-        f"{bracketed_docs_url('awslambda-python')}."
+        "A self-contained Python function suitable for uploading to AWS Lambda.\n\n"
+        f"See {doc_url('awslambda-python')}."
     )
 
 

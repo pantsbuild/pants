@@ -46,7 +46,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,9 @@ class InterpreterConstraintsField(StringSequenceField):
         "`CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.\n\nSpecify "
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
-        "the option `[python-setup].interpreter_constraints`.\n\nSee "
-        f"{bracketed_docs_url('python-interpreter-compatibility')} for how these interpreter "
-        f"constraints are merged with the constraints of dependencies."
+        "the option `[python-setup].interpreter_constraints`.\n\n"
+        f"See {doc_url('python-interpreter-compatibility')} for how these interpreter "
+        "constraints are merged with the constraints of dependencies."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
@@ -390,7 +390,7 @@ class PexBinary(Target):
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
         "self-contained executable files that contain a complete Python environment capable of "
-        f"running the target. For more information, see {bracketed_docs_url('pex-files')}."
+        f"running the target. For more information, see {doc_url('pex-files')}."
     )
 
 
@@ -471,7 +471,7 @@ class PythonTests(Target):
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
-        f"be included in the `dependencies` field.\n\nSee {bracketed_docs_url('python-test-goal')}."
+        f"be included in the `dependencies` field.\n\nSee {doc_url('python-test-goal')}."
     )
 
 
@@ -650,7 +650,7 @@ class PythonRequirementLibrary(Target):
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
         "already, you can instead use the macro `python_requirements()` to convert each "
         "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{bracketed_docs_url('python-third-party-dependencies')}."
+        f"{doc_url('python-third-party-dependencies')}."
     )
 
 
@@ -710,8 +710,8 @@ class PythonProvidesField(ScalarField, ProvidesField):
         "`name`. You can also set almost any keyword argument accepted by setup.py in the "
         "`setup()` function: "
         "(https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args)."
-        f"\n\nSee {bracketed_docs_url('plugins-setup-py')} for how to write a plugin to "
-        f"dynamically generate kwargs."
+        f"\n\nSee {doc_url('plugins-setup-py')} for how to write a plugin to "
+        "dynamically generate kwargs."
     )
 
     @classmethod
@@ -742,5 +742,5 @@ class PythonDistribution(Target):
     )
     help = (
         "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "
-        f"{bracketed_docs_url('python-distributions')}."
+        f"{doc_url('python-distributions')}."
     )
