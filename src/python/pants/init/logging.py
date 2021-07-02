@@ -15,7 +15,7 @@ import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
-from pants.util.docutil import unbracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_prefix
 
@@ -61,8 +61,8 @@ class _ExceptionFormatter(Formatter):
         )
 
         return (
-            f"{stacktrace}\n\n({debug_instructions}See {unbracketed_docs_url('troubleshooting')} for common issues. "
-            f"Consider reaching out for help: {unbracketed_docs_url('getting-help')}.)"
+            f"{stacktrace}\n\n({debug_instructions}See {doc_url('troubleshooting')} for common issues. "
+            f"Consider reaching out for help: {doc_url('getting-help')}.)"
         )
 
 

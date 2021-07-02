@@ -499,7 +499,7 @@ fn unmatched_globs_additional_context() -> Option<String> {
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {}.",
-    externs::bracketed_docs_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+    externs::doc_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
   ))
 }
 

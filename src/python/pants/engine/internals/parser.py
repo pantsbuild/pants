@@ -12,7 +12,7 @@ from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
 
@@ -105,7 +105,7 @@ class Parser:
             original = e.args[0].capitalize()
             help_str = (
                 "If you expect to see more symbols activated in the below list,"
-                f" refer to {bracketed_docs_url('enabling-backends')} for all available"
+                f" refer to {doc_url('enabling-backends')} for all available"
                 " backends to activate."
             )
 
@@ -142,6 +142,6 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
         raise ParseError(
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
             "BUILD files because they can easily break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a macro ({bracketed_docs_url('macros')}) or "
-            f"writing a plugin ({bracketed_docs_url('plugins-overview')}."
+            f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
+            f"writing a plugin ({doc_url('plugins-overview')}."
         )
