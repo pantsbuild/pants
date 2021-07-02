@@ -5,7 +5,7 @@
 
 jobs:
   audit:
-    if: ${{ github.repository_owner = pantsbuild }}
+    if: ${{ github.repository_owner == pantsbuild }}
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
