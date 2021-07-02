@@ -289,12 +289,7 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
         internal_only=False,
         platforms=PexPlatforms(["some-platform-x86_64"]),
     )
-    rule_runner.set_options(
-        [
-            "--python-setup-requirement-constraints=constraints.txt",
-            "--python-setup-resolve-all-constraints",
-        ]
-    )
+    rule_runner.set_options(["--python-setup-requirement-constraints=constraints.txt"])
     result = rule_runner.request(PexRequest, [request])
 
     assert result.repository_pex is None
