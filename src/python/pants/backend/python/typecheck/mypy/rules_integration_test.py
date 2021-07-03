@@ -236,7 +236,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
-    assert "4 project.good" in report_files[0].content.decode()
+    assert "4       4      1      1 good" in report_files[0].content.decode()
 
 
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
