@@ -183,7 +183,6 @@ def test_parse_multi_reqs() -> None:
     """
     retval = parse_pyproject_toml(toml_str, "/path/to/file")
     actual_reqs = {
-        Requirement.parse("python<4.0.0,>=3.8"),
         Requirement.parse("junk@ https://github.com/myrepo/junk.whl"),
         Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
         Requirement.parse('requests<3.0.0,>=2.25.1; python_version > "2.7"'),
