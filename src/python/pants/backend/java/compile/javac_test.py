@@ -14,8 +14,10 @@ from pants.backend.java.target_types import JavaLibrary
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.addresses import Addresses
 from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
@@ -29,7 +31,7 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 # TODO(#12293): Stabilize network flakiness.
-pytestmark = pytest.mark.skip
+# pytestmark = pytest.mark.skip
 
 
 @pytest.fixture
@@ -45,6 +47,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *javac_binary_rules(),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
+            QueryRule(CoarsenedTargets, (Addresses,)),
         ],
         target_types=[JvmDependencyLockfile, JavaLibrary],
     )
@@ -75,6 +78,17 @@ JAVA_LIB_MAIN_SOURCE = dedent(
     }
     """
 )
+
+
+def expect_single_expanded_coarsened_target(
+    rule_runner: RuleRunner, address: Address
+) -> CoarsenedTarget:
+    expanded_target = rule_runner.request(Targets, [Addresses([address])]).expect_single()
+    coarsened_targets = rule_runner.request(
+        CoarsenedTargets, [Addresses([expanded_target.address])]
+    )
+    assert len(coarsened_targets) == 1
+    return coarsened_targets[0]
 
 
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
@@ -109,13 +123,17 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
         CompiledClassfiles,
         [
             CompileJavaSourceRequest(
-                target=rule_runner.get_target(address=Address(spec_path="", target_name="lib"))
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="lib")
+                )
             )
         ],
     )
+
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert len(classfile_digest_contents) == 1
-    assert classfile_digest_contents[0].path == "org/pantsbuild/example/lib/ExampleLib.class"
+    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
+        ["org/pantsbuild/example/lib/ExampleLib.class"]
+    )
 
 
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
@@ -145,10 +163,12 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
-    request = CompileJavaSourceRequest(
-        target=rule_runner.get_target(address=Address(spec_path="", target_name="lib"))
-    )
 
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        )
+    )
     rule_runner.set_options(["--javac-jdk=zulu:1.6"])
     assert {
         contents.path
@@ -161,6 +181,332 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(CompiledClassfiles, [request])
+
+
+def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    maven_requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_library(
+                    name = 'lib',
+                    dependencies = [
+                        ':lockfile',
+                    ]
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "ExampleLib.java": JAVA_LIB_SOURCE,
+            "OtherLib.java": dedent(
+                """\
+                package org.pantsbuild.example.lib;
+
+                public class OtherLib {
+                    public static String hello() {
+                        return "Hello!";
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    expanded_targets = rule_runner.request(
+        Targets, [Addresses([Address(spec_path="", target_name="lib")])]
+    )
+    assert sorted(t.address.spec for t in expanded_targets) == [
+        "//ExampleLib.java:lib",
+        "//OtherLib.java:lib",
+    ]
+
+    coarsened_targets = rule_runner.request(
+        CoarsenedTargets, [Addresses([t.address for t in expanded_targets])]
+    )
+    assert len(coarsened_targets) == 1
+    coarsened_target = coarsened_targets[0]
+    assert len(coarsened_target.members) == 2
+    request = CompileJavaSourceRequest(component=coarsened_target)
+
+    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
+    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
+        ["org/pantsbuild/example/lib/ExampleLib.class", "org/pantsbuild/example/lib/OtherLib.class"]
+    )
+
+
+def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
+    """Test that javac can handle source-level cycles--even across build target boundaries--via
+    graph coarsening.
+
+    This test has to set up a contrived dependency since build-target cycles are forbidden by the graph.  However,
+    file-target cycles are not forbidden, so we configure the graph like so:
+
+    a:a has a single source file, which has file-target address a/A.java, and which inherits a:a's
+    explicit dependency on b/B.java.
+    b:b depends directly on a:a, and its source b/B.java inherits that dependency.
+
+    Therefore, after target expansion via Get(Targets, Addresses(...)), we get the cycle of:
+
+        a/A.java -> b/B.java -> a/A.java
+    """
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    maven_requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "a/BUILD": dedent(
+                """\
+                java_library(
+                    name = 'a',
+                    dependencies = [
+                        '//:lockfile',
+                        'b/B.java',
+                    ]
+                )
+                """
+            ),
+            "a/A.java": dedent(
+                """\
+                package org.pantsbuild.a;
+                import org.pantsbuild.b.B;
+                public interface A {}
+                class C implements B {}
+                """
+            ),
+            "b/BUILD": dedent(
+                """\
+                java_library(
+                    name = 'b',
+                    dependencies = [
+                        '//:lockfile',
+                        'a/A.java',
+                    ]
+                )
+                """
+            ),
+            "b/B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+                import org.pantsbuild.a.A;
+                public interface B {};
+                class C implements A {}
+                """
+            ),
+        }
+    )
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="a", target_name="a")
+    )
+    assert sorted([t.address.spec for t in coarsened_target.members]) == ["a/A.java", "b/B.java"]
+    request = CompileJavaSourceRequest(component=coarsened_target)
+
+    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
+    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
+        [
+            "org/pantsbuild/a/A.class",
+            "org/pantsbuild/a/C.class",
+            "org/pantsbuild/b/B.class",
+            "org/pantsbuild/b/C.class",
+        ]
+    )
+
+
+def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
+    """Like test_compile_with_cycle, but the cycle occurs as a transitive dep of the requested
+    target."""
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    maven_requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_library(
+                    name = 'main',
+                    dependencies = [
+                        '//:lockfile',
+                        'a:a',
+                    ]
+                )
+                """
+            ),
+            "Main.java": dedent(
+                """\
+                package org.pantsbuild.main;
+                import org.pantsbuild.a.A;
+                public class Main implements A {}
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "a/BUILD": dedent(
+                """\
+                java_library(
+                    name = 'a',
+                    dependencies = [
+                        '//:lockfile',
+                        'b/B.java',
+                    ]
+                )
+                """
+            ),
+            "a/A.java": dedent(
+                """\
+                package org.pantsbuild.a;
+                import org.pantsbuild.b.B;
+                public interface A {}
+                class C implements B {}
+                """
+            ),
+            "b/BUILD": dedent(
+                """\
+                java_library(
+                    name = 'b',
+                    dependencies = [
+                        '//:lockfile',
+                        'a:a',
+                    ]
+                )
+                """
+            ),
+            "b/B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+                import org.pantsbuild.a.A;
+                public interface B {};
+                class C implements A {}
+                """
+            ),
+        }
+    )
+
+    compiled_classfiles = rule_runner.request(
+        CompiledClassfiles,
+        [
+            CompileJavaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                )
+            )
+        ],
+    )
+    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
+    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
+        ["org/pantsbuild/main/Main.class"]
+    )
+
+
+def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
+    """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
+    rather than explicitly."""
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    maven_requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_library(
+                    name = 'main',
+                    dependencies = [
+                        '//:lockfile',
+                        'lib:lib',
+                    ]
+                )
+                """
+            ),
+            "Main.java": dedent(
+                """\
+                package org.pantsbuild.main;
+                import org.pantsbuild.a.A;
+                import org.pantsbuild.b.B;
+                public class Main implements A {}
+                class Other implements B {}
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "lib/BUILD": dedent(
+                """\
+                java_library(
+                    name = 'lib',
+                    dependencies = [
+                        '//:lockfile',
+                    ]
+                )
+                """
+            ),
+            "lib/A.java": dedent(
+                """\
+                package org.pantsbuild.a;
+                import org.pantsbuild.b.B;
+                public interface A {}
+                class C implements B {}
+                """
+            ),
+            "lib/B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+                import org.pantsbuild.a.A;
+                public interface B {};
+                class C implements A {}
+                """
+            ),
+        }
+    )
+
+    compiled_classfiles = rule_runner.request(
+        CompiledClassfiles,
+        [
+            CompileJavaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                )
+            )
+        ],
+    )
+    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
+    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
+        ["org/pantsbuild/main/Main.class", "org/pantsbuild/main/Other.class"]
+    )
 
 
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:
@@ -202,12 +548,13 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
-
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
         [
             CompileJavaSourceRequest(
-                target=rule_runner.get_target(address=Address(spec_path="", target_name="main"))
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                )
             )
         ],
     )
@@ -243,13 +590,14 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
             .decode("utf-8"),
         }
     )
-
-    compile_request = CompileJavaSourceRequest(
-        target=rule_runner.get_target(address=Address(spec_path="", target_name="main"))
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="main")
+        )
     )
     expected_exception_msg = r".*?package org.pantsbuild.example.lib does not exist.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(CompiledClassfiles, [compile_request])
+        rule_runner.request(CompiledClassfiles, [request])
 
 
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
@@ -304,15 +652,12 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-
-    compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
-        [
-            CompileJavaSourceRequest(
-                target=rule_runner.get_target(address=Address(spec_path="", target_name="main"))
-            )
-        ],
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="main")
+        )
     )
+    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
     assert len(classfile_digest_contents) == 1
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
@@ -359,9 +704,11 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
         }
     )
 
-    compile_request = CompileJavaSourceRequest(
-        target=rule_runner.get_target(address=Address(spec_path="", target_name="main"))
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="main")
+        )
     )
     expected_exception_msg = r".*?package org.joda.time does not exist.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(CompiledClassfiles, [compile_request])
+        rule_runner.request(CompiledClassfiles, [request])
