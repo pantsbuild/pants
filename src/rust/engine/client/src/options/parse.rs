@@ -169,6 +169,13 @@ fn format_parse_error(
     })
     .collect::<Vec<_>>()
     .join("\n");
+
+  let mut choices = parse_error.expected.tokens().collect::<Vec<_>>();
+  // N.B.: It appears to be the case that the peg parser parses alternatives concurrently and so
+  // the ordering of choices is observed to be unstable. As such sort them for consistent error
+  // messages.
+  choices.sort_unstable();
+
   ParseError::new(format!(
     "\
     Problem parsing {{name}} {type_id} value:\n{value_with_marker}\nExpected {choices} at \
@@ -176,8 +183,7 @@ fn format_parse_error(
     ",
     type_id = type_id,
     value_with_marker = value_with_marker,
-    choices = render_choice(parse_error.expected.tokens().collect::<Vec<_>>().as_slice())
-      .unwrap_or_else(|| "nothing".to_owned()),
+    choices = render_choice(choices.as_slice()).unwrap_or_else(|| "nothing".to_owned()),
     line = parse_error.location.line,
     column = parse_error.location.column,
   ))

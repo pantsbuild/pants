@@ -2,6 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 mod args;
+#[cfg(test)]
+mod args_tests;
+
 mod config;
 mod env;
 
@@ -45,7 +48,7 @@ pub(crate) struct ListEdit<T> {
 /// This is currently a subset of the types of options the Pants python option system handles.
 /// Implementations should mimic the behavior of the equivalent python source.
 ///
-trait OptionsSource {
+pub(crate) trait OptionsSource {
   ///
   /// Get a display version of the option `id` that most closely matches the syntax used to supply
   /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
