@@ -6,10 +6,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.target_types import JavaSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, RemovePrefix
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, Sources, Target, Targets
 from pants.jvm.resolve.coursier_fetch import (
@@ -19,9 +20,27 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspathRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+class JavacSubsystem(Subsystem):
+    options_scope = "javac"
+    help = "The javac Java source compiler."
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--jdk",
+            default="adopt:1.11",
+            advanced=True,
+            help="The JDK to use for invoking javac."
+            " This string will be passed directly to Coursier's `--jvm` parameter."
+            " Run `cs java --available` to see a list of available JVM versions on your platform.",
+        )
 
 
 @dataclass(frozen=True)
@@ -37,7 +56,7 @@ class CompiledClassfiles:
 @rule(level=LogLevel.DEBUG)
 async def compile_java_source(
     coursier: Coursier,
-    bash: BashBinary,
+    javac_binary: JavacBinary,
     request: CompileJavaSourceRequest,
 ) -> CompiledClassfiles:
     sources = await Get(
@@ -88,7 +107,7 @@ async def compile_java_source(
                 sources.snapshot.digest,
                 prefixed_direct_dependency_classfiles_digest,
                 materialized_classpath.digest,
-                coursier.digest,
+                javac_binary.digest,
             )
         ),
     )
@@ -97,10 +116,8 @@ async def compile_java_source(
         ProcessResult,
         Process(
             argv=[
-                bash.path,
-                coursier.javac,
-                coursier.coursier.exe,
-                "--class-path",
+                javac_binary.javac,
+                "-cp",
                 classpath_arg,
                 "-d",
                 "classfiles",

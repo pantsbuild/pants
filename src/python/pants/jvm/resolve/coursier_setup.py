@@ -52,19 +52,6 @@ COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
     """
 )
 
-JAVAC_WRAPPER_SCRIPT = textwrap.dedent(
-    """\
-    set -eux
-
-    coursier_exe="$1"
-    shift
-
-    javac_path="$(${coursier_exe} java-home --jvm openjdk:1.9.0-4)/bin/javac"
-
-    exec "${javac_path}" "$@"
-    """
-)
-
 
 class CoursierBinary(TemplatedExternalTool):
     options_scope = "coursier"
@@ -89,7 +76,6 @@ class Coursier:
     digest: Digest
     wrapper_script: ClassVar[str] = "coursier_wrapper_script.sh"
     post_processing_script: ClassVar[str] = "coursier_post_processing_script.py"
-    javac: ClassVar[str] = "coursier_javac.sh"
 
 
 @rule
@@ -109,11 +95,6 @@ async def setup_coursier(coursier_binary: CoursierBinary) -> Coursier:
                 FileContent(
                     Coursier.post_processing_script,
                     COURSIER_POST_PROCESSING_SCRIPT.encode("utf-8"),
-                    is_executable=True,
-                ),
-                FileContent(
-                    Coursier.javac,
-                    JAVAC_WRAPPER_SCRIPT.encode("utf-8"),
                     is_executable=True,
                 ),
             ]
