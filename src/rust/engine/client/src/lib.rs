@@ -32,9 +32,14 @@ mod build_root;
 mod build_root_tests;
 
 mod client;
+#[cfg(test)]
+mod client_tests;
+
 pub mod options;
 
 pub mod pantsd;
+#[cfg(test)]
+mod pantsd_testing;
 #[cfg(test)]
 mod pantsd_tests;
 
