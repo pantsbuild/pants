@@ -11,6 +11,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -155,6 +156,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
@@ -274,6 +276,7 @@ jobs:
         - '3.9'
     timeout-minutes: 40
   lint_python:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -350,6 +353,7 @@ jobs:
         - '3.9'
     timeout-minutes: 30
   test_python_linux:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -428,6 +432,7 @@ jobs:
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15

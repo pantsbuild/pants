@@ -507,8 +507,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
 
   def __new__(
     _cls,
-    local_parallelism: u64,
-    remote_parallelism: u64,
+    local_parallelism: usize,
+    remote_parallelism: usize,
     local_cleanup: bool,
     local_cache: bool,
     remote_cache_read: bool,
@@ -516,8 +516,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
   ) -> CPyResult<Self> {
     Self::create_instance(py,
       ExecutionStrategyOptions {
-        local_parallelism: local_parallelism as usize,
-        remote_parallelism: remote_parallelism as usize,
+        local_parallelism,
+        remote_parallelism,
         local_cleanup,
         local_cache,
         remote_cache_read,
@@ -540,14 +540,17 @@ py_class!(class PyRemotingOptions |py| {
     instance_name: Option<String>,
     root_ca_certs_path: Option<String>,
     store_headers: Vec<(String, String)>,
-    store_chunk_bytes: u64,
+    store_chunk_bytes: usize,
     store_chunk_upload_timeout: u64,
-    store_rpc_retries: u64,
+    store_rpc_retries: usize,
+    store_rpc_concurrency: usize,
     cache_warnings_behavior: String,
     cache_eager_fetch: bool,
+    cache_rpc_concurrency: usize,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
-    execution_overall_deadline_secs: u64
+    execution_overall_deadline_secs: u64,
+    execution_rpc_concurrency: usize,
   ) -> CPyResult<Self> {
     Self::create_instance(py,
       RemotingOptions {
@@ -558,14 +561,17 @@ py_class!(class PyRemotingOptions |py| {
         instance_name,
         root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
         store_headers: store_headers.into_iter().collect(),
-        store_chunk_bytes: store_chunk_bytes as usize,
+        store_chunk_bytes,
         store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
-        store_rpc_retries: store_rpc_retries as usize,
+        store_rpc_retries,
+        store_rpc_concurrency,
         cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior).unwrap(),
         cache_eager_fetch,
+        cache_rpc_concurrency,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+        execution_rpc_concurrency,
       }
     )
   }

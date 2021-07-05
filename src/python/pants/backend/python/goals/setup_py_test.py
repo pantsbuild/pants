@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import textwrap
 from typing import Iterable, Type
 
@@ -81,9 +83,11 @@ class PluginSetupKwargsRequest(SetupKwargsRequest):
 
 @rule
 def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
-    return SetupKwargs(
-        {**request.explicit_kwargs, "plugin_demo": "hello world"}, address=request.target.address
-    )
+    if "setup_script" in request.explicit_kwargs:
+        kwargs = request.explicit_kwargs
+    else:
+        kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
+    return SetupKwargs(kwargs, address=request.target.address)
 
 
 @pytest.fixture
@@ -107,7 +111,11 @@ def chroot_rule_runner() -> RuleRunner:
 
 
 def assert_chroot(
-    rule_runner: RuleRunner, expected_files, expected_setup_kwargs, addr: Address
+    rule_runner: RuleRunner,
+    expected_files: list[str],
+    expected_setup_script: str,
+    expected_setup_kwargs,
+    addr: Address,
 ) -> None:
     tgt = rule_runner.get_target(addr)
     chroot = rule_runner.request(
@@ -116,6 +124,7 @@ def assert_chroot(
     )
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
+    assert chroot.setup_script == expected_setup_script
     assert expected_setup_kwargs == chroot.setup_kwargs.kwargs
 
 
@@ -129,6 +138,80 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: Type[Ex
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
     assert type(ex.wrapped_exceptions[0]) == exc_cls
+
+
+def test_use_existing_setup_script(chroot_rule_runner) -> None:
+    chroot_rule_runner.add_to_build_file("src/python/foo/bar", "python_library()")
+    chroot_rule_runner.create_file("src/python/foo/bar/__init__.py")
+    chroot_rule_runner.create_file("src/python/foo/bar/bar.py")
+    # Add a `.pyi` stub file to ensure we include it in the final result.
+    chroot_rule_runner.create_file("src/python/foo/bar/bar.pyi")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo/resources", 'resources(sources=["js/code.js"])'
+    )
+    chroot_rule_runner.create_file("src/python/foo/resources/js/code.js")
+    chroot_rule_runner.add_to_build_file("files", 'files(sources=["README.txt"])')
+    chroot_rule_runner.create_file("files/README.txt")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name='foo-dist',
+                dependencies=[
+                    ':foo',
+                ],
+                provides=setup_py(
+                    setup_script='src/python/foo/setup.py',
+                    name='foo', version='1.2.3'
+                )
+            )
+
+            python_library(
+                dependencies=[
+                    'src/python/foo/bar',
+                    'src/python/foo/resources',
+                    'files',
+                ]
+            )
+            """
+        ),
+    )
+    chroot_rule_runner.create_file("src/python/foo/__init__.py", _namespace_decl)
+    chroot_rule_runner.create_file("src/python/foo/foo.py")
+    chroot_rule_runner.create_file(
+        "src/python/foo/setup.py",
+        textwrap.dedent(
+            """
+        from setuptools import setup
+
+        setup(
+            name = "foo",
+            version = "1.2.3",
+            packages = ["foo"],
+        )
+    """
+        ),
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        [
+            "files/README.txt",
+            "foo/bar/__init__.py",
+            "foo/bar/bar.py",
+            "foo/bar/bar.pyi",
+            "foo/resources/js/code.js",
+            "foo/__init__.py",
+            "foo/foo.py",
+            "foo/setup.py",
+        ],
+        "foo/setup.py",
+        {
+            "name": "foo",
+            "version": "1.2.3",
+        },
+        Address("src/python/foo", target_name="foo-dist"),
+    )
 
 
 def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
@@ -212,6 +295,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "setup.py",
             "MANIFEST.in",
         ],
+        "setup.py",
         {
             "name": "foo",
             "version": "1.2.3",
@@ -295,6 +379,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
     assert_chroot(
         chroot_rule_runner,
         ["src/project/app.py", "setup.py", "MANIFEST.in"],
+        "setup.py",
         {
             "name": "bin",
             "version": "1.1.1",

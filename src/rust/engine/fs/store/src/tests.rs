@@ -103,6 +103,7 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
       10 * MEGABYTES,
       Duration::from_secs(1),
       1,
+      256,
     )
     .unwrap()
 }
@@ -843,6 +844,7 @@ async fn instance_name_upload() {
       10 * MEGABYTES,
       Duration::from_secs(1),
       1,
+      256,
     )
     .unwrap();
 
@@ -870,6 +872,7 @@ async fn instance_name_download() {
       10 * MEGABYTES,
       Duration::from_secs(1),
       1,
+      256,
     )
     .unwrap();
 
@@ -919,6 +922,7 @@ async fn auth_upload() {
       10 * MEGABYTES,
       Duration::from_secs(1),
       1,
+      256,
     )
     .unwrap();
 
@@ -948,6 +952,7 @@ async fn auth_download() {
       10 * MEGABYTES,
       Duration::from_secs(1),
       1,
+      256,
     )
     .unwrap();
 
