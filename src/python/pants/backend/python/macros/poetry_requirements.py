@@ -117,7 +117,7 @@ class PyProjectToml:
     @classmethod
     def create(cls, parse_context: ParseContext, pyproject_toml_relpath: str) -> PyProjectToml:
         build_root = Path(parse_context.build_root)
-        toml_relpath = PurePath(pyproject_toml_relpath)
+        toml_relpath = PurePath(parse_context.rel_path, pyproject_toml_relpath)
         return cls(
             build_root=build_root,
             toml_relpath=toml_relpath,
@@ -155,7 +155,9 @@ class PyProjectToml:
         # TODO(John Sirois): This leaves the case where the path is a Python project directory
         #  inside the build root that the user actually wants Pex / Pip to build. A concrete case
         #  for this would be a repo where third party is partially handled with vendored exploded
-        #  source distributions.
+        #  source distributions. If someone in the wild needs the described case, plumb a
+        #  PoetryRequirements parameter that can list paths to treat as Pants controlled or
+        #  vice-versa.
         given_path = Path(path)
         if given_path.is_absolute():
             return self._non_pants_project_abs_path(given_path)
@@ -183,9 +185,9 @@ def handle_dict_attr(
 
     path_lookup = attributes.get("path")
     if path_lookup is not None:
-        external_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
-        if external_path:
-            return f"{proj_name} @ file://{external_path}"
+        non_pants_project_abs_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
+        if non_pants_project_abs_path:
+            return f"{proj_name} @ file://{non_pants_project_abs_path}"
         # An internal path will be handled by normal Pants dependencies and dependency inference;
         # i.e.: it never represents a third party requirement.
         return None
