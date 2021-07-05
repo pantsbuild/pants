@@ -6,14 +6,15 @@ from __future__ import annotations
 import itertools
 import logging
 import os
-from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional
+from dataclasses import dataclass
+from pathlib import Path, PurePath
+from typing import Any, Iterable, Iterator, Mapping, Optional
 
 import toml
 from packaging.version import InvalidVersion, Version
 from pkg_resources import Requirement
 
-from pants.base.build_environment import get_buildroot
+from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +68,10 @@ def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
                 parsed_version = Version(req[1:])
             except InvalidVersion:
                 raise InvalidVersion(
-                    (
-                        f'Failed to parse requirement {proj_name} = "{req}" in {fp}'
-                        "loaded by the poetry_requirements macro.\n\nIf you believe this requirement is "
-                        "valid, consider opening an issue at https://github.com/pantsbuild/pants/issues"
-                        "so that we can update Pants's Poetry macro to support this."
-                    )
+                    f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
+                    "poetry_requirements macro.\n\nIf you believe this requirement is valid, "
+                    "consider opening an issue at https://github.com/pantsbuild/pants/issues so "
+                    "that we can update Pants' Poetry macro to support this."
                 )
 
             max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
@@ -109,7 +108,66 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
     )
 
 
-def handle_dict_attr(proj_name: str, attributes: dict[str, str], fp: str) -> str:
+@dataclass(frozen=True)
+class PyProjectToml:
+    build_root: PurePath
+    toml_relpath: PurePath
+    toml_contents: str
+
+    @classmethod
+    def create(cls, parse_context: ParseContext, pyproject_toml_relpath: str) -> PyProjectToml:
+        build_root = Path(parse_context.build_root)
+        toml_relpath = PurePath(pyproject_toml_relpath)
+        return cls(
+            build_root=build_root,
+            toml_relpath=toml_relpath,
+            toml_contents=(build_root / toml_relpath).read_text(),
+        )
+
+    def parse(self) -> Mapping[str, Any]:
+        return toml.loads(self.toml_contents)
+
+    def _non_pants_project_abs_path(self, path: Path) -> Path | None:
+        resolved = path.resolve()
+        if resolved.is_file():
+            return resolved
+
+        try:
+            resolved.relative_to(self.build_root)
+        except ValueError:
+            return resolved
+
+        return None
+
+    def non_pants_project_abs_path(self, path: str) -> Path | None:
+        """Determine if the given path represents a non-Pants controlled project.
+
+        If the path points to a file, it's assumed the file is a distribution ( a wheel or sdist)
+        and the absolute path of that file is returned.
+
+        If the path points to a directory and that directory is outside of the build root, it's
+        assumed the directory is the root of a buildable Python project (i.e.: it contains a
+        pyproject.toml or setup.py) and the absolute path of the project is returned.
+
+        Otherwise, `None` is returned since the directory lies inside the build root and is assumed
+        to be a Pants controlled project.
+        """
+        # TODO(John Sirois): This leaves the case where the path is a Python project directory
+        #  inside the build root that the user actually wants Pex / Pip to build. A concrete case
+        #  for this would be a repo where third party is partially handled with vendored exploded
+        #  source distributions.
+        given_path = Path(path)
+        if given_path.is_absolute():
+            return self._non_pants_project_abs_path(given_path)
+        else:
+            return self._non_pants_project_abs_path(
+                Path(self.build_root / self.toml_relpath).parent / given_path
+            )
+
+
+def handle_dict_attr(
+    proj_name: str, attributes: dict[str, str], pyproject_toml: PyProjectToml
+) -> str | None:
     def produce_match(sep: str, feat: Optional[str]) -> str:
         return f"{sep}{feat}" if feat else ""
 
@@ -122,14 +180,23 @@ def handle_dict_attr(proj_name: str, attributes: dict[str, str], fp: str) -> str
         return f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
 
     version_lookup = attributes.get("version")
+
     path_lookup = attributes.get("path")
     if path_lookup is not None:
-        return f"{proj_name} @ file://{path_lookup}"
+        external_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
+        if external_path:
+            return f"{proj_name} @ file://{external_path}"
+        # An internal path will be handled by normal Pants dependencies and dependency inference;
+        # i.e.: it never represents a third party requirement.
+        return None
+
     url_lookup = attributes.get("url")
     if url_lookup is not None:
         return f"{proj_name} @ {url_lookup}"
+
     if version_lookup is not None:
         markers_lookup = produce_match(";", attributes.get("markers"))
+        fp = str(pyproject_toml.toml_relpath)
         python_lookup = parse_python_constraint(attributes.get("python"), fp)
         version_parsed = parse_str_version(proj_name, version_lookup, fp)
         return (
@@ -138,51 +205,50 @@ def handle_dict_attr(proj_name: str, attributes: dict[str, str], fp: str) -> str
             f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
             f"{python_lookup}"
         )
-    else:
-        raise AssertionError(
-            (
-                f"{proj_name} is not formatted correctly; at"
-                " minimum provide either a version, url, path or git location for"
-                " your dependency. "
-            )
-        )
+
+    raise AssertionError(
+        f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
+        "or git location for your dependency. "
+    )
 
 
 def parse_single_dependency(
-    proj_name: str, attributes: str | dict[str, Any] | list[dict[str, Any]], fp: str
-) -> tuple[Requirement, ...]:
+    proj_name: str,
+    attributes: str | dict[str, Any] | list[dict[str, Any]],
+    pyproject_toml: PyProjectToml,
+) -> Iterator[Requirement]:
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
-        return (Requirement.parse(parse_str_version(proj_name, attributes, fp)),)
+        yield Requirement.parse(
+            parse_str_version(proj_name, attributes, str(pyproject_toml.toml_relpath))
+        )
     elif isinstance(attributes, dict):
         # E.g. `foo = {version = "~1.1"}`.
-        return (Requirement.parse(handle_dict_attr(proj_name, attributes, fp)),)
+        req_str = handle_dict_attr(proj_name, attributes, pyproject_toml)
+        if req_str:
+            yield Requirement.parse(req_str)
     elif isinstance(attributes, list):
         # E.g. ` foo = [{version = "1.1","python" = "2.7"}, {version = "1.1","python" = "2.7"}]
-        return tuple(
-            Requirement.parse(handle_dict_attr(proj_name, attr, fp)) for attr in attributes
-        )
+        for attr in attributes:
+            req_str = handle_dict_attr(proj_name, attr, pyproject_toml)
+            if req_str:
+                yield Requirement.parse(req_str)
     else:
         raise AssertionError(
-            (
-                "Error: invalid poetry requirement format. Expected "
-                " type of requirement attributes to be string,"
-                f"dict, or list, but was of type {type(attributes).__name__}."
-            )
+            "Error: invalid poetry requirement format. Expected type of requirement attributes to "
+            f"be string, dict, or list, but was of type {type(attributes).__name__}."
         )
 
 
-def parse_pyproject_toml(toml_contents: str, file_path: str) -> set[Requirement]:
-    parsed = toml.loads(toml_contents)
+def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
+    parsed = pyproject_toml.parse()
     try:
         poetry_vals = parsed["tool"]["poetry"]
     except KeyError:
         raise KeyError(
-            (
-                f"No section `tool.poetry` found in {file_path}, which"
-                "is loaded by Pants from a `poetry_requirements` macro. "
-                "Did you mean to set up Poetry?"
-            )
+            f"No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which "
+            "is loaded by Pants from a `poetry_requirements` macro. "
+            "Did you mean to set up Poetry?"
         )
     dependencies = poetry_vals.get("dependencies", {})
     # N.B.: The "python" dependency is a special dependency required by Poetry that only serves to
@@ -193,17 +259,15 @@ def parse_pyproject_toml(toml_contents: str, file_path: str) -> set[Requirement]
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies:
         logger.warning(
-            (
-                "No requirements defined in poetry.tools.dependencies and"
-                f" poetry.tools.dev-dependencies in {file_path}, which is loaded by Pants"
-                " from a poetry_requirements macro. Did you mean to populate these"
-                " with requirements?"
-            )
+            "No requirements defined in poetry.tools.dependencies and "
+            f"poetry.tools.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
+            "by Pants from a poetry_requirements macro. Did you mean to populate these "
+            "with requirements?"
         )
 
     return set(
         itertools.chain.from_iterable(
-            parse_single_dependency(proj, attr, file_path)
+            parse_single_dependency(proj, attr, pyproject_toml)
             for proj, attr in {**dependencies, **dev_dependencies}.items()
         )
     )
@@ -267,9 +331,8 @@ class PoetryRequirements:
         )
         requirements_dep = f":{req_file_tgt.name}"
 
-        req_file = Path(get_buildroot(), self._parse_context.rel_path, pyproject_toml_relpath)
         requirements = parse_pyproject_toml(
-            req_file.read_text(), str(req_file.relative_to(get_buildroot()))
+            PyProjectToml.create(self._parse_context, pyproject_toml_relpath)
         )
         for parsed_req in requirements:
             proj_name = parsed_req.project_name

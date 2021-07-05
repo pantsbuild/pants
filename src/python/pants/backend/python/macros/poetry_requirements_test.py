@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Any, Dict, Iterable
 
@@ -10,6 +13,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirements,
+    PyProjectToml,
     get_max_caret,
     get_max_tilde,
     handle_dict_attr,
@@ -80,11 +84,28 @@ def test_handle_str(test, exp) -> None:
     assert parse_str_version("foo", test, "") == f"foo {exp}"
 
 
-def test_handle_git() -> None:
+def create_pyproject_toml(
+    build_root: PurePath | str = ".",
+    toml_relpath: PurePath | str = "pyproject.toml",
+    toml_contents: str = "",
+) -> PyProjectToml:
+    return PyProjectToml(
+        build_root=PurePath(build_root),
+        toml_relpath=PurePath(toml_relpath),
+        toml_contents=toml_contents,
+    )
+
+
+@pytest.fixture
+def empty_pyproject_toml() -> PyProjectToml:
+    return create_pyproject_toml(toml_contents="")
+
+
+def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_git(extra_opts: Dict[str, str], suffix: str) -> None:
         attr = {"git": "https://github.com/requests/requests.git", **extra_opts}
         assert (
-            handle_dict_attr("requests", attr, "")
+            handle_dict_attr("requests", attr, empty_pyproject_toml)
             == f"requests @ git+https://github.com/requests/requests.git{suffix}"
         )
 
@@ -94,25 +115,71 @@ def test_handle_git() -> None:
     assert_git({"rev": "1a2b3c4d"}, "#1a2b3c4d")
 
 
-def test_handle_path_arg() -> None:
-    attr = {"path": "../../my_py_proj.whl"}
-    assert handle_dict_attr("my_py_proj", attr, "") == "my_py_proj @ file://../../my_py_proj.whl"
+def test_handle_path_arg(tmp_path: Path) -> None:
+    build_root = tmp_path / "build_root"
+
+    one_level = Path("one")
+    one_pyproject_toml = create_pyproject_toml(
+        build_root=build_root, toml_relpath=one_level / "pyproject.toml"
+    )
+
+    two_level = one_level / "two"
+    two_pyproject_toml = create_pyproject_toml(
+        build_root=build_root, toml_relpath=two_level / "pyproject.toml"
+    )
+
+    (build_root / two_level).mkdir(parents=True)
+
+    external_file = tmp_path / "my_py_proj.whl"
+    external_file.touch()
+
+    external_project = tmp_path / "my_py_proj"
+    external_project.mkdir()
+
+    internal_file = build_root / "my_py_proj.whl"
+    internal_file.touch()
+
+    internal_project = build_root / "my_py_proj"
+    internal_project.mkdir()
+
+    file_attr = {"path": "../../my_py_proj.whl"}
+    dir_attr = {"path": "../../my_py_proj"}
+
+    assert (
+        handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml)
+        == f"my_py_proj @ file://{external_file}"
+    )
+
+    assert (
+        handle_dict_attr("my_py_proj", file_attr, two_pyproject_toml)
+        == f"my_py_proj @ file://{internal_file}"
+    )
+
+    assert (
+        handle_dict_attr("my_py_proj", dir_attr, one_pyproject_toml)
+        == f"my_py_proj @ file://{external_project}"
+    )
+
+    assert handle_dict_attr("my_py_proj", dir_attr, two_pyproject_toml) is None
 
 
-def test_handle_url_arg() -> None:
+def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
     attr = {"url": "https://my-site.com/mydep.whl"}
-    assert handle_dict_attr("my_py_proj", attr, "") == "my_py_proj @ https://my-site.com/mydep.whl"
+    assert (
+        handle_dict_attr("my_py_proj", attr, empty_pyproject_toml)
+        == "my_py_proj @ https://my-site.com/mydep.whl"
+    )
 
 
-def test_version_only() -> None:
+def test_version_only(empty_pyproject_toml: PyProjectToml) -> None:
     attr = {"version": "1.2.3"}
-    assert handle_dict_attr("foo", attr, "") == "foo ==1.2.3"
+    assert handle_dict_attr("foo", attr, empty_pyproject_toml) == "foo ==1.2.3"
 
 
-def test_py_constraints() -> None:
+def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_py_constraints(py_req: str, suffix: str) -> None:
         attr = {"version": "1.2.3", "python": py_req}
-        assert handle_dict_attr("foo", attr, "") == f"foo ==1.2.3;{suffix}"
+        assert handle_dict_attr("foo", attr, empty_pyproject_toml) == f"foo ==1.2.3;{suffix}"
 
     assert_py_constraints("3.6", "python_version == '3.6'")
     assert_py_constraints("3.6 || 3.7", "(python_version == '3.6') or (python_version == '3.7')")
@@ -123,13 +190,16 @@ def test_py_constraints() -> None:
     )
     assert_py_constraints(
         "~3.6 || ^3.7",
-        "(python_version >= '3.6' and python_version< '3.7') or (python_version >= '3.7' and python_version< '4.0')",
+        (
+            "(python_version >= '3.6' and python_version< '3.7') or "
+            "(python_version >= '3.7' and python_version< '4.0')"
+        ),
     )
 
 
-def test_multi_version_const() -> None:
+def test_multi_version_const(empty_pyproject_toml: PyProjectToml) -> None:
     lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
-    retval = parse_single_dependency("foo", lst_attr, "")
+    retval = tuple(parse_single_dependency("foo", lst_attr, empty_pyproject_toml))
     actual_reqs = (
         Requirement.parse("foo ==1.2.3; python_version == '3.6'"),
         Requirement.parse("foo ==1.2.4; python_version == '3.7'"),
@@ -146,10 +216,12 @@ def test_extended_form() -> None:
     markers = "platform_python_implementation == 'CPython'"
     [tool.poetry.dev-dependencies]
     """
-    retval = parse_pyproject_toml(toml_black_str, "/path/to/file")
+    pyproject_toml_black = create_pyproject_toml(toml_contents=toml_black_str)
+    retval = parse_pyproject_toml(pyproject_toml_black)
     actual_req = {
         Requirement.parse(
-            'black==19.10b0; platform_python_implementation == "CPython" and python_version == "3.6"'
+            "black==19.10b0; "
+            'platform_python_implementation == "CPython" and python_version == "3.6"'
         )
     }
     assert retval == actual_req
@@ -181,7 +253,8 @@ def test_parse_multi_reqs() -> None:
     requires = ["poetry-core>=1.0.0"]
     build-backend = "poetry.core.masonry.api"
     """
-    retval = parse_pyproject_toml(toml_str, "/path/to/file")
+    pyproject_toml = create_pyproject_toml(toml_contents=toml_str)
+    retval = parse_pyproject_toml(pyproject_toml)
     actual_reqs = {
         Requirement.parse("junk@ https://github.com/myrepo/junk.whl"),
         Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
@@ -189,7 +262,8 @@ def test_parse_multi_reqs() -> None:
         Requirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
         Requirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
         Requirement.parse(
-            'black==19.10b0; platform_python_implementation == "CPython" and python_version == "3.6"'
+            "black==19.10b0; "
+            'platform_python_implementation == "CPython" and python_version == "3.6"'
         ),
         Requirement.parse("isort<5.6,>=5.5.1"),
     }
