@@ -12,6 +12,12 @@ peg::parser! {
             = quiet!{ " " / "\n" / "\r" / "\t" }
 
         rule string() -> String
+            = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
+
+        rule non_escaped_character() -> char
+            = !"\\" c:$([_]) { c.chars().next().unwrap() }
+
+        rule quoted_string() -> String
             = whitespace()*
             string:(double_quoted_string() / single_quoted_string())
             whitespace()* { string }
@@ -59,7 +65,12 @@ peg::parser! {
             / expected!("the end of a tuple indicated by ')'")
 
         rule tuple_items() -> Vec<String>
-            = tuple_start() items:string() ** "," ","? tuple_end() { items }
+            = tuple_start()
+            items:quoted_string() ** ","
+            whitespace()* ","? whitespace()*
+            tuple_end() {
+                items
+            }
 
         rule list_start() -> ()
             = quiet!{ "[" }
@@ -70,11 +81,17 @@ peg::parser! {
             / expected!("the end of a list indicated by ']'")
 
         rule list_items() -> Vec<String>
-            = list_start() items:string() ** "," ","? list_end() { items }
+            = list_start()
+            items:quoted_string() ** ","
+            whitespace()* ","? whitespace()*
+            list_end() {
+                items
+            }
 
         rule items() -> Vec<String>
-            = tuple_items()
-            / list_items()
+            = whitespace()*
+            items:(tuple_items() / list_items())
+            whitespace()* { items }
 
         rule list_edit() -> ListEdit<String>
             = whitespace()* action:action() items:items() whitespace()* {
@@ -90,7 +107,7 @@ peg::parser! {
             }
 
         rule implicit_add() -> Vec<ListEdit<String>>
-            = !(whitespace() / add() / remove() / tuple_start() / list_start()) item:$([_]+) {
+            = !(whitespace() / add() / remove() / tuple_start() / list_start()) item:string() {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item.to_owned()] }]
             }
 
@@ -100,6 +117,7 @@ peg::parser! {
 }
 
 mod err {
+  #[derive(Debug, Eq, PartialEq)]
   pub(crate) struct ParseError {
     template: String,
   }

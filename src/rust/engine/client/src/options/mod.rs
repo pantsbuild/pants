@@ -10,6 +10,8 @@ mod id;
 mod id_tests;
 
 mod parse;
+#[cfg(test)]
+mod parse_tests;
 
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Deref;
@@ -24,14 +26,14 @@ pub use self::id::{OptionId, Scope};
 use crate::build_root::BuildRoot;
 use crate::option_id;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ListEditAction {
   Replace,
   Add,
   Remove,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct ListEdit<T> {
   pub action: ListEditAction,
   pub items: Vec<T>,
