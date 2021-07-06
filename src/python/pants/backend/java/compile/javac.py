@@ -118,7 +118,7 @@ async def compile_java_source(
         Process(
             argv=[
                 bash.path,
-                javac_binary.javac,
+                javac_binary.javac_wrapper_script,
                 "-cp",
                 classpath_arg,
                 "-d",

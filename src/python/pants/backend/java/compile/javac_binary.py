@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class JavacBinary:
     digest: Digest
-    javac: ClassVar[str] = "__javac_binary/javac.sh"
+    javac_wrapper_script: ClassVar[str] = "__javac_binary/javac.sh"
     classfiles_relpath: ClassVar[str] = "classfiles"
 
 
@@ -38,7 +38,7 @@ async def setup_javac_binary(coursier: Coursier, javac: JavacSubsystem) -> Javac
         CreateDigest(
             [
                 FileContent(
-                    JavacBinary.javac,
+                    JavacBinary.javac_wrapper_script,
                     javac_wrapper_script.encode("utf-8"),
                     is_executable=True,
                 ),

@@ -9,7 +9,7 @@ from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.process import rules as process_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -23,6 +23,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *javac_binary_rules(),
             *process_rules(),
+            QueryRule(BashBinary, ()),
             QueryRule(JavacBinary, ()),
             QueryRule(ProcessResult, (Process,)),
         ],
@@ -31,11 +32,16 @@ def rule_runner() -> RuleRunner:
 
 def run_javac_version(rule_runner: RuleRunner) -> str:
     javac_binary = rule_runner.request(JavacBinary, [])
+    bash = rule_runner.request(BashBinary, [])
     process_result = rule_runner.request(
         ProcessResult,
         [
             Process(
-                argv=[javac_binary.javac, "-version"],
+                argv=[
+                    bash.path,
+                    javac_binary.javac_wrapper_script,
+                    "-version",
+                ],
                 input_digest=javac_binary.digest,
                 description="",
             )
