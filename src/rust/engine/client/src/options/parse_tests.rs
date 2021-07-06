@@ -188,10 +188,13 @@ fn test_parse_string_list_tuple() {
 
 #[test]
 fn test_parse_string_list_error_formatting() {
-  let bad_input = "-['/etc/hosts'],
+  let bad_input = "\
+-['/etc/hosts'],
          ?(\"/dev/null\")
 ";
-  let expected_error_msg = "Problem parsing foo string list value:
+
+  let expected_error_msg = "\
+Problem parsing foo string list value:
 1:-['/etc/hosts'],
 2:         ?(\"/dev/null\")
   ---------^
