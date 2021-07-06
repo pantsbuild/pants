@@ -77,7 +77,13 @@ fn test_bool() {
 
 #[test]
 fn test_float() {
-  let args = args(["-j=4", "--foo=42", "--foo=3.14", "--baz-spam=1.137"]);
+  let args = args([
+    "-j=4",
+    "--foo=42",
+    "--foo=3.14",
+    "--baz-spam=1.137",
+    "--bad=swallow",
+  ]);
 
   let assert_float =
     |expected: f64, id: OptionId| assert_eq!(expected, args.get_float(&id).unwrap().unwrap());
@@ -87,6 +93,11 @@ fn test_float() {
   assert_float(1.137, option_id!("baz", "spam"));
 
   assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
+
+  assert_eq!(
+    "Problem parsing --bad value swallow as a float value: invalid float literal".to_owned(),
+    args.get_float(&option_id!("bad")).unwrap_err()
+  );
 }
 
 #[test]
@@ -125,8 +136,6 @@ fn test_string_list() {
 
   assert!(args.get_string_list(&option_id!("dne")).unwrap().is_none());
 
-  // N.B.: The last line of the error message has non-deterministic clause ordering; so we omit a
-  // check of that line.
   let expected_error_msg = "\
 Problem parsing --bad string list value:
 1:['mis', 'matched')
