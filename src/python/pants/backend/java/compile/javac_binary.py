@@ -34,7 +34,7 @@ async def setup_javac_binary(coursier: Coursier, javac: JavacSubsystem) -> Javac
         /bin/echo "JAVAC FILE: $(/usr/bin/file ${{javac_path}})"
         /bin/echo "ARCH: $(/usr/bin/arch)"
         /bin/mkdir -p {JavacBinary.classfiles_relpath}
-        exec "${{javac_path}}" "$@"
+        # exec "${{javac_path}}" "$@"
         """
     )
 
