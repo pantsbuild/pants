@@ -10,7 +10,7 @@ from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.target_types import JavaSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, RemovePrefix
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult, BashBinary
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, Sources, Target, Targets
 from pants.jvm.resolve.coursier_fetch import (
@@ -55,6 +55,7 @@ class CompiledClassfiles:
 
 @rule(level=LogLevel.DEBUG)
 async def compile_java_source(
+    bash: BashBinary,
     coursier: Coursier,
     javac_binary: JavacBinary,
     request: CompileJavaSourceRequest,
@@ -116,6 +117,7 @@ async def compile_java_source(
         ProcessResult,
         Process(
             argv=[
+                bash.path,
                 javac_binary.javac,
                 "-cp",
                 classpath_arg,
