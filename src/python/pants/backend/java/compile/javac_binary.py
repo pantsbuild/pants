@@ -35,6 +35,8 @@ async def setup_javac_binary(coursier: Coursier, javac: JavacSubsystem) -> Javac
         """
     )
 
+    print("WRAPPER SCRIPT:")
+    print(javac_wrapper_script)
     javac_wrapper_script_digest = await Get(
         Digest,
         CreateDigest(
