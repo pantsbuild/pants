@@ -10,13 +10,14 @@ use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use grpc_util::{headers_to_interceptor_fn, retry::retry_call, status_to_str};
+use grpc_util::{
+  headers_to_interceptor_fn, layered_service, retry::retry_call, status_to_str, LayeredService,
+};
 use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
-use tonic::transport::Channel;
 use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
@@ -40,7 +41,7 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   executor: task_executor::Executor,
   store: Store,
-  action_cache_client: Arc<ActionCacheClient<Channel>>,
+  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   headers: BTreeMap<String, String>,
   platform: Platform,
   cache_read: bool,
@@ -65,6 +66,7 @@ impl CommandRunner {
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
     eager_fetch: bool,
+    concurrency_limit: usize,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -77,7 +79,10 @@ impl CommandRunner {
       tls_client_config.as_ref(),
       &mut headers,
     )?;
-    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
+    let channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      concurrency_limit,
+    );
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
     } else {

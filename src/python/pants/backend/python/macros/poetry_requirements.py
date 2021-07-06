@@ -185,6 +185,11 @@ def parse_pyproject_toml(toml_contents: str, file_path: str) -> set[Requirement]
             )
         )
     dependencies = poetry_vals.get("dependencies", {})
+    # N.B.: The "python" dependency is a special dependency required by Poetry that only serves to
+    # constraint the python interpreter versions the project works with; so we skip that.
+    # See: https://python-poetry.org/docs/pyproject/#dependencies-and-dev-dependencies
+    dependencies.pop("python", None)
+
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies:
         logger.warning(

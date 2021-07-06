@@ -157,6 +157,7 @@ async fn write_file_multiple_chunks() {
     10 * 1024,
     Duration::from_secs(5),
     1,
+    256,
   )
   .unwrap();
 
@@ -226,6 +227,7 @@ async fn write_connection_error() {
     10 * 1024 * 1024,
     Duration::from_secs(1),
     1,
+    256,
   )
   .unwrap();
   let error = store
@@ -301,6 +303,7 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
     10 * MEGABYTES,
     Duration::from_secs(1),
     1,
+    256,
   )
   .unwrap()
 }

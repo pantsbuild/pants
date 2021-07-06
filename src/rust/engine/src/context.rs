@@ -78,11 +78,14 @@ pub struct RemotingOptions {
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
+  pub store_rpc_concurrency: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
+  pub cache_rpc_concurrency: usize,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
+  pub execution_rpc_concurrency: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +94,7 @@ pub struct ExecutionStrategyOptions {
   pub remote_parallelism: usize,
   pub local_cleanup: bool,
   pub local_cache: bool,
+  pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
 }
@@ -142,10 +146,45 @@ impl Core {
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
         remoting_opts.store_rpc_retries,
+        remoting_opts.store_rpc_concurrency,
       )
     } else {
       Ok(local_only)
     }
+  }
+
+  fn make_local_execution_runner(
+    store: &Store,
+    executor: &Executor,
+    local_execution_root_dir: &Path,
+    named_caches_dir: &Path,
+    process_execution_metadata: &ProcessMetadata,
+    exec_strategy_opts: &ExecutionStrategyOptions,
+  ) -> Box<dyn CommandRunner> {
+    let local_command_runner = process_execution::local::CommandRunner::new(
+      store.clone(),
+      executor.clone(),
+      local_execution_root_dir.to_path_buf(),
+      NamedCaches::new(named_caches_dir.to_path_buf()),
+      exec_strategy_opts.local_cleanup,
+    );
+
+    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
+      if exec_strategy_opts.local_enable_nailgun {
+        Box::new(process_execution::nailgun::CommandRunner::new(
+          local_command_runner,
+          process_execution_metadata.clone(),
+          local_execution_root_dir.to_path_buf(),
+          executor.clone(),
+        ))
+      } else {
+        Box::new(local_command_runner)
+      };
+
+    Box::new(BoundedCommandRunner::new(
+      maybe_nailgunnable_local_command_runner,
+      exec_strategy_opts.local_parallelism,
+    ))
   }
 
   fn make_command_runner(
@@ -171,16 +210,15 @@ impl Core {
     } else {
       full_store.clone()
     };
-    let local_command_runner = Box::new(BoundedCommandRunner::new(
-      Box::new(process_execution::local::CommandRunner::new(
-        store_for_local_runner,
-        executor.clone(),
-        local_execution_root_dir.to_path_buf(),
-        NamedCaches::new(named_caches_dir.to_path_buf()),
-        exec_strategy_opts.local_cleanup,
-      )),
-      exec_strategy_opts.local_parallelism,
-    ));
+
+    let local_command_runner = Core::make_local_execution_runner(
+      &store_for_local_runner,
+      executor,
+      local_execution_root_dir,
+      named_caches_dir,
+      process_execution_metadata,
+      &exec_strategy_opts,
+    );
 
     // Possibly either add the remote execution runner or the remote cache runner.
     // `global_options.py` already validates that both are not set at the same time.
@@ -200,6 +238,8 @@ impl Core {
             Platform::Linux,
             remoting_opts.execution_overall_deadline,
             Duration::from_millis(100),
+            remoting_opts.execution_rpc_concurrency,
+            remoting_opts.cache_rpc_concurrency,
           )?),
           exec_strategy_opts.remote_parallelism,
         ))
@@ -217,6 +257,7 @@ impl Core {
           exec_strategy_opts.remote_cache_write,
           remoting_opts.cache_warnings_behavior,
           remoting_opts.cache_eager_fetch,
+          remoting_opts.cache_rpc_concurrency,
         )?)
       } else {
         local_command_runner

@@ -149,6 +149,10 @@ class DynamicRemoteOptions:
     execution_address: str | None
     store_headers: dict[str, str]
     execution_headers: dict[str, str]
+    parallelism: int
+    store_rpc_concurrency: int
+    cache_rpc_concurrency: int
+    execution_rpc_concurrency: int
 
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
@@ -161,6 +165,10 @@ class DynamicRemoteOptions:
             execution_address=None,
             store_headers={},
             execution_headers={},
+            parallelism=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
+            store_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
+            cache_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
+            execution_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         )
 
     @classmethod
@@ -180,6 +188,10 @@ class DynamicRemoteOptions:
         instance_name = cast("str | None", bootstrap_options.remote_instance_name)
         execution_headers = cast("dict[str, str]", bootstrap_options.remote_execution_headers)
         store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
+        parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
+        store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
+        execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
 
         if bootstrap_options.remote_oauth_bearer_token_path:
             oauth_token = (
@@ -289,6 +301,10 @@ class DynamicRemoteOptions:
             execution_address=execution_address,
             store_headers=store_headers,
             execution_headers=execution_headers,
+            parallelism=parallelism,
+            store_rpc_concurrency=store_rpc_concurrency,
+            cache_rpc_concurrency=cache_rpc_concurrency,
+            execution_rpc_concurrency=execution_rpc_concurrency,
         )
         return opts, auth_plugin_result
 
@@ -311,6 +327,7 @@ class ExecutionOptions:
     process_execution_local_cache: bool
     process_execution_local_cleanup: bool
     process_execution_local_parallelism: int
+    process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
@@ -319,14 +336,17 @@ class ExecutionOptions:
     remote_store_chunk_bytes: Any
     remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
+    remote_store_rpc_concurrency: int
 
     remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
+    remote_cache_rpc_concurrency: int
 
     remote_execution_address: str | None
     remote_execution_extra_platform_properties: List[str]
     remote_execution_headers: Dict[str, str]
     remote_execution_overall_deadline_secs: int
+    remote_execution_rpc_concurrency: int
 
     @classmethod
     def from_options(
@@ -345,23 +365,27 @@ class ExecutionOptions:
             # Process execution setup.
             process_execution_local_cache=bootstrap_options.process_execution_local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
-            process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
+            process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_local_cleanup=bootstrap_options.process_execution_local_cleanup,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
+            process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
+            remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
+            remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
+            remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
         )
 
 
@@ -420,6 +444,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
     process_execution_local_cache=True,
+    process_execution_local_enable_nailgun=False,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -428,9 +453,11 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
+    remote_store_rpc_concurrency=128,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
     remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
+    remote_cache_rpc_concurrency=128,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
@@ -438,6 +465,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
         "user-agent": f"pants/{VERSION}",
     },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
+    remote_execution_rpc_concurrency=128,
 )
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
@@ -1022,6 +1050,13 @@ class GlobalOptions(Subsystem):
                 "process cache entries from being (re)used for different usecases or users."
             ),
         )
+        register(
+            "--process-execution-local-enable-nailgun",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
+            advanced=True,
+        )
 
         register(
             "--remote-execution",
@@ -1159,6 +1194,13 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
             help="Number of times to retry any RPC to the remote store before giving up.",
         )
+        register(
+            "--remote-store-rpc-concurrency",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
+            help="The number of concurrent requests allowed to the remote store service.",
+        )
 
         register(
             "--remote-cache-warnings",
@@ -1181,6 +1223,13 @@ class GlobalOptions(Subsystem):
                 "\n\nThis may result in worse performance, but reduce the frequency of errors "
                 "encountered by reducing the surface area of when remote caching is used."
             ),
+        )
+        register(
+            "--remote-cache-rpc-concurrency",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
+            help="The number of concurrent requests allowed to the remote cache service.",
         )
 
         register(
@@ -1220,6 +1269,13 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
             advanced=True,
             help="Overall timeout in seconds for each remote execution request from time of submission",
+        )
+        register(
+            "--remote-execution-rpc-concurrency",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
+            help="The number of concurrent requests allowed to the remote execution service.",
         )
 
         register(
