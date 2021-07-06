@@ -7,6 +7,8 @@ mod args_tests;
 
 mod config;
 mod env;
+#[cfg(test)]
+mod env_tests;
 
 mod id;
 #[cfg(test)]

@@ -11,7 +11,7 @@ use crate::options::ListEdit;
 
 #[derive(Debug)]
 pub(crate) struct Env {
-  env: HashMap<String, String>,
+  pub(crate) env: HashMap<String, String>,
 }
 
 impl Env {
