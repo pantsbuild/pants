@@ -48,6 +48,9 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert "javac 11.0" in run_javac_version(rule_runner)
 
+    print(run_javac_version(rule_runner))
+    assert "force failure" in run_javac_version(rule_runner)
+
     rule_runner.set_options(["--javac-jdk=adopt:1.8"])
     assert "javac 1.8" in run_javac_version(rule_runner)
 
