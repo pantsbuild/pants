@@ -201,6 +201,7 @@ class Scheduler:
             remote_cache_write=execution_options.remote_cache_write,
             local_cleanup=execution_options.process_execution_local_cleanup,
             local_parallelism=execution_options.process_execution_local_parallelism,
+            local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
         )
 

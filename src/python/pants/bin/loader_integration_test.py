@@ -54,16 +54,6 @@ def test_alternate_entrypoint_bad() -> None:
     assert "must be of the form" in pants_run.stderr
 
 
-def test_alternate_entrypoint_not_callable() -> None:
-    pants_run = run_pants(
-        command=["help"],
-        extra_env={DAEMON_ENTRYPOINT: "pants.bin.loader_integration_test:TEST_STR"},
-    )
-    pants_run.assert_failure()
-    assert "TEST_STR" in pants_run.stderr
-    assert "not callable" in pants_run.stderr
-
-
 def exercise_alternate_entrypoint_scrubbing():
     """An alternate test entrypoint for exercising scrubbing."""
     print(f"{DAEMON_ENTRYPOINT}={os.environ.get(DAEMON_ENTRYPOINT)}")
