@@ -35,16 +35,19 @@ readonly NATIVE_ENGINE_BINARY_PYO3="native_engine_pyo3.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_PYO3="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY_PYO3}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
+readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
+readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 
 function _build_native_code() {
-  banner "Building native engine..."
+  banner "Building native code..."
   # NB: See Cargo.toml with regard to the `extension-module` features.
   "${REPO_ROOT}/cargo" build \
     --features=extension-module \
     --features=engine_pyo3/extension-module \
     ${MODE_FLAG} \
     -p engine \
-    -p engine_pyo3 || die
+    -p engine_pyo3 \
+    -p client || die
 }
 
 function bootstrap_native_code() {
@@ -66,7 +69,11 @@ function bootstrap_native_code() {
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
-  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" || "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
+  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f \
+    "${NATIVE_ENGINE_RESOURCE_PYO3}" || ! -f \
+    "${NATIVE_CLIENT_PATH}" || \
+    "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
+
     _build_native_code || die
 
     # If bootstrapping the native engine fails, don't attempt to run pants
@@ -80,15 +87,21 @@ function bootstrap_native_code() {
       die "Failed to build native engine, file missing at ${native_binary_pyo3}."
     fi
 
+    # If bootstrapping the native client fails, don't attempt to run pants afterwards.
+    if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
+      die "Failed to build native client."
+    fi
+
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     engine_version_calculated="$(calculate_current_hash)"
 
     # Create the native engine resource.
     # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
     #  process from being killed when recompiling.
-    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
+    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}" "${NATIVE_CLIENT_PATH}"
     cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
     cp "${native_binary_pyo3}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
+    cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
 
     # Create the accompanying metadata file.
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
