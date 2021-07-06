@@ -45,7 +45,10 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
 
 
 def test_java_binary_versions(rule_runner: RuleRunner) -> None:
+    print(run_javac_version(rule_runner))
+
     # default version is 1.11
+
     assert "javac 11.0" in run_javac_version(rule_runner)
 
     print(run_javac_version(rule_runner))
