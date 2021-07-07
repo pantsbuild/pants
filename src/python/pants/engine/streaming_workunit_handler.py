@@ -13,6 +13,7 @@ from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, Snapshot
 from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyStdioDestination
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
@@ -28,6 +29,21 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # Streaming workunits plugin API
 # -----------------------------------------------------------------------------------------------
+
+
+def stdio_thread_get_destination() -> PyStdioDestination:
+    """Gets the threadlocal stdio destination for the current thread."""
+    return native_engine.stdio_thread_get_destination()
+
+
+def stdio_thread_set_destination(destination: PyStdioDestination) -> None:
+    """Sets the threadlocal stdio destination for the current thread.
+
+    WorkunitsCallback instances that spawn threads may want to propagate the stdio/logging
+    destination from the dedicated thread that they are spawned on to other threads that they create
+    for background work.
+    """
+    native_engine.stdio_thread_set_destination(destination)
 
 
 @dataclass(frozen=True)
