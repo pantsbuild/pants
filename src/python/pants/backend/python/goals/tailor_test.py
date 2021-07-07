@@ -45,6 +45,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--no-tailor-python-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
             f"src/python/foo/{fp}": ""
@@ -121,6 +122,41 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                     "tests",
                     ["bar_test.py"],
                     kwargs={"name": "tests"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]
+                ),
+            ]
+        )
+        == pts
+    )
+
+
+def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"src/python/foo/{fp}": ""
+            for fp in (
+                "__init__.py",
+                "bar/__init__.py",
+                "bar/bar.py",
+                "baz/__init__.py",
+                "qux/qux.py",
+            )
+        }
+    )
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources([]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    PythonLibrary, "src/python/foo/bar", "bar", ["__init__.py", "bar.py"]
                 ),
                 PutativeTarget.for_target_type(
                     PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]

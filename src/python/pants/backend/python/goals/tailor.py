@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.python.subsystems.tailor_python import TailorPythonSubsystem
 from pants.backend.python.target_types import PythonLibrary, PythonTests, PythonTestsSources
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -42,7 +43,9 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")
 async def find_putative_targets(
-    req: PutativePythonTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativePythonTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    tailor_python_subsys: TailorPythonSubsystem,
 ) -> PutativeTargets:
     all_py_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.py"))
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
@@ -52,6 +55,12 @@ async def find_putative_targets(
         for dirname, filenames in group_by_dir(paths).items():
             name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
             kwargs = {"name": name} if tgt_type == PythonTests else {}
+            if (
+                tailor_python_subsys.ignore_solitary_init_files()
+                and tgt_type == PythonLibrary
+                and filenames == {"__init__.py"}
+            ):
+                continue
             pts.append(
                 PutativeTarget.for_target_type(
                     tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
