@@ -181,6 +181,7 @@ class TestDebugRequest:
 
 
 @union
+@dataclass(frozen=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
