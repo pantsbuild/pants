@@ -44,7 +44,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -120,8 +120,8 @@ async def package_pex_binary(
             "targets, but Pants will not include them in the PEX. Filesystem APIs like `open()` "
             "are not able to load files within the binary itself; instead, they read from the "
             "current working directory."
-            "\n\nInstead, use `resources` targets or wrap this `pex_binary` in an `archive`. See "
-            f"{bracketed_docs_url('resources')}."
+            "\n\nInstead, use `resources` targets or wrap this `pex_binary` in an `archive`. "
+            f"See {doc_url('resources')}."
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 

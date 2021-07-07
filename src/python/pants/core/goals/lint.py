@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
-from pants.core.goals.style_request import StyleRequest
+from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -17,7 +16,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
@@ -26,7 +25,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import path_safe, strip_v2_chroot_path
+from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +35,13 @@ class LintReport:
     digest: Digest
 
 
-class InvalidLinterReportsError(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
-    partition_description: Optional[str] = None
-    report: Optional[LintReport] = None
+    partition_description: str | None = None
+    report: Digest = EMPTY_DIGEST
 
     @classmethod
     def from_fallible_process_result(
@@ -55,7 +50,7 @@ class LintResult(EngineAwareReturnType):
         *,
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
-        report: Optional[LintReport] = None,
+        report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -154,7 +149,7 @@ class LintRequest(StyleRequest):
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
 # are written under this directory. E.g.,
 # ./pants --flake8-args="--output-file=reports/report.txt" lint <target>
-LINTER_REPORT_DIR = "reports"
+REPORT_DIR = "reports"
 
 
 class LintSubsystem(GoalSubsystem):
@@ -193,7 +188,7 @@ class LintSubsystem(GoalSubsystem):
             ),
             removal_version="2.7.0.dev0",
             removal_hint=f"Edit the config file for the linter in question, or set its args via "
-            f"Pants options, to cause it to write reports under f{LINTER_REPORT_DIR} .",
+            f"Pants options, to cause it to write reports under f{REPORT_DIR} .",
         )
 
     @property
@@ -264,34 +259,16 @@ async def lint(
 
     all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
 
-    # Handle reports.
-    disambiguated_dirs: set[str] = set()
+    def get_tool_name(res: LintResults) -> str:
+        return res.linter_name
 
-    def write_report(digest: Digest, subdir: str) -> None:
-        while subdir in disambiguated_dirs:
-            # It's unlikely that two distinct partition descriptions will become the
-            # same after path_safe(), but might as well be safe.
-            subdir += "_"
-        disambiguated_dirs.add(subdir)
-        output_dir = str(dist_dir.relpath / "lint" / subdir)
-        workspace.write_digest(
-            digest,
-            path_prefix=output_dir,
-        )
-        logger.info(f"Wrote linter result files to {output_dir}.")
-
-    for results in all_results:
-        if len(results.results) == 1 and results.results[0].report:
-            write_report(results.results[0].report.digest, results.linter_name)
-        else:
-            for result in results.results:
-                if result.report:
-                    write_report(
-                        result.report.digest,
-                        os.path.join(
-                            results.linter_name, path_safe(result.partition_description or "all")
-                        ),
-                    )
+    write_reports(
+        all_results,
+        workspace,
+        dist_dir,
+        goal_name=LintSubsystem.name,
+        get_tool_name=get_tool_name,
+    )
 
     exit_code = 0
     if all_results:

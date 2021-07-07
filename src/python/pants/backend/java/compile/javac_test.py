@@ -9,6 +9,7 @@ import pytest
 
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
@@ -39,6 +40,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *javac_rules(),
             *util_rules(),
+            *javac_binary_rules(),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
         ],
         target_types=[JvmDependencyLockfile, JavaLibrary],
@@ -111,6 +113,67 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
     assert len(classfile_digest_contents) == 1
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/lib/ExampleLib.class"
+
+
+def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    maven_requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_library(
+                    name = 'lib',
+                    dependencies = [
+                        ':lockfile',
+                    ]
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "ExampleLib.java": JAVA_LIB_SOURCE,
+        }
+    )
+    request = CompileJavaSourceRequest(
+        target=rule_runner.get_target(address=Address(spec_path="", target_name="lib"))
+    )
+
+    rule_runner.set_options(["--javac-jdk=openjdk:1.16.0-1"])
+    assert {
+        contents.path
+        for contents in rule_runner.request(
+            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
+        )
+    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
+
+    rule_runner.set_options(["--javac-jdk=adopt:1.8"])
+    assert {
+        contents.path
+        for contents in rule_runner.request(
+            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
+        )
+    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
+
+    rule_runner.set_options(["--javac-jdk=zulu:1.6"])
+    assert {
+        contents.path
+        for contents in rule_runner.request(
+            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
+        )
+    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
+
+    rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
+    expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        rule_runner.request(CompiledClassfiles, [request])
 
 
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:

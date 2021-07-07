@@ -256,12 +256,12 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
 }
 
 /// Link to the Pants docs using the current version of Pants.
-pub fn bracketed_docs_url(slug: &str) -> String {
+pub fn doc_url(slug: &str) -> String {
   let gil = Python::acquire_gil();
   let py = gil.python();
   let docutil = py.import("pants.util.docutil").unwrap();
   docutil
-    .call(py, "bracketed_docs_url", (slug,), None)
+    .call(py, "doc_url", (slug,), None)
     .unwrap()
     .extract(py)
     .unwrap()

@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.engine.target import COMMON_TARGET_FIELDS, BoolField, Dependencies, Sources, Target
-from pants.util.docutil import bracketed_docs_url
-
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
 # Protobuf targets.
+from pants.util.docutil import doc_url
+
+
 class ProtobufDependencies(Dependencies):
     pass
 
@@ -25,4 +26,4 @@ class ProtobufGrpcToggle(BoolField):
 class ProtobufLibrary(Target):
     alias = "protobuf_library"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrpcToggle)
-    help = f"Protobuf files used to generate various languages.\n\nSee {bracketed_docs_url('protobuf')}."
+    help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."

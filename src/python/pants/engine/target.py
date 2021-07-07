@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import collections.abc
-import dataclasses
 import itertools
 import logging
 import os.path
@@ -27,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_type_hints,
 )
 
 from typing_extensions import final
@@ -46,7 +46,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
@@ -273,7 +273,7 @@ class Target:
 
     # Subclasses must define these
     alias: ClassVar[str]
-    core_fields: ClassVar[tuple[type[Field], ...]]
+    core_fields: ClassVar[Tuple[Type[Field], ...]]
     help: ClassVar[str]
 
     # Subclasses may define these.
@@ -282,13 +282,13 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: tuple[type[Field], ...]
-    field_values: FrozenDict[type[Field], Field]
+    plugin_fields: Tuple[Type[Field], ...]
+    field_values: FrozenDict[Type[Field], Field]
 
     @final
     def __init__(
         self,
-        unhydrated_values: dict[str, Any],
+        unhydrated_values: Dict[str, Any],
         address: Address,
         *,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
@@ -335,7 +335,7 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> tuple[type[Field], ...]:
+    def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
     @final
@@ -750,12 +750,12 @@ def generate_subtarget(
 
 
 def _get_field_set_fields_from_target(
-    field_set: type[FieldSet], target: Target
-) -> dict[str, Field]:
-    all_expected_fields: dict[str, type[Field]] = {
-        dataclass_field.name: dataclass_field.type
-        for dataclass_field in dataclasses.fields(field_set)
-        if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)
+    field_set: Type[FieldSet], target: Target
+) -> Dict[str, Field]:
+    all_expected_fields: Dict[str, Type[Field]] = {
+        name: field_type
+        for name, field_type in get_type_hints(field_set).items()
+        if isinstance(field_type, type) and issubclass(field_type, Field)
     }
     return {
         dataclass_field_name: (
@@ -809,7 +809,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         print(field_set.sources)
     """
 
-    required_fields: ClassVar[tuple[type[Field], ...]]
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
 
@@ -835,7 +835,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @classmethod
     def applicable_target_types(
         cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
-    ) -> tuple[type[Target], ...]:
+    ) -> Tuple[Type[Target], ...]:
         return tuple(
             tgt_type
             for tgt_type in target_types
@@ -844,7 +844,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def create(cls: type[_FS], tgt: Target) -> _FS:
+    def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
             address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
         )
@@ -861,13 +861,13 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSets(Generic[_FS]):
-    mapping: FrozenDict[Target, tuple[_FS, ...]]
+    mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
     def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
         self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
 
     @memoized_property
-    def field_sets(self) -> tuple[_FS, ...]:
+    def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(
             itertools.chain.from_iterable(
                 field_sets_per_target for field_sets_per_target in self.mapping.values()
@@ -875,7 +875,7 @@ class TargetRootsToFieldSets(Generic[_FS]):
         )
 
     @memoized_property
-    def targets(self) -> tuple[Target, ...]:
+    def targets(self) -> Tuple[Target, ...]:
         return tuple(self.mapping.keys())
 
 
@@ -888,7 +888,7 @@ class NoApplicableTargetsBehavior(Enum):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
-    field_set_superclass: type[_FS]
+    field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
@@ -897,7 +897,7 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
 
     def __init__(
         self,
-        field_set_superclass: type[_FS],
+        field_set_superclass: Type[_FS],
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
@@ -913,23 +913,23 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
 @dataclass(unsafe_hash=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
-    collection: tuple[tuple[_FS, ...], ...]
+    collection: Tuple[Tuple[_FS, ...], ...]
 
     def __init__(self, collection: Iterable[Iterable[_FS]]):
         self.collection = tuple(tuple(iterable) for iterable in collection)
 
     @memoized_property
-    def field_sets(self) -> tuple[_FS, ...]:
+    def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
-    field_set_superclass: type[_FS]
-    targets: tuple[Target, ...]
+    field_set_superclass: Type[_FS]
+    targets: Tuple[Target, ...]
 
-    def __init__(self, field_set_superclass: type[_FS], targets: Iterable[Target]):
+    def __init__(self, field_set_superclass: Type[_FS], targets: Iterable[Target]):
         self.field_set_superclass = field_set_superclass
         self.targets = tuple(targets)
 
@@ -1231,7 +1231,7 @@ class DictStringToStringSequenceField(Field):
 
 class Sources(StringSequenceField, AsyncFieldMixin):
     alias = "sources"
-    expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
+    expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
     help = (
@@ -1531,10 +1531,10 @@ class SecondaryOwnerMixin(ABC):
 
 
 def targets_with_sources_types(
-    sources_types: Iterable[type[Sources]],
+    sources_types: Iterable[Type[Sources]],
     targets: Iterable[Target],
     union_membership: UnionMembership,
-) -> tuple[Target, ...]:
+) -> Tuple[Target, ...]:
     """Return all targets either with the specified sources subclass(es) or which can generate those
     sources."""
     return tuple(
@@ -1612,7 +1612,7 @@ class ExplicitlyProvidedDependencies:
     ignores: FrozenOrderedSet[Address]
 
     @memoized_method
-    def any_are_covered_by_includes(self, addresses: tuple[Address, ...]) -> bool:
+    def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
         Note that if the input addresses are file addresses, they will still be marked as covered if
@@ -1624,7 +1624,7 @@ class ExplicitlyProvidedDependencies:
         )
 
     @memoized_method
-    def remaining_after_ignores(self, addresses: tuple[Address, ...]) -> frozenset[Address]:
+    def remaining_after_ignores(self, addresses: Tuple[Address, ...]) -> frozenset[Address]:
         """All addresses that are not covered by the explicitly provided ignores.
 
         Note that if the input addresses are file addresses, they will still be marked as covered if
@@ -1641,7 +1641,7 @@ class ExplicitlyProvidedDependencies:
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
-        ambiguous_addresses: tuple[Address, ...],
+        ambiguous_addresses: Tuple[Address, ...],
         original_address: Address,
         *,
         context: str,
@@ -1663,10 +1663,10 @@ class ExplicitlyProvidedDependencies:
             f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
-            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
         )
 
-    def disambiguated_via_ignores(self, ambiguous_addresses: tuple[Address, ...]) -> Address | None:
+    def disambiguated_via_ignores(self, ambiguous_addresses: Tuple[Address, ...]) -> Address | None:
         """If exactly one of the input addresses remains after considering the explicitly provided
         ignores, return it because it is disambiguated."""
         if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):

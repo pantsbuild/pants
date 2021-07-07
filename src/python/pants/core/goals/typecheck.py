@@ -3,16 +3,20 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
-from pants.core.goals.style_request import StyleRequest
+from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
+from pants.core.goals.style_request import StyleRequest, write_reports
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, _uncacheable_rule, collect_rules, goal_rule
@@ -23,20 +27,24 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class TypecheckResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
-    partition_description: Optional[str] = None
+    partition_description: str | None = None
+    report: Digest = EMPTY_DIGEST
 
     @staticmethod
     def from_fallible_process_result(
         process_result: FallibleProcessResult,
         *,
-        partition_description: Optional[str] = None,
+        partition_description: str | None = None,
         strip_chroot_path: bool = False,
+        report: Digest = EMPTY_DIGEST,
     ) -> TypecheckResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -46,6 +54,7 @@ class TypecheckResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             partition_description=partition_description,
+            report=report,
         )
 
     def metadata(self) -> Dict[str, Any]:
@@ -144,7 +153,11 @@ class Typecheck(Goal):
 
 @goal_rule
 async def typecheck(
-    console: Console, targets: Targets, union_membership: UnionMembership
+    console: Console,
+    workspace: Workspace,
+    targets: Targets,
+    dist_dir: DistDir,
+    union_membership: UnionMembership,
 ) -> Typecheck:
     typecheck_request_types = cast(
         "Iterable[type[StyleRequest]]", union_membership[TypecheckRequest]
@@ -168,6 +181,17 @@ async def typecheck(
     )
     all_results = await MultiGet(
         Get(EnrichedTypecheckResults, TypecheckRequest, request) for request in valid_requests
+    )
+
+    def get_tool_name(res: TypecheckResults) -> str:
+        return res.typechecker_name
+
+    write_reports(
+        all_results,
+        workspace,
+        dist_dir,
+        goal_name=TypecheckSubsystem.name,
+        get_tool_name=get_tool_name,
     )
 
     exit_code = 0

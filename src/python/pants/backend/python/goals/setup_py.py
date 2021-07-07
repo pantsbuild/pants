@@ -33,6 +33,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -53,6 +54,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Sources,
+    SourcesPaths,
     Target,
     Targets,
     TransitiveTargets,
@@ -61,7 +63,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import bracketed_docs_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -71,24 +73,29 @@ from pants.util.strutil import ensure_text
 logger = logging.getLogger(__name__)
 
 
-class InvalidSetupPyArgs(Exception):
+class SetupPyError(Exception):
+    def __init__(self, msg: str):
+        super().__init__(f"{msg} See {doc_url('python-distributions')}.")
+
+
+class InvalidSetupPyArgs(SetupPyError):
     """Indicates invalid arguments to setup.py."""
 
 
-class TargetNotExported(Exception):
+class TargetNotExported(SetupPyError):
     """Indicates a target that was expected to be exported is not."""
 
 
-class InvalidEntryPoint(Exception):
+class InvalidEntryPoint(SetupPyError):
     """Indicates that a specified binary entry point was invalid."""
 
 
-class OwnershipError(Exception):
+class OwnershipError(SetupPyError):
     """An error related to target ownership calculation."""
 
     def __init__(self, msg: str):
         super().__init__(
-            f"{msg} See {bracketed_docs_url('python-distributions')} for "
+            f"{msg} See {doc_url('python-distributions')} for "
             f"how python_library targets are mapped to distributions."
         )
 
@@ -201,8 +208,14 @@ class SetupKwargs:
         self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
     ) -> None:
         super().__init__()
+        if "name" not in kwargs:
+            raise InvalidSetupPyArgs(
+                f"Missing a `name` kwarg in the `provides` field for {address}."
+            )
         if "version" not in kwargs:
-            raise ValueError(f"Missing a `version` kwarg in the `provides` field for {address}.")
+            raise InvalidSetupPyArgs(
+                f"Missing a `version` kwarg in the `provides` field for {address}."
+            )
 
         if not _allow_banned_keys:
             for arg in {
@@ -274,9 +287,14 @@ class FinalizedSetupKwargs(SetupKwargs):
 
 @dataclass(frozen=True)
 class SetupPyChroot:
-    """A chroot containing a generated setup.py and the sources it operates on."""
+    """A chroot containing a setup.py and the sources it operates on."""
 
     digest: Digest
+    setup_script: str  # The path of the setup script within the digest.
+
+    # Note that this field is merely informational, used primarily in tests, and
+    # to construct the chroot name from the name and version kwargs, when setup is
+    # run with no args.
     setup_kwargs: FinalizedSetupKwargs
 
 
@@ -350,7 +368,7 @@ def validate_commands(commands: Tuple[str, ...]):
     # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
     #  See https://github.com/pantsbuild/pants/issues/8935.
     if "upload" in commands or "register" in commands:
-        raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
+        raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands.")
 
 
 @rule
@@ -422,7 +440,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
         ProcessResult,
         VenvPexProcess(
             setuptools_pex,
-            argv=("setup.py", *req.args),
+            argv=(req.chroot.setup_script, *req.args),
             input_digest=req.chroot.digest,
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
@@ -490,6 +508,28 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
+
+    setup_script = setup_kwargs.pop("setup_script", None)
+    if setup_script:
+        # The target points to an existing setup.py script, so use that.
+        invalid_keys = set(setup_kwargs.keys()) - {"name", "version"}
+        if invalid_keys:
+            raise InvalidSetupPyArgs(
+                f"The `provides` field in {exported_addr} specifies a setup_script kwarg, so it "
+                f"must only specify the name and version kwargs, but it also specified "
+                f"{','.join(sorted(invalid_keys))}."
+            )
+        stripped_setup_script = await Get(
+            StrippedSourceFileNames, SourcesPaths(files=(setup_script,), dirs=())
+        )
+        return SetupPyChroot(
+            sources.digest,
+            stripped_setup_script[0],
+            FinalizedSetupKwargs(setup_kwargs, address=target.address),
+        )
+
+    # There is no existing setup.py script, so we generate one.
+
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
     # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
     # specified `SetupKwargs(_allow_banned_keys=True)`.
@@ -562,7 +602,9 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
 
     chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
-    return SetupPyChroot(chroot_digest, FinalizedSetupKwargs(setup_kwargs, address=target.address))
+    return SetupPyChroot(
+        chroot_digest, "setup.py", FinalizedSetupKwargs(setup_kwargs, address=target.address)
+    )
 
 
 @rule

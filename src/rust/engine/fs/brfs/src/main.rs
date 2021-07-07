@@ -37,6 +37,7 @@ use std::sync::Arc;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
+use clap::{value_t, App, Arg};
 use futures::future::FutureExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
@@ -670,39 +671,47 @@ async fn main() {
 
   let default_store_path = Store::default_path();
 
-  let args = clap::App::new("brfs")
+  let args = App::new("brfs")
     .arg(
-      clap::Arg::with_name("local-store-path")
+      Arg::with_name("local-store-path")
         .takes_value(true)
         .long("local-store-path")
         .default_value_os(default_store_path.as_ref())
         .required(false),
     ).arg(
-      clap::Arg::with_name("server-address")
+      Arg::with_name("server-address")
         .takes_value(true)
         .long("server-address")
         .required(false),
     ).arg(
-      clap::Arg::with_name("remote-instance-name")
+      Arg::with_name("remote-instance-name")
         .takes_value(true)
         .long("remote-instance-name")
         .required(false),
     ).arg(
-      clap::Arg::with_name("root-ca-cert-file")
+      Arg::with_name("root-ca-cert-file")
         .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
         .takes_value(true)
         .long("root-ca-cert-file")
         .required(false)
     ).arg(
-      clap::Arg::with_name("oauth-bearer-token-file")
+      Arg::with_name("oauth-bearer-token-file")
         .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
         .takes_value(true)
         .long("oauth-bearer-token-file")
         .required(false)
     ).arg(
-      clap::Arg::with_name("mount-path")
+      Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("rpc-concurrency-limit")
+          .help("Maximum concurrenct RPCs to the service.")
+          .takes_value(true)
+          .long("rpc-concurrency-limit")
+          .required(false)
+          .default_value("128")
     ).get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
@@ -744,6 +753,8 @@ async fn main() {
         4 * 1024 * 1024,
         std::time::Duration::from_secs(5 * 60),
         1,
+        value_t!(args.value_of("rpc-concurrency-limit"), usize)
+          .expect("Bad rpc-concurrency-limit flag"),
       )
       .expect("Error making remote store"),
     None => local_only_store,

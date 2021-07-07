@@ -28,7 +28,7 @@ def test_pluralize() -> None:
 
 def test_ensure_text() -> None:
     bytes_val = bytes(bytearray([0xE5, 0xBF, 0xAB]))
-    assert "快", ensure_text(bytes_val)
+    assert "快" == ensure_text(bytes_val)
     with pytest.raises(TypeError):
         ensure_text(45)  # type: ignore[arg-type] # intended to fail type check
 

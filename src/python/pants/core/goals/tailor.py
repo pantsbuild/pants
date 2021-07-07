@@ -11,7 +11,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Set, Tuple, Type, cast
 
-from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptyDescendantAddresses
+from pants.base.specs import (
+    AddressSpecs,
+    AscendantAddresses,
+    MaybeEmptyDescendantAddresses,
+    Spec,
+    Specs,
+)
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -35,6 +41,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -42,8 +49,17 @@ from pants.util.meta import frozen_after_init
 
 
 @union
+@dataclass(frozen=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
-    pass
+    search_paths: PutativeTargetsSearchPaths
+
+
+@dataclass(frozen=True)
+class PutativeTargetsSearchPaths:
+    dirs: tuple[str, ...]
+
+    def path_globs(self, filename_glob: str) -> PathGlobs:
+        return PathGlobs([os.path.join(d, "**", filename_glob) for d in self.dirs])
 
 
 @memoized
@@ -227,7 +243,7 @@ class TailorSubsystem(GoalSubsystem):
             type=dict,
             help="A mapping from standard target type to custom type to use instead. The custom "
             "type can be a custom target type or a macro that offers compatible functionality "
-            "to the one it replaces (see https://www.pantsbuild.org/docs/macros).",
+            f"to the one it replaces (see {doc_url('macros')}).",
         )
 
     @property
@@ -404,16 +420,55 @@ async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
+def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
+    """Extract cmd-line specs that look like directories.
+
+    Error on all other specs.
+
+    This is a hack that allows us to emulate "directory specs", until we are able to
+    support those more intrinsically.
+
+    TODO: If other goals need "directory specs", move this logic to a rule that produces them.
+    """
+    # Specs that look like directories are interpreted by the SpecsParser as the address
+    # of the target with the same name as the directory of the BUILD file.
+    # Note that we can't tell the difference between the user specifying foo/bar and the
+    # user specifying foo/bar:bar, so we will consider the latter a "directory spec" too.
+    dir_specs = []
+    other_specs: list[Spec] = [
+        *specs.filesystem_specs.includes,
+        *specs.filesystem_specs.ignores,
+        *specs.address_specs.globs,
+    ]
+    for spec in specs.address_specs.literals:
+        if spec.target_component == os.path.basename(spec.path_component):
+            dir_specs.append(spec)
+        else:
+            other_specs.append(spec)
+    if other_specs:
+        raise ValueError(
+            "The tailor goal only accepts literal directories as arguments, but you "
+            f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
+            "specify no arguments to run against the entire repository."
+        )
+    # No specs at all means search the entire repo (represented by ("",)).
+    return tuple(spec.path_component for spec in specs.address_specs.literals) or ("",)
+
+
 @goal_rule
 async def tailor(
     tailor_subsystem: TailorSubsystem,
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    specs: Specs,
 ) -> Tailor:
-    putative_target_request_types = union_membership[PutativeTargetsRequest]
+    search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
+    putative_target_request_types: Iterable[type[PutativeTargetsRequest]] = union_membership[
+        PutativeTargetsRequest
+    ]
     putative_targets_results = await MultiGet(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type())
+        Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
         for req_type in putative_target_request_types
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)

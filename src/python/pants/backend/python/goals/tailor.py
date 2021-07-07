@@ -20,12 +20,13 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PutativePythonTargetsRequest:
+class PutativePythonTargetsRequest(PutativeTargetsRequest):
     pass
 
 
@@ -42,9 +43,11 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")
 async def find_putative_targets(
-    _: PutativePythonTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativePythonTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    python_setup: PythonSetup,
 ) -> PutativeTargets:
-    all_py_files = await Get(Paths, PathGlobs(["**/*.py"]))
+    all_py_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.py"))
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
     classified_unowned_py_files = classify_source_files(unowned_py_files)
     pts = []
@@ -52,6 +55,12 @@ async def find_putative_targets(
         for dirname, filenames in group_by_dir(paths).items():
             name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
             kwargs = {"name": name} if tgt_type == PythonTests else {}
+            if (
+                python_setup.tailor_ignore_solitary_init_files
+                and tgt_type == PythonLibrary
+                and filenames == {"__init__.py"}
+            ):
+                continue
             pts.append(
                 PutativeTarget.for_target_type(
                     tgt_type, dirname, name, sorted(filenames), kwargs=kwargs

@@ -112,6 +112,17 @@ class PythonSetup(Subsystem):
             ),
         )
 
+        register(
+            "--tailor-ignore-solitary-init-files",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Don't tailor python_library targets for solitary __init__.py files, as "
+            "those usually exist as import scaffolding rather than true library code.\n\n"
+            "Set to False if you commonly have packages containing real code in "
+            "__init__.py and there are no other .py files in the package.",
+        )
+
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
@@ -142,6 +153,10 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
+
+    @property
+    def tailor_ignore_solitary_init_files(self) -> bool:
+        return cast(bool, self.options.tailor_ignore_solitary_init_files)
 
     @property
     def scratch_dir(self):

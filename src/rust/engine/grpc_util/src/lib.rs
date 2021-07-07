@@ -36,10 +36,23 @@ use http::header::USER_AGENT;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tower::limit::ConcurrencyLimit;
+use tower::ServiceBuilder;
 
 pub mod hyper;
 pub mod prost;
 pub mod retry;
+
+// NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
+// Service layers that we use universally. If this type becomes unwieldy, or our various Services
+// diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
+pub type LayeredService = ConcurrencyLimit<Channel>;
+
+pub fn layered_service(channel: Channel, concurrency_limit: usize) -> LayeredService {
+  ServiceBuilder::new()
+    .concurrency_limit(concurrency_limit)
+    .service(channel)
+}
 
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
 pub fn create_endpoint(
