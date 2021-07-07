@@ -3,11 +3,11 @@
 
 import dataclasses
 import os.path
-from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from pants.option.native_goal_request import NativeGoalRequest
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -26,34 +26,30 @@ class SplitArgs:
     passthru: List[str]  # Any remaining args specified after a -- separator.
 
 
-class HelpRequest(ABC):
-    """Represents an implicit or explicit request for help by the user."""
-
-
 @dataclass(frozen=True)
-class ThingHelp(HelpRequest):
+class ThingHelp(NativeGoalRequest):
     """The user requested help on one or more things: e.g., an options scope or a target type."""
 
     advanced: bool = False
     things: Tuple[str, ...] = ()
 
 
-class VersionHelp(HelpRequest):
+class VersionHelp(NativeGoalRequest):
     """The user asked for the version of this instance of pants."""
 
 
-class AllHelp(HelpRequest):
+class AllHelp(NativeGoalRequest):
     """The user requested a dump of all help info."""
 
 
 @dataclass(frozen=True)
-class UnknownGoalHelp(HelpRequest):
+class UnknownGoalHelp(NativeGoalRequest):
     """The user specified an unknown goal (or task)."""
 
     unknown_goals: Tuple[str, ...]
 
 
-class NoGoalHelp(HelpRequest):
+class NoGoalHelp(NativeGoalRequest):
     """The user specified no goals."""
 
 
@@ -94,7 +90,7 @@ class ArgSplitter:
             str
         ] = []  # In reverse order, for efficient popping off the end.
         self._help_request: Optional[
-            HelpRequest
+            NativeGoalRequest
         ] = None  # Will be set if we encounter any help flags.
 
         # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
@@ -113,7 +109,7 @@ class ArgSplitter:
         ]
 
     @property
-    def help_request(self) -> Optional[HelpRequest]:
+    def help_request(self) -> Optional[NativeGoalRequest]:
         return self._help_request
 
     def _check_for_help_request(self, arg: str) -> bool:

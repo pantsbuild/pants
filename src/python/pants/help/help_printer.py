@@ -13,14 +13,8 @@ from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.help.maybe_color import MaybeColor
-from pants.option.arg_splitter import (
-    AllHelp,
-    HelpRequest,
-    NoGoalHelp,
-    ThingHelp,
-    UnknownGoalHelp,
-    VersionHelp,
-)
+from pants.option.arg_splitter import AllHelp, NoGoalHelp, ThingHelp, UnknownGoalHelp, VersionHelp
+from pants.option.native_goal_request import NativeGoalRequest
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap
@@ -33,7 +27,7 @@ class HelpPrinter(MaybeColor):
         self,
         *,
         bin_name: str,
-        help_request: HelpRequest,
+        help_request: NativeGoalRequest,
         all_help_info: AllHelpInfo,
         color: bool,
     ) -> None:

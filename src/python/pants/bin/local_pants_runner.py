@@ -32,8 +32,8 @@ from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.arg_splitter import HelpRequest
 from pants.option.global_options import DynamicRemoteOptions
+from pants.option.native_goal_request import NativeGoalRequest
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -198,7 +198,7 @@ class LocalPantsRunner:
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
-    def _print_help(self, request: HelpRequest) -> ExitCode:
+    def _print_help(self, request: NativeGoalRequest) -> ExitCode:
         global_options = self.options.for_global_scope()
 
         all_help_info = HelpInfoExtracter.get_all_help_info(

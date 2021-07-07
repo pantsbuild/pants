@@ -9,8 +9,9 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import ArgSplitter, HelpRequest
+from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
+from pants.option.native_goal_request import NativeGoalRequest
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
@@ -172,7 +173,7 @@ class Options:
         scope_to_flags: Dict[str, List[str]],
         specs: List[str],
         passthru: List[str],
-        help_request: Optional[HelpRequest],
+        help_request: Optional[NativeGoalRequest],
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
@@ -200,7 +201,7 @@ class Options:
         return self._frozen
 
     @property
-    def help_request(self) -> Optional[HelpRequest]:
+    def help_request(self) -> Optional[NativeGoalRequest]:
         """
         :API: public
         """
