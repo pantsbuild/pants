@@ -25,7 +25,7 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PutativeShellTargetsRequest:
+class PutativeShellTargetsRequest(PutativeTargetsRequest):
     pass
 
 
@@ -42,9 +42,9 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate shell targets to create")
 async def find_putative_targets(
-    _: PutativeShellTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeShellTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_shell_files = await Get(Paths, PathGlobs(["**/*.sh"]))
+    all_shell_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.sh"))
     unowned_shell_files = set(all_shell_files.files) - set(all_owned_sources)
     classified_unowned_shell_files = classify_source_files(unowned_shell_files)
     pts = []

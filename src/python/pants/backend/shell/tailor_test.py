@@ -1,10 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants.backend.shell import tailor
 from pants.backend.shell.tailor import PutativeShellTargetsRequest, classify_source_files
 from pants.backend.shell.target_types import ShellLibrary, Shunit2Tests
-from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import (
+    AllOwnedSources,
+    PutativeTarget,
+    PutativeTargets,
+    PutativeTargetsSearchPaths,
+)
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -17,14 +24,18 @@ def test_classify_source_files() -> None:
     )
 
 
-def test_find_putative_targets() -> None:
-    rule_runner = RuleRunner(
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
         rules=[
             *tailor.rules(),
             QueryRule(PutativeTargets, [PutativeShellTargetsRequest, AllOwnedSources]),
         ],
         target_types=[],
     )
+
+
+def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"src/sh/foo/{fp}": ""
@@ -41,7 +52,7 @@ def test_find_putative_targets() -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeShellTargetsRequest(),
+            PutativeShellTargetsRequest(PutativeTargetsSearchPaths(("",))),
             AllOwnedSources(["src/sh/foo/bar/baz1.sh", "src/sh/foo/bar/baz1_test.sh"]),
         ],
     )
@@ -59,6 +70,45 @@ def test_find_putative_targets() -> None:
                     ["baz2_test.sh"],
                     kwargs={"name": "tests"},
                 ),
+            ]
+        )
+        == pts
+    )
+
+
+def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"src/sh/foo/{fp}": ""
+            for fp in (
+                "bar/bar.sh",
+                "bar/bar_test.sh",
+                "baz/baz.sh",
+                "baz/baz_test.sh",
+                "qux/qux.sh",
+            )
+        }
+    )
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeShellTargetsRequest(
+                PutativeTargetsSearchPaths(("src/sh/foo/bar", "src/sh/foo/qux"))
+            ),
+            AllOwnedSources(["src/sh/foo/bar/bar.sh"]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    Shunit2Tests,
+                    "src/sh/foo/bar",
+                    "tests",
+                    ["bar_test.sh"],
+                    kwargs={"name": "tests"},
+                ),
+                PutativeTarget.for_target_type(ShellLibrary, "src/sh/foo/qux", "qux", ["qux.sh"]),
             ]
         )
         == pts
