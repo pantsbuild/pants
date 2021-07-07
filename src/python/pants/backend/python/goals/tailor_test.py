@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--no-tailor-python-ignore-solitary-init-files"])
+    rule_runner.set_options(["--no-python-setup-tailor-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
             f"src/python/foo/{fp}": ""

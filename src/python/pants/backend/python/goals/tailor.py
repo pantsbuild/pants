@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.subsystems.tailor_python import TailorPythonSubsystem
 from pants.backend.python.target_types import PythonLibrary, PythonTests, PythonTestsSources
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -21,6 +20,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.logging import LogLevel
 
@@ -45,7 +45,7 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 async def find_putative_targets(
     req: PutativePythonTargetsRequest,
     all_owned_sources: AllOwnedSources,
-    tailor_python_subsys: TailorPythonSubsystem,
+    python_setup: PythonSetup,
 ) -> PutativeTargets:
     all_py_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.py"))
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
@@ -56,7 +56,7 @@ async def find_putative_targets(
             name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
             kwargs = {"name": name} if tgt_type == PythonTests else {}
             if (
-                tailor_python_subsys.ignore_solitary_init_files()
+                python_setup.tailor_ignore_solitary_init_files
                 and tgt_type == PythonLibrary
                 and filenames == {"__init__.py"}
             ):
