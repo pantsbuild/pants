@@ -511,6 +511,7 @@ py_class!(class PyExecutionStrategyOptions |py| {
     remote_parallelism: usize,
     local_cleanup: bool,
     local_cache: bool,
+    local_enable_nailgun: bool,
     remote_cache_read: bool,
     remote_cache_write: bool
   ) -> CPyResult<Self> {
@@ -520,6 +521,7 @@ py_class!(class PyExecutionStrategyOptions |py| {
         remote_parallelism,
         local_cleanup,
         local_cache,
+        local_enable_nailgun,
         remote_cache_read,
         remote_cache_write,
       }

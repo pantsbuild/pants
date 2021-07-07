@@ -24,6 +24,8 @@ class ParseContext:
     ) -> None:
         """Create a ParseContext.
 
+        :param type_aliases: A dictionary of BUILD file symbols.
+        :param rel_path_oracle: An oracle than can be queried for the current BUILD file path.
         :param build_root: The absolute path to the build root.
         :param type_aliases: A dictionary of BUILD file symbols.
         :param rel_path_oracle: An oracle than can be queried for the current BUILD file path.

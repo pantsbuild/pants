@@ -52,8 +52,7 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
     def lint_results(self) -> EnrichedLintResults:
         addresses = [config.address for config in self.field_sets]
         return EnrichedLintResults(
-            [LintResult(self.exit_code(addresses), "", "", report=None)],
-            linter_name=self.linter_name,
+            [LintResult(self.exit_code(addresses), "", "")], linter_name=self.linter_name
         )
 
 
@@ -128,13 +127,12 @@ def run_lint_rule(
     include_sources: bool = True,
 ) -> Tuple[int, str]:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        workspace = Workspace(rule_runner.scheduler)
         union_membership = UnionMembership({LintRequest: lint_request_types})
         result: Lint = run_rule_with_mocks(
             lint,
             rule_args=[
                 console,
-                workspace,
+                Workspace(rule_runner.scheduler),
                 Targets(targets),
                 create_goal_subsystem(
                     LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False

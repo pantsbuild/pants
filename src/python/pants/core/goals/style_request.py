@@ -1,14 +1,24 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import logging
+import os.path
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Generic, Iterable, Optional, Type, TypeVar
+from typing import Callable, ClassVar, Generic, Iterable, Optional, Sequence, Type, TypeVar
 
+from typing_extensions import Protocol
+
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
-from pants.engine.fs import Snapshot
+from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot, Workspace
 from pants.engine.target import FieldSet
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import path_safe
+
+logger = logging.getLogger(__name__)
 
 _FS = TypeVar("_FS", bound=FieldSet)
 
@@ -35,3 +45,55 @@ class StyleRequest(Generic[_FS], metaclass=ABCMeta):
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
         self.prior_formatter_result = prior_formatter_result
+
+
+class _ResultWithReport(Protocol):
+    @property
+    def report(self) -> Digest:
+        ...
+
+    @property
+    def partition_description(self) -> str | None:
+        ...
+
+
+class _ResultsWithReports(Protocol):
+    @property
+    def results(self) -> Sequence[_ResultWithReport]:
+        ...
+
+
+_R = TypeVar("_R", bound=_ResultsWithReports)
+
+
+def write_reports(
+    all_results: tuple[_ResultsWithReports, ...],
+    workspace: Workspace,
+    dist_dir: DistDir,
+    *,
+    goal_name: str,
+    get_tool_name: Callable[[_R], str],
+) -> None:
+    disambiguated_dirs: set[str] = set()
+
+    def write_report(digest: Digest, subdir: str) -> None:
+        while subdir in disambiguated_dirs:
+            # It's unlikely that two distinct partition descriptions will become the
+            # same after path_safe(), but might as well be safe.
+            subdir += "_"
+        disambiguated_dirs.add(subdir)
+        output_dir = str(dist_dir.relpath / goal_name / subdir)
+        workspace.write_digest(digest, path_prefix=output_dir)
+        logger.info(f"Wrote {goal_name} report files to {output_dir}.")
+
+    for results in all_results:
+        tool_name = get_tool_name(results).lower()  # type: ignore[arg-type]
+        if len(results.results) == 1 and results.results[0].report != EMPTY_DIGEST:
+            write_report(results.results[0].report, tool_name)
+        else:
+            for result in results.results:
+                if result.report != EMPTY_DIGEST:
+                    write_report(
+                        result.report,
+                        os.path.join(tool_name, path_safe(result.partition_description or "all")),
+                    )

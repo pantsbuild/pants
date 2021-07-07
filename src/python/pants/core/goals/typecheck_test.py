@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
@@ -12,15 +13,17 @@ from pants.core.goals.typecheck import (
     TypecheckResult,
     typecheck,
 )
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
+from pants.engine.fs import Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -124,9 +127,16 @@ def run_typecheck_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership({TypecheckRequest: request_types})
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
+        rule_runner = RuleRunner()
         result: Typecheck = run_rule_with_mocks(
             typecheck,
-            rule_args=[console, Targets(targets), union_membership],
+            rule_args=[
+                console,
+                Workspace(rule_runner.scheduler),
+                Targets(targets),
+                DistDir(relpath=Path("dist")),
+                union_membership,
+            ],
             mock_gets=[
                 MockGet(
                     output_type=EnrichedTypecheckResults,
