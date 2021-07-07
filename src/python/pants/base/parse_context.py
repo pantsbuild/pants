@@ -19,13 +19,16 @@ class ParseContext:
     in its `__init__`).
     """
 
-    def __init__(self, type_aliases: Mapping[str, Any], rel_path_oracle: RelPathOracle) -> None:
+    def __init__(
+        self, build_root: str, type_aliases: Mapping[str, Any], rel_path_oracle: RelPathOracle
+    ) -> None:
         """Create a ParseContext.
 
+        :param build_root: The absolute path to the build root.
         :param type_aliases: A dictionary of BUILD file symbols.
         :param rel_path_oracle: An oracle than can be queried for the current BUILD file path.
         """
-
+        self._build_root = build_root
         self._type_aliases = type_aliases
         self._rel_path_oracle = rel_path_oracle
 
@@ -56,3 +59,8 @@ class ParseContext:
         :API: public
         """
         return self._rel_path_oracle.rel_path()
+
+    @property
+    def build_root(self) -> str:
+        """Absolute path of the build root."""
+        return self._build_root

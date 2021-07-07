@@ -59,14 +59,19 @@ class ParseState(threading.local):
 
 class Parser:
     def __init__(
-        self, *, target_type_aliases: Iterable[str], object_aliases: BuildFileAliases
+        self,
+        *,
+        build_root: str,
+        target_type_aliases: Iterable[str],
+        object_aliases: BuildFileAliases,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
-            target_type_aliases, object_aliases
+            build_root, target_type_aliases, object_aliases
         )
 
     @staticmethod
     def _generate_symbols(
+        build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
     ) -> tuple[dict[str, Any], ParseState]:
@@ -96,7 +101,9 @@ class Parser:
         symbols: dict[str, Any] = dict(object_aliases.objects)
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
-        parse_context = ParseContext(type_aliases=symbols, rel_path_oracle=parse_state)
+        parse_context = ParseContext(
+            build_root=build_root, type_aliases=symbols, rel_path_oracle=parse_state
+        )
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
 

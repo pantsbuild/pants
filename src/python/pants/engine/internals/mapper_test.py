@@ -21,7 +21,7 @@ from pants.util.frozendict import FrozenDict
 
 def parse_address_map(build_file: str) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(target_type_aliases=["thing"], object_aliases=BuildFileAliases())
+    parser = Parser(build_root="", target_type_aliases=["thing"], object_aliases=BuildFileAliases())
     address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
     assert path == address_map.path
     return address_map
