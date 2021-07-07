@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents
+from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -61,7 +61,7 @@ def assert_success(
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "No issues identified." in result[0].stdout.strip()
-    assert result[0].report is None
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -77,7 +77,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-    assert result[0].report is None
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -93,7 +93,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
     assert "good.py" not in result[0].stdout
     assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-    assert result[0].report is None
+    assert result[0].report == EMPTY_DIGEST
 
 
 @skip_unless_python27_and_python3_present
@@ -180,7 +180,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Issue: [C100:hardcoded_aws_key]" in result[0].stdout
-    assert result[0].report is None
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
@@ -192,8 +192,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert result[0].stdout.strip() == ""
-    assert result[0].report is not None
-    report_files = rule_runner.request(DigestContents, [result[0].report.digest])
+    report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
     assert (
         "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in report_files[0].content.decode()
@@ -218,4 +217,4 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     assert "f.py " not in result[0].stdout
     assert "f.pyi" in result[0].stdout
     assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-    assert result[0].report is None
+    assert result[0].report == EMPTY_DIGEST
