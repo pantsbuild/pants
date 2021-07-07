@@ -210,7 +210,7 @@ class EngineInitializer:
         native_engine_visualize_to: Optional[str] = None,
         watch_filesystem: bool = True,
     ) -> GraphScheduler:
-        build_root = build_root or get_buildroot()
+        build_root_path = build_root or get_buildroot()
 
         rules = build_configuration.rules
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
@@ -221,6 +221,7 @@ class EngineInitializer:
         @rule
         def parser_singleton() -> Parser:
             return Parser(
+                build_root=build_root_path,
                 target_type_aliases=registered_target_types.aliases,
                 object_aliases=build_configuration.registered_aliases,
             )
@@ -283,7 +284,7 @@ class EngineInitializer:
         scheduler = Scheduler(
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
-            build_root=build_root,
+            build_root=build_root_path,
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
