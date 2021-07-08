@@ -4,7 +4,7 @@ freezegun==1.1.0
 
 # Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
 # anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
-humbug==0.1.9
+humbug==0.2.6
 
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
