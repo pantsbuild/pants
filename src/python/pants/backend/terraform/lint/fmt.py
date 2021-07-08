@@ -51,11 +51,11 @@ async def format_terraform_targets(
         results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
-        return LanguageFmtResults(
-            tuple(results),
-            input=original_sources.snapshot.digest,
-            output=prior_formatter_result.digest,
-        )
+    return LanguageFmtResults(
+        tuple(results),
+        input=original_sources.snapshot.digest,
+        output=prior_formatter_result.digest,
+    )
 
 
 def rules():
