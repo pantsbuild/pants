@@ -187,6 +187,32 @@ def test_union_rules() -> None:
     ) in str(exc.value.args[0])
 
 
+def create_outlined_get() -> Get[int, str]:
+    return Get(int, str, "hello")
+
+
+@rule
+async def uses_outlined_get() -> int:
+    return await create_outlined_get()
+
+
+def test_outlined_get() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            uses_outlined_get,
+            QueryRule(int, []),
+        ],
+    )
+    # Fails because the creation of the `Get` was out-of-lined into a separate function.
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(int, [])
+    assert (
+        "Get(int, str, hello) was not detected in your @rule body at rule compile time. "
+        "Was the `Get` constructor called in a separate function, or perhaps "
+        "dynamically? If so, it must be inlined into the @rule body."
+    ) in str(exc.value.args[0])
+
+
 # -----------------------------------------------------------------------------------------------
 # Test tracebacks
 # -----------------------------------------------------------------------------------------------

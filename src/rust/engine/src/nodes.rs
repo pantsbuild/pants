@@ -966,7 +966,9 @@ impl Task {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
                 throw(&format!(
-                  "Could not find a rule to satisfy Get({}, {}, {}).",
+                  "Get({}, {}, {}) was not detected in your @rule body at rule compile time. \
+                    Was the `Get` constructor called in a separate function, or perhaps \
+                    dynamically? If so, it must be inlined into the @rule body.",
                   get.output, get.input_type, get.input
                 ))
               }
