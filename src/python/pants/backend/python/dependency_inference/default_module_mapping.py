@@ -19,6 +19,7 @@ DEFAULT_MODULE_MAPPING = {
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs"),
     "pytest-runner": ("ptr",),
+    "scikit-image": ("skimage",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
 
