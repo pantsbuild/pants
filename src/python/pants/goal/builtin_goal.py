@@ -4,5 +4,5 @@
 from abc import ABC
 
 
-class NativeGoalRequest(ABC):
-    """Represents an implicit or explicit request for help by the user."""
+class BuiltinGoal(ABC):
+    """A goal built-in to pants rather than using the Plugin API."""

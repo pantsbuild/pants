@@ -52,18 +52,18 @@ class ArgSplitterTest(unittest.TestCase):
         assert expected_scope_to_flags == split_args.scope_to_flags
         assert expected_specs == split_args.specs
         assert expected_passthru == split_args.passthru
-        assert expected_is_help == (splitter.help_request is not None)
+        assert expected_is_help == (splitter.builtin_goal is not None)
         assert expected_help_advanced == (
-            isinstance(splitter.help_request, ThingHelp) and splitter.help_request.advanced
+            isinstance(splitter.builtin_goal, ThingHelp) and splitter.builtin_goal.advanced
         )
-        assert expected_help_all == isinstance(splitter.help_request, AllHelp)
+        assert expected_help_all == isinstance(splitter.builtin_goal, AllHelp)
 
     @staticmethod
     def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         splitter.split_args(shlex.split(args_str))
-        assert isinstance(splitter.help_request, UnknownGoalHelp)
-        assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
+        assert isinstance(splitter.builtin_goal, UnknownGoalHelp)
+        assert set(unknown_goals) == set(splitter.builtin_goal.unknown_goals)
 
     def test_is_spec(self) -> None:
         unambiguous_specs = [
@@ -366,7 +366,7 @@ class ArgSplitterTest(unittest.TestCase):
         def assert_version_request(args_str: str) -> None:
             splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
             splitter.split_args(shlex.split(args_str))
-            self.assertTrue(isinstance(splitter.help_request, VersionHelp))
+            self.assertTrue(isinstance(splitter.builtin_goal, VersionHelp))
 
         assert_version_request("./pants -v")
         assert_version_request("./pants -V")
@@ -383,4 +383,4 @@ class ArgSplitterTest(unittest.TestCase):
     def test_no_goal_detection(self) -> None:
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         splitter.split_args(shlex.split("./pants foo/bar:baz"))
-        self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))
+        self.assertTrue(isinstance(splitter.builtin_goal, NoGoalHelp))

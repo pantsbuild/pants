@@ -11,7 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
-from pants.option.native_goal_request import NativeGoalRequest
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
@@ -151,7 +151,7 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        help_request = splitter.help_request
+        builtin_goal = splitter.builtin_goal
 
         parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
@@ -160,7 +160,7 @@ class Options:
             scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
-            help_request=help_request,
+            builtin_goal=builtin_goal,
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
@@ -173,7 +173,7 @@ class Options:
         scope_to_flags: Dict[str, List[str]],
         specs: List[str],
         passthru: List[str],
-        help_request: Optional[NativeGoalRequest],
+        builtin_goal: Optional[BuiltinGoal],
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
@@ -187,7 +187,7 @@ class Options:
         self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
-        self._help_request = help_request
+        self._builtin_goal = builtin_goal
         self._parser_hierarchy = parser_hierarchy
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
@@ -201,11 +201,11 @@ class Options:
         return self._frozen
 
     @property
-    def help_request(self) -> Optional[NativeGoalRequest]:
+    def builtin_goal(self) -> Optional[BuiltinGoal]:
         """
         :API: public
         """
-        return self._help_request
+        return self._builtin_goal
 
     @property
     def specs(self) -> List[str]:
@@ -285,7 +285,7 @@ class Options:
             scope_to_flags=no_flags,
             specs=self._specs,
             passthru=self._passthru,
-            help_request=self._help_request,
+            builtin_goal=self._builtin_goal,
             parser_hierarchy=self._parser_hierarchy,
             bootstrap_option_values=self._bootstrap_option_values,
             known_scope_to_info=self._known_scope_to_info,

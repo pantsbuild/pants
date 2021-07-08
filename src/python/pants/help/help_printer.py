@@ -14,7 +14,7 @@ from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import AllHelp, NoGoalHelp, ThingHelp, UnknownGoalHelp, VersionHelp
-from pants.option.native_goal_request import NativeGoalRequest
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap
@@ -27,13 +27,13 @@ class HelpPrinter(MaybeColor):
         self,
         *,
         bin_name: str,
-        help_request: NativeGoalRequest,
+        builtin_goal: BuiltinGoal,
         all_help_info: AllHelpInfo,
         color: bool,
     ) -> None:
         super().__init__(color)
         self._bin_name = bin_name
-        self._help_request = help_request
+        self._builtin_goal = builtin_goal
         self._all_help_info = all_help_info
         self._width = terminal_width()
 
@@ -44,16 +44,16 @@ class HelpPrinter(MaybeColor):
             print(f"Use `{self.maybe_green(self._bin_name + ' help')}` to get help.")
             print(f"Use `{self.maybe_green(self._bin_name + ' help goals')}` to list goals.")
 
-        if isinstance(self._help_request, VersionHelp):
+        if isinstance(self._builtin_goal, VersionHelp):
             print(pants_version())
-        elif isinstance(self._help_request, AllHelp):
+        elif isinstance(self._builtin_goal, AllHelp):
             self._print_all_help()
-        elif isinstance(self._help_request, ThingHelp):
+        elif isinstance(self._builtin_goal, ThingHelp):
             self._print_thing_help()
-        elif isinstance(self._help_request, UnknownGoalHelp):
+        elif isinstance(self._builtin_goal, UnknownGoalHelp):
             # Only print help and suggestions for the first unknown goal.
             # It gets confusing to try and show suggestions for multiple cases.
-            unknown_goal = self._help_request.unknown_goals[0]
+            unknown_goal = self._builtin_goal.unknown_goals[0]
             print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
 
             did_you_mean = list(
@@ -68,7 +68,7 @@ class HelpPrinter(MaybeColor):
 
             print_hint()
             return 1
-        elif isinstance(self._help_request, NoGoalHelp):
+        elif isinstance(self._builtin_goal, NoGoalHelp):
             print("No goals specified.")
             print_hint()
             return 1
@@ -84,12 +84,12 @@ class HelpPrinter(MaybeColor):
     def _print_thing_help(self) -> None:
         """Print a help screen.
 
-        Assumes that self._help_request is an instance of OptionsHelp.
+        Assumes that self._builtin_goal is an instance of OptionsHelp.
 
         Note: Ony useful if called after options have been registered.
         """
-        help_request = cast(ThingHelp, self._help_request)
-        things = set(help_request.things)
+        builtin_goal = cast(ThingHelp, self._builtin_goal)
+        things = set(builtin_goal.things)
 
         if things:
             for thing in sorted(things):
@@ -100,9 +100,9 @@ class HelpPrinter(MaybeColor):
                 elif thing == "targets":
                     self._print_all_targets()
                 elif thing == "global":
-                    self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
+                    self._print_options_help(GLOBAL_SCOPE, builtin_goal.advanced)
                 elif thing in self._all_help_info.scope_to_help_info:
-                    self._print_options_help(thing, help_request.advanced)
+                    self._print_options_help(thing, builtin_goal.advanced)
                 elif thing in self._all_help_info.name_to_target_type_info:
                     self._print_target_help(thing)
                 else:
@@ -231,7 +231,7 @@ class HelpPrinter(MaybeColor):
     def _print_options_help(self, scope: str, show_advanced_and_deprecated: bool) -> None:
         """Prints a human-readable help message for the options registered on this object.
 
-        Assumes that self._help_request is an instance of OptionsHelp.
+        Assumes that self._builtin_goal is an instance of OptionsHelp.
         """
         help_formatter = HelpFormatter(
             show_advanced=show_advanced_and_deprecated,

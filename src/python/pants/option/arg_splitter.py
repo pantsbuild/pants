@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from pants.option.native_goal_request import NativeGoalRequest
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -27,29 +27,29 @@ class SplitArgs:
 
 
 @dataclass(frozen=True)
-class ThingHelp(NativeGoalRequest):
+class ThingHelp(BuiltinGoal):
     """The user requested help on one or more things: e.g., an options scope or a target type."""
 
     advanced: bool = False
     things: Tuple[str, ...] = ()
 
 
-class VersionHelp(NativeGoalRequest):
+class VersionHelp(BuiltinGoal):
     """The user asked for the version of this instance of pants."""
 
 
-class AllHelp(NativeGoalRequest):
+class AllHelp(BuiltinGoal):
     """The user requested a dump of all help info."""
 
 
 @dataclass(frozen=True)
-class UnknownGoalHelp(NativeGoalRequest):
+class UnknownGoalHelp(BuiltinGoal):
     """The user specified an unknown goal (or task)."""
 
     unknown_goals: Tuple[str, ...]
 
 
-class NoGoalHelp(NativeGoalRequest):
+class NoGoalHelp(BuiltinGoal):
     """The user specified no goals."""
 
 
@@ -89,8 +89,8 @@ class ArgSplitter:
         self._unconsumed_args: List[
             str
         ] = []  # In reverse order, for efficient popping off the end.
-        self._help_request: Optional[
-            NativeGoalRequest
+        self._builtin_goal: Optional[
+            BuiltinGoal
         ] = None  # Will be set if we encounter any help flags.
 
         # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
@@ -109,24 +109,24 @@ class ArgSplitter:
         ]
 
     @property
-    def help_request(self) -> Optional[NativeGoalRequest]:
-        return self._help_request
+    def builtin_goal(self) -> Optional[BuiltinGoal]:
+        return self._builtin_goal
 
-    def _check_for_help_request(self, arg: str) -> bool:
+    def _check_for_builtin_goal(self, arg: str) -> bool:
         if arg not in self._HELP_ARGS:
             return False
         if arg in self._HELP_VERSION_ARGS:
-            self._help_request = VersionHelp()
+            self._builtin_goal = VersionHelp()
         elif arg in self._HELP_ALL_SCOPES_ARGS:
-            self._help_request = AllHelp()
+            self._builtin_goal = AllHelp()
         else:
             # First ensure that we have a basic OptionsHelp.
-            if not self._help_request:
-                self._help_request = ThingHelp()
+            if not self._builtin_goal:
+                self._builtin_goal = ThingHelp()
             # Now see if we need to enhance it.
-            if isinstance(self._help_request, ThingHelp):
-                advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-                self._help_request = dataclasses.replace(self._help_request, advanced=advanced)
+            if isinstance(self._builtin_goal, ThingHelp):
+                advanced = self._builtin_goal.advanced or arg in self._HELP_ADVANCED_ARGS
+                self._builtin_goal = dataclasses.replace(self._builtin_goal, advanced=advanced)
         return True
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
@@ -165,7 +165,7 @@ class ArgSplitter:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
         scope, flags = self._consume_scope()
         while scope:
-            if not self._check_for_help_request(scope.lower()):
+            if not self._check_for_builtin_goal(scope.lower()):
                 add_scope(scope)
                 goals.add(scope.partition(".")[0])
                 for flag in flags:
@@ -176,7 +176,7 @@ class ArgSplitter:
             arg = self._unconsumed_args.pop()
             if arg.startswith("-"):
                 # We assume any args here are in global scope.
-                if not self._check_for_help_request(arg):
+                if not self._check_for_builtin_goal(arg):
                     assign_flag_to_scope(arg, GLOBAL_SCOPE)
             elif self.likely_a_spec(arg):
                 specs.append(arg)
@@ -187,15 +187,15 @@ class ArgSplitter:
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
-        if unknown_scopes and not self._help_request:
-            self._help_request = UnknownGoalHelp(tuple(unknown_scopes))
+        if unknown_scopes and not self._builtin_goal:
+            self._builtin_goal = UnknownGoalHelp(tuple(unknown_scopes))
 
-        if not goals and not self._help_request:
-            self._help_request = NoGoalHelp()
+        if not goals and not self._builtin_goal:
+            self._builtin_goal = NoGoalHelp()
 
-        if isinstance(self._help_request, ThingHelp):
-            self._help_request = dataclasses.replace(
-                self._help_request, things=tuple(goals) + tuple(unknown_scopes)
+        if isinstance(self._builtin_goal, ThingHelp):
+            self._builtin_goal = dataclasses.replace(
+                self._builtin_goal, things=tuple(goals) + tuple(unknown_scopes)
             )
         return SplitArgs(
             goals=list(goals),
@@ -239,7 +239,7 @@ class ArgSplitter:
         flags = []
         while self._at_flag():
             flag = self._unconsumed_args.pop()
-            if not self._check_for_help_request(flag):
+            if not self._check_for_builtin_goal(flag):
                 flags.append(flag)
         return flags
 
