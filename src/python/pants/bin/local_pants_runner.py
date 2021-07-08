@@ -26,6 +26,7 @@ from pants.engine.streaming_workunit_handler import (
 )
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
@@ -33,7 +34,6 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
 from pants.option.global_options import DynamicRemoteOptions
-from pants.goal.builtin_goal import BuiltinGoal
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -226,7 +226,7 @@ class LocalPantsRunner:
     def _run_inner(self) -> ExitCode:
         goals = tuple(self.options.goals)
         if self.options.builtin_goal:
-            return self._print_help(self.options.help_request)
+            return self._print_help(self.options.builtin_goal)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 

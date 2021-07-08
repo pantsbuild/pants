@@ -10,11 +10,11 @@ from typing import Dict, cast
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_version
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import AllHelp, NoGoalHelp, ThingHelp, UnknownGoalHelp, VersionHelp
-from pants.goal.builtin_goal import BuiltinGoal
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap
