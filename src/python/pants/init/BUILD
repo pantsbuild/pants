@@ -10,6 +10,7 @@ target(
     'src/python/pants/backend/codegen/protobuf/python',
     'src/python/pants/backend/experimental/go',
     'src/python/pants/backend/experimental/go/lint/gofmt',
+    'src/python/pants/backend/experimental/python',
     'src/python/pants/backend/experimental/terraform',
     'src/python/pants/backend/experimental/terraform/lint/tffmt',
     'src/python/pants/backend/experimental/terraform/lint/validate',
