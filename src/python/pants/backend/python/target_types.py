@@ -241,7 +241,9 @@ class PexPlatformsField(StringSequenceField):
     help = (
         "The platforms the built PEX should be compatible with.\n\nThis defaults to the current "
         "platform, but can be overridden to different platforms. You can give a list of multiple "
-        "platforms to create a multiplatform PEX.\n\nTo use wheels for specific "
+        "platforms to create a multiplatform PEX. A multiplatform PEX file will contain platform "
+        "specific wheels for each 3rd party dependency that has some non-Python "
+        "code that requires compilation on each target platform.\n\nTo use wheels for specific "
         "interpreter/platform tags, you can append them to the platform with hyphens like: "
         'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
         '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n  - PLATFORM: the host platform, e.g. '
