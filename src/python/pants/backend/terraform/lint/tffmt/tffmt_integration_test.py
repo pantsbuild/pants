@@ -97,7 +97,7 @@ def run_tffmt(
 ) -> Tuple[Sequence[LintResult], FmtResult]:
     args = ["--backend-packages=pants.backend.experimental.terraform.lint.tffmt"]
     if skip:
-        args.append("--tffmt-skip")
+        args.append("--terraform-fmt-skip")
     rule_runner.set_options(args)
     field_sets = [TffmtFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [TffmtRequest(field_sets)])

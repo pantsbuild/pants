@@ -23,7 +23,7 @@ from pants.util.strutil import pluralize
 
 
 class TerraformValidateSubsystem(Subsystem):
-    options_scope = "tf-validate"
+    options_scope = "terraform-validate"
     help = """Terraform validate options."""
 
     @classmethod

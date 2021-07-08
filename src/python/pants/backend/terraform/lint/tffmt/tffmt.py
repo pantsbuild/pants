@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class TfFmtSubsystem(Subsystem):
-    options_scope = "tffmt"
+    options_scope = "terraform-fmt"
     help = """Terraform fmt options."""
 
     @classmethod

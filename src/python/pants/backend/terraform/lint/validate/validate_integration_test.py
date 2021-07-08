@@ -86,7 +86,7 @@ def run_terraform_validate(
 ) -> Sequence[LintResult]:
     args = ["--backend-packages=pants.backend.experimental.terraform.lint.validate"]
     if skip:
-        args.append("--tf-validate-skip")
+        args.append("--terraform-validate-skip")
     rule_runner.set_options(args)
     field_sets = [ValidateFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [ValidateRequest(field_sets)])
