@@ -20,8 +20,8 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-class PipCompile(PythonToolBase):
-    options_scope = "pip_compile"
+class PipToolsSubsystem(PythonToolBase):
+    options_scope = "pip-tools"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
     default_version = "pip-tools==6.2.0"
@@ -58,7 +58,7 @@ class LockGoal(Goal):
 #  reqs used by the transitive closure? That would better mirror generate_lockfile.sh.
 @goal_rule
 async def generate_lockfile(
-    targets: Targets, pip_compile_subsystem: PipCompile, workspace: Workspace
+    targets: Targets, pip_tools_subsystem: PipToolsSubsystem, workspace: Workspace
 ) -> LockGoal:
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField] for tgt in targets if tgt.has_field(PythonRequirementsField)
@@ -72,16 +72,16 @@ async def generate_lockfile(
         PexRequest(
             output_filename="pip_compile.pex",
             internal_only=True,
-            requirements=PexRequirements(pip_compile_subsystem.all_requirements),
+            requirements=PexRequirements(pip_tools_subsystem.all_requirements),
             # TODO: Figure out which interpreter constraints to use...Among other reasons, this is
             #  tricky because python_requirement_library targets don't have interpreter constraints!
             interpreter_constraints=InterpreterConstraints(["CPython==3.9.*"]),
-            main=pip_compile_subsystem.main,
+            main=pip_tools_subsystem.main,
         ),
     )
     input_requirements, pip_compile = await MultiGet(input_requirements_get, pip_compile_get)
 
-    dest = pip_compile_subsystem.lockfile_dest
+    dest = pip_tools_subsystem.lockfile_dest
     result = await Get(
         ProcessResult,
         VenvPexProcess(
