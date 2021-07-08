@@ -6,17 +6,16 @@ from __future__ import annotations
 import logging
 from typing import cast
 
-from pants.backend.python.util_rules.pex import VenvPex, PexRequest, PexRequirements, VenvPexProcess
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.engine.fs import Digest, CreateDigest, FileContent, Workspace
+from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import goal_rule, Get, collect_rules, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.util.strutil import pluralize
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class PipCompile(PythonToolBase):
             "--lockfile-dest",
             type=str,
             default="3rdparty/python/lockfile.txt",
-            help="The file path to be created.\n\nThis will overwrite any previous files."
+            help="The file path to be created.\n\nThis will overwrite any previous files.",
         )
 
     @property
@@ -47,6 +46,7 @@ class PipCompile(PythonToolBase):
 
 class LockSubsystem(GoalSubsystem):
     name = "lock"
+    help = "Generate a lockfile."
 
 
 class LockGoal(Goal):
@@ -61,9 +61,7 @@ async def generate_lockfile(
     targets: Targets, pip_compile_subsystem: PipCompile, workspace: Workspace
 ) -> LockGoal:
     reqs = PexRequirements.create_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        for tgt in targets
-        if tgt.has_field(PythonRequirementsField)
+        tgt[PythonRequirementsField] for tgt in targets if tgt.has_field(PythonRequirementsField)
     )
 
     input_requirements_get = Get(
@@ -78,8 +76,8 @@ async def generate_lockfile(
             # TODO: Figure out which interpreter constraints to use...Among other reasons, this is
             #  tricky because python_requirement_library targets don't have interpreter constraints!
             interpreter_constraints=InterpreterConstraints(["CPython==3.9.*"]),
-            main=pip_compile_subsystem.main
-        )
+            main=pip_compile_subsystem.main,
+        ),
     )
     input_requirements, pip_compile = await MultiGet(input_requirements_get, pip_compile_get)
 
@@ -101,7 +99,7 @@ async def generate_lockfile(
             ],
             input_digest=input_requirements,
             output_files=(dest,),
-        )
+        ),
     )
     # TODO: rewrite the file to have Pants header info, like how to regenerate the lockfile w/
     #  Pants.
