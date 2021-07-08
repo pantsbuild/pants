@@ -158,7 +158,7 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                     system_tags
                     + [
                         f"pants_version:{telemetry_data.get('pants_version')}",
-                        # This is hashed, unlike the contents of the repo_id var.
+                        # This is hashed, unlike the contents of the unhashed_repo_id var.
                         f"repo:{telemetry_data.get('repo_id', 'UNKNOWN')}",
                         f"user:{telemetry_data.get('user_id', 'UNKNOWN')}",
                         f"machine:{telemetry_data.get('machine_id', 'UNKNOWN')}",
