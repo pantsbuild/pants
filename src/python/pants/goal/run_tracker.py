@@ -105,7 +105,7 @@ class RunTracker:
             }
         )
 
-    def get_anonymous_telemetry_data(self, repo_id: str) -> dict[str, str | list[str]]:
+    def get_anonymous_telemetry_data(self, unhashed_repo_id: str) -> dict[str, str | list[str]]:
         # TODO: Find a way to know from a goal name whether it's a standard or a custom
         #  goal whose name could, in theory, reveal something proprietary. That's more work than
         #  we want to do at the moment, so we maintain this manual list for now.
@@ -131,9 +131,9 @@ class RunTracker:
         }
 
         def maybe_hash_with_repo_id_prefix(s: str) -> str:
-            qualified_str = f"{repo_id}.{s}" if s else repo_id
+            qualified_str = f"{unhashed_repo_id}.{s}" if s else unhashed_repo_id
             # If the repo_id is the empty string we return a blank string.
-            return sha256(qualified_str.encode()).hexdigest() if repo_id else ""
+            return sha256(qualified_str.encode()).hexdigest() if unhashed_repo_id else ""
 
         return {
             "run_id": str(self._run_info.get("id", uuid.uuid4())),
