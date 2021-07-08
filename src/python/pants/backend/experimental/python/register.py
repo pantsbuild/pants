@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.experimental.python import lockfile
+from pants.backend.python.util_rules import pex
 
 
 def rules():
-    return lockfile.rules()
+    return (*lockfile.rules(), *pex.rules())
