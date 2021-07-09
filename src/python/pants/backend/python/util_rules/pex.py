@@ -90,6 +90,7 @@ class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     requirements: PexRequirements
+    requirements_file: str | None
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
@@ -107,6 +108,7 @@ class PexRequest(EngineAwareParameter):
         output_filename: str,
         internal_only: bool,
         requirements: PexRequirements = PexRequirements(),
+        requirements_file: str | None = None,
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
@@ -148,6 +150,7 @@ class PexRequest(EngineAwareParameter):
         self.output_filename = output_filename
         self.internal_only = internal_only
         self.requirements = requirements
+        self.requirements_file = requirements_file
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
         self.sources = sources
@@ -166,6 +169,11 @@ class PexRequest(EngineAwareParameter):
                 "Internal only PEXes can only constrain interpreters with interpreter_constraints."
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
+            )
+        if self.requirements and self.requirements_file:
+            raise ValueError(
+                "You should only specify `requirements` or `requirements_file`, but both were set: "
+                f"{self}"
             )
 
     def debug_hint(self) -> str:
@@ -359,6 +367,20 @@ async def build_pex(
             ),
         )
 
+    requirements_file_digest = EMPTY_DIGEST
+    if request.requirements_file:
+        argv.extend(["--requirement", request.requirements_file])
+        requirements_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [request.requirements_file],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                # TODO(#12314): Parametrize this. Figure out a factoring that makes sense, e.g. a
+                #  LockfilePex type.
+                description_of_origin="the option `[python-setup].experimental_lockfile`",
+            ),
+        )
+
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
@@ -374,6 +396,7 @@ async def build_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                requirements_file_digest,
                 repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),
             )
@@ -393,6 +416,8 @@ async def build_pex(
                 f"{pluralize(len(request.requirements), 'requirement')}: "
                 f"{', '.join(request.requirements)}"
             )
+        elif request.requirements_file:
+            description = f"Building {request.output_filename} from {request.requirements_file}"
         else:
             description = f"Building {request.output_filename}"
 
