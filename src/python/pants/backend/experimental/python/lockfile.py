@@ -16,6 +16,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,10 @@ class LockGoal(Goal):
 
 @goal_rule
 async def generate_lockfile(
-    addresses: Addresses, pip_tools_subsystem: PipToolsSubsystem, workspace: Workspace
+    addresses: Addresses,
+    pip_tools_subsystem: PipToolsSubsystem,
+    python_setup: PythonSetup,
+    workspace: Workspace,
 ) -> LockGoal:
     # TODO: Looking at the transitive closure to generate a single lockfile will not work when we
     #  have multiple lockfiles supported, via per-tool lockfiles and multiple user lockfiles.
@@ -86,7 +90,7 @@ async def generate_lockfile(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
         )
-        return LockGoal(exit_code=1)
+        return LockGoal(exit_code=0)
 
     input_requirements_get = Get(
         Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs).encode())])
@@ -102,7 +106,7 @@ async def generate_lockfile(
             # TODO: Figure out which interpreter constraints to use...Likely get it from the
             #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
             #  but we need to figure out how this will work with multiple resolves.
-            interpreter_constraints=InterpreterConstraints(["CPython==3.9.*"]),
+            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
             main=pip_tools_subsystem.main,
         ),
     )
@@ -116,6 +120,7 @@ async def generate_lockfile(
             description=(
                 f"Generate lockfile for {pluralize(len(reqs), 'requirements')}: {', '.join(reqs)}"
             ),
+            # TODO: Wire up all the pip options like indexes.
             argv=[
                 "requirements.in",
                 "--generate-hashes",
