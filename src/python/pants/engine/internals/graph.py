@@ -40,6 +40,7 @@ from pants.engine.internals import native_engine
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    CoarsenedTarget,
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
@@ -344,32 +345,35 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 
 
 # -----------------------------------------------------------------------------------------------
-# CoarsenedTarget
+# CoarsenedTargets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-async def coarsened_targets(address: Address) -> CoarsenedTargets:
+async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
     dependency_mapping = await Get(
         _DependencyMapping,
-        _DependencyMappingRequest(TransitiveTargetsRequest([address]), expanded_targets=False),
+        _DependencyMappingRequest(TransitiveTargetsRequest(addresses), expanded_targets=False),
     )
     components = native_engine.strongly_connected_components(
         list(dependency_mapping.mapping.items())
     )
 
-    # Return the relevant component.
-    # TODO: This is very inefficient. Before landing, this should apply a strategy similar to
-    # https://github.com/pantsbuild/pants/issues/11270 to share subgraphs which have already been
-    # computed.
+    addresses_set = set(addresses)
     addresses_to_targets = {
         t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
     }
+    targets = []
     for component in components:
-        if address not in component:
+        if not any(component_address in addresses_set for component_address in component):
             continue
-        return CoarsenedTargets([addresses_to_targets[a] for a in component])
-    raise AssertionError("No component contained the relevant Address.")
+        component_set = set(component)
+        members = tuple(addresses_to_targets[a] for a in component)
+        dependencies = FrozenOrderedSet(
+            [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
+        )
+        targets.append(CoarsenedTarget(members, dependencies))
+    return CoarsenedTargets(targets)
 
 
 # -----------------------------------------------------------------------------------------------

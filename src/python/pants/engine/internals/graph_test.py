@@ -98,7 +98,7 @@ class MockTarget(Target):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(CoarsenedTargets, (Address,)),
+            QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(Targets, (DependenciesRequest,)),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
         ],
@@ -326,15 +326,11 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     )
 
     def coarsened(a: Address) -> List[Address]:
-        return list(
-            sorted(
-                t.address
-                for t in transitive_targets_rule_runner.request(
-                    CoarsenedTargets,
-                    [a],
-                )
-            )
+        coarsened_targets = transitive_targets_rule_runner.request(
+            CoarsenedTargets,
+            [Addresses([a])],
         )
+        return list(sorted(t.address for t in coarsened_targets[0].members))
 
     # BUILD targets are never involved in cycles, and so always coarsen to themselves.
     assert coarsened(Address("", target_name="dep")) == [Address("", target_name="dep")]

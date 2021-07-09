@@ -606,8 +606,20 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
-class CoarsenedTargets(Collection[Target]):
+@dataclass(frozen=True)
+class CoarsenedTarget:
     """A set of Targets which cyclicly reach one another, and are thus indivisable."""
+
+    # The members of the cycle.
+    members: Tuple[Target, ...]
+    # The deduped dependencies of all Targets in the cycle. Dependencies between members of the
+    # cycle are excluded, so this set of dependencies will only refer to other/disjoint
+    # CoarsenedTarget instances.
+    dependencies: FrozenOrderedSet[Address]
+
+
+class CoarsenedTargets(Collection[CoarsenedTarget]):
+    """A set of direct (not transitive) disjoint CoarsenedTarget instances."""
 
 
 @dataclass(frozen=True)
