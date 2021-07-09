@@ -176,20 +176,6 @@ class LintSubsystem(GoalSubsystem):
                 "faster than `--no-per-file-caching` for your use case."
             ),
         )
-        register(
-            "--reports-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            help=(
-                "Specifying a directory causes linters that support writing report files to write "
-                "into this directory."
-            ),
-            removal_version="2.7.0.dev0",
-            removal_hint=f"Edit the config file for the linter in question, or set its args via "
-            f"Pants options, to cause it to write reports under f{REPORT_DIR} .",
-        )
 
     @property
     def per_file_caching(self) -> bool:

@@ -6,6 +6,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Alan Velasco
 + Alex Schmitt
 + Alexander Johnson
++ Alexey Tereshenkov
 + Alyssa Pohahau
 + Andreas Stenius
 + Andrew Hamilton
@@ -71,6 +72,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gordon Cassie
 + Greg Shuflin
 + Guy Marom
 + Harley Cooper
