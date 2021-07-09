@@ -41,7 +41,9 @@ from pants.backend.python.target_types_rules import (
     inject_pex_binary_entry_point_dependency,
     inject_python_distribution_dependencies,
     resolve_pex_entry_point,
+    resolve_python_distribution_entry_points,
 )
+from pants.backend.python.util_rules import python_sources
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
@@ -368,7 +370,10 @@ def test_inject_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
             inject_python_distribution_dependencies,
+            resolve_pex_entry_point,
+            resolve_python_distribution_entry_points,
             *import_rules(),
+            *python_sources.rules(),
             QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
         ],
         target_types=[PythonDistribution, PythonRequirementLibrary, PythonLibrary, PexBinary],

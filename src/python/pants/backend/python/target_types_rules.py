@@ -217,6 +217,7 @@ async def inject_python_distribution_dependencies(
             original_tgt.target[PythonDistributionEntryPoints]
         ),
     )
+
     entry_point_addresses = Addresses()
 
     if entry_points.val and python_infer_subsystem.entry_points:
