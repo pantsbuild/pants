@@ -695,7 +695,7 @@ dependencies = [
  "nailgun",
  "num_enum",
  "parking_lot",
- "petgraph 0.4.13",
+ "petgraph",
  "process_execution",
  "rand 0.8.2",
  "regex",
