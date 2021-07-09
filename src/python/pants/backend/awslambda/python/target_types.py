@@ -8,7 +8,6 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -31,14 +30,6 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
-
-
-class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
-    removal_version = "2.7.0.dev0"
-    removal_hint = (
-        "The `interpreter_constraints` field does not do anything for `python_awslambda` targets. "
-        "Use the `runtime` field instead to choose the Python interpreter."
-    )
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -199,7 +190,6 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        DeprecatedAwsLambdaInterpreterConstraints,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
