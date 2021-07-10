@@ -612,9 +612,10 @@ class CoarsenedTarget:
 
     # The members of the cycle.
     members: Tuple[Target, ...]
-    # The deduped dependencies of all Targets in the cycle. Dependencies between members of the
-    # cycle are excluded, so this set of dependencies will only refer to other/disjoint
-    # CoarsenedTarget instances.
+    # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
+    # between members of the cycle are excluded.
+    #
+    # To expand these dependencies, request `CoarsenedTargets` for them.
     dependencies: FrozenOrderedSet[Address]
 
 

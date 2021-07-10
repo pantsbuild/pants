@@ -353,7 +353,14 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
     dependency_mapping = await Get(
         _DependencyMapping,
-        _DependencyMappingRequest(TransitiveTargetsRequest(addresses), expanded_targets=False),
+        _DependencyMappingRequest(
+            # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
+            # requires a transitive graph walk (to ensure that all cycles are actually detected),
+            # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
+            # involved in a cycle with one of the input Addresses is discarded in the output.
+            TransitiveTargetsRequest(addresses, include_special_cased_deps=True),
+            expanded_targets=False,
+        ),
     )
     components = native_engine.strongly_connected_components(
         list(dependency_mapping.mapping.items())

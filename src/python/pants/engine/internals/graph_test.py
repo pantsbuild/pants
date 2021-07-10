@@ -325,30 +325,62 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
         ),
     )
 
-    def coarsened(a: Address) -> List[Address]:
+    def assert_coarsened(
+        a: Address, expected_members: List[Address], expected_dependencies: List[Address]
+    ) -> None:
         coarsened_targets = transitive_targets_rule_runner.request(
             CoarsenedTargets,
             [Addresses([a])],
         )
-        return list(sorted(t.address for t in coarsened_targets[0].members))
+        assert list(sorted(t.address for t in coarsened_targets[0].members)) == expected_members
+        assert list(sorted(d for d in coarsened_targets[0].dependencies)) == expected_dependencies
 
     # BUILD targets are never involved in cycles, and so always coarsen to themselves.
-    assert coarsened(Address("", target_name="dep")) == [Address("", target_name="dep")]
-    assert coarsened(Address("", target_name="t1")) == [Address("", target_name="t1")]
-    assert coarsened(Address("", target_name="t2")) == [Address("", target_name="t2")]
+    assert_coarsened(
+        Address("", target_name="dep"),
+        [Address("", target_name="dep")],
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
+    assert_coarsened(
+        Address("", target_name="t1"),
+        [Address("", target_name="t1")],
+        [
+            Address("", relative_file_path="dep.txt", target_name="dep"),
+            Address("", relative_file_path="t1.txt", target_name="t1"),
+            Address("", relative_file_path="t2.txt", target_name="t2"),
+        ],
+    )
+    assert_coarsened(
+        Address("", target_name="t2"),
+        [Address("", target_name="t2")],
+        [
+            Address("", relative_file_path="t1.txt", target_name="t1"),
+            Address("", relative_file_path="t2.txt", target_name="t2"),
+        ],
+    )
 
     # As will file targets not involved in cycles.
-    assert coarsened(Address("", relative_file_path="dep.txt", target_name="dep")) == [
-        Address("", relative_file_path="dep.txt", target_name="dep")
-    ]
+    assert_coarsened(
+        Address("", relative_file_path="dep.txt", target_name="dep"),
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+        [],
+    )
 
-    # But file targets involved in cycles will coarsen to the cycle.
+    # But file targets involved in cycles will coarsen to the cycle, and have only dependencies outside of the cycle.
     cycle_files = [
         Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
     ]
-    assert coarsened(Address("", relative_file_path="t1.txt", target_name="t1")) == cycle_files
-    assert coarsened(Address("", relative_file_path="t2.txt", target_name="t2")) == cycle_files
+    assert_coarsened(
+        Address("", relative_file_path="t1.txt", target_name="t1"),
+        cycle_files,
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
+    assert_coarsened(
+        Address("", relative_file_path="t2.txt", target_name="t2"),
+        cycle_files,
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
 
 
 def assert_failed_cycle(
