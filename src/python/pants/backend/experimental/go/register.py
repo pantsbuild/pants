@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.go import build, distribution
+from pants.backend.go import build, distribution, import_analysis
 from pants.backend.go.target_types import GoBinary, GoPackage
 
 
@@ -10,4 +10,4 @@ def target_types():
 
 
 def rules():
-    return [*build.rules(), *distribution.rules()]
+    return [*build.rules(), *distribution.rules(), *import_analysis.rules()]

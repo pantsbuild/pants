@@ -5,7 +5,7 @@ from typing import Iterable, List
 
 import pytest
 
-from pants.backend.go import build
+from pants.backend.go import build, import_analysis
 from pants.backend.go.build import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.build_graph.address import Address
@@ -24,6 +24,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
+            *import_analysis.rules(),
             *build.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],

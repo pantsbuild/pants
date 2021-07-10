@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Dict, List, Tuple
 
 from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.backend.go.target_types import GoBinaryMainAddress, GoBinaryName, GoImportPath, GoSources
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -31,7 +32,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -75,16 +75,6 @@ class GoBinaryFieldSet(PackageFieldSet):
     output_path: OutputPathField
 
 
-@dataclass(frozen=True)
-class EnrichedGoLangDistribution:
-    stdlib_packages: FrozenDict[str, str]
-
-
-@dataclass(frozen=True)
-class EnrichGoLangDistributionRequest:
-    downloaded_goroot: DownloadedExternalTool
-
-
 @goal_rule
 async def run_go_build(targets: Targets) -> GoBuildGoal:
     await MultiGet(
@@ -96,35 +86,10 @@ async def run_go_build(targets: Targets) -> GoBuildGoal:
 
 
 @rule
-async def grok_goroot(
-    request: EnrichGoLangDistributionRequest, platform: Platform
-) -> EnrichedGoLangDistribution:
-    snapshot = await Get(Snapshot, Digest, request.downloaded_goroot.digest)
-
-    packages: Dict[str, str] = {}
-
-    for filename in snapshot.files:
-        # TODO: Substitute GOOS and GARCH values into path.
-        # TODO: Handle race detection version of stdlib packages. (Append `_race` to directory.
-        if not filename.startswith(f"go/pkg/{platform.value}_amd64/"):
-            continue
-        if not filename.endswith(".a"):
-            continue
-        p = PurePath(filename).relative_to(f"go/pkg/{platform.value}_amd64")
-        key = p.name[0:-2]
-        if len(p.parts) > 1:
-            key = f"{os.path.normpath(p.parent)}/{key}"
-        packages[key] = filename
-
-    if not packages:
-        raise ValueError("Did not find any SDK packages in Go SDK")
-
-    return EnrichedGoLangDistribution(FrozenDict(packages))
-
-
-@rule
 async def build_target(
-    request: BuildGoPackageRequest, goroot: GoLangDistribution
+    request: BuildGoPackageRequest,
+    goroot: GoLangDistribution,
+    goroot_import_mappings: ResolvedImportPathsForGoLangDistribution,
 ) -> BuiltGoPackage:
     download_goroot_request = Get(
         DownloadedExternalTool,
@@ -165,31 +130,23 @@ async def build_target(
         Digest, MergeDigests([d for _, d in import_config_digests.values()])
     )
 
-    enriched_goroot = await Get(
-        EnrichedGoLangDistribution, EnrichGoLangDistributionRequest(downloaded_goroot)
-    )
-
+    input_root_digests = {source_files.snapshot.digest, merged_packages_digest}
     import_config: List[str] = ["# import config"]
     for import_path, (fp, _) in import_config_digests.items():
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
-    for pkg, path in enriched_goroot.stdlib_packages.items():
-        import_config.append(f"packagefile {pkg}={os.path.normpath(path)}")
+    for pkg, pkg_descriptor in goroot_import_mappings.import_path_mapping.items():
+        input_root_digests.add(pkg_descriptor.digest)
+        import_config.append(f"packagefile {pkg}={os.path.normpath(pkg_descriptor.path)}")
     import_config_content = "\n".join(import_config).encode("utf-8")
     _logger.info(f"import_config_content={import_config_content!r}")
     import_config_digest = await Get(
         Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
     )
+    input_root_digests.add(import_config_digest)
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (
-                source_files.snapshot.digest,
-                downloaded_goroot.digest,
-                merged_packages_digest,
-                import_config_digest,
-            )
-        ),
+        MergeDigests(input_root_digests),
     )
 
     import_path = request.field_sets.import_path.value or ""
@@ -230,7 +187,7 @@ async def build_target(
 @rule
 async def package_go_binary(
     field_set: GoBinaryFieldSet,
-    goroot: GoLangDistribution,
+    goroot_import_mappings: ResolvedImportPathsForGoLangDistribution,
 ) -> BuiltPackage:
     main_address = field_set.main_address.value or ""
     main_go_package_address = await Get(
@@ -243,12 +200,6 @@ async def package_go_binary(
     main_go_package_field_set = BuildGoPackageFieldSet.create(main_go_package_target.target)
     built_main_go_package = await Get(
         BuiltGoPackage, BuildGoPackageRequest(field_sets=main_go_package_field_set, is_main=True)
-    )
-
-    downloaded_goroot = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(Platform.current),
     )
 
     transitive_targets = await Get(
@@ -277,31 +228,24 @@ async def package_go_binary(
         Digest, MergeDigests([d for _, d in import_config_digests.values()])
     )
 
-    enriched_goroot = await Get(
-        EnrichedGoLangDistribution, EnrichGoLangDistributionRequest(downloaded_goroot)
-    )
-
+    input_root_digests = {built_main_go_package.object_digest, merged_packages_digest}
     import_config: List[str] = ["# import config"]
     for import_path, (fp, _) in import_config_digests.items():
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
-    for pkg, path in enriched_goroot.stdlib_packages.items():
-        import_config.append(f"packagefile {pkg}={os.path.normpath(path)}")
+    for pkg, pkg_descriptor in goroot_import_mappings.import_path_mapping.items():
+        input_root_digests.add(pkg_descriptor.digest)
+        import_config.append(f"packagefile {pkg}={os.path.normpath(pkg_descriptor.path)}")
     import_config_content = "\n".join(import_config).encode("utf-8")
     import_config_digest = await Get(
         Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
     )
+    input_root_digests.add(import_config_digest)
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (
-                built_main_go_package.object_digest,
-                downloaded_goroot.digest,
-                merged_packages_digest,
-                import_config_digest,
-            )
-        ),
+        MergeDigests(input_root_digests),
     )
+
     input_snapshot = await Get(Snapshot, Digest, input_digest)
     _logger.info(f"input_snapshot={input_snapshot.files}")
 
