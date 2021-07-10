@@ -4,18 +4,13 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
 from pants.backend.python.lint.yapf.subsystem import Yapf
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -58,7 +53,8 @@ class Setup:
 
 
 def generate_argv(
-    source_files: SourceFiles, yapf: Yapf, check_only: bool, inplace: bool) -> Tuple[str, ...]:
+    source_files: SourceFiles, yapf: Yapf, check_only: bool, inplace: bool
+) -> Tuple[str, ...]:
     args = [*yapf.args]
     if check_only:
         # If "--diff" is passed, yapf returns zero when no changes were necessary and
@@ -110,7 +106,8 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
         VenvPexProcess(
             yapf_pex,
             argv=generate_argv(
-                source_files, yapf,
+                source_files,
+                yapf,
                 check_only=setup_request.check_only,
                 inplace=setup_request.inplace,
             ),
