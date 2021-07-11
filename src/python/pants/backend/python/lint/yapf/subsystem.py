@@ -40,8 +40,10 @@ class Yapf(PythonToolBase):
             member_type=shell_str,
             help=(
                 "Arguments to pass directly to yapf, e.g. "
-                f'`--{cls.options_scope}-args="--no-local-style"`.'
-                "All flags except ... are ignored (because they are handled by Pants)"  # TODO(alte)
+                f'`--{cls.options_scope}-args="--no-local-style"`. '
+                "Certain arguments, specifically `--recursive`, `--in-place`, and "
+                "`--parallel`, will be ignored because Pants takes care of finding "
+                "all the relevant files and running the formatting in parallel."
             ),
         )
         register(
