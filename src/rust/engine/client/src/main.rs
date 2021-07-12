@@ -64,6 +64,11 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     ));
   }
 
+  let concurrent = options_parser.parse_bool(&option_id!("concurrent"), false)?;
+  if concurrent.value {
+    return Err("Pantsd is being turned off since --concurrent is true.".to_owned());
+  }
+
   let level_option = option_id!(-'l', "level");
   let log_level_option_value =
     options_parser.parse_string(&level_option, PythonLogLevel::Info.as_ref())?;
