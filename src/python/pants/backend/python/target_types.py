@@ -244,8 +244,10 @@ class PexPlatformsField(StringSequenceField):
         "available for all of the foreign platforms, rather than sdists.\n\n"
         "You can give a list of multiple platforms to create a multiplatform PEX, "
         "meaning that the PEX will be executable in all of the supported environments.\n\n"
-        "Platforms should be in the format defined by PEP 425, i.e. PLATFORM-IMPL-PYVER-ABI "
-        '(e.g. "linux_x86_64-cp-27-cp27mu", "macosx_10.12_x86_64-cp-36-cp36m"):\n\n'
+        "Platforms should be in the format defined by Pex "
+        "(https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e. "
+        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
+        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n'
         "  - PLATFORM: the host platform, e.g. "
         '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
         'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
