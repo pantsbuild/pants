@@ -1310,13 +1310,22 @@ class OptionsTest(unittest.TestCase):
         )
 
     def test_enum_option_type_parse_error(self) -> None:
-        self.maxDiff = None
         with pytest.raises(ParseError) as exc:
             options = self._parse(flags="enum-opt --some-enum=invalid-value")
-            options.for_scope("enum-opt").some_enum
+            options.for_scope("enum-opt")
+
         assert (
-            "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option "
-            "'--some_enum' in scope 'enum-opt'"
+            "Invalid choice 'invalid-value'. "
+            "Choose from: a-value, another-value, yet-another, one-more"
+        ) in str(exc.value)
+
+    def test_non_enum_option_type_parse_error(self) -> None:
+        with pytest.raises(ParseError) as exc:
+            options = self._parse(flags="--a=not-a-number")
+            options.for_global_scope()
+
+        assert (
+            "Error applying type 'int' to option value 'not-a-number': invalid literal for int()"
         ) in str(exc.value)
 
     def test_mutually_exclusive_options(self) -> None:

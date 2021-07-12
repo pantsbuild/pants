@@ -8,7 +8,6 @@ import inspect
 import json
 import os
 import re
-import traceback
 import typing
 from collections import defaultdict
 from dataclasses import dataclass
@@ -292,7 +291,7 @@ class Parser:
                 args_str = ", ".join(args)
                 raise type(e)(
                     f"Error computing value for {args_str} in {self._scope_str()} (may also be "
-                    f"from PANTS_* environment variables).\nCaused by:\n{traceback.format_exc()}"
+                    f"from PANTS_* environment variables).\nCaused by:\n{e}"
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
@@ -581,9 +580,11 @@ class Parser:
                 return DictValueComponent.create(val_str)
             return type_arg(val_str)
         except (TypeError, ValueError) as e:
+            if issubclass(type_arg, Enum):
+                choices = ", ".join(f"{choice.value}" for choice in type_arg)
+                raise ParseError(f"Invalid choice '{val_str}'. Choose from: {choices}")
             raise ParseError(
-                f"Error applying type '{type_arg.__name__}' to option value '{val_str}', "
-                f"for option '--{dest}' in {self._scope_str()}: {e}"
+                f"Error applying type '{type_arg.__name__}' to option value '{val_str}': {e}"
             )
 
     @classmethod
