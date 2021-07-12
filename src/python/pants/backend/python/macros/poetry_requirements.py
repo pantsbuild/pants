@@ -173,13 +173,26 @@ def handle_dict_attr(
     def produce_match(sep: str, feat: Optional[str]) -> str:
         return f"{sep}{feat}" if feat else ""
 
+    def add_markers(base: str) -> str:
+        markers_lookup = produce_match(";", attributes.get("markers"))
+        fp = str(pyproject_toml.toml_relpath)
+        python_lookup = parse_python_constraint(attributes.get("python"), fp)
+
+        return (
+            f"{base}"
+            f"{markers_lookup}"
+            f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
+            f"{python_lookup}"
+        )
+
     git_lookup = attributes.get("git")
     if git_lookup is not None:
         rev_lookup = produce_match("#", attributes.get("rev"))
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
 
-        return f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
+        base = f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
+        return add_markers(base)
 
     version_lookup = attributes.get("version")
 
@@ -187,26 +200,22 @@ def handle_dict_attr(
     if path_lookup is not None:
         non_pants_project_abs_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
         if non_pants_project_abs_path:
-            return f"{proj_name} @ file://{non_pants_project_abs_path}"
+            base = f"{proj_name} @ file://{non_pants_project_abs_path}"
+            return add_markers(base)
         # An internal path will be handled by normal Pants dependencies and dependency inference;
         # i.e.: it never represents a third party requirement.
         return None
 
     url_lookup = attributes.get("url")
     if url_lookup is not None:
-        return f"{proj_name} @ {url_lookup}"
+        base = f"{proj_name} @ {url_lookup}"
+        return add_markers(base)
 
     if version_lookup is not None:
-        markers_lookup = produce_match(";", attributes.get("markers"))
-        fp = str(pyproject_toml.toml_relpath)
-        python_lookup = parse_python_constraint(attributes.get("python"), fp)
-        version_parsed = parse_str_version(proj_name, version_lookup, fp)
-        return (
-            f"{version_parsed}"
-            f"{markers_lookup}"
-            f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
-            f"{python_lookup}"
+        version_parsed = parse_str_version(
+            proj_name, version_lookup, str(pyproject_toml.toml_relpath)
         )
+        return add_markers(version_parsed)
 
     raise AssertionError(
         f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
