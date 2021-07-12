@@ -315,26 +315,12 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     if python_setup.lockfile:
         # TODO(#12314): This does not handle the case where requirements are disjoint to the
         #  lockfile. W/ constraints, we would avoid using a repository PEX in that case. We need
-        #  to decide what to do in a lockfile world, possibly a) we give up on repository PEX and
-        #  likely the lockfile entirely (see below) or b) generate a new lockfile / error / warn
-        #  to regenerate.
+        #  to decide what to do in a lockfile world, likely a) give up on repository PEX and
+        #  lockfile, or b) generate a new lockfile / error / warn to regenerate.
         #
         #  This will likely change when multiple lockfiles are supported. In the meantime, it
         #  would be an issue because it would force you to have a single consistent resolve for
         #  your whole repo.
-
-        # TODO(#12314): The repository PEX feature is not safe when `platforms` are in use for
-        #  `pex_binary` because the lockfile may be a superset of what is actually needed by the
-        #  `pex_binary`, and some of that superset may not have bdist wheels available. When we
-        #  have multiple lockfiles, I think the fix is to use a dedicated lockfile for that
-        #  `pex_binary`?
-        #
-        #  The previous solution will not work: don't use a repository PEX but still use a
-        #  constraints file. Our new lockfile format does not work as a constraints file because
-        #  it may include extras and URL requirements etc. There is currently no way for us to say
-        #  "only install these 5 loose requirement strings, but grab all versions and transitive
-        #  deps from this lockfile". That is what a constraints file is meant to do, but those are
-        #  deficient.
         repository_pex = await Get(
             Pex,
             PexRequest(
