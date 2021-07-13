@@ -1338,6 +1338,7 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
     result = dependencies_rule_runner.request(
         ExplicitlyProvidedDependencies, [DependenciesRequest(target[Dependencies])]
     )
+    assert result.address == target.address
     expected_addresses = {Address("a/b/c"), Address("files", relative_file_path="f.txt")}
     assert set(result.includes) == expected_addresses
     assert set(result.ignores) == {

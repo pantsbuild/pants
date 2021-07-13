@@ -132,35 +132,46 @@ def test_resolve_pex_binary_entry_point() -> None:
         ]
     )
 
-    def assert_resolved(*, entry_point: Optional[str], expected: Optional[EntryPoint]) -> None:
+    def assert_resolved(
+        *, entry_point: Optional[str], expected: Optional[EntryPoint], is_file: bool
+    ) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
         ep_field = PexEntryPointField(entry_point, addr)
         result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
+        assert result.file_name_used == is_file
 
     # Full module provided.
-    assert_resolved(entry_point="custom.entry_point", expected=EntryPoint("custom.entry_point"))
     assert_resolved(
-        entry_point="custom.entry_point:func", expected=EntryPoint.parse("custom.entry_point:func")
+        entry_point="custom.entry_point", expected=EntryPoint("custom.entry_point"), is_file=False
+    )
+    assert_resolved(
+        entry_point="custom.entry_point:func",
+        expected=EntryPoint.parse("custom.entry_point:func"),
+        is_file=False,
     )
 
     # File names are expanded into the full module path.
-    assert_resolved(entry_point="app.py", expected=EntryPoint(module="project.app"))
+    assert_resolved(entry_point="app.py", expected=EntryPoint(module="project.app"), is_file=True)
     assert_resolved(
-        entry_point="app.py:func", expected=EntryPoint(module="project.app", function="func")
+        entry_point="app.py:func",
+        expected=EntryPoint(module="project.app", function="func"),
+        is_file=True,
     )
 
     # We special case the strings `<none>` and `<None>`.
-    assert_resolved(entry_point="<none>", expected=None)
-    assert_resolved(entry_point="<None>", expected=None)
+    assert_resolved(entry_point="<none>", expected=None, is_file=False)
+    assert_resolved(entry_point="<None>", expected=None, is_file=False)
 
     with pytest.raises(ExecutionError):
-        assert_resolved(entry_point="doesnt_exist.py", expected=EntryPoint("doesnt matter"))
+        assert_resolved(
+            entry_point="doesnt_exist.py", expected=EntryPoint("doesnt matter"), is_file=True
+        )
     # Resolving >1 file is an error.
     with pytest.raises(ExecutionError):
-        assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"))
+        assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"), is_file=True)
 
 
 def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
@@ -173,33 +184,55 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         ],
         target_types=[PexBinary, PythonRequirementLibrary, PythonLibrary],
     )
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name='ansicolors',
-                requirements=['ansicolors'],
-                module_mapping={'ansicolors': ['colors']},
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("project/app.py")
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            python_library(sources=['app.py'])
-            pex_binary(name='first_party', entry_point='project.app')
-            pex_binary(name='first_party_func', entry_point='project.app:func')
-            pex_binary(name='first_party_shorthand', entry_point='app.py')
-            pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
-            pex_binary(name='third_party', entry_point='colors')
-            pex_binary(name='third_party_func', entry_point='colors:func')
-            pex_binary(name='unrecognized', entry_point='who_knows.module')
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement_library(
+                    name='ansicolors',
+                    requirements=['ansicolors'],
+                    module_mapping={'ansicolors': ['colors']},
+                )
+                """
+            ),
+            "project/app.py": "",
+            "project/ambiguous.py": "",
+            "project/ambiguous_in_another_root.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_library(sources=['app.py'])
+                pex_binary(name='first_party', entry_point='project.app')
+                pex_binary(name='first_party_func', entry_point='project.app:func')
+                pex_binary(name='first_party_shorthand', entry_point='app.py')
+                pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
+                pex_binary(name='third_party', entry_point='colors')
+                pex_binary(name='third_party_func', entry_point='colors:func')
+                pex_binary(name='unrecognized', entry_point='who_knows.module')
+
+                python_library(name="dep1", sources=["ambiguous.py"])
+                python_library(name="dep2", sources=["ambiguous.py"])
+                pex_binary(name="ambiguous", entry_point="ambiguous.py")
+                pex_binary(
+                    name="disambiguated",
+                    entry_point="ambiguous.py",
+                    dependencies=["!./ambiguous.py:dep2"],
+                )
+
+                python_library(
+                    name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
+                )
+                pex_binary(
+                    name="another_root__file_used", entry_point="ambiguous_in_another_root.py"
+                )
+                pex_binary(
+                    name="another_root__module_used",
+                    entry_point="project.ambiguous_in_another_root",
+                )
+                """
+            ),
+            "src/py/project/ambiguous_in_another_root.py": "",
+            "src/py/project/BUILD.py": "python_library()",
+        }
     )
 
     def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
@@ -236,28 +269,9 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     )
     assert_injected(Address("project", target_name="unrecognized"), expected=None)
 
-    # Test that we can turn off the injection.
-    rule_runner.set_options(["--no-python-infer-entry-points"])
-    assert_injected(Address("project", target_name="first_party"), expected=None)
-    rule_runner.set_options([])
-
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    rule_runner.create_file("project/ambiguous.py")
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            python_library(name="dep1", sources=["ambiguous.py"])
-            python_library(name="dep2", sources=["ambiguous.py"])
-            pex_binary(name="ambiguous", entry_point="ambiguous.py")
-            """
-        ),
-    )
-    assert_injected(
-        Address("project", target_name="ambiguous"),
-        expected=None,
-    )
+    assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
         "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
@@ -265,26 +279,37 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     ) in caplog.text
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
-    # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
+    # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
     # warning about ambiguity.
     caplog.clear()
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            pex_binary(
-                name="disambiguated",
-                entry_point="ambiguous.py",
-                dependencies=["!./ambiguous.py:dep2"],
-            )
-            """
-        ),
-    )
     assert_injected(
         Address("project", target_name="disambiguated"),
         expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
     )
     assert not caplog.records
+
+    # Test that using a file path results in ignoring all targets which are not an ancestor. We can
+    # do this because we know the file name must be in the current directory or subdir of the
+    # `pex_binary`.
+    assert_injected(
+        Address("project", target_name="another_root__file_used"),
+        expected=Address(
+            "project",
+            target_name="ambiguous_in_another_root",
+            relative_file_path="ambiguous_in_another_root.py",
+        ),
+    )
+    caplog.clear()
+    assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
+    assert len(caplog.records) == 1
+    assert (
+        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
+        "ambiguous_in_another_root.py']"
+    ) in caplog.text
+
+    # Test that we can turn off the injection.
+    rule_runner.set_options(["--no-python-infer-entry-points"])
+    assert_injected(Address("project", target_name="first_party"), expected=None)
 
 
 def test_requirements_field() -> None:

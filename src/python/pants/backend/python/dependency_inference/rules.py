@@ -159,7 +159,7 @@ async def infer_python_dependencies_via_imports(
             import_reference="module",
             context=f"The target {address} imports `{imp}`",
         )
-        maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
+        maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
 

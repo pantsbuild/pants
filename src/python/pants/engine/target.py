@@ -1608,6 +1608,7 @@ class ExplicitlyProvidedDependencies:
     what was in the BUILD file.
     """
 
+    address: Address
     includes: FrozenOrderedSet[Address]
     ignores: FrozenOrderedSet[Address]
 
@@ -1624,20 +1625,29 @@ class ExplicitlyProvidedDependencies:
         )
 
     @memoized_method
-    def remaining_after_ignores(self, addresses: Tuple[Address, ...]) -> frozenset[Address]:
-        """All addresses that are not covered by the explicitly provided ignores.
+    def remaining_after_disambiguation(
+        self, addresses: Tuple[Address, ...], owners_must_be_ancestors: bool
+    ) -> frozenset[Address]:
+        """All addresses that remain after ineligible candidates are discarded.
 
-        Note that if the input addresses are file addresses, they will still be marked as covered if
-        their original BUILD target is in the explicitly provided ignores.
+        Candidates are removed if they appear as ignores (`!` and `!!)` in the `dependencies`
+        field. Note that if the input addresses are file addresses, they will still be marked as
+        covered if their original BUILD target is in the explicitly provided ignores.
+
+        Candidates are also removed if `owners_must_be_ancestors` is True and the targets are not
+        ancestors, e.g. `root2:tgt` is not a valid candidate for something defined in `root1`.
         """
-        return frozenset(
-            addr
-            for addr in addresses
-            if (
-                addr not in self.ignores
-                and addr.maybe_convert_to_build_target() not in self.ignores
+        original_addr_path = PurePath(self.address.spec_path)
+
+        def is_valid(addr: Address) -> bool:
+            is_ignored = (
+                addr in self.ignores or addr.maybe_convert_to_build_target() in self.ignores
             )
-        )
+            if owners_must_be_ancestors is False:
+                return not is_ignored
+            return not is_ignored and original_addr_path.is_relative_to(addr.spec_path)
+
+        return frozenset(filter(is_valid, addresses))
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
@@ -1646,18 +1656,26 @@ class ExplicitlyProvidedDependencies:
         *,
         context: str,
         import_reference: str,
+        owners_must_be_ancestors: bool = False,
     ) -> None:
-        """If the module is ambiguous and the user did not disambiguate via explicitly provided
-        dependencies, warn that dependency inference will not be used."""
+        """If the module is ambiguous and the user did not disambiguate, warn that dependency
+        inference will not be used.
+
+        Disambiguation usually happens by using ignores in the `dependencies` field with `!` and
+        `!!`. If `owners_must_be_ancestors` is True, any addresses which are not ancestors of the
+        target in question will also be ignored.
+        """
         if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
             return
-        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
-        if len(remaining_after_ignores) <= 1:
+        remaining = self.remaining_after_disambiguation(
+            ambiguous_addresses, owners_must_be_ancestors=owners_must_be_ancestors
+        )
+        if len(remaining) <= 1:
             return
         logger.warning(
             f"{context}, but Pants cannot safely infer a dependency because more than one target "
             f"owns this {import_reference}, so it is ambiguous which to use: "
-            f"{sorted(addr.spec for addr in remaining_after_ignores)}."
+            f"{sorted(addr.spec for addr in remaining)}."
             f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
             f"field of {original_address}, or ignore the ones you do not want by prefixing "
             f"with `!` or `!!` so that one or no targets are left."
@@ -1666,12 +1684,20 @@ class ExplicitlyProvidedDependencies:
             f"{doc_url('troubleshooting#import-errors-and-missing-dependencies')}."
         )
 
-    def disambiguated_via_ignores(self, ambiguous_addresses: Tuple[Address, ...]) -> Address | None:
-        """If exactly one of the input addresses remains after considering the explicitly provided
-        ignores, return it because it is disambiguated."""
+    def disambiguated(
+        self, ambiguous_addresses: Tuple[Address, ...], owners_must_be_ancestors: bool = False
+    ) -> Address | None:
+        """If exactly one of the input addresses remains after disambiguation, return it.
+
+        Disambiguation usually happens by using ignores in the `dependencies` field with `!` and
+        `!!`. If `owners_must_be_ancestors` is True, any addresses which are not ancestors of the
+        target in question will also be ignored.
+        """
         if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
             return None
-        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
+        remaining_after_ignores = self.remaining_after_disambiguation(
+            ambiguous_addresses, owners_must_be_ancestors=owners_must_be_ancestors
+        )
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 

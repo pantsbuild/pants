@@ -722,7 +722,9 @@ async def determine_explicitly_provided_dependencies(
     parsed_includes = await MultiGet(Get(Address, AddressInput, ai) for ai in addresses)
     parsed_ignores = await MultiGet(Get(Address, AddressInput, ai) for ai in ignored_addresses)
     return ExplicitlyProvidedDependencies(
-        FrozenOrderedSet(sorted(parsed_includes)), FrozenOrderedSet(sorted(parsed_ignores))
+        request.field.address,
+        FrozenOrderedSet(sorted(parsed_includes)),
+        FrozenOrderedSet(sorted(parsed_ignores)),
     )
 
 
