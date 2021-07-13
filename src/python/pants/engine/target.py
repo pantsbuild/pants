@@ -1645,7 +1645,12 @@ class ExplicitlyProvidedDependencies:
             )
             if owners_must_be_ancestors is False:
                 return not is_ignored
-            return not is_ignored and original_addr_path.is_relative_to(addr.spec_path)
+            # NB: `PurePath.is_relative_to()` was not added until Python 3.9. This emulates it.
+            try:
+                original_addr_path.relative_to(addr.spec_path)
+                return not is_ignored
+            except ValueError:
+                return False
 
         return frozenset(filter(is_valid, addresses))
 
