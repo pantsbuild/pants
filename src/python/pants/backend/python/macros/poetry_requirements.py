@@ -167,23 +167,27 @@ class PyProjectToml:
             )
 
 
+def produce_match(sep: str, feat: Optional[str]) -> str:
+    return f"{sep}{feat}" if feat else ""
+
+
+def add_markers(base: str, attributes: dict[str, str], fp)-> str:
+    markers_lookup = produce_match(";", attributes.get("markers"))
+    python_lookup = parse_python_constraint(attributes.get("python"), fp)
+
+    return (
+        f"{base}"
+        f"{markers_lookup}"
+        f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
+        f"{python_lookup}"
+    )
+
+
 def handle_dict_attr(
     proj_name: str, attributes: dict[str, str], pyproject_toml: PyProjectToml
 ) -> str | None:
-    def produce_match(sep: str, feat: Optional[str]) -> str:
-        return f"{sep}{feat}" if feat else ""
-
-    def add_markers(base: str) -> str:
-        markers_lookup = produce_match(";", attributes.get("markers"))
-        fp = str(pyproject_toml.toml_relpath)
-        python_lookup = parse_python_constraint(attributes.get("python"), fp)
-
-        return (
-            f"{base}"
-            f"{markers_lookup}"
-            f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
-            f"{python_lookup}"
-        )
+    base = ""
+    fp = str(pyproject_toml.toml_relpath)
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
@@ -192,36 +196,34 @@ def handle_dict_attr(
         tag_lookup = produce_match("@", attributes.get("tag"))
 
         base = f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
-        return add_markers(base)
-
-    version_lookup = attributes.get("version")
 
     path_lookup = attributes.get("path")
     if path_lookup is not None:
         non_pants_project_abs_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
         if non_pants_project_abs_path:
             base = f"{proj_name} @ file://{non_pants_project_abs_path}"
-            return add_markers(base)
-        # An internal path will be handled by normal Pants dependencies and dependency inference;
-        # i.e.: it never represents a third party requirement.
-        return None
+        else:
+            # An internal path will be handled by normal Pants dependencies and dependency inference;
+            # i.e.: it never represents a third party requirement.
+            return None
 
     url_lookup = attributes.get("url")
     if url_lookup is not None:
         base = f"{proj_name} @ {url_lookup}"
-        return add_markers(base)
 
+    version_lookup = attributes.get("version")
     if version_lookup is not None:
-        version_parsed = parse_str_version(
-            proj_name, version_lookup, str(pyproject_toml.toml_relpath)
+        base = parse_str_version(
+            proj_name, version_lookup, fp
         )
-        return add_markers(version_parsed)
 
-    raise AssertionError(
-        f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
-        "or git location for your dependency. "
-    )
+    if len(base) == 0:
+        raise AssertionError(
+            f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
+            "or git location for your dependency. "
+        )
 
+    return add_markers(base, attributes, fp)
 
 def parse_single_dependency(
     proj_name: str,

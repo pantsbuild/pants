@@ -14,6 +14,7 @@ from pkg_resources import Requirement
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirements,
     PyProjectToml,
+    add_markers,
     get_max_caret,
     get_max_tilde,
     handle_dict_attr,
@@ -84,6 +85,62 @@ def test_handle_str(test, exp) -> None:
     assert parse_str_version("foo", test, "") == f"foo {exp}"
 
 
+def test_add_markers() -> None:
+    # case with just mark
+    attr_mark = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_mark, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+    # case with just py
+    attr_py = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_py, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+    # case with just advanced mark
+    attr_adv_mark = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_mark, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+    # case with just py
+    attr_adv_py = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_py, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+    # case with basic mark basic py
+    attr_basic_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_basic_both, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+    # case with adv py basic mark
+    attr_adv_py_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_py_both, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+    # case with multi mark simple py
+    attr_adv_mark_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_mark_both, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+    # adv py adv mark
+    attr_adv_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    assert (
+        add_markers("foo==1.0.0", attr_adv_both, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    )
+
+
 def create_pyproject_toml(
     build_root: PurePath | str = ".",
     toml_relpath: PurePath | str = "pyproject.toml",
@@ -113,6 +170,14 @@ def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     assert_git({"branch": "main"}, "@main")
     assert_git({"tag": "v1.1.1"}, "@v1.1.1")
     assert_git({"rev": "1a2b3c4d"}, "#1a2b3c4d")
+    assert_git(
+        {
+            "branch": "main",
+            "markers": "platform_python_implementation == 'CPython'",
+            "python": "3.6",
+        },
+        "@main;platform_python_implementation == 'CPython' and python_version == '3.6'",
+    )
 
 
 def test_handle_path_arg(tmp_path: Path) -> None:
