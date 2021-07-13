@@ -7,7 +7,7 @@ from pants.testutil.pants_integration_test import run_pants
 
 _no_explicit_setting_msg = "An explicit setting will get rid of this message"
 _no_repo_id_msg = 'set `repo_id = "<uuid>"` in the [anonymous-telemetry] section of pants.toml'
-_bad_repo_id_msg = "The repo_id must be between 30 and 60 characters long"
+_bad_repo_id_msg = "must be between 30 and 60 characters long"
 
 
 def test_warn_if_no_explicit_setting() -> None:
