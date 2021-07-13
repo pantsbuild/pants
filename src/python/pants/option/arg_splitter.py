@@ -84,7 +84,7 @@ class ArgSplitter:
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
         self._buildroot = Path(buildroot)
         self._known_scope_infos = known_scope_infos
-        self._known_scopes = {si.scope for si in known_scope_infos} | {
+        self._known_scopes = {si.scope for si in known_scope_infos if si.is_goal} | {
             "version",
             "help",
             "help-advanced",
