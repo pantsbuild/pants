@@ -45,6 +45,9 @@ mod pantsd_tests;
 
 pub use crate::client::{execute_command, ConnectionSettings};
 
+#[cfg(test)]
+mod lib_tests;
+
 pub fn render_choice(items: &[&str]) -> Option<String> {
   match items {
     [] => None,

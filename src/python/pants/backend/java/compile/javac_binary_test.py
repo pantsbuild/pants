@@ -59,12 +59,6 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--javac-jdk=adopt:1.8"])
     assert "javac 1.8" in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--javac-jdk=adopt:1.16"])
-    assert "javac 16.0" in run_javac_version(rule_runner)
-
-    rule_runner.set_options(["--javac-jdk=openjdk:1.16"])
-    assert "javac 16.0" in run_javac_version(rule_runner)
-
     rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):

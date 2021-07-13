@@ -36,9 +36,12 @@ from pants.engine.fs import (
     Snapshot,
     SpecsSnapshot,
 )
+from pants.engine.internals import native_engine
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    CoarsenedTarget,
+    CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -77,6 +80,7 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -238,29 +242,58 @@ def _detect_cycles(
             )
 
 
-@rule(desc="Resolve transitive targets")
-async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
-    """Find all the targets transitively depended upon by the target roots.
+@dataclass(frozen=True)
+class _DependencyMappingRequest:
+    tt_request: TransitiveTargetsRequest
+    expanded_targets: bool
 
-    This uses iteration, rather than recursion, so that we can tolerate dependency cycles. Unlike a
-    traditional BFS algorithm, we batch each round of traversals via `MultiGet` for improved
-    performance / concurrency.
+
+@dataclass(frozen=True)
+class _DependencyMapping:
+    mapping: FrozenDict[Address, Tuple[Address, ...]]
+    visited: FrozenOrderedSet[Target]
+    roots_as_targets: Collection[Target]
+
+
+@rule
+async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _DependencyMapping:
+    """This uses iteration, rather than recursion, so that we can tolerate dependency cycles.
+
+    Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
+    improved performance / concurrency.
     """
-    roots_as_targets = await Get(Targets, Addresses(request.roots))
+    roots_as_targets: Collection[Target]
+    if request.expanded_targets:
+        roots_as_targets = await Get(Targets, Addresses(request.tt_request.roots))
+    else:
+        roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
     while queued:
-        direct_dependencies = await MultiGet(
-            Get(
-                Targets,
-                DependenciesRequest(
-                    tgt.get(Dependencies),
-                    include_special_cased_deps=request.include_special_cased_deps,
-                ),
+        direct_dependencies: Tuple[Collection[Target], ...]
+        if request.expanded_targets:
+            direct_dependencies = await MultiGet(
+                Get(
+                    Targets,
+                    DependenciesRequest(
+                        tgt.get(Dependencies),
+                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                    ),
+                )
+                for tgt in queued
             )
-            for tgt in queued
-        )
+        else:
+            direct_dependencies = await MultiGet(
+                Get(
+                    UnexpandedTargets,
+                    DependenciesRequest(
+                        tgt.get(Dependencies),
+                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                    ),
+                )
+                for tgt in queued
+            )
 
         dependency_mapping.update(
             zip(
@@ -278,11 +311,21 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
     # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
     # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
     _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
+    return _DependencyMapping(
+        FrozenDict(dependency_mapping), FrozenOrderedSet(visited), roots_as_targets
+    )
+
+
+@rule(desc="Resolve transitive targets")
+async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
+    """Find all the targets transitively depended upon by the target roots."""
+
+    dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*roots_as_targets, *visited):
+    for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
@@ -296,8 +339,48 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
         )
 
     return TransitiveTargets(
-        tuple(roots_as_targets), FrozenOrderedSet(visited.difference(transitive_excludes))
+        tuple(dependency_mapping.roots_as_targets),
+        FrozenOrderedSet(dependency_mapping.visited.difference(transitive_excludes)),
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# CoarsenedTargets
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
+    dependency_mapping = await Get(
+        _DependencyMapping,
+        _DependencyMappingRequest(
+            # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
+            # requires a transitive graph walk (to ensure that all cycles are actually detected),
+            # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
+            # involved in a cycle with one of the input Addresses is discarded in the output.
+            TransitiveTargetsRequest(addresses, include_special_cased_deps=True),
+            expanded_targets=False,
+        ),
+    )
+    components = native_engine.strongly_connected_components(
+        list(dependency_mapping.mapping.items())
+    )
+
+    addresses_set = set(addresses)
+    addresses_to_targets = {
+        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
+    }
+    targets = []
+    for component in components:
+        if not any(component_address in addresses_set for component_address in component):
+            continue
+        component_set = set(component)
+        members = tuple(addresses_to_targets[a] for a in component)
+        dependencies = FrozenOrderedSet(
+            [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
+        )
+        targets.append(CoarsenedTarget(members, dependencies))
+    return CoarsenedTargets(targets)
 
 
 # -----------------------------------------------------------------------------------------------

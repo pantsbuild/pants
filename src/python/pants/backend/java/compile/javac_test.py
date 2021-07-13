@@ -146,22 +146,6 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         target=rule_runner.get_target(address=Address(spec_path="", target_name="lib"))
     )
 
-    rule_runner.set_options(["--javac-jdk=openjdk:1.16.0-1"])
-    assert {
-        contents.path
-        for contents in rule_runner.request(
-            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
-        )
-    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
-
-    rule_runner.set_options(["--javac-jdk=adopt:1.8"])
-    assert {
-        contents.path
-        for contents in rule_runner.request(
-            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
-        )
-    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
-
     rule_runner.set_options(["--javac-jdk=zulu:1.6"])
     assert {
         contents.path
