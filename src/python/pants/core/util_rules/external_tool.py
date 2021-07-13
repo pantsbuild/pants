@@ -6,6 +6,8 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, cast
 
+from pkg_resources import Requirement
+
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.fs import Digest, DownloadFile, FileDigest
@@ -22,6 +24,11 @@ class UnknownVersion(Exception):
 
 class ExternalToolError(Exception):
     pass
+
+
+class UnsupportedVersion(ExternalToolError):
+    """The specified version of the tool is not supported, according to the given version
+    constraints."""
 
 
 @dataclass(frozen=True)
@@ -52,6 +59,8 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
           "1.2.3|linux |1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
         ]
 
+        version_constraints = ">=1.2.3, <2.0"
+
         def generate_url(self, plat: Platform) -> str:
             ...
 
@@ -73,6 +82,15 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     default_version: str
     default_known_versions: List[str]
 
+    # our hard constraints required for this tool, to support the API we expect from it
+    version_constraints: Optional[str] = None
+    constraints: Optional[Requirement] = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.version_constraints:
+            self.constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
+
     @classproperty
     def name(cls):
         """The name of the tool, for use in user-facing messages.
@@ -89,7 +107,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             type=str,
             default=cls.default_version,
             advanced=True,
-            help=f"Use this version of {cls.name}.",
+            help=f"Use this version of {cls.name}."
+            + (
+                f" Must satisfy constraints {cls.version_constraints}"
+                if cls.version_constraints
+                else ""
+            ),
         )
 
         help_str = textwrap.dedent(
@@ -152,6 +175,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
+        self.check_version_constraint(self.version)
         for known_version in self.known_versions:
             try:
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
@@ -174,6 +198,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
+
+    def check_version_constraint(self, version: str) -> None:
+        if self.constraints and not self.constraints.specifier.contains(version):  # type: ignore[attr-defined]
+            raise UnsupportedVersion(
+                f"Version {version} does not satisfy the version constraint {self.constraints}"
+            )
 
 
 class TemplatedExternalTool(ExternalTool):
