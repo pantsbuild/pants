@@ -171,14 +171,22 @@ def produce_match(sep: str, feat: Optional[str]) -> str:
     return f"{sep}{feat}" if feat else ""
 
 
-def add_markers(base: str, attributes: dict[str, str], fp)-> str:
-    markers_lookup = produce_match(";", attributes.get("markers"))
+def add_markers(base: str, attributes: dict[str, str], fp) -> str:
+    markers_lookup = produce_match("", attributes.get("markers"))
     python_lookup = parse_python_constraint(attributes.get("python"), fp)
 
+    # Python constraints are passed as a `python_version` environment marker; if we have multiple
+    # markers, we evaluate them as one whole, and then AND with the new marker for the Python constraint.
+    # E.g. (marker1 AND marker2 OR marker3...) AND (python_version)
+    # rather than (marker1 AND marker2 OR marker3 AND python_version)
     return (
         f"{base}"
+        f"{';' if len(markers_lookup) > 0 else ''}"
+        f"{'(' if (' and ' in markers_lookup or ' or ' in markers_lookup) else ''}"
         f"{markers_lookup}"
-        f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
+        f"{';' if python_lookup and not markers_lookup else ''}"
+        f"{')' if (' and ' in markers_lookup or ' or ' in markers_lookup) else ''}"
+        f"{' and ' if python_lookup and markers_lookup else ''}"
         f"{python_lookup}"
     )
 
@@ -213,9 +221,7 @@ def handle_dict_attr(
 
     version_lookup = attributes.get("version")
     if version_lookup is not None:
-        base = parse_str_version(
-            proj_name, version_lookup, fp
-        )
+        base = parse_str_version(proj_name, version_lookup, fp)
 
     if len(base) == 0:
         raise AssertionError(
@@ -224,6 +230,7 @@ def handle_dict_attr(
         )
 
     return add_markers(base, attributes, fp)
+
 
 def parse_single_dependency(
     proj_name: str,

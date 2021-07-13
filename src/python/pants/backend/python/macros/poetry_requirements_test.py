@@ -87,57 +87,37 @@ def test_handle_str(test, exp) -> None:
 
 def test_add_markers() -> None:
     # case with just mark
-    attr_mark = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    attr_mark = {"markers": "platform_python_implementation == 'CPython'"}
     assert (
-        add_markers("foo==1.0.0", attr_adv_mark, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+        add_markers("foo==1.0.0", attr_mark, "somepath")
+        == "foo==1.0.0;platform_python_implementation == 'CPython'"
     )
 
-    # case with just py
-    attr_py = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    # case with adv mark
+    attr_mark_adv = {
+        "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'"
+    }
     assert (
-        add_markers("foo==1.0.0", attr_adv_py, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+        add_markers("foo==1.0.0", attr_mark_adv, "somepath")
+        == "foo==1.0.0;(platform_python_implementation == 'CPython' or sys_platform == 'win32')"
     )
-
-    # case with just advanced mark
-    attr_adv_mark = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
-    assert (
-        add_markers("foo==1.0.0", attr_adv_mark, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
-    )
-
-    # case with just py
-    attr_adv_py = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
-    assert (
-        add_markers("foo==1.0.0", attr_adv_py, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
-    )
-
     # case with basic mark basic py
-    attr_basic_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
+    attr_basic_both = {"python": "3.6", **attr_mark}
     assert (
         add_markers("foo==1.0.0", attr_basic_both, "somepath")
         == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
     )
     # case with adv py basic mark
-    attr_adv_py_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
-    assert (
-        add_markers("foo==1.0.0", attr_adv_py_both, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    attr_adv_py_both = {"python": "^3.6", **attr_mark}
+    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
+        "foo==1.0.0;platform_python_implementation == 'CPython' and "
+        "python_version >= '3.6' and python_version< '4.0'"
     )
 
-    # case with multi mark simple py
-    attr_adv_mark_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
-    assert (
-        add_markers("foo==1.0.0", attr_adv_mark_both, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
-    )
-    # adv py adv mark
-    attr_adv_both = {"python": "3.6", "markers": "platform_python_implementation == 'CPython'"}
-    assert (
-        add_markers("foo==1.0.0", attr_adv_both, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+    attr_adv_both = {"python": "^3.6", **attr_mark_adv}
+    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
+        "foo==1.0.0;(platform_python_implementation == 'CPython' or "
+        "sys_platform == 'win32') and python_version >= '3.6' and python_version< '4.0'"
     )
 
 
@@ -208,11 +188,17 @@ def test_handle_path_arg(tmp_path: Path) -> None:
     internal_project.mkdir()
 
     file_attr = {"path": "../../my_py_proj.whl"}
+    file_attr_mark = {"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"}
     dir_attr = {"path": "../../my_py_proj"}
 
     assert (
         handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml)
         == f"my_py_proj @ file://{external_file}"
+    )
+
+    assert (
+        handle_dict_attr("my_py_proj", file_attr_mark, one_pyproject_toml)
+        == f"my_py_proj @ file://{external_file};os_name=='darwin'"
     )
 
     assert (
@@ -233,6 +219,12 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
     assert (
         handle_dict_attr("my_py_proj", attr, empty_pyproject_toml)
         == "my_py_proj @ https://my-site.com/mydep.whl"
+    )
+
+    attr_with_mark = {**attr, "markers": "os_name=='darwin'"}
+    assert (
+        handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml)
+        == "my_py_proj @ https://my-site.com/mydep.whl;os_name=='darwin'"
     )
 
 
