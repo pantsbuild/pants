@@ -43,6 +43,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AsyncFieldMixin,
+    CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -97,6 +98,7 @@ class MockTarget(Target):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(Targets, (DependenciesRequest,)),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
         ],
@@ -304,6 +306,81 @@ def test_transitive_targets_tolerates_subtarget_cycles(
         Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
     ]
+
+
+def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
+    """CoarsenedTargets should "coarsen" a cycle into a single CoarsenedTarget instance.
+
+    Cycles are only allowed for file targets, so we use explicit file dependencies in this test.
+    """
+    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='dep', sources=['dep.txt'])
+            target(name='t1', sources=['t1.txt'], dependencies=['dep.txt:dep', 't2.txt:t2'])
+            target(name='t2', sources=['t2.txt'], dependencies=['t1.txt:t1'])
+            """
+        ),
+    )
+
+    def assert_coarsened(
+        a: Address, expected_members: List[Address], expected_dependencies: List[Address]
+    ) -> None:
+        coarsened_targets = transitive_targets_rule_runner.request(
+            CoarsenedTargets,
+            [Addresses([a])],
+        )
+        assert list(sorted(t.address for t in coarsened_targets[0].members)) == expected_members
+        assert list(sorted(d for d in coarsened_targets[0].dependencies)) == expected_dependencies
+
+    # BUILD targets are never involved in cycles, and so always coarsen to themselves.
+    assert_coarsened(
+        Address("", target_name="dep"),
+        [Address("", target_name="dep")],
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
+    assert_coarsened(
+        Address("", target_name="t1"),
+        [Address("", target_name="t1")],
+        [
+            Address("", relative_file_path="dep.txt", target_name="dep"),
+            Address("", relative_file_path="t1.txt", target_name="t1"),
+            Address("", relative_file_path="t2.txt", target_name="t2"),
+        ],
+    )
+    assert_coarsened(
+        Address("", target_name="t2"),
+        [Address("", target_name="t2")],
+        [
+            Address("", relative_file_path="t1.txt", target_name="t1"),
+            Address("", relative_file_path="t2.txt", target_name="t2"),
+        ],
+    )
+
+    # As will file targets not involved in cycles.
+    assert_coarsened(
+        Address("", relative_file_path="dep.txt", target_name="dep"),
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+        [],
+    )
+
+    # But file targets involved in cycles will coarsen to the cycle, and have only dependencies outside of the cycle.
+    cycle_files = [
+        Address("", relative_file_path="t1.txt", target_name="t1"),
+        Address("", relative_file_path="t2.txt", target_name="t2"),
+    ]
+    assert_coarsened(
+        Address("", relative_file_path="t1.txt", target_name="t1"),
+        cycle_files,
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
+    assert_coarsened(
+        Address("", relative_file_path="t2.txt", target_name="t2"),
+        cycle_files,
+        [Address("", relative_file_path="dep.txt", target_name="dep")],
+    )
 
 
 def assert_failed_cycle(

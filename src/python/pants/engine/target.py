@@ -607,6 +607,23 @@ class UnexpandedTargets(Collection[Target]):
 
 
 @dataclass(frozen=True)
+class CoarsenedTarget:
+    """A set of Targets which cyclicly reach one another, and are thus indivisable."""
+
+    # The members of the cycle.
+    members: Tuple[Target, ...]
+    # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
+    # between members of the cycle are excluded.
+    #
+    # To expand these dependencies, request `CoarsenedTargets` for them.
+    dependencies: FrozenOrderedSet[Address]
+
+
+class CoarsenedTargets(Collection[CoarsenedTarget]):
+    """A set of direct (not transitive) disjoint CoarsenedTarget instances."""
+
+
+@dataclass(frozen=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.
 

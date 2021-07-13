@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from io import RawIOBase
-from typing import Any, Sequence, TextIO
+from typing import Any, Sequence, TextIO, Tuple
 
 from typing_extensions import Protocol
 
@@ -139,6 +139,9 @@ def rule_subgraph_visualize(
 ) -> None: ...
 def garbage_collect_store(scheduler: PyScheduler, target_size_bytes: int) -> None: ...
 def lease_files_in_graph(scheduler: PyScheduler, session: PySession) -> None: ...
+def strongly_connected_components(
+    adjacency_lists: Sequence[Tuple[Any, Sequence[Any]]]
+) -> Sequence[Sequence[Any]]: ...
 
 class PyDigest:
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
