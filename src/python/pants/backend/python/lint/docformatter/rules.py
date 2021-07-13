@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import importlib.resources
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -58,23 +59,36 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    docformatter_pex_request = Get(
+    if docformatter.lockfile == "<none>":
+        pex_request_kwargs = dict(requirements=PexRequirements(docformatter.all_requirements))
+    elif docformatter.lockfile == "<default>":
+        pex_request_kwargs = dict(
+            requirements_file_content=importlib.resources.read_binary(
+                "pants.backend.python.lint.docformatter", "lockfile.txt"
+            ),
+            additional_args=("--no-transitive",),
+        )
+    else:
+        pex_request_kwargs = dict(
+            requirements_file_content=docformatter.lockfile,
+            additional_args=("--no-transitive",),
+        )
+    docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=PexRequirements(docformatter.all_requirements),
             interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
             main=docformatter.main,
+            description="Build docformatter.pex",
+            **pex_request_kwargs,
         ),
     )
-
-    source_files_request = Get(
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-
-    source_files, docformatter_pex = await MultiGet(source_files_request, docformatter_pex_request)
+    source_files, docformatter_pex = await MultiGet(source_files_get, docformatter_pex_get)
 
     source_files_snapshot = (
         source_files.snapshot

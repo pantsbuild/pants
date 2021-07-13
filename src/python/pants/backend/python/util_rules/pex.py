@@ -89,8 +89,11 @@ class PexPlatforms(DeduplicatedCollection[str]):
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
+    # TODO(#12314): This isn't very ergonomic to have 3 requirements types. Consider encapsulating
+    #  with PexRequirements?
     requirements: PexRequirements
     requirements_file: str | None
+    requirements_file_content: bytes | None
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
@@ -109,6 +112,7 @@ class PexRequest(EngineAwareParameter):
         internal_only: bool,
         requirements: PexRequirements = PexRequirements(),
         requirements_file: str | None = None,
+        requirements_file_content: bytes | None = None,
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
@@ -151,6 +155,7 @@ class PexRequest(EngineAwareParameter):
         self.internal_only = internal_only
         self.requirements = requirements
         self.requirements_file = requirements_file
+        self.requirements_file_content = requirements_file_content
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
         self.sources = sources
@@ -174,6 +179,16 @@ class PexRequest(EngineAwareParameter):
             raise ValueError(
                 "You should only specify `requirements` or `requirements_file`, but both were set: "
                 f"{self}"
+            )
+        if self.requirements and self.requirements_file_content:
+            raise ValueError(
+                "You should only specify `requirements` or `requirements_file_content`, but both "
+                f"were set: {self}"
+            )
+        if self.requirements_file and self.requirements_file_content:
+            raise ValueError(
+                "You should only specify `requirements_file` or `requirements_file_content`, but "
+                f"both were set: {self}"
             )
 
     def debug_hint(self) -> str:
@@ -353,6 +368,12 @@ async def build_pex(
                 #  LockfilePex type.
                 description_of_origin="the option `[python-setup].experimental_lockfile`",
             ),
+        )
+    if request.requirements_file_content:
+        argv.extend(["--requirement", "__requirements.txt"])
+        requirements_file_digest = await Get(
+            Digest,
+            CreateDigest([FileContent("__requirements.txt", request.requirements_file_content)]),
         )
 
     sources_digest_as_subdir = await Get(
