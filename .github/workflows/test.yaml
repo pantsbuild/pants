@@ -101,7 +101,9 @@ jobs:
         key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
 
           '
-        path: 'src/python/pants/engine/internals/native_engine.so
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine_pyo3.so
 
@@ -132,7 +134,9 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: 'src/python/pants/engine/internals/native_engine.so
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine_pyo3.so
 
@@ -245,7 +249,9 @@ jobs:
         key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
 
           '
-        path: 'src/python/pants/engine/internals/native_engine.so
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine_pyo3.so
 
@@ -258,7 +264,9 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: 'src/python/pants/engine/internals/native_engine.so
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine_pyo3.so
 
