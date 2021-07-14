@@ -112,7 +112,7 @@ class PexRequirements:
             return f"PexRequirements(file_path={self.file_path})"
         return f"PexRequirements({list(self.req_strings)!r})"
 
-    def __bool__(self) -> True:
+    def __bool__(self) -> bool:
         return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
 
 
