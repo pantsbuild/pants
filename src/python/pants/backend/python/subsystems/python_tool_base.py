@@ -1,9 +1,13 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import ClassVar, Sequence, Tuple, cast
+from __future__ import annotations
+
+from typing import ClassVar, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequirements
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 
@@ -56,20 +60,39 @@ class PythonToolRequirementsBase(Subsystem):
             )
 
     @property
-    def requirement(self) -> str:
+    def version(self) -> str:
         return cast(str, self.options.version)
 
     @property
-    def extra_requirements(self) -> Tuple[str, ...]:
+    def extra_requirements(self) -> tuple[str, ...]:
         return tuple(self.options.extra_requirements)
 
     @property
-    def all_requirements(self) -> Tuple[str, ...]:
-        return (self.requirement, *self.extra_requirements)
+    def all_requirements(self) -> tuple[str, ...]:
+        """All the raw requirement strings to install the tool.
+
+        This may not include transitive dependencies: these are top-level requirements.
+        """
+        return (self.version, *self.extra_requirements)
 
     @property
-    def interpreter_constraints(self) -> Tuple[str, ...]:
-        return tuple(self.options.interpreter_constraints)
+    def pex_requirements(self) -> PexRequirements:
+        """The requirements to be used when installing the tool.
+
+        If the tool supports lockfiles, the returned type will install from the lockfile rather than
+        `all_requirements`.
+        """
+        # TODO(#11898): move lockfile option registration into PythonToolBase, and update this to
+        #  set the PexRequirements appropriately.
+        return PexRequirements(self.all_requirements)
+
+    @property
+    def interpreter_constraints(self) -> InterpreterConstraints:
+        """The interpreter constraints to use when installing and running the tool.
+
+        This assumes you have set the class property `register_interpreter_constraints = True`.
+        """
+        return InterpreterConstraints(self.options.interpreter_constraints)
 
 
 class PythonToolBase(PythonToolRequirementsBase):

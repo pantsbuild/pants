@@ -124,7 +124,7 @@ async def generate_lockfile(
         PexRequest(
             output_filename="pip_compile.pex",
             internal_only=True,
-            requirements=PexRequirements(pip_tools_subsystem.all_requirements),
+            requirements=pip_tools_subsystem.pex_requirements,
             interpreter_constraints=interpreter_constraints,
             main=pip_tools_subsystem.main,
             description=(
@@ -186,7 +186,7 @@ class PythonToolLockfileRequest:
     tool_name: str
     lockfile_path: str
     requirements: tuple[str, ...]
-    interpreter_constraints: tuple[str, ...]
+    interpreter_constraints: InterpreterConstraints
 
 
 # TODO(#12314): Unify this goal with `lock` once we figure out how to unify the semantics,
@@ -215,17 +215,17 @@ async def generate_tool_lockfile(
             ]
         ),
     )
-    interpreter_constraints = InterpreterConstraints(request.interpreter_constraints)
     pip_compile_get = Get(
         VenvPex,
         PexRequest(
             output_filename="pip_compile.pex",
             internal_only=True,
-            requirements=PexRequirements(pip_tools_subsystem.all_requirements),
-            interpreter_constraints=interpreter_constraints,
+            requirements=pip_tools_subsystem.pex_requirements,
+            interpreter_constraints=request.interpreter_constraints,
             main=pip_tools_subsystem.main,
             description=(
-                f"Building pip_compile.pex with interpreter constraints: {interpreter_constraints}"
+                "Building pip_compile.pex with interpreter constraints: "
+                f"{request.interpreter_constraints}"
             ),
         ),
     )
