@@ -112,6 +112,9 @@ class PexRequirements:
             return f"PexRequirements(file_path={self.file_path})"
         return f"PexRequirements({list(self.req_strings)!r})"
 
+    def __bool__(self) -> True:
+        return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
+
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True

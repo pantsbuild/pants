@@ -103,7 +103,7 @@ async def generate_lockfile(
         if tgt.has_field(PythonRequirementsField)
     )
 
-    if not reqs.req_strings:
+    if not reqs:
         logger.warning(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
