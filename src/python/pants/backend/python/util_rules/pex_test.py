@@ -75,7 +75,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(PexResolveInfo, (VenvPex,)),
             QueryRule(PexPEX, ()),
         ],
-        preserve_tmpdirs=True,
     )
 
 
