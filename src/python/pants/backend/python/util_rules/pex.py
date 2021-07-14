@@ -90,6 +90,7 @@ class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     requirements: PexRequirements
+    requirements_file: str | None
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
@@ -107,6 +108,7 @@ class PexRequest(EngineAwareParameter):
         output_filename: str,
         internal_only: bool,
         requirements: PexRequirements = PexRequirements(),
+        requirements_file: str | None = None,
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
@@ -148,6 +150,7 @@ class PexRequest(EngineAwareParameter):
         self.output_filename = output_filename
         self.internal_only = internal_only
         self.requirements = requirements
+        self.requirements_file = requirements_file
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
         self.sources = sources
@@ -167,24 +170,14 @@ class PexRequest(EngineAwareParameter):
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
             )
+        if self.requirements and self.requirements_file:
+            raise ValueError(
+                "You should only specify `requirements` or `requirements_file`, but both were set: "
+                f"{self}"
+            )
 
     def debug_hint(self) -> str:
         return self.output_filename
-
-
-@dataclass(frozen=True)
-class TwoStepPexRequest:
-    """A request to create a PEX in two steps.
-
-    First we create a requirements-only pex. Then we create the full pex on top of that
-    requirements pex, instead of having the full pex directly resolve its requirements.
-
-    This allows us to re-use the requirements-only pex when no requirements have changed (which is
-    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
-    over and over again.
-    """
-
-    pex_request: PexRequest
 
 
 @dataclass(frozen=True)
@@ -194,17 +187,6 @@ class Pex:
     digest: Digest
     name: str
     python: PythonExecutable | None
-
-
-@dataclass(frozen=True)
-class TwoStepPex:
-    """The result of creating a PEX in two steps.
-
-    TODO(9320): A workaround for https://github.com/pantsbuild/pants/issues/9320. Really we
-      just want the rules to directly return a Pex.
-    """
-
-    pex: Pex
 
 
 logger = logging.getLogger(__name__)
@@ -359,6 +341,20 @@ async def build_pex(
             ),
         )
 
+    requirements_file_digest = EMPTY_DIGEST
+    if request.requirements_file:
+        argv.extend(["--requirement", request.requirements_file])
+        requirements_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [request.requirements_file],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                # TODO(#12314): Parametrize this. Figure out a factoring that makes sense, e.g. a
+                #  LockfilePex type.
+                description_of_origin="the option `[python-setup].experimental_lockfile`",
+            ),
+        )
+
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
@@ -374,6 +370,7 @@ async def build_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                requirements_file_digest,
                 repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),
             )
@@ -393,6 +390,8 @@ async def build_pex(
                 f"{pluralize(len(request.requirements), 'requirement')}: "
                 f"{', '.join(request.requirements)}"
             )
+        elif request.requirements_file:
+            description = f"Building {request.output_filename} from {request.requirements_file}"
         else:
             description = f"Building {request.output_filename}"
 
@@ -628,41 +627,6 @@ async def create_venv_pex(
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
     )
-
-
-@rule(level=LogLevel.DEBUG)
-async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
-    """Create a PEX in two steps: a requirements-only PEX and then a full PEX from it."""
-    request = two_step_pex_request.pex_request
-    req_pex_name = "__requirements.pex"
-
-    repository_pex: Pex | None = None
-
-    # Create a pex containing just the requirements.
-    if request.requirements:
-        repository_pex = await Get(
-            Pex,
-            PexRequest(
-                output_filename=req_pex_name,
-                internal_only=request.internal_only,
-                requirements=request.requirements,
-                interpreter_constraints=request.interpreter_constraints,
-                platforms=request.platforms,
-                # TODO: Do we need to pass all the additional args to the requirements pex creation?
-                #  Some of them may affect resolution behavior, but others may be irrelevant.
-                #  For now we err on the side of caution.
-                additional_args=request.additional_args,
-                description=(
-                    f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
-                    f"{', '.join(request.requirements)}"
-                ),
-            ),
-        )
-
-    # Now create a full PEX on top of the requirements PEX.
-    full_pex_request = dataclasses.replace(request, repository_pex=repository_pex)
-    full_pex = await Get(Pex, PexRequest, full_pex_request)
-    return TwoStepPex(pex=full_pex)
 
 
 @frozen_after_init

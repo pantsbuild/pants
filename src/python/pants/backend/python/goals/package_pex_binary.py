@@ -24,11 +24,8 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import PexPlatforms, TwoStepPex
-from pants.backend.python.util_rules.pex_from_targets import (
-    PexFromTargetsRequest,
-    TwoStepPexFromTargetsRequest,
-)
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -126,22 +123,20 @@ async def package_pex_binary(
         )
 
     output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
-    two_step_pex = await Get(
-        TwoStepPex,
-        TwoStepPexFromTargetsRequest(
-            PexFromTargetsRequest(
-                addresses=[field_set.address],
-                internal_only=False,
-                # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
-                #  https://github.com/pantsbuild/pants/issues/11619
-                main=resolved_entry_point.val,
-                platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
-                output_filename=output_filename,
-                additional_args=field_set.generate_additional_args(pex_binary_defaults),
-            )
+    pex = await Get(
+        Pex,
+        PexFromTargetsRequest(
+            addresses=[field_set.address],
+            internal_only=False,
+            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
+            #  https://github.com/pantsbuild/pants/issues/11619
+            main=resolved_entry_point.val,
+            platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
+            output_filename=output_filename,
+            additional_args=field_set.generate_additional_args(pex_binary_defaults),
         ),
     )
-    return BuiltPackage(two_step_pex.pex.digest, (BuiltPackageArtifact(output_filename),))
+    return BuiltPackage(pex.digest, (BuiltPackageArtifact(output_filename),))
 
 
 def rules():

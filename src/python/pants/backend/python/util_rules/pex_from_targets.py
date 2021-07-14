@@ -18,13 +18,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexPlatforms,
-    PexRequest,
-    PexRequirements,
-    TwoStepPexRequest,
-)
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -163,21 +157,6 @@ class PexFromTargetsRequest:
         )
 
 
-@dataclass(frozen=True)
-class TwoStepPexFromTargetsRequest:
-    """Request to create a PEX from the closure of a set of targets, in two steps.
-
-    First we create a requirements-only pex. Then we create the full pex on top of that
-    requirements pex, instead of having the full pex directly resolve its requirements.
-
-    This allows us to re-use the requirements-only pex when no requirements have changed (which is
-    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
-    over and over again.
-    """
-
-    pex_from_targets_request: PexFromTargetsRequest
-
-
 @rule(level=LogLevel.DEBUG)
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     if request.direct_deps_only:
@@ -312,6 +291,28 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].requirement_constraints` must also be set."
         )
 
+    if python_setup.lockfile:
+        # TODO(#12314): This does not handle the case where requirements are disjoint to the
+        #  lockfile. W/ constraints, we would avoid using a repository PEX in that case. We need
+        #  to decide what to do in a lockfile world, likely a) give up on repository PEX and
+        #  lockfile, or b) generate a new lockfile / error / warn to regenerate.
+        #
+        #  This will likely change when multiple lockfiles are supported. In the meantime, it
+        #  would be an issue because it would force you to have a single consistent resolve for
+        #  your whole repo.
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                description=f"Resolving {python_setup.lockfile}",
+                output_filename="lockfile.pex",
+                internal_only=request.internal_only,
+                requirements_file=python_setup.lockfile,
+                interpreter_constraints=interpreter_constraints,
+                platforms=request.platforms,
+                additional_args=(*request.additional_args, "--no-transitive"),
+            ),
+        )
+
     return PexRequest(
         output_filename=request.output_filename,
         internal_only=request.internal_only,
@@ -325,12 +326,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_args=request.additional_args,
         description=description,
     )
-
-
-@rule
-async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoStepPexRequest:
-    pex_request = await Get(PexRequest, PexFromTargetsRequest, req.pex_from_targets_request)
-    return TwoStepPexRequest(pex_request=pex_request)
 
 
 def rules():

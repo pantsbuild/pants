@@ -11,6 +11,7 @@ DEFAULT_MODULE_MAPPING = {
     "djangorestframework": ("rest_framework",),
     "enum34": ("enum",),
     "paho-mqtt": ("paho",),
+    "psycopg2-binary": ("psycopg2",),
     "protobuf": ("google.protobuf",),
     "pycrypto": ("Crypto",),
     "pyopenssl": ("OpenSSL",),

@@ -32,8 +32,8 @@ class PipToolsSubsystem(PythonToolBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        # TODO: How should users indicate where to save the lockfile to when we have per-tool
-        #  lockfiles and mmultiple user lockfiles?
+        # TODO(#12314): How should users indicate where to save the lockfile to when we have
+        #  per-tool lockfiles and multiple user lockfiles?
         register(
             "--lockfile-dest",
             type=str,
@@ -62,22 +62,33 @@ async def generate_lockfile(
     python_setup: PythonSetup,
     workspace: Workspace,
 ) -> LockGoal:
-    # TODO: Looking at the transitive closure to generate a single lockfile will not work when we
-    #  have multiple lockfiles supported, via per-tool lockfiles and multiple user lockfiles.
+    # TODO(#12314): Looking at the transitive closure to generate a single lockfile will not work
+    #  when we have multiple lockfiles supported, via per-tool lockfiles and multiple user lockfiles.
     #  Ideally, `./pants lock ::` would mean "regenerate all unique lockfiles", whereas now it
     #  means "generate a single lockfile based on this transitive closure."
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
+
+    # TODO(#12314): Likely include "dev dependencies" like MyPy and Pytest, which must not have
+    #  conflicting versions with user requirements. This is a simpler alternative to shading, which
+    #  is likely out of scope for the project. See https://github.com/pantsbuild/pants/issues/9206.
+    #
+    #  We may want to redesign how you set the version and requirements for subsystems in the
+    #  process. Perhaps they should be directly a python_requirement_library, and you use a target
+    #  address? Pytest is a particularly weird case because it's often both a tool you run _and_
+    #  something you import.
+    #
+    #  Make sure to not break https://github.com/pantsbuild/pants/issues/10819.
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
         # NB: By looking at the dependencies, rather than the closure, we only generate for
         # requirements that are actually used in the project.
         #
-        # TODO: It's not totally clear to me if that is desirable. Consider requirements like
+        # TODO(#12314): It's not totally clear to me if that is desirable. Consider requirements like
         #  pydevd-pycharm. Should that be in the lockfile? I think this needs to be the case when
         #  we have multiple lockfiles, though: we shouldn't look at the universe in that case,
         #  only the relevant subset of requirements.
         #
-        # Note that the current generate_lockfile.sh script in our docs also mixes in
+        #  Note that the current generate_lockfile.sh script in our docs also mixes in
         #  `requirements.txt`, but not inlined python_requirement_library targets if they're not
         #  in use. We don't have a way to emulate those semantics because at this point, all we
         #  have is `python_requirement_library` targets without knowing the source.
@@ -95,8 +106,8 @@ async def generate_lockfile(
     input_requirements_get = Get(
         Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs).encode())])
     )
-    # TODO: Figure out named_caches for pip-tools. The best would be to share the cache between
-    #  Pex and Pip. Next best is a dedicated named_cache.
+    # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share the cache
+    #  between Pex and Pip. Next best is a dedicated named_cache.
     pip_compile_get = Get(
         VenvPex,
         PexRequest(
@@ -120,7 +131,7 @@ async def generate_lockfile(
             description=(
                 f"Generate lockfile for {pluralize(len(reqs), 'requirements')}: {', '.join(reqs)}"
             ),
-            # TODO: Wire up all the pip options like indexes.
+            # TODO(#12314): Wire up all the pip options like indexes.
             argv=[
                 "requirements.in",
                 "--generate-hashes",
@@ -133,8 +144,8 @@ async def generate_lockfile(
             output_files=(dest,),
         ),
     )
-    # TODO: rewrite the file to have Pants header info, like how to regenerate the lockfile w/
-    #  Pants.
+    # TODO(#12314): rewrite the file to have Pants header info, like how to regenerate the lockfile
+    #  w/ Pants.
     workspace.write_digest(result.output_digest)
     logger.info(f"Wrote lockfile to {dest}")
 
