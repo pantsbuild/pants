@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, Ven
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -60,19 +60,22 @@ def generate_args(
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
     if docformatter.lockfile == "<none>":
-        pex_request_kwargs = dict(requirements=PexRequirements(docformatter.all_requirements))
+        requirements = PexRequirements(docformatter.all_requirements)
     elif docformatter.lockfile == "<default>":
-        pex_request_kwargs = dict(
-            requirements_file_content=importlib.resources.read_binary(
-                "pants.backend.python.lint.docformatter", "lockfile.txt"
-            ),
-            additional_args=("--no-transitive",),
+        requirements = PexRequirements(
+            file_content=FileContent(
+                "docformatter_default_lockfile.txt",
+                importlib.resources.read_binary(
+                    "pants.backend.python.lint.docformatter", "lockfile.txt"
+                ),
+            )
         )
     else:
-        pex_request_kwargs = dict(
-            requirements_file_content=docformatter.lockfile,
-            additional_args=("--no-transitive",),
+        requirements = PexRequirements(
+            file_path=docformatter.lockfile,
+            file_path_description_of_origin="the option `[docformatter].experimental_lockfile`",
         )
+
     docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
@@ -81,7 +84,8 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
             interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
             main=docformatter.main,
             description="Build docformatter.pex",
-            **pex_request_kwargs,
+            requirements=requirements,
+            is_lockfile=docformatter.lockfile != "<none>",
         ),
     )
     source_files_get = Get(

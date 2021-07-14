@@ -273,7 +273,7 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
-    assert set(parse_requirements(requirements)).issubset(
+    assert set(parse_requirements(requirements.req_strings)).issubset(
         set(parse_requirements(pex_info["requirements"]))
     )
 

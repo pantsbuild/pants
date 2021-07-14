@@ -12,7 +12,7 @@ from pants.backend.python.target_types import ConsoleScript, PythonRequirementsF
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -103,7 +103,7 @@ async def generate_lockfile(
         if tgt.has_field(PythonRequirementsField)
     )
 
-    if not reqs:
+    if not reqs.req_strings:
         logger.warning(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
@@ -111,7 +111,7 @@ async def generate_lockfile(
         return LockGoal(exit_code=0)
 
     input_requirements_get = Get(
-        Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs).encode())])
+        Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs.req_strings).encode())])
     )
     # TODO: Figure out which interpreter constraints to use...Likely get it from the
     #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
@@ -140,7 +140,8 @@ async def generate_lockfile(
         VenvPexProcess(
             pip_compile,
             description=(
-                f"Generate lockfile for {pluralize(len(reqs), 'requirements')}: {', '.join(reqs)}"
+                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirements')}: "
+                f"{', '.join(reqs.req_strings)}"
             ),
             # TODO(#12314): Wire up all the pip options like indexes.
             argv=[
@@ -252,7 +253,7 @@ async def generate_tool_lockfile(
 
 
 @goal_rule
-async def generate_lockfile(
+async def generate_all_tool_lockfiles(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> ToolLockGoal:

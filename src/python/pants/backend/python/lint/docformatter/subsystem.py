@@ -58,7 +58,8 @@ class Docformatter(PythonToolBase):
                 "Set to the string '<none>' to opt out of using a lockfile. We do not recommend "
                 "this, as lockfiles are essential for reproducible builds.\n\n"
                 "To use a custom lockfile, set this option to a file path relative to the build "
-                "root, then run `./pants tool-lock`.\n\n"
+                "root, then activate the backend_package `pants.backend.experimental.python` and "
+                "run `./pants tool-lock`.\n\n"
                 "This option is experimental and will likely change. It does not follow the normal "
                 "deprecation cycle."
             ),
