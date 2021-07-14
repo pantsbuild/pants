@@ -7,11 +7,11 @@ from pants.testutil.pants_integration_test import run_pants
 
 _no_explicit_setting_msg = "An explicit setting will get rid of this message"
 _no_repo_id_msg = 'set `repo_id = "<uuid>"` in the [anonymous-telemetry] section of pants.toml'
-_bad_repo_id_msg = "The repo_id must be between 30 and 60 characters long"
+_bad_repo_id_msg = "must be between 30 and 60 characters long"
 
 
 def test_warn_if_no_explicit_setting() -> None:
-    result = run_pants(["roots"], config={}, use_pantsd=False)
+    result = run_pants(["roots"], config={})
     result.assert_success()
     assert _no_explicit_setting_msg in result.stderr
     assert _no_repo_id_msg not in result.stderr
@@ -19,9 +19,7 @@ def test_warn_if_no_explicit_setting() -> None:
 
 
 def test_warn_if_repo_id_unset() -> None:
-    result = run_pants(
-        ["roots"], config={"anonymous-telemetry": {"enabled": True}}, use_pantsd=False
-    )
+    result = run_pants(["roots"], config={"anonymous-telemetry": {"enabled": True}})
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr
     assert _no_repo_id_msg in result.stderr
@@ -32,7 +30,6 @@ def test_warn_if_repo_id_invalid() -> None:
     result = run_pants(
         ["roots"],
         config={"anonymous-telemetry": {"enabled": True, "repo_id": "tooshort"}},
-        use_pantsd=False,
     )
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr
