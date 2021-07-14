@@ -18,13 +18,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexPlatforms,
-    PexRequest,
-    PexRequirements,
-    TwoStepPexRequest,
-)
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -161,21 +155,6 @@ class PexFromTargetsRequest:
             internal_only=internal_only,
             direct_deps_only=direct_deps_only,
         )
-
-
-@dataclass(frozen=True)
-class TwoStepPexFromTargetsRequest:
-    """Request to create a PEX from the closure of a set of targets, in two steps.
-
-    First we create a requirements-only pex. Then we create the full pex on top of that
-    requirements pex, instead of having the full pex directly resolve its requirements.
-
-    This allows us to re-use the requirements-only pex when no requirements have changed (which is
-    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
-    over and over again.
-    """
-
-    pex_from_targets_request: PexFromTargetsRequest
 
 
 @rule(level=LogLevel.DEBUG)
@@ -347,12 +326,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_args=request.additional_args,
         description=description,
     )
-
-
-@rule
-async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoStepPexRequest:
-    pex_request = await Get(PexRequest, PexFromTargetsRequest, req.pex_from_targets_request)
-    return TwoStepPexRequest(pex_request=pex_request)
 
 
 def rules():
