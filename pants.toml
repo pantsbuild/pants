@@ -72,7 +72,7 @@ root_patterns = [
 ]
 
 [python-setup]
-requirement_constraints = "3rdparty/python/constraints.txt"
+experimental_lockfile = "3rdparty/python/lockfile.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 
 [docformatter]

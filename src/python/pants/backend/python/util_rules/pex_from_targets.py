@@ -312,6 +312,28 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].requirement_constraints` must also be set."
         )
 
+    if python_setup.lockfile:
+        # TODO(#12314): This does not handle the case where requirements are disjoint to the
+        #  lockfile. W/ constraints, we would avoid using a repository PEX in that case. We need
+        #  to decide what to do in a lockfile world, likely a) give up on repository PEX and
+        #  lockfile, or b) generate a new lockfile / error / warn to regenerate.
+        #
+        #  This will likely change when multiple lockfiles are supported. In the meantime, it
+        #  would be an issue because it would force you to have a single consistent resolve for
+        #  your whole repo.
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                description=f"Resolving {python_setup.lockfile}",
+                output_filename="lockfile.pex",
+                internal_only=request.internal_only,
+                requirements_file=python_setup.lockfile,
+                interpreter_constraints=interpreter_constraints,
+                platforms=request.platforms,
+                additional_args=(*request.additional_args, "--no-transitive"),
+            ),
+        )
+
     return PexRequest(
         output_filename=request.output_filename,
         internal_only=request.internal_only,

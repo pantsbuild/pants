@@ -45,6 +45,7 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             type=file_option,
+            mutually_exclusive_group="lockfile",
             help=(
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use.\n\nSee "
@@ -68,6 +69,21 @@ class PythonSetup(Subsystem):
                 "\n\nUsually this option should be enabled because it can result in far fewer "
                 "resolves."
                 "\n\nRequires [python-setup].requirement_constraints to be set."
+            ),
+        )
+        register(
+            "--experimental-lockfile",
+            advanced=True,
+            type=file_option,
+            mutually_exclusive_group="constraints",
+            help=(
+                "The lockfile to use when resolving requirements for your own code (vs. tools you "
+                "run).\n\n"
+                "This is highly experimental and will change, including adding support for "
+                "multiple lockfiles. This option's behavior may change without the normal "
+                "deprecation cycle.\n\n"
+                "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
+                "and run `./pants lock ::`."
             ),
         )
         register(
@@ -131,6 +147,10 @@ class PythonSetup(Subsystem):
     def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
         return cast("str | None", self.options.requirement_constraints)
+
+    @property
+    def lockfile(self) -> str | None:
+        return cast("str | None", self.options.experimental_lockfile)
 
     @property
     def resolve_all_constraints(self) -> bool:
