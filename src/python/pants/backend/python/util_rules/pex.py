@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -467,11 +468,18 @@ class VenvScriptWriter:
             f"{name}={shlex.quote(value)}"
             for name, value in pex_environment.environment_dict(python_configured=True).items()
         )
+        # Ensure that the pex is executed from a path relative to the shim script, so
+        # that running from within a working directory works properly.
+        # NB: No method for determining the path of the current script is entirely foolproof,
+        #  but BASH_SOURCE works fine in our specific case (and has been available since bash-3.0,
+        #  released in 2004, so it seems safe to assume it's available).
+        local_pex_bin = '"${BASH_SOURCE%/*}/"' + shlex.quote(self.pex.name)
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            shlex.quote(arg)
-            for arg in pex_environment.create_argv(self.pex.name, python=self.pex.python)
+            # Don't quote the BASH_SOURCE dereference in local_pex_bin.
+            arg if arg == local_pex_bin else shlex.quote(arg)
+            for arg in pex_environment.create_argv(local_pex_bin, python=self.pex.python)[1:]
         )
 
         script = dedent(
@@ -637,6 +645,7 @@ class PexProcess:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None
+    working_directory: str | None
     extra_env: FrozenDict[str, str] | None
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
@@ -652,6 +661,7 @@ class PexProcess:
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest | None = None,
+        working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -664,6 +674,7 @@ class PexProcess:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.working_directory = working_directory
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
@@ -675,7 +686,12 @@ class PexProcess:
 @rule
 async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvironment) -> Process:
     pex = request.pex
-    argv = pex_environment.create_argv(pex.name, *request.argv, python=pex.python)
+    pex_bin = (
+        os.path.relpath(pex.name, request.working_directory)
+        if request.working_directory
+        else pex.name
+    )
+    argv = pex_environment.create_argv(pex_bin, *request.argv, python=pex.python)
     env = {
         **pex_environment.environment_dict(python_configured=pex.python is not None),
         **(request.extra_env or {}),
@@ -690,6 +706,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvi
         description=request.description,
         level=request.level,
         input_digest=input_digest,
+        working_directory=request.working_directory,
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
@@ -708,6 +725,7 @@ class VenvPexProcess:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None
+    working_directory: str | None
     extra_env: FrozenDict[str, str] | None
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
@@ -723,6 +741,7 @@ class VenvPexProcess:
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest | None = None,
+        working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -735,6 +754,7 @@ class VenvPexProcess:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.working_directory = working_directory
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
@@ -748,7 +768,12 @@ async def setup_venv_pex_process(
     request: VenvPexProcess, pex_environment: SandboxPexEnvironment
 ) -> Process:
     venv_pex = request.venv_pex
-    argv = (venv_pex.pex.argv0, *request.argv)
+    pex_bin = (
+        os.path.relpath(venv_pex.pex.argv0, request.working_directory)
+        if request.working_directory
+        else venv_pex.pex.argv0
+    )
+    argv = (pex_bin, *request.argv)
     input_digest = (
         await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
@@ -759,6 +784,7 @@ async def setup_venv_pex_process(
         description=request.description,
         level=request.level,
         input_digest=input_digest,
+        working_directory=request.working_directory,
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
