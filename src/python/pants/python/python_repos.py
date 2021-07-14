@@ -61,9 +61,20 @@ def _resolve_monkey(self, link):
         ).url
     )
 
+@staticmethod
+def _create_session_monkey(max_retries):
+    def _create_session(max_retries):
+        session = requests.session()
+        session.trust_env = False
+        retrying_adapter = requests.adapters.HTTPAdapter(max_retries=max_retries)
+        session.mount('http://', retrying_adapter)
+        session.mount('https://', retrying_adapter)
+        return session
+
 
 RequestsContext.open = _open_monkey
 RequestsContext.resolve = _resolve_monkey
+RequestsContext._create_session= _create_session_monkey
 
 
 class PythonRepos(Subsystem):
