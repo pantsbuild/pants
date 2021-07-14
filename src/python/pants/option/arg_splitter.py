@@ -84,12 +84,13 @@ class ArgSplitter:
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
         self._buildroot = Path(buildroot)
         self._known_scope_infos = known_scope_infos
-        self._known_scopes = {si.scope for si in known_scope_infos if si.is_goal} | {
+        self._known_scopes = {si.scope for si in known_scope_infos} | {
             "version",
             "help",
             "help-advanced",
             "help-all",
         }
+        self._known_goal_scopes = {si.scope for si in known_scope_infos if si.is_goal}
         self._unconsumed_args: List[
             str
         ] = []  # In reverse order, for efficient popping off the end.
@@ -171,7 +172,8 @@ class ArgSplitter:
         while scope:
             if not self._check_for_help_request(scope.lower()):
                 add_scope(scope)
-                goals.add(scope.partition(".")[0])
+                if scope in self._known_goal_scopes:
+                    goals.add(scope.partition(".")[0])
                 for flag in flags:
                     assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()

@@ -57,7 +57,7 @@ def global_scope() -> ScopeInfo:
 
 
 def task(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope)
+    return ScopeInfo(scope, is_goal=True)
 
 
 def intermediate(scope: str) -> ScopeInfo:
