@@ -174,6 +174,8 @@ class ArgSplitter:
                 add_scope(scope)
                 if scope in self._known_goal_scopes:
                     goals.add(scope.partition(".")[0])
+                else:
+                    unknown_scopes.append(scope)
                 for flag in flags:
                     assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
