@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
+import re
+from collections import OrderedDict
+from pathlib import Path, PurePath
 from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
@@ -98,6 +100,10 @@ class PythonSetup(Subsystem):
                 "and/or to directories containing interpreter binaries. The order of entries does "
                 "not matter. The following special strings are supported:\n\n"
                 '* "<PATH>", the contents of the PATH env var\n'
+                '* "<ASDF>", all Python versions currently configured by ASDF '
+                "(asdf shell, ${HOME}/.tool-versions), with a fallback to all installed versions\n"
+                '* "<ASDF_LOCAL>", the ASDF interpreter with the version in '
+                "BUILD_ROOT/.tool-versions\n"
                 '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
                 '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
                 "BUILD_ROOT/.python-version\n"
@@ -207,6 +213,8 @@ class PythonSetup(Subsystem):
         special_strings = {
             "<PEXRC>": cls.get_pex_python_paths,
             "<PATH>": lambda: cls.get_environment_paths(env),
+            "<ASDF>": lambda: cls.get_asdf_paths(env),
+            "<ASDF_LOCAL>": lambda: cls.get_asdf_paths(env, asdf_local=True),
             "<PYENV>": lambda: cls.get_pyenv_paths(env),
             "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(env, pyenv_local=True),
         }
@@ -252,6 +260,134 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
+    def get_asdf_paths(env: Environment, *, asdf_local: bool = False) -> List[str]:
+        """Returns a list of paths to Python interpreters managed by ASDF.
+
+        :param env: The environment to use to look up ASDF.
+        :param bool asdf_local: If True, only use the interpreter specified by
+                                '.tool-versions' file under `build_root`.
+        """
+        asdf_dir = get_asdf_dir(env)
+        if not asdf_dir:
+            return []
+
+        asdf_dir = Path(asdf_dir)
+
+        # Ignore ASDF if the python plugin isn't installed.
+        asdf_python_plugin = asdf_dir / "plugins" / "python"
+        if not asdf_python_plugin.exists():
+            return []
+
+        # Ignore ASDF if no python versions have ever been installed (the installs folder is
+        # missing).
+        asdf_installs_dir = asdf_dir / "installs" / "python"
+        if not asdf_installs_dir.exists():
+            return []
+
+        # Find all installed versions.
+        asdf_installed_paths: List[str] = []
+        for child in asdf_installs_dir.iterdir():
+            # Aliases, and non-cpython installs may have odd names.
+            # Make sure that the entry is a subdirectory of the installs directory.
+            if child.is_dir():
+                # Make sure that the subdirectory has a bin directory.
+                bin_dir = child / "bin"
+                if bin_dir.exists():
+                    asdf_installed_paths.append(str(bin_dir))
+
+        # Ignore ASDF if there are no installed versions.
+        if not asdf_installed_paths:
+            return []
+
+        asdf_paths: List[str] = []
+        asdf_versions: OrderedDict[str, str] = OrderedDict()
+        tool_versions_file = None
+
+        # Support "shell" based ASDF configuration
+        ASDF_PYTHON_VERSION = env.get("ASDF_PYTHON_VERSION")
+        if ASDF_PYTHON_VERSION:
+            asdf_versions.update(
+                [(v, "ASDF_PYTHON_VERSION") for v in re.split(r"\s+", ASDF_PYTHON_VERSION)]
+            )
+
+        # Target the local tool-versions file.
+        if asdf_local:
+            tool_versions_file = Path(get_buildroot(), ".tool-versions")
+            if not tool_versions_file.exists():
+                logger.warning(
+                    "No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in"
+                    " `[python-setup].interpreter_search_paths`."
+                )
+                tool_versions_file = None
+        # Target the home directory tool-versions file.
+        else:
+            home = env.get("HOME")
+            if home:
+                tool_versions_file = Path(home) / ".tool-versions"
+                if not tool_versions_file.exists():
+                    tool_versions_file = None
+
+        if tool_versions_file:
+            # Parse the tool-versions file.
+            # A tool-versions file contains multiple lines, one or more per tool.
+            # Standardize that the last line for each tool wins.
+            #
+            # The definition of a tool-versions file can be found here:
+            # https://asdf-vm.com/#/core-configuration?id=tool-versions
+            tool_versions_lines = tool_versions_file.read_text().splitlines()
+            last_line = None
+            for line in tool_versions_lines:
+                # Find the last python line.
+                if line.lower().startswith("python"):
+                    last_line = line
+            if last_line:
+                _, _, versions = last_line.partition("python")
+                for v in re.split(r"\s+", versions.strip()):
+                    if ":" in v:
+                        key, _, value = v.partition(":")
+                        if key.lower() == "path":
+                            asdf_paths.append(value)
+                        elif key.lower() == "ref":
+                            asdf_versions[value] = str(tool_versions_file)
+                        else:
+                            logger.warning(
+                                f"Unknown version format `{v}` from ASDF configured by "
+                                "`[python-setup].interpreter_search_paths`, ignoring. This "
+                                "version will not be considered when determining which Python "
+                                f"interpreters to use. Please check that `{tool_versions_file}` "
+                                "is accurate."
+                            )
+                    elif v == "system":
+                        logger.warning(
+                            "System python set by ASDF configured by "
+                            "`[python-setup].interpreter_search_paths` is unsupported, ignoring. "
+                            "This version will not be considered when determining which Python "
+                            "interpreters to use. Please remove 'system' from "
+                            f"`{tool_versions_file}` to disable this warning."
+                        )
+                    else:
+                        asdf_versions[v] = str(tool_versions_file)
+
+        for version, source in asdf_versions.items():
+            install_dir = asdf_installs_dir / version / "bin"
+            if install_dir.exists():
+                asdf_paths.append(str(install_dir))
+            else:
+                logger.warning(
+                    f"Trying to use ASDF version `{version}` configured by "
+                    f"`[python-setup].interpreter_search_paths` but `{install_dir}` does not "
+                    "exist. This version will not be considered when determining which Python "
+                    f"interpreters to use. Please check that `{source}` is accurate."
+                )
+
+        # For non-local, if no paths have been defined, fallback to every version installed
+        if not asdf_local and len(asdf_paths) == 0:
+            # This could be appended to asdf_paths, but there isn't any reason to
+            return asdf_installed_paths
+        else:
+            return asdf_paths
+
+    @staticmethod
     def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> List[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
@@ -288,6 +424,16 @@ class PythonSetup(Subsystem):
             if path.is_dir():
                 paths.append(str(path))
         return paths
+
+
+def get_asdf_dir(env: Environment) -> PurePath | None:
+    """See https://asdf-vm.com/#/core-configuration?id=environment-variables."""
+    asdf_dir = env.get("ASDF_DIR", env.get("ASDF_DATA_DIR"))
+    if not asdf_dir:
+        home = env.get("HOME")
+        if home:
+            return PurePath(home) / ".asdf"
+    return PurePath(asdf_dir) if asdf_dir else None
 
 
 def get_pyenv_root(env: Environment) -> str | None:
