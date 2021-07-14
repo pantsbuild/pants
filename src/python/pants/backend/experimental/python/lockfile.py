@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -11,11 +12,12 @@ from pants.backend.python.target_types import ConsoleScript, PythonRequirementsF
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionMembership, union
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
@@ -44,6 +46,11 @@ class PipToolsSubsystem(PythonToolBase):
     @property
     def lockfile_dest(self) -> str:
         return cast(str, self.options.lockfile_dest)
+
+
+# --------------------------------------------------------------------------------------
+# User lockfiles
+# --------------------------------------------------------------------------------------
 
 
 class LockSubsystem(GoalSubsystem):
@@ -104,8 +111,12 @@ async def generate_lockfile(
         return LockGoal(exit_code=0)
 
     input_requirements_get = Get(
-        Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs).encode())])
+        Digest, CreateDigest([FileContent("requirements.in", "\n".join(reqs.req_strings).encode())])
     )
+    # TODO: Figure out which interpreter constraints to use...Likely get it from the
+    #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
+    #  but we need to figure out how this will work with multiple resolves.
+    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
     # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share the cache
     #  between Pex and Pip. Next best is a dedicated named_cache.
     pip_compile_get = Get(
@@ -114,11 +125,11 @@ async def generate_lockfile(
             output_filename="pip_compile.pex",
             internal_only=True,
             requirements=PexRequirements(pip_tools_subsystem.all_requirements),
-            # TODO: Figure out which interpreter constraints to use...Likely get it from the
-            #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
-            #  but we need to figure out how this will work with multiple resolves.
-            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
+            interpreter_constraints=interpreter_constraints,
             main=pip_tools_subsystem.main,
+            description=(
+                f"Building pip_compile.pex with interpreter constraints: {interpreter_constraints}"
+            ),
         ),
     )
     input_requirements, pip_compile = await MultiGet(input_requirements_get, pip_compile_get)
@@ -129,7 +140,8 @@ async def generate_lockfile(
         VenvPexProcess(
             pip_compile,
             description=(
-                f"Generate lockfile for {pluralize(len(reqs), 'requirements')}: {', '.join(reqs)}"
+                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirements')}: "
+                f"{', '.join(reqs.req_strings)}"
             ),
             # TODO(#12314): Wire up all the pip options like indexes.
             argv=[
@@ -150,6 +162,121 @@ async def generate_lockfile(
     logger.info(f"Wrote lockfile to {dest}")
 
     return LockGoal(exit_code=0)
+
+
+# --------------------------------------------------------------------------------------
+# Tool lockfiles
+# --------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PythonToolLockfile:
+    digest: Digest
+    tool_name: str
+    path: str
+
+
+@union
+class PythonToolLockfileSentinel:
+    pass
+
+
+@dataclass(frozen=True)
+class PythonToolLockfileRequest:
+    tool_name: str
+    lockfile_path: str
+    requirements: tuple[str, ...]
+    interpreter_constraints: tuple[str, ...]
+
+
+# TODO(#12314): Unify this goal with `lock` once we figure out how to unify the semantics,
+#  particularly w/ CLI specs. This is a separate goal only to facilitate progress.
+class ToolLockSubsystem(GoalSubsystem):
+    name = "tool-lock"
+    help = "Generate a lockfile for a Python tool."
+    required_union_implementations = (PythonToolLockfileSentinel,)
+
+
+class ToolLockGoal(Goal):
+    subsystem_cls = ToolLockSubsystem
+
+
+@rule
+async def generate_tool_lockfile(
+    request: PythonToolLockfileRequest, pip_tools_subsystem: PipToolsSubsystem
+) -> PythonToolLockfile:
+    input_requirements_get = Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    f"requirements_{request.tool_name}.in", "\n".join(request.requirements).encode()
+                )
+            ]
+        ),
+    )
+    interpreter_constraints = InterpreterConstraints(request.interpreter_constraints)
+    pip_compile_get = Get(
+        VenvPex,
+        PexRequest(
+            output_filename="pip_compile.pex",
+            internal_only=True,
+            requirements=PexRequirements(pip_tools_subsystem.all_requirements),
+            interpreter_constraints=interpreter_constraints,
+            main=pip_tools_subsystem.main,
+            description=(
+                f"Building pip_compile.pex with interpreter constraints: {interpreter_constraints}"
+            ),
+        ),
+    )
+    input_requirements, pip_compile = await MultiGet(input_requirements_get, pip_compile_get)
+
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            pip_compile,
+            description=f"Generate lockfile for {request.tool_name}",
+            argv=[
+                f"requirements_{request.tool_name}.in",
+                "--generate-hashes",
+                f"--output-file={request.lockfile_path}",
+                # NB: This allows pinning setuptools et al, which we must do. This will become
+                # the default in a future version of pip-tools.
+                "--allow-unsafe",
+            ],
+            input_digest=input_requirements,
+            output_files=(request.lockfile_path,),
+        ),
+    )
+
+    return PythonToolLockfile(result.output_digest, request.tool_name, request.lockfile_path)
+
+
+@goal_rule
+async def generate_all_tool_lockfiles(
+    workspace: Workspace,
+    union_membership: UnionMembership,
+) -> ToolLockGoal:
+    # TODO(#12314): Add logic to inspect the Specs and generate for only relevant lockfiles. For
+    #  now, we generate for all tools.
+    requests = await MultiGet(
+        Get(PythonToolLockfileRequest, PythonToolLockfileSentinel, sentinel())
+        for sentinel in union_membership.get(PythonToolLockfileSentinel)
+    )
+    if not requests:
+        return ToolLockGoal(exit_code=0)
+
+    results = await MultiGet(
+        Get(PythonToolLockfile, PythonToolLockfileRequest, req)
+        for req in requests
+        if req.lockfile_path not in {"<none>", "<default>"}
+    )
+    merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
+    workspace.write_digest(merged_digest)
+    for result in results:
+        logger.info(f"Wrote lockfile for {result.tool_name} to {result.path}")
+
+    return ToolLockGoal(exit_code=0)
 
 
 def rules():

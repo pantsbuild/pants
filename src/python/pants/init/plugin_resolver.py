@@ -56,7 +56,7 @@ async def resolve_plugins(
             # The repository's constraints are not relevant here, because this resolve is mixed
             # into the Pants' process' path, and never into user code.
             apply_requirement_constraints=False,
-            description=f"Resolving plugins: {', '.join(requirements)}",
+            description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
         ),
     )
 

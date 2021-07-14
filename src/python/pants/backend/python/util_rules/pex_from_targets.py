@@ -230,7 +230,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         name_reqs = set()  # E.g., foobar>=1.2.3
         name_req_projects = set()
 
-        for req_str in exact_reqs:
+        for req_str in exact_reqs.req_strings:
             req = Requirement.parse(req_str)
             if req.url:  # type: ignore[attr-defined]
                 url_reqs.add(req)
@@ -267,8 +267,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 #  name requirements but different subsets of URL requirements. Fortunately since
                 #  all these repository pexes will have identical pinned versions of everything,
                 #  this is not a correctness issue, only a performance one.
-                # TODO: Address this as part of providing proper lockfile support. However we
-                #  generate lockfiles, they must be able to include URL requirements.
                 all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
                 repository_pex = await Get(
                     Pex,
@@ -290,26 +288,26 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].resolve_all_constraints` is enabled, so "
             "`[python-setup].requirement_constraints` must also be set."
         )
-
-    if python_setup.lockfile:
+    elif python_setup.lockfile:
         # TODO(#12314): This does not handle the case where requirements are disjoint to the
-        #  lockfile. W/ constraints, we would avoid using a repository PEX in that case. We need
-        #  to decide what to do in a lockfile world, likely a) give up on repository PEX and
-        #  lockfile, or b) generate a new lockfile / error / warn to regenerate.
-        #
-        #  This will likely change when multiple lockfiles are supported. In the meantime, it
-        #  would be an issue because it would force you to have a single consistent resolve for
-        #  your whole repo.
+        #  lockfile. We should likely regenerate the lockfile (or warn/error), as the inputs have
+        #  changed.
         repository_pex = await Get(
             Pex,
             PexRequest(
                 description=f"Resolving {python_setup.lockfile}",
                 output_filename="lockfile.pex",
                 internal_only=request.internal_only,
-                requirements_file=python_setup.lockfile,
+                requirements=PexRequirements(
+                    file_path=python_setup.lockfile,
+                    file_path_description_of_origin=(
+                        "the option `[python-setup].experimental_lockfile`"
+                    ),
+                ),
                 interpreter_constraints=interpreter_constraints,
                 platforms=request.platforms,
-                additional_args=(*request.additional_args, "--no-transitive"),
+                is_lockfile=True,
+                additional_args=request.additional_args,
             ),
         )
 

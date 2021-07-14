@@ -695,7 +695,7 @@ async def get_requirements(
         for tgt in direct_deps_with_excl
         if tgt.has_field(PythonRequirementsField)
     )
-    req_strs = list(reqs)
+    req_strs = list(reqs.req_strings)
 
     # Add the requirements on any exported targets on which we depend.
     kwargs_for_exported_targets_we_depend_on = await MultiGet(

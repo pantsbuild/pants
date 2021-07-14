@@ -77,6 +77,7 @@ interpreter_constraints = [">=3.7,<3.10"]
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
+experimental_lockfile = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
 
 [flake8]
 config = "build-support/flake8/.flake8"

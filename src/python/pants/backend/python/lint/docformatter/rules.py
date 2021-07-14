@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import importlib.resources
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -14,7 +15,7 @@ from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, Ven
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -58,23 +59,40 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    docformatter_pex_request = Get(
+    if docformatter.lockfile == "<none>":
+        requirements = PexRequirements(docformatter.all_requirements)
+    elif docformatter.lockfile == "<default>":
+        requirements = PexRequirements(
+            file_content=FileContent(
+                "docformatter_default_lockfile.txt",
+                importlib.resources.read_binary(
+                    "pants.backend.python.lint.docformatter", "lockfile.txt"
+                ),
+            )
+        )
+    else:
+        requirements = PexRequirements(
+            file_path=docformatter.lockfile,
+            file_path_description_of_origin="the option `[docformatter].experimental_lockfile`",
+        )
+
+    docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=PexRequirements(docformatter.all_requirements),
             interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
             main=docformatter.main,
+            description="Build docformatter.pex",
+            requirements=requirements,
+            is_lockfile=docformatter.lockfile != "<none>",
         ),
     )
-
-    source_files_request = Get(
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-
-    source_files, docformatter_pex = await MultiGet(source_files_request, docformatter_pex_request)
+    source_files, docformatter_pex = await MultiGet(source_files_get, docformatter_pex_get)
 
     source_files_snapshot = (
         source_files.snapshot
