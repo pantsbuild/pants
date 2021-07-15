@@ -15,16 +15,20 @@ def test_doc_url(monkeypatch) -> None:
 
 
 def test_git_url(monkeypatch) -> None:
-    monkeypatch.setattr(docutil, "MAJOR_MINOR", "1.29")
     monkeypatch.setattr(docutil, "PANTS_SEMVER", Version("1.29.0.dev0"))
-    assert git_url("some_file.ext") == "https://github.com/pantsbuild/pants/blob/main/some_file.ext"
+    assert (
+        git_url("some_file.ext")
+        == "https://github.com/pantsbuild/pants/blob/release_1.29.0.dev0/some_file.ext"
+    )
 
     monkeypatch.setattr(docutil, "PANTS_SEMVER", Version("1.29.0rc0"))
     assert (
-        git_url("some_file.ext") == "https://github.com/pantsbuild/pants/blob/1.29.x/some_file.ext"
+        git_url("some_file.ext")
+        == "https://github.com/pantsbuild/pants/blob/release_1.29.0rc0/some_file.ext"
     )
 
     monkeypatch.setattr(docutil, "PANTS_SEMVER", Version("1.29.0"))
     assert (
-        git_url("some_file.ext") == "https://github.com/pantsbuild/pants/blob/1.29.x/some_file.ext"
+        git_url("some_file.ext")
+        == "https://github.com/pantsbuild/pants/blob/release_1.29.0/some_file.ext"
     )

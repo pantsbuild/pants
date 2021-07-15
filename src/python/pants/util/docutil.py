@@ -19,10 +19,5 @@ def doc_url(slug: str) -> str:
 
 
 def git_url(fp: str) -> str:
-    """Link to code in pantsbuild/pants.
-
-    Note that links will not be stable for dev releases because `main` floats. Only release
-    candidates and stable releases have stable links.
-    """
-    branch = "main" if PANTS_SEMVER.is_devrelease else f"{MAJOR_MINOR}.x"
-    return f"https://github.com/pantsbuild/pants/blob/{branch}/{fp}"
+    """Link to code in pantsbuild/pants."""
+    return f"https://github.com/pantsbuild/pants/blob/release_{PANTS_SEMVER}/{fp}"
