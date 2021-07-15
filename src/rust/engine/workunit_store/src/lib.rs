@@ -423,12 +423,12 @@ impl HeavyHittersData {
     res
   }
 
-  fn render_straggling_workunits(&self, duration_threshold: Duration) -> Option<String> {
+  fn straggling_workunits(&self, duration_threshold: Duration) -> Vec<(Duration, String)> {
     self.refresh_store();
     let now = SystemTime::now();
     let inner = self.inner.lock();
 
-    let mut matching_visible_parents = inner
+    let matching_visible_parents = inner
       .graph
       .externals(petgraph::Direction::Outgoing)
       .map(|entry| inner.graph[entry])
@@ -442,28 +442,23 @@ impl HeavyHittersData {
           )
           .and_then(|span_id| inner.workunit_records.get(&span_id))
           .and_then(|wu| wu.metadata.desc.as_ref())
-          .map(|desc| (duration, desc))
+          .map(|desc| (desc.clone(), duration))
         }
         _ => None,
       })
-      .collect::<Vec<_>>();
+      .collect::<HashMap<_, _>>();
 
     if matching_visible_parents.is_empty() {
-      return None;
+      return vec![];
     }
 
-    // NB: We sort before stringifying the Duration to get Duration ordering.
-    matching_visible_parents.sort();
-    matching_visible_parents.dedup();
-
-    Some(format!(
-      "Long running tasks:\n  {}",
-      matching_visible_parents
-        .into_iter()
-        .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
-        .collect::<Vec<_>>()
-        .join("\n  "),
-    ))
+    let mut stragglers = matching_visible_parents
+      .into_iter()
+      .map(|(k, v)| (v, k))
+      .collect::<Vec<_>>();
+    // NB: Because the Duration is first in the tuple, we get ascending Duration order.
+    stragglers.sort();
+    stragglers
   }
 
   fn is_visible(workunit: &Workunit) -> bool {
@@ -525,17 +520,16 @@ impl WorkunitStore {
     }))
   }
 
-  pub fn log_straggling_workunits(&self, threshold: Duration) {
-    if let Some(stragglers_msg) = self
-      .heavy_hitters_data
-      .render_straggling_workunits(threshold)
-    {
-      log::info!("{}", stragglers_msg)
-    }
+  ///
+  /// Return visible workunits which have been running longer than the duration_threshold, sorted
+  /// in ascending order by their duration.
+  ///
+  pub fn straggling_workunits(&self, threshold: Duration) -> Vec<(Duration, String)> {
+    self.heavy_hitters_data.straggling_workunits(threshold)
   }
 
   ///
-  /// Find the longest running leaf workunits, and render their first visible parents.
+  /// Find the longest running leaf workunits, and return their first visible parents.
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     self.heavy_hitters_data.heavy_hitters(k)
