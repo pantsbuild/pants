@@ -145,6 +145,13 @@ pub enum WorkunitState {
 }
 
 impl WorkunitState {
+  fn completed(&self) -> bool {
+    match self {
+      WorkunitState::Completed { .. } => true,
+      WorkunitState::Started { .. } => false,
+    }
+  }
+
   fn blocked(&self) -> bool {
     match self {
       WorkunitState::Started { blocked, .. } => blocked.load(atomic::Ordering::Relaxed),
@@ -267,7 +274,7 @@ impl StreamingWorkunitData {
 
         if should_emit(&started) {
           started.parent_id =
-            first_matched_parent(&workunit_records, started.parent_id, should_emit);
+            first_matched_parent(&workunit_records, started.parent_id, |_| false, should_emit);
           started_workunits.push(started);
         }
       }
@@ -299,8 +306,12 @@ impl StreamingWorkunitData {
             workunit_records.insert(span_id, workunit.clone());
 
             if should_emit(&workunit) {
-              workunit.parent_id =
-                first_matched_parent(&workunit_records, workunit.parent_id, should_emit);
+              workunit.parent_id = first_matched_parent(
+                &workunit_records,
+                workunit.parent_id,
+                |_| false,
+                should_emit,
+              );
               completed_workunits.push(workunit);
             }
           }
@@ -431,9 +442,12 @@ impl HeavyHittersData {
     let mut res = HashMap::new();
     while let Some((_dur, span_id)) = queue.pop() {
       // If the leaf is visible or has a visible parent, emit it.
-      if let Some(span_id) =
-        first_matched_parent(&inner.workunit_records, Some(span_id), Self::is_visible)
-      {
+      if let Some(span_id) = first_matched_parent(
+        &inner.workunit_records,
+        Some(span_id),
+        |wu| wu.state.completed(),
+        Self::is_visible,
+      ) {
         let workunit = inner.workunit_records.get(&span_id).unwrap();
         if let Some(effective_name) = workunit.metadata.desc.as_ref() {
           let maybe_duration = Self::duration_for(now, &workunit);
@@ -463,6 +477,7 @@ impl HeavyHittersData {
           first_matched_parent(
             &inner.workunit_records,
             Some(workunit.span_id),
+            |wu| wu.state.completed(),
             Self::is_visible,
           )
           .and_then(|span_id| inner.workunit_records.get(&span_id))
@@ -487,7 +502,9 @@ impl HeavyHittersData {
   }
 
   fn is_visible(workunit: &Workunit) -> bool {
-    workunit.metadata.level <= Level::Debug && workunit.metadata.desc.is_some()
+    workunit.metadata.level <= Level::Debug
+      && workunit.metadata.desc.is_some()
+      && matches!(workunit.state, WorkunitState::Started { .. })
   }
 
   fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
@@ -508,13 +525,19 @@ pub struct HeavyHittersInnerStore {
 fn first_matched_parent(
   workunit_records: &HashMap<SpanId, Workunit>,
   mut span_id: Option<SpanId>,
+  is_terminal: impl Fn(&Workunit) -> bool,
   is_visible: impl Fn(&Workunit) -> bool,
 ) -> Option<SpanId> {
   while let Some(current_span_id) = span_id {
     let workunit = workunit_records.get(&current_span_id);
 
-    // Is the current workunit visible?
     if let Some(ref workunit) = workunit {
+      // Should we continue visiting parents?
+      if is_terminal(workunit) {
+        break;
+      }
+
+      // Is the current workunit visible?
       if is_visible(workunit) {
         return Some(current_span_id);
       }
