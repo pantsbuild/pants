@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Iterator, Mapping, Optional
+from typing import Any, Iterable, Iterator, Mapping, Optional, Sequence
 
 import toml
 from packaging.version import InvalidVersion, Version
@@ -55,7 +55,7 @@ def get_max_tilde(parsed_version: Version) -> str:
     return f"{major}.{minor}.0"
 
 
-def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
+def parse_str_version(proj_name: str, attributes: Any, fp: str, extras_string: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
     comma_split_reqs = (i.strip() for i in attributes.split(","))
@@ -79,7 +79,7 @@ def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
-    return f"{proj_name} {','.join(pep440_reqs)}"
+    return f"{proj_name}{extras_string} {','.join(pep440_reqs)}"
 
 
 def parse_python_constraint(constr: str | None, fp: str) -> str:
@@ -87,7 +87,7 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
         return ""
     valid_specifiers = "<>!~= "
     or_and_split = [[j.strip() for j in i.split(",")] for i in constr.split("||")]
-    ver_parsed = [[parse_str_version("", j, fp) for j in i] for i in or_and_split]
+    ver_parsed = [[parse_str_version("", j, fp, "") for j in i] for i in or_and_split]
 
     def conv_and(lst: list[str]) -> list:
         return list(itertools.chain(*[i.split(",") for i in lst]))
@@ -139,7 +139,7 @@ class PyProjectToml:
 
         return None
 
-    def non_pants_project_abs_path(self, path: str) -> Path | None:
+    def non_pants_project_abs_path(self, path: Any) -> Path | None:
         """Determine if the given path represents a non-Pants controlled project.
 
         If the path points to a file, it's assumed the file is a distribution ( a wheel or sdist)
@@ -167,11 +167,11 @@ class PyProjectToml:
             )
 
 
-def produce_match(sep: str, feat: Optional[str]) -> str:
+def produce_match(sep: str, feat: Any) -> str:
     return f"{sep}{feat}" if feat else ""
 
 
-def add_markers(base: str, attributes: dict[str, str], fp) -> str:
+def add_markers(base: str, attributes: Mapping[str, Any], fp) -> str:
     markers_lookup = produce_match("", attributes.get("markers"))
     python_lookup = parse_python_constraint(attributes.get("python"), fp)
 
@@ -192,10 +192,18 @@ def add_markers(base: str, attributes: dict[str, str], fp) -> str:
 
 
 def handle_dict_attr(
-    proj_name: str, attributes: dict[str, str], pyproject_toml: PyProjectToml
+    proj_name: str, attributes: Mapping[str, Sequence[str] | str], pyproject_toml: PyProjectToml
 ) -> str | None:
     base = ""
     fp = str(pyproject_toml.toml_relpath)
+
+    extras_lookup = attributes.get("extras")
+    if type(extras_lookup) == list:
+        extras_str = f"[{','.join(extras_lookup)}]"
+    elif type(extras_lookup) == str:
+        extras_str = f"{extras_lookup}"
+    else:
+        extras_str = ""
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
@@ -203,13 +211,13 @@ def handle_dict_attr(
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
 
-        base = f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
+        base = f"{proj_name}{extras_str} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
 
     path_lookup = attributes.get("path")
     if path_lookup is not None:
         non_pants_project_abs_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
         if non_pants_project_abs_path:
-            base = f"{proj_name} @ file://{non_pants_project_abs_path}"
+            base = f"{proj_name}{extras_str} @ file://{non_pants_project_abs_path}"
         else:
             # An internal path will be handled by normal Pants dependencies and dependency inference;
             # i.e.: it never represents a third party requirement.
@@ -217,11 +225,11 @@ def handle_dict_attr(
 
     url_lookup = attributes.get("url")
     if url_lookup is not None:
-        base = f"{proj_name} @ {url_lookup}"
+        base = f"{proj_name}{extras_str} @ {url_lookup}"
 
     version_lookup = attributes.get("version")
     if version_lookup is not None:
-        base = parse_str_version(proj_name, version_lookup, fp)
+        base = parse_str_version(proj_name, version_lookup, fp, extras_str)
 
     if len(base) == 0:
         raise AssertionError(
@@ -234,13 +242,17 @@ def handle_dict_attr(
 
 def parse_single_dependency(
     proj_name: str,
-    attributes: str | dict[str, Any] | list[dict[str, Any]],
+    attributes: str | Mapping[str, Any] | Sequence[Mapping[str, Any]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[Requirement]:
+
+    # TODO(Liam Wilson): Type hints are a bit of a mess at the moment; I think the best way to
+    # clean this up is a TypedDict for the attributes argument; almost everything else loses a
+    # decent amount of information.
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield Requirement.parse(
-            parse_str_version(proj_name, attributes, str(pyproject_toml.toml_relpath))
+            parse_str_version(proj_name, attributes, str(pyproject_toml.toml_relpath), "")
         )
     elif isinstance(attributes, dict):
         # E.g. `foo = {version = "~1.1"}`.

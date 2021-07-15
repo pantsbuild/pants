@@ -82,11 +82,12 @@ def test_max_tilde(test, exp) -> None:
     ],
 )
 def test_handle_str(test, exp) -> None:
-    assert parse_str_version("foo", test, "") == f"foo {exp}"
+    assert parse_str_version("foo", test, "", "") == f"foo {exp}"
 
 
 def test_add_markers() -> None:
     # case with just mark
+
     attr_mark = {"markers": "platform_python_implementation == 'CPython'"}
     assert (
         add_markers("foo==1.0.0", attr_mark, "somepath")
@@ -136,6 +137,17 @@ def create_pyproject_toml(
 @pytest.fixture
 def empty_pyproject_toml() -> PyProjectToml:
     return create_pyproject_toml(toml_contents="")
+
+
+def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
+    # Tested with git/path/url in those respective tests.
+    attr = {"version": "1.0.0", "extras": "[extra1]"}
+    assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
+    attr_multi = {"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]}
+    assert (
+        handle_dict_attr("requests", attr_multi, empty_pyproject_toml)
+        == "requests[extra1,extra2,extra3] ==1.0.0"
+    )
 
 
 def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
@@ -189,11 +201,17 @@ def test_handle_path_arg(tmp_path: Path) -> None:
 
     file_attr = {"path": "../../my_py_proj.whl"}
     file_attr_mark = {"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"}
+    file_attr_extras = {"path": "../../my_py_proj.whl", "extras": "[extra1]"}
     dir_attr = {"path": "../../my_py_proj"}
 
     assert (
         handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml)
         == f"my_py_proj @ file://{external_file}"
+    )
+
+    assert (
+        handle_dict_attr("my_py_proj", file_attr_extras, one_pyproject_toml)
+        == f"my_py_proj[extra1] @ file://{external_file}"
     )
 
     assert (
@@ -219,6 +237,12 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
     assert (
         handle_dict_attr("my_py_proj", attr, empty_pyproject_toml)
         == "my_py_proj @ https://my-site.com/mydep.whl"
+    )
+
+    attr_with_extra = {**attr, "extras": "[extra1]"}
+    assert (
+        handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml)
+        == "my_py_proj[extra1] @ https://my-site.com/mydep.whl"
     )
 
     attr_with_mark = {**attr, "markers": "os_name=='darwin'"}
@@ -293,9 +317,9 @@ def test_parse_multi_reqs() -> None:
 
     [tool.poetry.dependencies]
     python = "^3.8"
-    junk = {url = "https://github.com/myrepo/junk.whl"}
+    junk = {url = "https://github.com/myrepo/junk.whl", extras = ["security"]}
     poetry = {git = "https://github.com/python-poetry/poetry.git", tag = "v1.1.1"}
-    requests = {extras = ["security"], version = "^2.25.1", python = ">2.7"}
+    requests = {extras = ["security","random"], version = "^2.25.1", python = ">2.7"}
     foo = [{version = ">=1.9", python = "^2.7"},{version = "^2.0", python = "3.4 || 3.5"}]
 
     [tool.poetry.dependencies.black]
@@ -313,9 +337,9 @@ def test_parse_multi_reqs() -> None:
     pyproject_toml = create_pyproject_toml(toml_contents=toml_str)
     retval = parse_pyproject_toml(pyproject_toml)
     actual_reqs = {
-        Requirement.parse("junk@ https://github.com/myrepo/junk.whl"),
+        Requirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
         Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
-        Requirement.parse('requests<3.0.0,>=2.25.1; python_version > "2.7"'),
+        Requirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
         Requirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
         Requirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
         Requirement.parse(
