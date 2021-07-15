@@ -11,6 +11,7 @@ backend_packages.add = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.python.lint.yapf",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
@@ -98,6 +99,11 @@ extra_requirements.add = [
 
 [isort]
 experimental_lockfile = "src/python/pants/backend/python/lint/isort/lockfile.txt"
+
+[yapf]
+# We only activate this to generate and maintain a lockfile - we don't actually want to use yapf.
+skip = true
+experimental_lockfile = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
 
 [shellcheck]
 args = ["--external-sources"]

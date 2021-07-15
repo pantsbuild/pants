@@ -6,9 +6,15 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonToolLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -18,9 +24,14 @@ class Yapf(PythonToolBase):
 
     default_version = "yapf==0.31.0"
     default_extra_requirements = ["setuptools", "toml"]
+    default_main = ConsoleScript("yapf")
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
-    default_main = ConsoleScript("yapf")
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.lint.yapf", "lockfile.txt")
+    default_lockfile_file_path = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
 
     @classmethod
     def register_options(cls, register):
@@ -104,3 +115,16 @@ class Yapf(PythonToolBase):
             check_existence=check_existence,
             check_content=check_content,
         )
+
+
+class YapfLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule
+def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> PythonToolLockfileRequest:
+    return PythonToolLockfileRequest.from_tool(yapf)
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, YapfLockfileSentinel))
