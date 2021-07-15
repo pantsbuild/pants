@@ -4,6 +4,7 @@
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
+from pants.option.scope import ScopeInfo
 from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
 from pants.testutil.rule_runner import mock_console, run_rule_with_mocks
 
@@ -33,3 +34,14 @@ def test_line_oriented_goal() -> None:
         )
         assert result.exit_code == 0
         assert stdio_reader.get_stdout() == "output...line oriented\n"
+
+
+def test_goal_scope_flag() -> None:
+    class DummyGoal(GoalSubsystem):
+        name = "dummy"
+
+    dummy = create_goal_subsystem(DummyGoal)
+    assert dummy.get_scope_info().is_goal is True
+    assert dummy.known_scope_infos() == {
+        ScopeInfo(scope="dummy", optionable_cls=DummyGoal, is_goal=True)
+    }

@@ -90,6 +90,7 @@ class ArgSplitter:
             "help-advanced",
             "help-all",
         }
+        self._known_goal_scopes = {si.scope for si in known_scope_infos if si.is_goal}
         self._unconsumed_args: List[
             str
         ] = []  # In reverse order, for efficient popping off the end.
@@ -171,7 +172,10 @@ class ArgSplitter:
         while scope:
             if not self._check_for_help_request(scope.lower()):
                 add_scope(scope)
-                goals.add(scope.partition(".")[0])
+                if scope in self._known_goal_scopes:
+                    goals.add(scope.partition(".")[0])
+                else:
+                    unknown_scopes.append(scope)
                 for flag in flags:
                     assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()

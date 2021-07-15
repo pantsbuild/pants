@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cas
 
 from typing_extensions import final
 
+from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
 
@@ -36,6 +37,10 @@ class GoalSubsystem(Subsystem):
     # If the goal requires downstream implementations to work properly, such as `test` and `run`,
     # it should declare the union types that must have members.
     required_union_implementations: Tuple[Type, ...] = ()
+
+    @classmethod
+    def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
+        return super().create_scope_info(is_goal=True, **scope_info_kwargs)
 
     @classproperty
     @abstractmethod
