@@ -34,6 +34,9 @@ class ScopeInfo:
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
 
+    # command line goal scope flag
+    is_goal: bool = False
+
     @property
     def description(self) -> str:
         return cast(str, getattr(self.optionable_cls, "help"))
