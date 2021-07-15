@@ -10,10 +10,10 @@ from pants.core.util_rules.external_tool import (
     ExternalTool,
     ExternalToolError,
     ExternalToolRequest,
-    ExternalToolVersionConstraintsViolationAction,
     TemplatedExternalTool,
     UnknownVersion,
     UnsupportedVersion,
+    UnsupportedVersionUsage,
 )
 from pants.engine.fs import DownloadFile, FileDigest
 from pants.engine.platform import Platform
@@ -144,16 +144,16 @@ def no_exception():
     [
         (
             "v1.2.3",
-            ExternalToolVersionConstraintsViolationAction.RaiseError,
+            UnsupportedVersionUsage.RaiseError,
             pytest.raises(
                 UnsupportedVersion,
-                match="Version v1.2.3 does not satisfy the version constraints foobar<3.8,>3.2.1",
+                match="foobar v1.2.3 does not satisfy the version constraints foobar<3.8,>3.2.1",
             ),
             None,
         ),
         (
             "v3.2.2",
-            ExternalToolVersionConstraintsViolationAction.RaiseError,
+            UnsupportedVersionUsage.RaiseError,
             pytest.raises(
                 UnknownVersion, match="No known version of foobar v3.2.2 for darwin found in"
             ),
@@ -161,21 +161,21 @@ def no_exception():
         ),
         (
             "v3.4.7",
-            ExternalToolVersionConstraintsViolationAction.RaiseError,
+            UnsupportedVersionUsage.RaiseError,
             no_exception(),
             None,
         ),
         (
             "v3.8.0",
-            ExternalToolVersionConstraintsViolationAction.RaiseError,
+            UnsupportedVersionUsage.RaiseError,
             pytest.raises(
-                UnsupportedVersion, match="Version v3.8.0 does not satisfy the version constraints"
+                UnsupportedVersion, match="foobar v3.8.0 does not satisfy the version constraints"
             ),
             None,
         ),
         (
             "v3.8.0",
-            ExternalToolVersionConstraintsViolationAction.LogWarning,
+            UnsupportedVersionUsage.LogWarning,
             pytest.raises(
                 UnknownVersion, match="No known version of foobar v3.8.0 for darwin found in"
             ),
@@ -188,7 +188,7 @@ def no_exception():
         ),
         (
             "v3.8.0",
-            ExternalToolVersionConstraintsViolationAction.Ignore,
+            UnsupportedVersionUsage.Allow,
             pytest.raises(
                 UnknownVersion, match="No known version of foobar v3.8.0 for darwin found in"
             ),
@@ -209,7 +209,7 @@ def test_version_constraints(caplog, version, action, assert_expectation, expect
         create_subsystem(
             ConstrainedTool,
             version=version,
-            on_version_constraints_violation=action,
+            use_unsupported_version=action,
             known_versions=ConstrainedTool.default_known_versions,
             url_template=ConstrainedTool.default_url_template,
             url_platform_mapping=ConstrainedTool.default_url_platform_mapping,

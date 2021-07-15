@@ -35,16 +35,15 @@ class UnsupportedVersion(ExternalToolError):
     constraints."""
 
 
-class ExternalToolVersionConstraintsViolationAction(Enum):
-    """What action to take in case the requested version does not satisfy the version constraints
-    for this tool.
+class UnsupportedVersionUsage(Enum):
+    """What action to take in case the requested version of {tool} is not supported.
 
-    Current constraints: {constraints}
+    Supported versions: {constraints}
     """
 
-    LogWarning = "warning"
+    Allow = "allow"
     RaiseError = "error"
-    Ignore = "ignore"
+    LogWarning = "warning"
 
 
 @dataclass(frozen=True)
@@ -124,7 +123,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             default=cls.default_version,
             advanced=True,
             help=f"Use this version of {cls.name}."
-            + (f" Constraints {cls.version_constraints}" if cls.version_constraints else ""),
+            + (
+                f" Supported versions: {cls.version_constraints}" if cls.version_constraints else ""
+            ),
         )
 
         help_str = textwrap.dedent(
@@ -157,16 +158,17 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         )
 
         register(
-            "--on-version-constraints-violation",
+            "--use-unsupported-version",
             advanced=True,
-            type=ExternalToolVersionConstraintsViolationAction,
+            type=UnsupportedVersionUsage,
             help=textwrap.dedent(
                 "    "
-                + ExternalToolVersionConstraintsViolationAction.__doc__.format(
-                    constraints=cls.version_constraints
+                + UnsupportedVersionUsage.__doc__.format(
+                    tool=cls.name,
+                    constraints=cls.version_constraints if cls.version_constraints else "any",
                 )
             ),
-            default=ExternalToolVersionConstraintsViolationAction.LogWarning,
+            default=UnsupportedVersionUsage.LogWarning,
         )
 
     @property
@@ -229,22 +231,22 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             # all ok
             return None
 
-        action = self.options.on_version_constraints_violation
-        if action is ExternalToolVersionConstraintsViolationAction.Ignore:
+        action = self.options.use_unsupported_version
+        if action is UnsupportedVersionUsage.Allow:
             logger.debug(
                 f"Ignoring constraints for version {version}, does not satisfy version constraints {self.constraints}"
             )
-        elif action is ExternalToolVersionConstraintsViolationAction.LogWarning:
+        elif action is UnsupportedVersionUsage.LogWarning:
             logger.warning(
                 f"{self.name} {version} may not be compatible with this version of pants, as it does not satisfy the constraints {self.constraints}"
             )
-        elif action is ExternalToolVersionConstraintsViolationAction.RaiseError:
+        elif action is UnsupportedVersionUsage.RaiseError:
             raise UnsupportedVersion(
-                f"Version {version} does not satisfy the version constraints {self.constraints}"
+                f"{self.name} {version} does not satisfy the version constraints {self.constraints}"
             )
         else:
             raise ValueError(
-                f"Internal Error: unexpected value for --on-version-constraints-violation: {action!r}"
+                f"Internal Error: unexpected value for --use-unsupported-version: {action!r}"
             )
 
 
