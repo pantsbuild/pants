@@ -37,10 +37,11 @@ GOOD_FILE = "data = []\n"
 BAD_FILE = "data = {  'a':11,'b':22    }\n"
 FIXED_BAD_FILE = "data = {'a': 11, 'b': 22}\n"
 
-# Note the indentation is 6 spaces; after formatting it should become 2
-NEEDS_FORMATTING_FILE = "def func():\n      return 42\n"
-FIXED_NEEDS_FORMATTING_FILE_INDENT2 = "def func():\n  return 42\n"
-FIXED_NEEDS_FORMATTING_FILE_INDENT4 = "def func():\n    return 42\n"
+# Note the indentation is 6 spaces; after formatting it should
+# become 2 or 4 spaces depending on the configuration
+NEEDS_CONFIG_FILE = "def func():\n      return 42\n"
+FIXED_NEEDS_CONFIG_FILE_INDENT2 = "def func():\n  return 42\n"
+FIXED_NEEDS_CONFIG_FILE_INDENT4 = "def func():\n    return 42\n"
 
 
 def run_yapf(
@@ -129,7 +130,7 @@ def test_config_file(
 ) -> None:
     rule_runner.write_files(
         {
-            "f.py": NEEDS_FORMATTING_FILE,
+            "f.py": NEEDS_CONFIG_FILE,
             "BUILD": "python_library(name='t', interpreter_constraints=['==3.9.*'])",
             path: f"[{section}]\nindent_width = 2\n",
         }
@@ -139,14 +140,12 @@ def test_config_file(
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert all(msg in lint_results[0].stdout for msg in ("reformatted", "original", "f.py"))
-    assert fmt_result.output == get_digest(
-        rule_runner, {"f.py": FIXED_NEEDS_FORMATTING_FILE_INDENT2}
-    )
+    assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_NEEDS_CONFIG_FILE_INDENT2})
     assert fmt_result.did_change is True
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": NEEDS_FORMATTING_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_yapf(
         rule_runner, [tgt], extra_args=["--yapf-args=--style='{indent_width: 4}'"]
@@ -154,9 +153,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert all(msg in lint_results[0].stdout for msg in ("reformatted", "original", "f.py"))
-    assert fmt_result.output == get_digest(
-        rule_runner, {"f.py": FIXED_NEEDS_FORMATTING_FILE_INDENT4}
-    )
+    assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_NEEDS_CONFIG_FILE_INDENT4})
     assert fmt_result.did_change is True
 
 
