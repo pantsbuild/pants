@@ -33,6 +33,17 @@ class BooleanOptionNameWithNo(RegistrationError):
     """Boolean option names cannot start with --no."""
 
 
+class DefaultValueType(RegistrationError):
+    """Default value {value_type}({default_value!r}) does not match option type {option_type}."""
+
+
+class DefaultMemberValueType(DefaultValueType):
+    """Default member value type mismatch.
+
+    Member value {value_type}({member_value!r}) does not match list option type {member_type}.
+    """
+
+
 class ImplicitValIsNone(RegistrationError):
     """Implicit value cannot be None."""
 
