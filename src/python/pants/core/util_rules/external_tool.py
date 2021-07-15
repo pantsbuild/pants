@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Tuple, cast
 
 from pkg_resources import Requirement
@@ -17,6 +19,8 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
+logger = logging.getLogger(__name__)
+
 
 class UnknownVersion(Exception):
     pass
@@ -29,6 +33,18 @@ class ExternalToolError(Exception):
 class UnsupportedVersion(ExternalToolError):
     """The specified version of the tool is not supported, according to the given version
     constraints."""
+
+
+class ExternalToolVersionConstraintsViolationAction(Enum):
+    """What action to take in case the requested version does not satisfy the version constraints
+    for this tool.
+
+    Current constraints: {constraints}
+    """
+
+    LogWarning = "warning"
+    RaiseError = "error"
+    Ignore = "ignore"
 
 
 @dataclass(frozen=True)
@@ -108,11 +124,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             default=cls.default_version,
             advanced=True,
             help=f"Use this version of {cls.name}."
-            + (
-                f" Must satisfy constraints {cls.version_constraints}"
-                if cls.version_constraints
-                else ""
-            ),
+            + (f" Constraints {cls.version_constraints}" if cls.version_constraints else ""),
         )
 
         help_str = textwrap.dedent(
@@ -142,6 +154,19 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             default=cls.default_known_versions,
             advanced=True,
             help=help_str,
+        )
+
+        register(
+            "--on-version-constraints-violation",
+            advanced=True,
+            type=ExternalToolVersionConstraintsViolationAction,
+            help=textwrap.dedent(
+                "    "
+                + ExternalToolVersionConstraintsViolationAction.__doc__.format(
+                    constraints=cls.version_constraints
+                )
+            ),
+            default=ExternalToolVersionConstraintsViolationAction.LogWarning,
         )
 
     @property
@@ -200,9 +225,26 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         )
 
     def check_version_constraint(self, version: str) -> None:
-        if self.constraints and not self.constraints.specifier.contains(version):  # type: ignore[attr-defined]
+        if not self.constraints or self.constraints.specifier.contains(version):  # type: ignore[attr-defined]
+            # all ok
+            return None
+
+        action = self.options.on_version_constraints_violation
+        if action is ExternalToolVersionConstraintsViolationAction.Ignore:
+            logger.debug(
+                f"Ignoring constraints for version {version}, does not satisfy version constraints {self.constraints}"
+            )
+        elif action is ExternalToolVersionConstraintsViolationAction.LogWarning:
+            logger.warning(
+                f"{self.name} {version} may not be compatible with this version of pants, as it does not satisfy the constraints {self.constraints}"
+            )
+        elif action is ExternalToolVersionConstraintsViolationAction.RaiseError:
             raise UnsupportedVersion(
-                f"Version {version} does not satisfy the version constraint {self.constraints}"
+                f"Version {version} does not satisfy the version constraints {self.constraints}"
+            )
+        else:
+            raise ValueError(
+                f"Internal Error: unexpected value for --on-version-constraints-violation: {action!r}"
             )
 
 
