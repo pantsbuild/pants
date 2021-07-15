@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.subsystems.ipython import IPython
-from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -81,7 +81,7 @@ async def create_ipython_repl_request(
         PexRequest(
             output_filename="ipython.pex",
             main=ipython.main,
-            requirements=PexRequirements(ipython.all_requirements),
+            requirements=ipython.pex_requirements,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             internal_only=True,
         ),

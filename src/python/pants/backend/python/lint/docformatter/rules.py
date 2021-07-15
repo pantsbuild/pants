@@ -10,7 +10,6 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -60,7 +59,7 @@ def generate_args(
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
     if docformatter.lockfile == "<none>":
-        requirements = PexRequirements(docformatter.all_requirements)
+        requirements = docformatter.pex_requirements
     elif docformatter.lockfile == "<default>":
         requirements = PexRequirements(
             file_content=FileContent(
@@ -81,10 +80,9 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
-            main=docformatter.main,
-            description="Build docformatter.pex",
             requirements=requirements,
+            interpreter_constraints=docformatter.interpreter_constraints,
+            main=docformatter.main,
             is_lockfile=docformatter.lockfile != "<none>",
         ),
     )
