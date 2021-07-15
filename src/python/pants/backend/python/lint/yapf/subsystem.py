@@ -40,7 +40,7 @@ class Yapf(PythonToolBase):
             member_type=shell_str,
             help=(
                 "Arguments to pass directly to yapf, e.g. "
-                f'`--{cls.options_scope}-args="--no-local-style"`. '
+                f'`--{cls.options_scope}-args="--no-local-style"`.\n\n'
                 "Certain arguments, specifically `--recursive`, `--in-place`, and "
                 "`--parallel`, will be ignored because Pants takes care of finding "
                 "all the relevant files and running the formatting in parallel."
@@ -65,7 +65,7 @@ class Yapf(PythonToolBase):
             advanced=True,
             help=(
                 "If true, Pants will include any relevant config files during "
-                "runs (`.style.yapf`, `pyproject.toml`, `setup.cfg`, and `~/.config/yapf/style`)."
+                "runs (`.style.yapf`, `pyproject.toml`, and `setup.cfg`)."
                 f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
                 f"non-standard location."
             ),
@@ -85,15 +85,15 @@ class Yapf(PythonToolBase):
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://github.com/google/yapf#formatting-style.
+        check_existence = []
         check_content = {}
         for d in ("", *dirs):
+            check_existence.append(os.path.join(d, ".yapfignore"))
             check_content.update(
                 {
-                    os.path.join(d, "pyproject.toml"): b"[tool.yapf]",
+                    os.path.join(d, "pyproject.toml"): b"[tool.yapf",
                     os.path.join(d, "setup.cfg"): b"[yapf]",
                     os.path.join(d, ".style.yapf"): b"[style]",
-                    "~/.config/yapf/style": b"[style]",
-                    os.path.join(d, ".yapfignore"): b"",
                 }
             )
 
@@ -101,5 +101,6 @@ class Yapf(PythonToolBase):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=cast(bool, self.options.config_discovery),
+            check_existence=check_existence,
             check_content=check_content,
         )

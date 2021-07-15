@@ -43,7 +43,6 @@ class YapfRequest(PythonFmtRequest, LintRequest):
 class SetupRequest:
     request: YapfRequest
     check_only: bool
-    inplace: bool
 
 
 @dataclass(frozen=True)
@@ -52,15 +51,13 @@ class Setup:
     original_digest: Digest
 
 
-def generate_argv(
-    source_files: SourceFiles, yapf: Yapf, check_only: bool, inplace: bool
-) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tuple[str, ...]:
     args = [*yapf.args]
     if check_only:
         # If "--diff" is passed, yapf returns zero when no changes were necessary and
         # non-zero otherwise
         args.append("--diff")
-    if inplace:
+    else:
         # The "--in-place" flag makes yapf to actually reformat files
         args.append("--in-place")
     if yapf.config:
@@ -109,7 +106,6 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
                 source_files,
                 yapf,
                 check_only=setup_request.check_only,
-                inplace=setup_request.inplace,
             ),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
@@ -124,13 +120,12 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
         return FmtResult.skip(formatter_name="yapf")
-    setup = await Get(Setup, SetupRequest(request, check_only=False, inplace=True))
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
         formatter_name="yapf",
-        strip_chroot_path=True,
     )
 
 
@@ -138,10 +133,10 @@ async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
 async def yapf_lint(request: YapfRequest, yapf: Yapf) -> LintResults:
     if yapf.skip:
         return LintResults([], linter_name="yapf")
-    setup = await Get(Setup, SetupRequest(request, check_only=True, inplace=False))
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        [LintResult.from_fallible_process_result(result)],
         linter_name="yapf",
     )
 
