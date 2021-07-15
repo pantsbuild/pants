@@ -82,7 +82,8 @@ experimental_lockfile = "src/python/pants/backend/codegen/protobuf/python/mypy_p
 experimental_lockfile = "src/python/pants/backend/awslambda/python/lambdex_lockfile.txt"
 
 [black]
-experimental_lockfile = "src/python/pants/backend/python/lint/black/lockfile.txt"
+# TODO(#12200): Figure out how to get this lockfile to work with multiple interpreters.
+# experimental_lockfile = "src/python/pants/backend/python/lint/black/lockfile.txt"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
