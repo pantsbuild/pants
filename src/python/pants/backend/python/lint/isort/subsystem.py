@@ -31,6 +31,7 @@ class Isort(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.isort", "lockfile.txt")
+    default_lockfile_file_path = "src/python/pants/backend/python/lint/isort/lockfile.txt"
 
     @classmethod
     def register_options(cls, register):

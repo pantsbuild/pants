@@ -109,6 +109,7 @@ class CoverageSubsystem(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py_lockfile.txt")
+    default_lockfile_file_path = "src/python/pants/backend/python/goals/coverage_py.py"
 
     @classmethod
     def register_options(cls, register):

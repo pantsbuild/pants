@@ -72,6 +72,9 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
         "pants.backend.codegen.protobuf.python",
         "mypy_protobuf_lockfile.txt",
     )
+    default_lockfile_file_path = (
+        "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf_lockfile.txt"
+    )
 
 
 class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):

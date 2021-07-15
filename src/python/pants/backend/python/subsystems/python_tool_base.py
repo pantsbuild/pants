@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.pex import PexRequirements
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import git_url
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -33,6 +34,7 @@ class PythonToolRequirementsBase(Subsystem):
     # Register the UnionRule.
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
+    default_lockfile_file_path: ClassVar[str | None] = None
 
     @classmethod
     def register_options(cls, register):
@@ -71,10 +73,12 @@ class PythonToolRequirementsBase(Subsystem):
                 help="Python interpreter constraints for this tool.",
             )
 
-        if cls.register_lockfile and not cls.default_lockfile_resource:
+        if cls.register_lockfile and (
+            not cls.default_lockfile_resource or not cls.default_lockfile_file_path
+        ):
             raise ValueError(
-                "The class property `default_lockfile_resource` must be set if "
-                f"`register_lockfile` is set. See `{cls.options_scope}`."
+                "The class properties `default_lockfile_resource` and `default_lockfile_file_path` "
+                f"must be set if `register_lockfile` is set. See `{cls.options_scope}`."
             )
         if cls.register_lockfile and not cls.register_interpreter_constraints:
             # TODO(#12314): Figure out how to determine the interpreter constraints for tools that
@@ -96,7 +100,8 @@ class PythonToolRequirementsBase(Subsystem):
                     "Set to the string '<default>' to use a lockfile provided by "
                     "Pants, so long as you have not changed the `--version`, "
                     "`--extra-requirements`, and `--interpreter-constraints` options. See "
-                    "{} for the default lockfile contents.\n\n"
+                    f"{git_url(cls.default_lockfile_file_path)} for the default lockfile "
+                    f"contents.\n\n"
                     "Set to the string '<none>' to opt out of using a lockfile. We do not "
                     "recommend this, as lockfiles are essential for reproducible builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
