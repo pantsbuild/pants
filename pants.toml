@@ -75,6 +75,15 @@ root_patterns = [
 experimental_lockfile = "3rdparty/python/lockfile.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 
+[python-protobuf.mypy-plugin]
+experimental_lockfile = "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf_lockfile.txt"
+
+[lambdex]
+experimental_lockfile = "src/python/pants/backend/awslambda/python/lambdex_lockfile.txt"
+
+[black]
+experimental_lockfile = "src/python/pants/backend/python/lint/black/lockfile.txt"
+
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 experimental_lockfile = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
@@ -87,7 +96,7 @@ extra_requirements.add = [
 ]
 
 [isort]
-version = "isort[pyproject,colors]>=5.5.1,<5.6"
+experimental_lockfile = "src/python/pants/backend/python/lint/isort/lockfile.txt"
 
 [shellcheck]
 args = ["--external-sources"]
@@ -166,6 +175,7 @@ extra_env_vars = [
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
+experimental_lockfile = "src/python/pants/backend/python/subsystems/coverage_py_lockfile.txt"
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"

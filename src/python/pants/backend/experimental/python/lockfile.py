@@ -7,7 +7,10 @@ import logging
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import (
+    PythonToolBase,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
@@ -187,6 +190,15 @@ class PythonToolLockfileRequest:
     lockfile_path: str
     requirements: tuple[str, ...]
     interpreter_constraints: InterpreterConstraints
+
+    @classmethod
+    def from_tool(cls, subsystem: PythonToolRequirementsBase) -> PythonToolLockfileRequest:
+        return cls(
+            tool_name=subsystem.options_scope,
+            lockfile_path=subsystem.lockfile,
+            requirements=subsystem.all_requirements,
+            interpreter_constraints=subsystem.interpreter_constraints,
+        )
 
 
 # TODO(#12314): Unify this goal with `lock` once we figure out how to unify the semantics,

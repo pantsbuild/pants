@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import importlib.resources
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -10,11 +9,11 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, FileContent
+from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -58,32 +57,14 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    if docformatter.lockfile == "<none>":
-        requirements = docformatter.pex_requirements
-    elif docformatter.lockfile == "<default>":
-        requirements = PexRequirements(
-            file_content=FileContent(
-                "docformatter_default_lockfile.txt",
-                importlib.resources.read_binary(
-                    "pants.backend.python.lint.docformatter", "lockfile.txt"
-                ),
-            )
-        )
-    else:
-        requirements = PexRequirements(
-            file_path=docformatter.lockfile,
-            file_path_description_of_origin="the option `[docformatter].experimental_lockfile`",
-        )
-
     docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=requirements,
+            requirements=docformatter.pex_requirements,
             interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
-            is_lockfile=docformatter.lockfile != "<none>",
         ),
     )
     source_files_get = Get(

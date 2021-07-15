@@ -9,8 +9,8 @@ https://black.readthedocs.io/en/stable/.
 
 from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.black import rules as black_rules
-from pants.backend.python.lint.black import skip_field
+from pants.backend.python.lint.black import skip_field, subsystem
 
 
 def rules():
-    return (*black_rules.rules(), *python_fmt.rules(), *skip_field.rules())
+    return (*black_rules.rules(), *python_fmt.rules(), *skip_field.rules(), *subsystem.rules())

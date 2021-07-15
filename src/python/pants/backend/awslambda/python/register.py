@@ -6,13 +6,14 @@
 See https://www.pantsbuild.org/docs/awslambda-python.
 """
 
+from pants.backend.awslambda.python import lambdex
 from pants.backend.awslambda.python import rules as python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.awslambda.python.target_types import rules as target_types_rules
 
 
 def rules():
-    return (*python_rules.rules(), *target_types_rules())
+    return (*python_rules.rules(), *target_types_rules(), *lambdex.rules())
 
 
 def target_types():

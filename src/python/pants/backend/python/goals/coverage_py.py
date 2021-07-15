@@ -12,6 +12,10 @@ from typing import List, Optional, Tuple, cast
 
 import toml
 
+from pants.backend.experimental.python.lockfile import (
+    PythonToolLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -99,8 +103,12 @@ class CoverageSubsystem(PythonToolBase):
 
     default_version = "coverage[toml]>=5.0.3,<5.1"
     default_main = ConsoleScript("coverage")
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py_lockfile.txt")
 
     @classmethod
     def register_options(cls, register):
@@ -205,6 +213,17 @@ class CoverageSubsystem(PythonToolBase):
     @property
     def global_report(self) -> bool:
         return cast(bool, self.options.global_report)
+
+
+class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule
+def setup_coverage_lockfile(
+    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
+) -> PythonToolLockfileRequest:
+    return PythonToolLockfileRequest.from_tool(coverage)
 
 
 @dataclass(frozen=True)
@@ -532,4 +551,8 @@ def _get_coverage_report(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(CoverageDataCollection, PytestCoverageDataCollection)]
+    return [
+        *collect_rules(),
+        UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
+        UnionRule(PythonToolLockfileSentinel, CoveragePyLockfileSentinel),
+    ]
