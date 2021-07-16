@@ -15,7 +15,7 @@ from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import target_option
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 
 
 class PythonProtobufSubsystem(Subsystem):
@@ -72,7 +72,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
         "pants.backend.codegen.protobuf.python",
         "mypy_protobuf_lockfile.txt",
     )
-    default_lockfile_file_path = (
+    default_lockfile_url = git_url(
         "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf_lockfile.txt"
     )
 

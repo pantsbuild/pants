@@ -12,6 +12,7 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
+from pants.util.docutil import git_url
 
 
 class Docformatter(PythonToolBase):
@@ -26,7 +27,7 @@ class Docformatter(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.docformatter", "lockfile.txt")
-    default_lockfile_file_path = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
+    default_lockfile_url = git_url("src/python/pants/backend/python/lint/docformatter/lockfile.txt")
 
     @classmethod
     def register_options(cls, register):

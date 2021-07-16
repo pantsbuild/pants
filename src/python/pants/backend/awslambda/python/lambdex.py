@@ -9,6 +9,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.docutil import git_url
 
 
 class Lambdex(PythonToolBase):
@@ -23,7 +24,7 @@ class Lambdex(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.awslambda.python", "lambdex_lockfile.txt")
-    default_lockfile_file_path = "src/python/pants/backend/awslambda/python/lambdex_lockfile.txt"
+    default_lockfile_url = git_url("src/python/pants/backend/awslambda/python/lambdex_lockfile.txt")
 
 
 class LambdexLockfileSentinel(PythonToolLockfileSentinel):

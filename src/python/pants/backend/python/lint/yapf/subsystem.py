@@ -16,6 +16,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
+from pants.util.docutil import git_url
 
 
 class Yapf(PythonToolBase):
@@ -31,7 +32,7 @@ class Yapf(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.yapf", "lockfile.txt")
-    default_lockfile_file_path = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
+    default_lockfile_url = git_url("src/python/pants/backend/python/lint/yapf/lockfile.txt")
 
     @classmethod
     def register_options(cls, register):

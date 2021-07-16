@@ -50,6 +50,7 @@ from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
 from pants.source.source_root import AllSourceRoots
+from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 """
@@ -109,7 +110,7 @@ class CoverageSubsystem(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py_lockfile.txt")
-    default_lockfile_file_path = "src/python/pants/backend/python/goals/coverage_py.py"
+    default_lockfile_url = git_url("src/python/pants/backend/python/goals/coverage_py.py")
 
     @classmethod
     def register_options(cls, register):
