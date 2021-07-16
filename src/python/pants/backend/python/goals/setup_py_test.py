@@ -285,13 +285,13 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     assert_chroot(
         chroot_rule_runner,
         [
-            "files/README.txt",
-            "foo/qux/__init__.py",
-            "foo/qux/qux.py",
-            "foo/qux/qux.pyi",
-            "foo/resources/js/code.js",
-            "foo/__init__.py",
-            "foo/foo.py",
+            "src/files/README.txt",
+            "src/foo/qux/__init__.py",
+            "src/foo/qux/qux.py",
+            "src/foo/qux/qux.pyi",
+            "src/foo/resources/js/code.js",
+            "src/foo/__init__.py",
+            "src/foo/foo.py",
             "setup.py",
             "MANIFEST.in",
         ],
@@ -300,6 +300,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "name": "foo",
             "version": "1.2.3",
             "plugin_demo": "hello world",
+            "package_dir": {"": "src"},
             "packages": ("foo", "foo.qux"),
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
@@ -377,12 +378,13 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
     )
     assert_chroot(
         chroot_rule_runner,
-        ["project/app.py", "setup.py", "MANIFEST.in"],
+        ["src/project/app.py", "setup.py", "MANIFEST.in"],
         "setup.py",
         {
             "name": "bin",
             "version": "1.1.1",
             "plugin_demo": "hello world",
+            "package_dir": {"": "src"},
             "packages": ("project",),
             "namespace_packages": (),
             "install_requires": (),
