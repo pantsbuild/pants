@@ -1,10 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Tuple, cast
+
+from pkg_resources import Requirement
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
@@ -15,6 +19,8 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
+logger = logging.getLogger(__name__)
+
 
 class UnknownVersion(Exception):
     pass
@@ -22,6 +28,18 @@ class UnknownVersion(Exception):
 
 class ExternalToolError(Exception):
     pass
+
+
+class UnsupportedVersion(ExternalToolError):
+    """The specified version of the tool is not supported, according to the given version
+    constraints."""
+
+
+class UnsupportedVersionUsage(Enum):
+    """What action to take in case the requested version of the tool is not supported."""
+
+    RaiseError = "error"
+    LogWarning = "warning"
 
 
 @dataclass(frozen=True)
@@ -52,6 +70,8 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
           "1.2.3|linux |1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
         ]
 
+        version_constraints = ">=1.2.3, <2.0"
+
         def generate_url(self, plat: Platform) -> str:
             ...
 
@@ -68,10 +88,19 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         ...
     """
 
-    # The default values for --version and --known-versions.
+    # The default values for --version and --known-versions, and the supported versions.
     # Subclasses must set appropriately.
     default_version: str
     default_known_versions: List[str]
+    version_constraints: Optional[str] = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.version_constraints:
+            constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
+            self.check_version_constraints(
+                self.version, constraints, self.options.use_unsupported_version
+            )
 
     @classproperty
     def name(cls):
@@ -89,7 +118,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             type=str,
             default=cls.default_version,
             advanced=True,
-            help=f"Use this version of {cls.name}.",
+            help=f"Use this version of {cls.name}."
+            + (
+                f"\n\nSupported {cls.name} versions: {cls.version_constraints}"
+                if cls.version_constraints
+                else ""
+            ),
         )
 
         help_str = textwrap.dedent(
@@ -119,6 +153,20 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             default=cls.default_known_versions,
             advanced=True,
             help=help_str,
+        )
+
+        register(
+            "--use-unsupported-version",
+            advanced=True,
+            type=UnsupportedVersionUsage,
+            help=textwrap.dedent(
+                f"""
+                What action to take in case the requested version of {cls.name} is not supported.
+
+                Supported {cls.name} versions: {cls.version_constraints if cls.version_constraints else "unspecified"}
+                """
+            ),
+            default=UnsupportedVersionUsage.RaiseError,
         )
 
     @property
@@ -174,6 +222,36 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
+
+    @classmethod
+    def check_version_constraints(
+        cls, version: str, constraints: Requirement, action: UnsupportedVersionUsage
+    ) -> None:
+        if constraints.specifier.contains(version):  # type: ignore[attr-defined]
+            # all ok
+            return None
+
+        msg = [
+            f"The option [{cls.options_scope}].version is set to {version}, which is not compatible",
+            f"with what this release of Pants expects: {constraints}.",
+            "Please update the version to a supported value, or consider using a different Pants",
+            "release if you cannot change the version.",
+        ]
+
+        if action is UnsupportedVersionUsage.LogWarning:
+            msg.extend(
+                [
+                    "Alternatively, you can ignore this warning (at your own peril) by adding this",
+                    "to the GLOBAL section of pants.toml:",
+                    f"""ignore_warnings = ["The option [{cls.options_scope}].version is set to"].""",
+                ]
+            )
+            logger.warning(" ".join(msg))
+        elif action is UnsupportedVersionUsage.RaiseError:
+            msg.append(
+                f"Alternatively, update [{cls.options_scope}].use_unsupported_version to be 'warning'."
+            )
+            raise UnsupportedVersion(" ".join(msg))
 
 
 class TemplatedExternalTool(ExternalTool):
