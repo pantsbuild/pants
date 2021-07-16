@@ -15,10 +15,11 @@ def test_docker_build_image():
     dockerfile = path.join(source_path, "Dockerfile")
     docker = DockerBinary(docker_path)
     digest = Digest(sha256().hexdigest(), 123)
-    build_request = docker.build_image(digest, source_path, dockerfile)
+    tag = "test:latest"
+    build_request = docker.build_image(digest, source_path, dockerfile, tag)
 
     assert build_request == Process(
-        argv=(docker_path, "build", "-f", dockerfile, source_path),
+        argv=(docker_path, "build", "-t", tag, "-f", dockerfile, source_path),
         input_digest=digest,
-        description=f"Building docker image from {dockerfile}",
+        description=f"Building docker image {tag} from {dockerfile}",
     )

@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from os import path
 
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -39,11 +39,11 @@ class DockerBinary(BinaryPath):
 
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
-    def build_image(self, digest: Digest, build_root: str, dockerfile: str):
+    def build_image(self, digest: Digest, build_root: str, dockerfile: str, tag: str):
         return Process(
-            argv=(self.path, "build", "-f", dockerfile, build_root),
+            argv=(self.path, "build", "-t", tag, "-f", dockerfile, build_root),
             input_digest=digest,
-            description=f"Building docker image from {dockerfile}",
+            description=f"Building docker image {tag} from {dockerfile}",
         )
 
 
@@ -74,9 +74,10 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
 
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet):
-    required_fields = (DockerImageSources,)
+    required_fields = (DockerImageSources, DockerImageVersion)
 
     docker_image_sources: DockerImageSources
+    docker_image_version: DockerImageVersion
 
 
 @rule(level=LogLevel.DEBUG)
@@ -93,17 +94,22 @@ async def build_docker_image(
     result = await Get(
         ProcessResult,
         Process,
-        docker.build_image(all_sources.snapshot.digest, source_path, dockerfile),
+        docker.build_image(
+            all_sources.snapshot.digest,
+            source_path,
+            dockerfile,
+            f"{field_set.address.target_name}:{field_set.docker_image_version.value}",
+        ),
     )
     return BuiltPackage(
         result.output_digest,
         (
             BuiltPackageArtifact(
                 relpath=None,
-                extra_log_lines=(
-                    *result.stdout.decode().split("\n"),
-                    *result.stderr.decode().split("\n"),
-                ),
+                # extra_log_lines=(
+                #     *result.stdout.decode().split("\n"),
+                #     *result.stderr.decode().split("\n"),
+                # ),
             ),
         ),
     )
