@@ -567,6 +567,16 @@ impl crate::CommandRunner for CommandRunner {
       )
     };
 
+    if hit_cache {
+      workunit.update_metadata(|initial| WorkunitMetadata {
+        desc: initial
+          .desc
+          .as_ref()
+          .map(|desc| format!("Hit remote cache: {}", desc)),
+        ..initial
+      });
+    }
+
     if !hit_cache && result.exit_code == 0 && self.cache_write {
       // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
       // counter is recorded, given that the cache write is async and may still be executing after

@@ -43,9 +43,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use hashing::{Digest, EMPTY_FINGERPRINT};
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use workunit_store::{
-  in_workunit, RunningWorkunit, UserMetadataItem, WorkunitMetadata, WorkunitStore,
-};
+use workunit_store::{RunningWorkunit, WorkunitStore};
 
 pub mod cache;
 #[cfg(test)]
@@ -537,69 +535,33 @@ impl CommandRunner for BoundedCommandRunner {
   async fn run(
     &self,
     context: Context,
-    // TODO
-    _workunit: &mut RunningWorkunit,
+    workunit: &mut RunningWorkunit,
     mut req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let name = format!("{}-running", req.workunit_name());
-    let desc = req.user_facing_name();
-    let metadata = WorkunitMetadata {
-      level: req.workunit_level(),
-      desc: Some(desc.clone()),
-      ..WorkunitMetadata::default()
-    };
+    let semaphore = self.inner.1.clone();
+    let inner = self.inner.clone();
+    let blocking_token = workunit.blocking();
+    semaphore
+      .with_acquired(|concurrency_id| {
+        log::debug!(
+          "Running {} under semaphore with concurrency id: {}",
+          req.user_facing_name(),
+          concurrency_id
+        );
+        std::mem::drop(blocking_token);
 
-    in_workunit!(
-      context.workunit_store.clone(),
-      name,
-      metadata,
-      |workunit| async move {
-        let semaphore = self.inner.1.clone();
-        let inner = self.inner.clone();
-        let blocking_token = workunit.blocking();
-        let res: (Result<_, _>) = semaphore
-          .with_acquired(|concurrency_id| {
-            log::debug!(
-              "Running {} under semaphore with concurrency id: {}",
-              desc,
-              concurrency_id
-            );
-            std::mem::drop(blocking_token);
-
-            for (_, process) in req.0.iter_mut() {
-              if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-                let execution_slot = format!("{}", concurrency_id);
-                process
-                  .env
-                  .insert(execution_slot_env_var.clone(), execution_slot);
-              }
-            }
-
-            inner.0.run(context, workunit, req)
-          })
-          .await;
-
-        if let Ok(FallibleProcessResultWithPlatform {
-          stdout_digest,
-          stderr_digest,
-          exit_code,
-          ..
-        }) = res
-        {
-          workunit.update_metadata(|initial| WorkunitMetadata {
-            stdout: Some(stdout_digest),
-            stderr: Some(stderr_digest),
-            user_metadata: vec![(
-              "exit_code".to_string(),
-              UserMetadataItem::ImmediateId(exit_code as i64),
-            )],
-            ..initial
-          })
+        for (_, process) in req.0.iter_mut() {
+          if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+            let execution_slot = format!("{}", concurrency_id);
+            process
+              .env
+              .insert(execution_slot_env_var.clone(), execution_slot);
+          }
         }
-        res
-      }
-    )
-    .await
+
+        inner.0.run(context, workunit, req)
+      })
+      .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

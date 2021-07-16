@@ -31,7 +31,7 @@ from pants.engine.internals.engine_testutil import (
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.platform import rules as platform_rules
-from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
+from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.process import rules as process_rules
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.streaming_workunit_handler import (
@@ -609,6 +609,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             proc = Process(
                 ["/bin/sh", "-c", "true"],
                 description="always true",
+                cache_scope=ProcessCacheScope.PER_SESSION,
             )
             _ = await Get(ProcessResult, MultiPlatformProcess({None: proc}))
             return TrueResult()
@@ -624,9 +625,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunits_with_counters = [item for item in finished if "counters" in item]
-        assert workunits_with_counters[0]["counters"]["local_execution_requests"] == 1
-        assert workunits_with_counters[1]["counters"]["local_cache_requests"] == 1
-        assert workunits_with_counters[1]["counters"]["local_cache_requests_uncached"] == 1
+        assert workunits_with_counters[0]["counters"]["local_cache_requests"] == 1
+        assert workunits_with_counters[0]["counters"]["local_cache_requests_uncached"] == 1
+        assert workunits_with_counters[1]["counters"]["local_execution_requests"] == 1
 
         assert histograms_info["version"] == 0
         assert "histograms" in histograms_info
@@ -752,9 +753,7 @@ def test_process_digests_on_streaming_workunits(
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-    process_workunit = next(
-        item for item in finished if item["name"] == "multi_platform_process-running"
-    )
+    process_workunit = next(item for item in finished if item["name"] == "multi_platform_process")
     assert process_workunit is not None
     stdout_digest = process_workunit["artifacts"]["stdout_digest"]
     stderr_digest = process_workunit["artifacts"]["stderr_digest"]
@@ -782,9 +781,7 @@ def test_process_digests_on_streaming_workunits(
 
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-    process_workunit = next(
-        item for item in finished if item["name"] == "multi_platform_process-running"
-    )
+    process_workunit = next(item for item in finished if item["name"] == "multi_platform_process")
 
     assert process_workunit is not None
     stdout_digest = process_workunit["artifacts"]["stdout_digest"]

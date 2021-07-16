@@ -117,6 +117,13 @@ impl crate::CommandRunner for CommandRunner {
     .await;
 
     if let Ok(result) = cache_read_result {
+      workunit.update_metadata(|initial| WorkunitMetadata {
+        desc: initial
+          .desc
+          .as_ref()
+          .map(|desc| format!("Hit local cache: {}", desc)),
+        ..initial
+      });
       return Ok(result);
     }
 

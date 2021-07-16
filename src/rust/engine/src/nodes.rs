@@ -39,8 +39,7 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  in_workunit, ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
-  WorkunitMetadata,
+  in_workunit, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -163,15 +162,16 @@ impl Select {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
-          &tasks::Rule::Task(ref task) => context
-            .get(Task {
-              params: self.params.clone(),
-              product: self.product,
-              task: task.clone(),
-              entry: Arc::new(self.entry.clone()),
-            })
-            .await
-            .map(|output| output.value),
+          &tasks::Rule::Task(ref task) => {
+            context
+              .get(Task {
+                params: self.params.clone(),
+                product: self.product,
+                task: task.clone(),
+                entry: Arc::new(self.entry.clone()),
+              })
+              .await
+          }
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
@@ -416,6 +416,16 @@ impl WrappedNode for MultiPlatformExecuteProcess {
         .run(execution_context, workunit, request)
         .await
         .map_err(|e| throw(&e))?;
+
+      workunit.update_metadata(|initial| WorkunitMetadata {
+        stdout: Some(res.stdout_digest),
+        stderr: Some(res.stderr_digest),
+        user_metadata: vec![(
+          "exit_code".to_string(),
+          UserMetadataItem::ImmediateId(res.exit_code as i64),
+        )],
+        ..initial
+      });
 
       Ok(ProcessResult(res))
     } else {
@@ -1087,23 +1097,15 @@ impl fmt::Debug for Task {
   }
 }
 
-pub struct PythonRuleOutput {
-  value: Value,
-  new_level: Option<log::Level>,
-  message: Option<String>,
-  new_artifacts: Vec<(String, ArtifactOutput)>,
-  new_metadata: Vec<(String, Value)>,
-}
-
 #[async_trait]
 impl WrappedNode for Task {
-  type Item = PythonRuleOutput;
+  type Item = Value;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     workunit: &mut RunningWorkunit,
-  ) -> NodeResult<PythonRuleOutput> {
+  ) -> NodeResult<Value> {
     let params = self.params;
     let deps = {
       // While waiting for dependencies, mark ourselves blocking.
@@ -1153,13 +1155,26 @@ impl WrappedNode for Task {
       } else {
         (None, None, Vec::new(), Vec::new())
       };
-      Ok(PythonRuleOutput {
-        value: result_val,
-        new_level,
-        message,
-        new_artifacts,
-        new_metadata,
-      })
+      workunit.update_metadata(|mut metadata| {
+        if let Some(new_level) = new_level {
+          metadata.level = new_level;
+        }
+        metadata.message = message;
+        metadata.artifacts.extend(new_artifacts);
+        metadata
+          .user_metadata
+          .extend(new_metadata.into_iter().map(|(key, val)| {
+            let py_value_handle = UserMetadataPyValue::new();
+            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
+            context.session.with_metadata_map(|map| {
+              let val = val.clone();
+              map.insert(py_value_handle.clone(), val);
+            });
+            (key, umi)
+          }));
+        metadata
+      });
+      Ok(result_val)
     } else {
       Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
@@ -1257,6 +1272,7 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
+      NodeKey::MultiPlatformExecuteProcess(ref mpp) => mpp.process.workunit_level(),
       NodeKey::DownloadedFile(..) => Level::Debug,
       _ => Level::Trace,
     }
@@ -1365,14 +1381,12 @@ impl Node for NodeKey {
       level: self.workunit_level(),
       ..WorkunitMetadata::default()
     };
-    let metadata2 = metadata.clone();
 
     in_workunit!(
       workunit_store_handle.store,
       workunit_name,
       metadata,
       |workunit| async move {
-        let metadata = metadata2;
         // To avoid races, we must ensure that we have installed a watch for the subject before
         // executing the node logic. But in case of failure, we wait to see if the Node itself
         // fails, and prefer that error message if so (because we have little control over the
@@ -1391,12 +1405,6 @@ impl Node for NodeKey {
           Ok(())
         };
 
-        let mut level = metadata.level;
-        let mut message = None;
-        let mut artifacts = Vec::new();
-        let mut user_metadata = Vec::new();
-
-        let context2 = context.clone();
         let mut result = match self {
           NodeKey::DigestFile(n) => {
             n.run_wrapped_node(context, workunit)
@@ -1445,20 +1453,10 @@ impl Node for NodeKey {
           }
           NodeKey::Task(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(|python_rule_output| {
-                if let Some(new_level) = python_rule_output.new_level {
-                  level = new_level;
-                }
-                message = python_rule_output.message;
-                artifacts = python_rule_output.new_artifacts;
-                user_metadata = python_rule_output.new_metadata;
-                NodeOutput::Value(python_rule_output.value)
-              })
+              .map_ok(NodeOutput::Value)
               .await
           }
         };
-
-        result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
 
         // If both the Node and the watch failed, prefer the Node's error message.
         match (&result, maybe_watch) {
@@ -1469,25 +1467,7 @@ impl Node for NodeKey {
           }
         }
 
-        let session = context2.session;
-        workunit.update_metadata(|_| WorkunitMetadata {
-          level,
-          message,
-          artifacts,
-          user_metadata: user_metadata
-            .into_iter()
-            .map(|(key, val)| {
-              let py_value_handle = UserMetadataPyValue::new();
-              let umi = UserMetadataItem::PyValue(py_value_handle.clone());
-              session.with_metadata_map(|map| {
-                let val = val.clone();
-                map.insert(py_value_handle.clone(), val);
-              });
-              (key, umi)
-            })
-            .collect(),
-          ..metadata
-        });
+        result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
 
         result
       }
@@ -1587,23 +1567,6 @@ impl NodeOutput {
       | NodeOutput::LinkDest(_)
       | NodeOutput::Paths(_)
       | NodeOutput::Value(_) => vec![],
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for PythonRuleOutput {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::Value(v) => Ok(PythonRuleOutput {
-        value: v,
-        new_level: None,
-        message: None,
-        new_artifacts: Vec::new(),
-        new_metadata: Vec::new(),
-      }),
-      _ => Err(()),
     }
   }
 }
