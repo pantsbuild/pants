@@ -31,3 +31,4 @@ def current_platform() -> Platform:
 
 def rules() -> Iterable[Rule]:
     return collect_rules()
+

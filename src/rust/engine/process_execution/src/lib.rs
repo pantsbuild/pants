@@ -73,8 +73,9 @@ use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
-  Darwin,
-  Linux,
+  MacOsX86_64,
+  MacOsArm64,
+  LinuxX86_64,
 }
 
 impl Platform {
@@ -82,9 +83,10 @@ impl Platform {
     let platform_info =
       uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
     match platform_info {
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
-      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => Ok(Platform::LinuxX86_64),
+      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "arm64" => Ok(Platform::MacOsArm64),
+      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "x86_64" => Ok(Platform::MacOsX86_64),
+      uname::Info { ref sysname, ref machine, .. } => Err(format!("Found unknown system/arch name pair {} {}", sysname, machine)),
     }
   }
 }
@@ -92,8 +94,9 @@ impl Platform {
 impl From<Platform> for String {
   fn from(platform: Platform) -> String {
     match platform {
-      Platform::Linux => "linux".to_string(),
-      Platform::Darwin => "darwin".to_string(),
+      Platform::LinuxX86_64 => "linux_x86_64".to_string(),
+      Platform::MacOsArm64 => "macos_arm64".to_string(),
+      Platform::MacOsX86_64 => "macos_x86_64".to_string(),
     }
   }
 }
@@ -102,8 +105,9 @@ impl TryFrom<String> for Platform {
   type Error = String;
   fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
     match variant_candidate.as_ref() {
-      "darwin" => Ok(Platform::Darwin),
-      "linux" => Ok(Platform::Linux),
+      "macos_arm64" => Ok(Platform::MacOsArm64),
+      "macos_x86_64" => Ok(Platform::MacOsX86_64),
+      "linux_x86_64" => Ok(Platform::LinuxX86_64),
       other => Err(format!(
         "Unknown platform {:?} encountered in parsing",
         other
