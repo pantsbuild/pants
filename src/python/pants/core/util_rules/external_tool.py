@@ -38,7 +38,6 @@ class UnsupportedVersion(ExternalToolError):
 class UnsupportedVersionUsage(Enum):
     """What action to take in case the requested version of the tool is not supported."""
 
-    Allow = "allow"
     RaiseError = "error"
     LogWarning = "warning"
 
@@ -233,25 +232,26 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             return None
 
         msg = [
-            f"The option [{cls.options_scope}].version is set to {version}, which is not compatible with what this release of Pants expects: {constraints}",
+            f"The option [{cls.options_scope}].version is set to {version}, which is not compatible",
+            f"with what this release of Pants expects: {constraints}.",
+            "Please update the version to a supported value, or consider using a different Pants",
+            "release if you cannot change the version.",
         ]
 
-        if action is UnsupportedVersionUsage.Allow:
-            msg.append(
-                f"The option [{cls.options_scope}].use_unsupported_version is set to 'allow'."
+        if action is UnsupportedVersionUsage.LogWarning:
+            msg.extend(
+                [
+                    "Alternatively, you can ignore this warning (at your own peril) by adding this",
+                    "to the GLOBAL section of pants.toml:",
+                    f"""ignore_warnings = ["The option [{cls.options_scope}].version is set to"].""",
+                ]
             )
-            logger.info("\n".join(msg))
-        else:
+            logger.warning(" ".join(msg))
+        elif action is UnsupportedVersionUsage.RaiseError:
             msg.append(
-                "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version."
+                f"Alternatively, update [{cls.options_scope}].use_unsupported_version to be 'warning'."
             )
-            if action is UnsupportedVersionUsage.LogWarning:
-                logger.warning("\n".join(msg))
-            elif action is UnsupportedVersionUsage.RaiseError:
-                msg.append(
-                    f"Alternatively, update [{cls.options_scope}].use_unsupported_version to be 'allow' or 'warning'."
-                )
-                raise UnsupportedVersion("\n".join(msg))
+            raise UnsupportedVersion(" ".join(msg))
 
 
 class TemplatedExternalTool(ExternalTool):

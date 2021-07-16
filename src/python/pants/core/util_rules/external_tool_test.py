@@ -144,9 +144,9 @@ class ConstrainedTool(TemplatedExternalTool):
             pytest.raises(
                 UnsupportedVersion,
                 match=re.escape(
-                    "The option [foobar].version is set to v1.2.3, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
-                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version.\n"
-                    "Alternatively, update [foobar].use_unsupported_version to be 'allow' or 'warning'."
+                    "The option [foobar].version is set to v1.2.3, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1. "
+                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version. "
+                    "Alternatively, update [foobar].use_unsupported_version to be 'warning'."
                 ),
             ),
             None,
@@ -171,9 +171,9 @@ class ConstrainedTool(TemplatedExternalTool):
             pytest.raises(
                 UnsupportedVersion,
                 match=re.escape(
-                    "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
-                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version.\n"
-                    "Alternatively, update [foobar].use_unsupported_version to be 'allow' or 'warning'."
+                    "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1. "
+                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version. "
+                    "Alternatively, update [foobar].use_unsupported_version to be 'warning'."
                 ),
             ),
             None,
@@ -188,24 +188,10 @@ class ConstrainedTool(TemplatedExternalTool):
                 (
                     logging.WARNING,
                     (
-                        "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
-                        "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version."
-                    ),
-                )
-            ],
-        ),
-        (
-            "v3.8.0",
-            UnsupportedVersionUsage.Allow,
-            pytest.raises(
-                UnknownVersion, match="No known version of foobar v3.8.0 for darwin found in"
-            ),
-            [
-                (
-                    logging.INFO,
-                    (
-                        "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
-                        "The option [foobar].use_unsupported_version is set to 'allow'."
+                        "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1. "
+                        "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version. "
+                        "Alternatively, you can ignore this warning (at your own peril) by adding this to the GLOBAL section of pants.toml: "
+                        'ignore_warnings = ["The option [foobar].version is set to"].'
                     ),
                 )
             ],
