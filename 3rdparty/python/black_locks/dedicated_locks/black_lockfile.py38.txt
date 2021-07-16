@@ -1,24 +1,24 @@
-appdirs==1.4.4 \
+appdirs==1.4.4 ; python_version == '3.8' \
     --hash=sha256:7d5d0167b2b1ba821647616af46a749d1c653740dd0d2415100fe26e27afdf41 \
     --hash=sha256:a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128
     # via black
-black==21.5b2 \
+black==21.5b2 ; python_version == '3.8' \
     --hash=sha256:1fc0e0a2c8ae7d269dfcf0c60a89afa299664f3e811395d40b1922dff8f854b5 \
     --hash=sha256:e5cf21ebdffc7a9b29d73912b6a6a9a4df4ce70220d523c21647da2eae0751ef
     # via -r requirements_black.in
-click==8.0.1 \
+click==8.0.1 ; python_version == '3.8' \
     --hash=sha256:8c04c11192119b1ef78ea049e0a6f0463e4c48ef00a30160c704337586f3ad7a \
     --hash=sha256:fba402a4a47334742d782209a7c79bc448911afe1149d07bdabdf480b3e2f4b6
     # via black
-mypy-extensions==0.4.3 \
+mypy-extensions==0.4.3 ; python_version == '3.8' \
     --hash=sha256:090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d \
     --hash=sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8
     # via black
-pathspec==0.8.1 \
+pathspec==0.8.1 ; python_version == '3.8' \
     --hash=sha256:86379d6b86d75816baba717e64b1a3a3469deb93bb76d613c9ce79edc5cb68fd \
     --hash=sha256:aa0cb481c4041bf52ffa7b0d8fa6cd3e88a2ca4879c533c9153882ee2556790d
     # via black
-regex==2021.7.6 \
+regex==2021.7.6 ; python_version == '3.8' \
     --hash=sha256:0eb2c6e0fcec5e0f1d3bcc1133556563222a2ffd2211945d7b1480c1b1a42a6f \
     --hash=sha256:15dddb19823f5147e7517bb12635b3c82e6f2a3a6b696cc3e321522e8b9308ad \
     --hash=sha256:173bc44ff95bc1e96398c38f3629d86fa72e539c79900283afa895694229fe6a \
@@ -61,13 +61,13 @@ regex==2021.7.6 \
     --hash=sha256:f9392a4555f3e4cb45310a65b403d86b589adc773898c25a39184b1ba4db8985 \
     --hash=sha256:f98dc35ab9a749276f1a4a38ab3e0e2ba1662ce710f6530f5b0a6656f1c32b58
     # via black
-toml==0.10.2 \
+toml==0.10.2 ; python_version == '3.8' \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
     # via black
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==57.2.0 \
+setuptools==57.2.0 ; python_version == '3.8' \
     --hash=sha256:a7e88b9bbaece494162d697d19525c567ab60c85dd7e2fd90cb7dfe8d8129a62 \
     --hash=sha256:b4bb42f3123fbb01e4f5f5ea9ed6d6b5f7021d18b3bc64236477a82aedf2190e
     # via -r requirements_black.in
