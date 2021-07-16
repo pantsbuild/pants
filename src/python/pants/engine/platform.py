@@ -8,17 +8,18 @@ from typing import Iterable
 
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.memo import memoized_classproperty
-from pants.util.osutil import get_normalized_os_name
+from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
 
 
 class Platform(Enum):
-    darwin = "darwin"
-    linux = "linux"
+    linux_x86_64 = "linux_x86_64"
+    macos_arm64 = "macos_arm64"
+    macos_x86_64 = "macos_x86_64"
 
     # TODO: try to turn all of these accesses into v2 dependency injections!
     @memoized_classproperty
     def current(cls) -> Platform:
-        return Platform(get_normalized_os_name())
+        return Platform(f"{get_normalized_os_name()}_{get_normalized_arch_name()}")
 
 
 # TODO We will want to allow users to specify the execution platform for rules,

@@ -28,11 +28,25 @@ CPU_COUNT = _compute_cpu_count()
 
 
 OS_ALIASES = {
-    "darwin": {"macos", "darwin", "macosx", "mac os x", "mac"},
+    "macos": {"macos", "darwin", "macosx", "mac os x", "mac"},
     "linux": {"linux", "linux2"},
 }
 
+ARCH_ALIASES = {
+    "x86_64": {"x86_64", "x86-64", "amd64"},
+    "arm64": {"arm64", "aarch64"},
+}
+
 Pid = int
+
+
+def get_arch_name(uname_result: Optional[posix.uname_result] = None) -> str:
+    """
+    :API: public
+    """
+    if uname_result is None:
+        uname_result = os.uname()
+    return uname_result.machine.lower()
 
 
 def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
@@ -41,27 +55,64 @@ def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
     """
     if uname_result is None:
         uname_result = os.uname()
-    return uname_result[0].lower()
+    return uname_result.sysname.lower()
+
+
+def normalize_arch_name(os_name: str) -> str:
+    """
+    :API: public
+    """
+    normalized = _find_normalized(os_name, ARCH_ALIASES)
+    if normalized is not None:
+        return normalized
+    else:
+        logger.warning(
+            "Unknown architecture name: {bad}, known names are: {known}".format(
+                bad=os_name, known=", ".join(sorted(known_arch_names()))
+            )
+        )
+        return os_name
 
 
 def normalize_os_name(os_name: str) -> str:
     """
     :API: public
     """
-    if os_name not in OS_ALIASES:
-        for proper_name, aliases in OS_ALIASES.items():
-            if os_name in aliases:
-                return proper_name
+    normalized = _find_normalized(os_name, OS_ALIASES)
+    if normalized is not None:
+        return normalized
+    else:
         logger.warning(
             "Unknown operating system name: {bad}, known names are: {known}".format(
                 bad=os_name, known=", ".join(sorted(known_os_names()))
             )
         )
-    return os_name
+        return os_name
+
+
+def _find_normalized(alias: str, aliases: dict[str, set[str]]) -> Optional[str]:
+    """ Finds the canonical name for a given alias. Used for OS and architecture names. 
+    
+    :API: private
+    """
+    
+    for proper_name, alias_set in aliases.items():
+        if alias in alias_set:
+            return proper_name
+
+    return None
 
 
 def get_normalized_os_name() -> str:
     return normalize_os_name(get_os_name())
+
+
+def get_normalized_arch_name() -> str:
+    return normalize_arch_name(get_arch_name())
+
+
+def known_os_names() -> Set[str]:
+    return reduce(set.union, OS_ALIASES.values())
 
 
 def known_os_names() -> Set[str]:
