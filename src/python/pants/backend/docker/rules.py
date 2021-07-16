@@ -4,12 +4,17 @@
 import logging
 from dataclasses import dataclass
 from os import path
+from typing import List
 
-from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion
+from pants.backend.docker.target_types import (
+    DockerContext,
+    DockerDependencies,
+    Dockerfile,
+    DockerImageVersion,
+)
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import (
     BinaryNotFoundError,
     BinaryPath,
@@ -20,13 +25,29 @@ from pants.engine.process import (
     ProcessResult,
     SearchPath,
 )
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Sources, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    DependenciesRequest,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    Sources,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class DockerPackages:
+    artifacts: Digest
+    built: List[BuiltPackage]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -74,33 +95,69 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
 
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet):
-    required_fields = (DockerImageSources, DockerImageVersion)
+    required_fields = (Dockerfile,)
 
-    docker_image_sources: DockerImageSources
-    docker_image_version: DockerImageVersion
+    build_context: DockerContext
+    dockerfile: Dockerfile
+    image_version: DockerImageVersion
+    dependencies: DockerDependencies
 
 
 @rule(level=LogLevel.DEBUG)
 async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
+    dockerfile = field_set.dockerfile.value
+    source_path = path.dirname(dockerfile)
+
+    # get docker binary
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="build docker images"))
+
+    # get source files
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
-    all_sources = await Get(
+    target_sources = await Get(
         SourceFiles, SourceFilesRequest([t.get(Sources) for t in transitive_targets.closure])
     )
-    dockerfile = field_set.docker_image_sources.path_globs(FilesNotFoundBehavior.error).globs[0]
-    source_path = path.dirname(dockerfile)
+
+    # get dockerfile
+    dockerfile_digest = await Get(
+        Digest,
+        PathGlobs(
+            [dockerfile],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{field_set.address}'s `{field_set.dockerfile.alias}` field",
+        ),
+    )
+
+    # get packages
+    dep_targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
+    dep_packages = await Get(DockerPackages, Targets, dep_targets)
+    packages_digest = await Get(Digest, AddPrefix(dep_packages.artifacts, source_path))
+
+    # merge build context
+    context = await Get(
+        Digest,
+        MergeDigests(
+            (
+                dockerfile_digest,
+                target_sources.snapshot.digest,
+                packages_digest,
+            )
+        ),
+    )
+
+    # run docker build
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
-            all_sources.snapshot.digest,
+            context,
             source_path,
             dockerfile,
-            f"{field_set.address.target_name}:{field_set.docker_image_version.value}",
+            f"{field_set.address.target_name}:{field_set.image_version.value}",
         ),
     )
+
     return BuiltPackage(
         result.output_digest,
         (
@@ -115,8 +172,50 @@ async def build_docker_image(
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def get_packages(targets: Targets) -> DockerPackages:
+    target_packages = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets)
+    )
+    built_packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in target_packages.field_sets
+    )
+
+    artifacts = []
+
+    for pkg in built_packages:
+        artifacts.append(
+            await Get(
+                Digest,
+                DigestSubset(
+                    pkg.digest,
+                    PathGlobs(artifact.relpath for artifact in pkg.artifacts if artifact.relpath),
+                ),
+            )
+        )
+
+    digest = await Get(Digest, MergeDigests(artifacts))
+    return DockerPackages(artifacts=digest, built=built_packages)
+
+
+class InjectDockerDependencies(InjectDependenciesRequest):
+    inject_for = DockerDependencies
+
+
+@rule
+async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
+    """..."""
+    return InjectedDependencies()
+
+
 def rules():
     return [
         *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
         UnionRule(PackageFieldSet, DockerFieldSet),
     ]

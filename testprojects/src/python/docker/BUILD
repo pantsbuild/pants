@@ -4,4 +4,5 @@
 docker_image(
     name="test-example",
     version="1.2.3",
+    dependencies=["testprojects/src/python/hello/main"],
 )
