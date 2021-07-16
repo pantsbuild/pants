@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Union,List
+from typing_extensions import TypedDict
 
 import pytest
 from packaging.version import Version
@@ -29,6 +30,22 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
+PyprojectAttr = TypedDict(
+    "PyprojectAttr",
+    {
+        "extras": Union[List[str],str],
+        "git": str,
+        "rev": str,
+        "branch": str,
+        "python": str,
+        "markers": str,
+        "tag": str,
+        "version": str,
+        "url": str,
+        "path": str,
+    },
+    total=False,
+)
 
 @pytest.mark.parametrize(
     "test, exp",
@@ -82,7 +99,7 @@ def test_max_tilde(test, exp) -> None:
     ],
 )
 def test_handle_str(test, exp) -> None:
-    assert parse_str_version("foo", test, "", "") == f"foo {exp}"
+    assert parse_str_version(test, proj_name="foo", file_path="", extras_str="") == f"foo {exp}"
 
 
 def test_add_markers() -> None:
@@ -141,9 +158,9 @@ def empty_pyproject_toml() -> PyProjectToml:
 
 def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
     # Tested with git/path/url in those respective tests.
-    attr = {"version": "1.0.0", "extras": "[extra1]"}
+    attr = PyprojectAttr({"version": "1.0.0", "extras": "[extra1]"})
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
-    attr_multi = {"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]}
+    attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2","extra3"]})
     assert (
         handle_dict_attr("requests", attr_multi, empty_pyproject_toml)
         == "requests[extra1,extra2,extra3] ==1.0.0"
@@ -152,7 +169,7 @@ def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
 
 def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_git(extra_opts: Dict[str, str], suffix: str) -> None:
-        attr = {"git": "https://github.com/requests/requests.git", **extra_opts}
+        attr = PyprojectAttr({"git":"https://github.com/requests/requests.git", **extra_opts})
         assert (
             handle_dict_attr("requests", attr, empty_pyproject_toml)
             == f"requests @ git+https://github.com/requests/requests.git{suffix}"
@@ -199,10 +216,10 @@ def test_handle_path_arg(tmp_path: Path) -> None:
     internal_project = build_root / "my_py_proj"
     internal_project.mkdir()
 
-    file_attr = {"path": "../../my_py_proj.whl"}
-    file_attr_mark = {"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"}
-    file_attr_extras = {"path": "../../my_py_proj.whl", "extras": "[extra1]"}
-    dir_attr = {"path": "../../my_py_proj"}
+    file_attr = PyprojectAttr({"path": "../../my_py_proj.whl"})
+    file_attr_mark = PyprojectAttr({"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"})
+    file_attr_extras = PyprojectAttr({"path": "../../my_py_proj.whl", "extras": "[extra1]"})
+    dir_attr = PyprojectAttr({"path": "../../my_py_proj"})
 
     assert (
         handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml)
@@ -233,19 +250,19 @@ def test_handle_path_arg(tmp_path: Path) -> None:
 
 
 def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = {"url": "https://my-site.com/mydep.whl"}
+    attr = PyprojectAttr({"url": "https://my-site.com/mydep.whl"})
     assert (
         handle_dict_attr("my_py_proj", attr, empty_pyproject_toml)
         == "my_py_proj @ https://my-site.com/mydep.whl"
     )
 
-    attr_with_extra = {**attr, "extras": "[extra1]"}
+    attr_with_extra = PyprojectAttr({**attr, "extras": "[extra1]"})
     assert (
         handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml)
         == "my_py_proj[extra1] @ https://my-site.com/mydep.whl"
     )
 
-    attr_with_mark = {**attr, "markers": "os_name=='darwin'"}
+    attr_with_mark = PyprojectAttr({**attr, "markers": "os_name=='darwin'"})
     assert (
         handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml)
         == "my_py_proj @ https://my-site.com/mydep.whl;os_name=='darwin'"
@@ -253,13 +270,13 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
 
 
 def test_version_only(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = {"version": "1.2.3"}
+    attr = PyprojectAttr({"version": "1.2.3"})
     assert handle_dict_attr("foo", attr, empty_pyproject_toml) == "foo ==1.2.3"
 
 
 def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_py_constraints(py_req: str, suffix: str) -> None:
-        attr = {"version": "1.2.3", "python": py_req}
+        attr = PyprojectAttr({"version": "1.2.3", "python": py_req})
         assert handle_dict_attr("foo", attr, empty_pyproject_toml) == f"foo ==1.2.3;{suffix}"
 
     assert_py_constraints("3.6", "python_version == '3.6'")
