@@ -9,8 +9,7 @@ from pants.backend.python.lint.yapf.skip_field import SkipYapfField
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -73,8 +72,8 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
         PexRequest(
             output_filename="yapf.pex",
             internal_only=True,
-            requirements=PexRequirements(yapf.all_requirements),
-            interpreter_constraints=InterpreterConstraints(yapf.interpreter_constraints),
+            requirements=yapf.pex_requirements,
+            interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
         ),
     )

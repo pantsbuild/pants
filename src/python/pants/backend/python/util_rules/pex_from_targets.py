@@ -303,10 +303,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     file_path_description_of_origin=(
                         "the option `[python-setup].experimental_lockfile`"
                     ),
+                    is_lockfile=True,
                 ),
                 interpreter_constraints=interpreter_constraints,
                 platforms=request.platforms,
-                is_lockfile=True,
                 additional_args=request.additional_args,
             ),
         )

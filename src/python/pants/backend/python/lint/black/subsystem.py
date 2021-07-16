@@ -6,10 +6,17 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonToolLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
+from pants.util.docutil import git_url
 
 
 class Black(PythonToolBase):
@@ -19,8 +26,13 @@ class Black(PythonToolBase):
     default_version = "black==21.5b2"
     default_extra_requirements = ["setuptools"]
     default_main = ConsoleScript("black")
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
+    default_lockfile_url = git_url("src/python/pants/backend/python/lint/black/lockfile.txt")
 
     @classmethod
     def register_options(cls, register):
@@ -89,3 +101,16 @@ class Black(PythonToolBase):
             discovery=cast(bool, self.options.config_discovery),
             check_content=candidates,
         )
+
+
+class BlackLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule
+def setup_black_lockfile(_: BlackLockfileSentinel, black: Black) -> PythonToolLockfileRequest:
+    return PythonToolLockfileRequest.from_tool(black)
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, BlackLockfileSentinel))

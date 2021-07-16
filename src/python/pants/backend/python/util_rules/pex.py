@@ -65,6 +65,7 @@ class PexRequirements:
     file_content: FileContent | None
     file_path: str | None
     file_path_description_of_origin: str | None
+    is_lockfile: bool
 
     def __init__(
         self,
@@ -73,11 +74,13 @@ class PexRequirements:
         file_content: FileContent | None = None,
         file_path: str | None = None,
         file_path_description_of_origin: str | None = None,
+        is_lockfile: bool = False,
     ) -> None:
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.file_content = file_content
         self.file_path = file_path
         self.file_path_description_of_origin = file_path_description_of_origin
+        self.is_lockfile = is_lockfile
 
         if self.file_path and not self.file_path_description_of_origin:
             raise ValueError(
@@ -145,7 +148,6 @@ class PexRequest(EngineAwareParameter):
     repository_pex: Pex | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
-    is_lockfile: bool
     apply_requirement_constraints: bool
     description: str | None = dataclasses.field(compare=False)
 
@@ -163,7 +165,6 @@ class PexRequest(EngineAwareParameter):
         repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
-        is_lockfile: bool = False,
         apply_requirement_constraints: bool = True,
         description: str | None = None,
     ) -> None:
@@ -205,7 +206,6 @@ class PexRequest(EngineAwareParameter):
         self.repository_pex = repository_pex
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
-        self.is_lockfile = is_lockfile
         self.apply_requirement_constraints = apply_requirement_constraints
         self.description = description
         self.__post_init__()
@@ -334,7 +334,7 @@ async def build_pex(
             ]
         )
 
-    if request.is_lockfile:
+    if request.requirements.is_lockfile:
         argv.append("--no-transitive")
 
     python: PythonExecutable | None = None
@@ -388,7 +388,7 @@ async def build_pex(
 
     constraint_file_digest = EMPTY_DIGEST
     if (
-        not request.is_lockfile and request.apply_requirement_constraints
+        not request.requirements.is_lockfile and request.apply_requirement_constraints
     ) and python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])
         constraint_file_digest = await Get(
