@@ -1399,7 +1399,7 @@ class GlobalOptions(Subsystem):
         register(
             "--streaming-workunits-report-interval",
             type=float,
-            default=1,
+            default=1.0,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
         )

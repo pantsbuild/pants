@@ -22,15 +22,18 @@ from pants.util.contextutil import pushd, temporary_dir
 
 class ArgSplitterTest(unittest.TestCase):
     _known_scope_infos = [
-        ScopeInfo("compile"),
-        ScopeInfo("compile.java"),
-        ScopeInfo("compile.scala"),
-        ScopeInfo("jvm"),
-        ScopeInfo("jvm.test.junit"),
-        ScopeInfo("reporting"),
-        ScopeInfo("test"),
-        ScopeInfo("test.junit"),
-    ]
+        ScopeInfo(scope, is_goal=True)
+        for scope in [
+            "compile",
+            "compile.java",
+            "compile.scala",
+            "jvm",
+            "jvm.test.junit",
+            "reporting",
+            "test",
+            "test.junit",
+        ]
+    ] + [ScopeInfo("hidden", is_goal=False)]
 
     @staticmethod
     def assert_valid_split(
@@ -384,3 +387,6 @@ class ArgSplitterTest(unittest.TestCase):
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         splitter.split_args(shlex.split("./pants foo/bar:baz"))
         self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))
+
+    def test_hidden_scope_is_unknown_goal(self) -> None:
+        self.assert_unknown_goal("./pants hidden", ["hidden"])

@@ -96,7 +96,7 @@ class Subsystem(Optionable):
         if subscope is None:
             return super().get_scope_info()
         else:
-            return ScopeInfo(cls.subscope(subscope), cls)
+            return cls.create_scope_info(scope=cls.subscope(subscope), optionable_cls=cls)
 
     def __init__(self, scope: str, options: OptionValueContainer) -> None:
         super().__init__()
@@ -191,9 +191,9 @@ class Subsystem(Optionable):
                 if scoped_to == GLOBAL_SCOPE
                 else optionable_cls.subscope(scoped_to)
             )
-            scope_info = ScopeInfo(
-                scope,
-                optionable_cls,
+            scope_info = cls.create_scope_info(
+                scope=scope,
+                optionable_cls=optionable_cls,
                 removal_version=removal_version,
                 removal_hint=removal_hint,
             )

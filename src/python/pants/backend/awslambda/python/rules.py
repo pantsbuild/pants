@@ -12,12 +12,10 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexPlatforms,
     PexRequest,
-    PexRequirements,
     VenvPex,
     VenvPexProcess,
 )
@@ -91,8 +89,8 @@ async def package_python_awslambda(
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=PexRequirements(lambdex.all_requirements),
-        interpreter_constraints=InterpreterConstraints(lambdex.interpreter_constraints),
+        requirements=lambdex.pex_requirements,
+        interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )
 

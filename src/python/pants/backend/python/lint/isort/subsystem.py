@@ -6,21 +6,33 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonToolLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
+from pants.util.docutil import git_url
 
 
 class Isort(PythonToolBase):
     options_scope = "isort"
     help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
 
-    default_version = "isort[pyproject]>=5.5.1,<5.6"
+    default_version = "isort[pyproject,colors]>=5.5.1,<5.6"
     default_extra_requirements = ["setuptools"]
+    default_main = ConsoleScript("isort")
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
-    default_main = ConsoleScript("isort")
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.lint.isort", "lockfile.txt")
+    default_lockfile_url = git_url("src/python/pants/backend/python/lint/isort/lockfile.txt")
 
     @classmethod
     def register_options(cls, register):
@@ -113,3 +125,16 @@ class Isort(PythonToolBase):
             check_existence=check_existence,
             check_content=check_content,
         )
+
+
+class IsortLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule
+def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> PythonToolLockfileRequest:
+    return PythonToolLockfileRequest.from_tool(isort)
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, IsortLockfileSentinel))

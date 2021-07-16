@@ -4,6 +4,10 @@
 from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
+from pants.backend.experimental.python.lockfile import (
+    PythonToolLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -11,7 +15,7 @@ from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import target_option
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 
 
 class PythonProtobufSubsystem(Subsystem):
@@ -59,8 +63,29 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     )
 
     default_version = "mypy-protobuf==2.4"
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = (
+        "pants.backend.codegen.protobuf.python",
+        "mypy_protobuf_lockfile.txt",
+    )
+    default_lockfile_url = git_url(
+        "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf_lockfile.txt"
+    )
+
+
+class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule
+def setup_bandit_lockfile(
+    _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
+) -> PythonToolLockfileRequest:
+    return PythonToolLockfileRequest.from_tool(mypy_protobuf)
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):
@@ -79,4 +104,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(InjectDependenciesRequest, InjectPythonProtobufDependencies),
+        UnionRule(PythonToolLockfileSentinel, MypyProtobufLockfileSentinel),
     ]

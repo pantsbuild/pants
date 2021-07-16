@@ -220,15 +220,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         {"f.py": content, "BUILD": "python_library(name='t', interpreter_constraints=['>=3.9'])"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(
-        rule_runner,
-        [tgt],
-        # TODO: remove this and go back to using the default version once the new Black release
-        #  comes out.
-        extra_args=[
-            "--black-version=Black@ git+https://github.com/psf/black.git@aebd3c37b28bbc0183a58d13b80e7595db3c09bb"
-        ],
-    )
+    lint_results, fmt_result = run_black(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr

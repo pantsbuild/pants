@@ -9,7 +9,7 @@ from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -61,7 +61,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
         PexRequest(
             output_filename="flake8.pex",
             internal_only=True,
-            requirements=PexRequirements(flake8.all_requirements),
+            requirements=flake8.pex_requirements,
             interpreter_constraints=partition.interpreter_constraints,
             main=flake8.main,
         ),

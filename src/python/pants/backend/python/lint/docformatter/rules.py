@@ -9,8 +9,7 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -58,23 +57,21 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    docformatter_pex_request = Get(
+    docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=PexRequirements(docformatter.all_requirements),
-            interpreter_constraints=InterpreterConstraints(docformatter.interpreter_constraints),
+            requirements=docformatter.pex_requirements,
+            interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
         ),
     )
-
-    source_files_request = Get(
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-
-    source_files, docformatter_pex = await MultiGet(source_files_request, docformatter_pex_request)
+    source_files, docformatter_pex = await MultiGet(source_files_get, docformatter_pex_get)
 
     source_files_snapshot = (
         source_files.snapshot

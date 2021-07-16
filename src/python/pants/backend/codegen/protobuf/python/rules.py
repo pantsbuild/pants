@@ -13,14 +13,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    PexRequest,
-    PexRequirements,
-    PexResolveInfo,
-    VenvPex,
-    VenvPexRequest,
-)
+from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import SandboxPexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -108,10 +101,8 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=PexRequirements([python_protobuf_mypy_plugin.requirement]),
-        interpreter_constraints=InterpreterConstraints(
-            python_protobuf_mypy_plugin.interpreter_constraints
-        ),
+        requirements=python_protobuf_mypy_plugin.pex_requirements,
+        interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
     )
 
     if python_protobuf_subsystem.mypy_plugin:

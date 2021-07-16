@@ -429,7 +429,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
-            requirements=PexRequirements(setuptools.all_requirements),
+            requirements=setuptools.pex_requirements,
             interpreter_constraints=req.interpreter_constraints,
         ),
     )
@@ -695,7 +695,7 @@ async def get_requirements(
         for tgt in direct_deps_with_excl
         if tgt.has_field(PythonRequirementsField)
     )
-    req_strs = list(reqs)
+    req_strs = list(reqs.req_strings)
 
     # Add the requirements on any exported targets on which we depend.
     kwargs_for_exported_targets_we_depend_on = await MultiGet(

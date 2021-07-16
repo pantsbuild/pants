@@ -7,6 +7,7 @@ import json
 import os
 import shlex
 import unittest.mock
+from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from textwrap import dedent
@@ -25,6 +26,7 @@ from pants.option.custom_types import UnsetBool, file_option, shell_str, target_
 from pants.option.errors import (
     BooleanConversionError,
     BooleanOptionNameWithNo,
+    DefaultValueType,
     FromfileError,
     ImplicitValIsNone,
     InvalidKwarg,
@@ -57,7 +59,7 @@ def global_scope() -> ScopeInfo:
 
 
 def task(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope)
+    return ScopeInfo(scope, is_goal=True)
 
 
 def intermediate(scope: str) -> ScopeInfo:
@@ -222,6 +224,91 @@ def test_bool_invalid_value(val: Any) -> None:
 
     with pytest.raises(BooleanConversionError):
         create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
+
+
+# ----------------------------------------------------------------------------------------
+# Type checks
+# ----------------------------------------------------------------------------------------
+
+
+@contextmanager
+def no_exception():
+    """use in tests as placeholder for a pytest.raises, when no exception is expected."""
+    yield None
+
+
+@pytest.mark.parametrize(
+    "option_kwargs, assert_expected",
+    [
+        (
+            dict(type=str, default=""),
+            no_exception(),
+        ),
+        (
+            dict(type=str, default=42),
+            pytest.raises(
+                DefaultValueType, match=r"Default value int\(42\) does not match option type str\."
+            ),
+        ),
+        (
+            dict(type=bool, default="True"),
+            no_exception(),
+        ),
+        (
+            dict(type=bool, default=True),
+            no_exception(),
+        ),
+        (
+            dict(type=bool, default="not a bool"),
+            pytest.raises(
+                BooleanConversionError, match=r'Got "not a bool"\. Expected "True" or "False"\.'
+            ),
+        ),
+        (
+            dict(type=int, default=1.0),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Default value float\(1\.0\) does not match option type int\. \[option --opt in global scope\]\.",
+            ),
+        ),
+        (
+            dict(type=list, member_type=int, default="[1, 2, 3]"),
+            no_exception(),
+        ),
+        (
+            dict(type=list, member_type=int, default="[1, 2.1, 3]"),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Default member value type mismatch\.\n\n    Member value float\(2\.1\) does not match list option type int\.",
+            ),
+        ),
+        (
+            dict(type=list, member_type=float, default="[1.1, 2.0, 3.3]"),
+            no_exception(),
+        ),
+        (
+            dict(type=list, member_type=float, default="[1.1, 2.2, '3.3']"),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Member value str\('3\.3'\) does not match list option type float\.",
+            ),
+        ),
+        (
+            dict(type=dict, default="{'foo': 'bar'}"),
+            no_exception(),
+        ),
+        (
+            dict(type=dict, default="['foo', 'bar']"),
+            pytest.raises(ParseError, match=r"Invalid dict value: \['foo', 'bar'\]"),
+        ),
+    ],
+)
+def test_default_value_type_assert(option_kwargs, assert_expected):
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--opt", **option_kwargs)
+
+    with assert_expected:
+        create_options([GLOBAL_SCOPE], register).for_scope(GLOBAL_SCOPE)
 
 
 # ----------------------------------------------------------------------------------------
