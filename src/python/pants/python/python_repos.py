@@ -62,19 +62,6 @@ def _resolve_monkey(self, link):
     )
 
 
-def _make_create_session_patcher(trust_env):
-    @staticmethod
-    def _create_session_monkey(max_retries):
-        session = requests.session()
-        session.trust_env = trust_env
-        retrying_adapter = requests.adapters.HTTPAdapter(max_retries=max_retries)
-        session.mount('http://', retrying_adapter)
-        session.mount('https://', retrying_adapter)
-        return session
-
-    return _create_session_monkey
-
-
 RequestsContext.open = _open_monkey
 RequestsContext.resolve = _resolve_monkey
 
@@ -107,14 +94,6 @@ class PythonRepos(Subsystem):
             default=["https://pypi.org/simple/"],
             help="URLs of code repository indexes.",
         )
-        register(
-            "--trust-env",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="requests.Session trust_env attribute."
-        )
-
 
     @property
     def repos(self):
@@ -134,5 +113,4 @@ class PythonRepos(Subsystem):
     @memoized_method
     def get_network_context(self):
         # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
-        RequestsContext._create_session = _make_create_session_patcher(self.get_options().trust_env)
         return RequestsContext()
