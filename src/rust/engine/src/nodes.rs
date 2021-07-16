@@ -983,10 +983,13 @@ pub struct Task {
 impl Task {
   async fn gen_get(
     context: &Context,
+    workunit: &mut RunningWorkunit,
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeResult<Vec<Value>> {
+    // While waiting for dependencies, mark the workunit for this Task blocked.
+    let _blocking_token = workunit.blocking();
     let get_futures = gets
       .into_iter()
       .map(|get| {
@@ -1046,11 +1049,11 @@ impl Task {
   /// it completes with a result Value.
   ///
   async fn generate(
-    context: Context,
+    context: &Context,
+    workunit: &mut RunningWorkunit,
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-    _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Value> {
     let mut input = Value::from(externs::none());
     loop {
@@ -1059,11 +1062,11 @@ impl Task {
       let entry = entry.clone();
       match externs::generator_send(&generator, &input)? {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, &params, &entry, vec![get]).await?;
+          let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, &params, &entry, gets).await?;
+          let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
           input = externs::store_tuple(values);
         }
         externs::GeneratorResponse::Break(val) => {
@@ -1103,6 +1106,8 @@ impl WrappedNode for Task {
   ) -> NodeResult<PythonRuleOutput> {
     let params = self.params;
     let deps = {
+      // While waiting for dependencies, mark ourselves blocking.
+      let _blocking_token = workunit.blocking();
       let edges = &context
         .core
         .rule_graph
@@ -1131,7 +1136,7 @@ impl WrappedNode for Task {
     let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
-      result_val = Self::generate(context.clone(), params, entry, result_val, workunit).await?;
+      result_val = Self::generate(&context, workunit, params, entry, result_val).await?;
       result_type = externs::get_type_for(&result_val);
     }
 
