@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from contextlib import contextmanager
+import re
 
 import pytest
 
@@ -18,6 +18,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import DownloadFile, FileDigest
 from pants.engine.platform import Platform
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.pytest_util import no_exception
 
 
 class FooBar(ExternalTool):
@@ -134,11 +135,6 @@ class ConstrainedTool(TemplatedExternalTool):
         return f"foobar-{self.version}/bin/foobar"
 
 
-@contextmanager
-def no_exception():
-    yield None
-
-
 @pytest.mark.parametrize(
     "version, action, assert_expectation, expect_logged",
     [
@@ -147,7 +143,11 @@ def no_exception():
             UnsupportedVersionUsage.RaiseError,
             pytest.raises(
                 UnsupportedVersion,
-                match="foobar v1.2.3 does not satisfy the version constraints foobar<3.8,>3.2.1",
+                match=re.escape(
+                    "The option [foobar].version is set to v1.2.3, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
+                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version.\n"
+                    "Alternatively, update [foobar].use_unsupported_version to be 'allow' or 'warning'."
+                ),
             ),
             None,
         ),
@@ -169,7 +169,12 @@ def no_exception():
             "v3.8.0",
             UnsupportedVersionUsage.RaiseError,
             pytest.raises(
-                UnsupportedVersion, match="foobar v3.8.0 does not satisfy the version constraints"
+                UnsupportedVersion,
+                match=re.escape(
+                    "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
+                    "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version.\n"
+                    "Alternatively, update [foobar].use_unsupported_version to be 'allow' or 'warning'."
+                ),
             ),
             None,
         ),
@@ -182,7 +187,10 @@ def no_exception():
             [
                 (
                     logging.WARNING,
-                    "foobar v3.8.0 may not be compatible with this version of pants, as it does not satisfy the constraints foobar<3.8,>3.2.1",
+                    (
+                        "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
+                        "Please update the version to a supported value, or consider using a different Pants release if you cannot change the version."
+                    ),
                 )
             ],
         ),
@@ -194,8 +202,11 @@ def no_exception():
             ),
             [
                 (
-                    logging.DEBUG,
-                    "Ignoring constraints for version v3.8.0, does not satisfy version constraints foobar<3.8,>3.2.1",
+                    logging.INFO,
+                    (
+                        "The option [foobar].version is set to v3.8.0, which is not compatible with what this release of Pants expects: foobar<3.8,>3.2.1\n"
+                        "The option [foobar].use_unsupported_version is set to 'allow'."
+                    ),
                 )
             ],
         ),
