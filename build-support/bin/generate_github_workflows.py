@@ -32,7 +32,7 @@ Env = Dict[str, str]
 # ----------------------------------------------------------------------
 
 
-NATIVE_ENGINE_SO_FILES = [
+NATIVE_FILES = [
     ".pants",
     "src/python/pants/engine/internals/native_engine.so",
     "src/python/pants/engine/internals/native_engine_pyo3.so",
@@ -187,38 +187,38 @@ def bootstrap_caches() -> Sequence[Step]:
         # which are how the bootstrap jobs share the compiled binaries with the other jobs like
         # `lint` and `test`.
         {
-            "name": "Get Engine Hash",
+            "name": "Get native engine hash",
             "id": "get-engine-hash",
             "run": 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"\n',
             "shell": "bash",
         },
         {
-            "name": "Cache Native Engine",
+            "name": "Cache native engine",
             "uses": "actions/cache@v2",
             "with": {
-                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
+                "path": "\n".join(NATIVE_FILES),
                 "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
             },
         },
     ]
 
 
-def native_engine_so_upload() -> Step:
+def native_binaries_upload() -> Step:
     return {
-        "name": "Upload native_engine.so",
+        "name": "Upload native binaries",
         "uses": "actions/upload-artifact@v2",
         "with": {
-            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-            "path": "\n".join(NATIVE_ENGINE_SO_FILES),
+            "name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "\n".join(NATIVE_FILES),
         },
     }
 
 
-def native_engine_so_download() -> Step:
+def native_binaries_download() -> Step:
     return {
-        "name": "Download native_engine.so",
+        "name": "Download native binaries",
         "uses": "actions/download-artifact@v2",
-        "with": {"name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}"},
+        "with": {"name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}"},
     }
 
 
@@ -285,7 +285,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     ),
                 },
                 upload_log_artifacts(name="bootstrap-linux"),
-                native_engine_so_upload(),
+                native_binaries_upload(),
                 {
                     "name": "Test and Lint Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -314,7 +314,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
@@ -331,7 +331,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
@@ -352,7 +352,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                native_engine_so_upload(),
+                native_binaries_upload(),
                 {
                     "name": "Test Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -378,7 +378,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",

@@ -90,12 +90,12 @@ jobs:
 
           '
     - id: get-engine-hash
-      name: Get Engine Hash
+      name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
 
         '
       shell: bash
-    - name: Cache Native Engine
+    - name: Cache native engine
       uses: actions/cache@v2
       with:
         key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
@@ -130,10 +130,10 @@ jobs:
       with:
         name: pants-log-bootstrap-linux
         path: .pants.d/pants.log
-    - name: Upload native_engine.so
+    - name: Upload native binaries
       uses: actions/upload-artifact@v2
       with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -239,12 +239,12 @@ jobs:
 
           '
     - id: get-engine-hash
-      name: Get Engine Hash
+      name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
 
         '
       shell: bash
-    - name: Cache Native Engine
+    - name: Cache native engine
       uses: actions/cache@v2
       with:
         key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
@@ -261,10 +261,10 @@ jobs:
       run: './pants --version
 
         '
-    - name: Upload native_engine.so
+    - name: Upload native binaries
       uses: actions/upload-artifact@v2
       with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -337,10 +337,10 @@ jobs:
         path: '~/.cache/pants/pants_dev_deps
 
           '
-    - name: Download native_engine.so
+    - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - name: Lint
       run: './pants validate ''**''
 
@@ -415,10 +415,10 @@ jobs:
         path: '~/.cache/pants/pants_dev_deps
 
           '
-    - name: Download native_engine.so
+    - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - name: Run Python tests
       run: './pants test ::
 
@@ -493,10 +493,10 @@ jobs:
         path: '~/.cache/pants/pants_dev_deps
 
           '
-    - name: Download native_engine.so
+    - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test ::
 
