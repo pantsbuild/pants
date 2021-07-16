@@ -735,8 +735,9 @@ impl crate::CommandRunner for CommandRunner {
   /// Run the given MultiPlatformProcess via the Remote Execution API.
   async fn run(
     &self,
-    request: MultiPlatformProcess,
     context: Context,
+    _workunit: &mut RunningWorkunit,
+    request: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Retrieve capabilities for this server.
     let capabilities = self.get_capabilities().await?;
@@ -1397,7 +1398,7 @@ pub async fn check_action_cache(
               "eager_fetch_action_cache".to_owned(),
               WorkunitMetadata {
                 level: Level::Trace,
-                desc: Some(format!("eagerly fetching from action cache")),
+                desc: Some("eagerly fetching after action cache hit".to_owned()),
                 ..WorkunitMetadata::default()
               },
               |_workunit| async move {

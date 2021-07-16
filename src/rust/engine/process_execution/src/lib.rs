@@ -43,7 +43,9 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use hashing::{Digest, EMPTY_FINGERPRINT};
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use workunit_store::{in_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
+use workunit_store::{
+  in_workunit, RunningWorkunit, UserMetadataItem, WorkunitMetadata, WorkunitStore,
+};
 
 pub mod cache;
 #[cfg(test)]
@@ -476,8 +478,9 @@ pub trait CommandRunner: Send + Sync {
   ///
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String>;
 
   ///
@@ -533,8 +536,10 @@ impl BoundedCommandRunner {
 impl CommandRunner for BoundedCommandRunner {
   async fn run(
     &self,
-    mut req: MultiPlatformProcess,
     context: Context,
+    // TODO
+    _workunit: &mut RunningWorkunit,
+    mut req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let name = format!("{}-running", req.workunit_name());
     let desc = req.user_facing_name();
@@ -553,7 +558,7 @@ impl CommandRunner for BoundedCommandRunner {
         let inner = self.inner.clone();
         let blocking_token = workunit.blocking();
         let res: (Result<_, _>) = semaphore
-          .with_acquired(move |concurrency_id| {
+          .with_acquired(|concurrency_id| {
             log::debug!(
               "Running {} under semaphore with concurrency id: {}",
               desc,
@@ -570,7 +575,7 @@ impl CommandRunner for BoundedCommandRunner {
               }
             }
 
-            async move { inner.0.run(req, context).await }
+            inner.0.run(context, workunit, req)
           })
           .await;
 

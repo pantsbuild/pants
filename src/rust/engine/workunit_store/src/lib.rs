@@ -768,10 +768,16 @@ impl WorkunitStore {
     Ok(result)
   }
 
-  pub fn setup_for_tests() -> WorkunitStore {
+  pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
     let store = WorkunitStore::new(false);
     store.init_thread_state(None);
-    store
+    let workunit = store.start_workunit(
+      SpanId(0),
+      "testing".to_owned(),
+      None,
+      WorkunitMetadata::default(),
+    );
+    (store.clone(), RunningWorkunit::new(store, workunit))
   }
 }
 

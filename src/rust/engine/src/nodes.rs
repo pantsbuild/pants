@@ -395,7 +395,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   async fn run_wrapped_node(
     self,
     context: Context,
-    _workunit: &mut RunningWorkunit,
+    workunit: &mut RunningWorkunit,
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
@@ -413,7 +413,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       );
 
       let res = command_runner
-        .run(request, execution_context)
+        .run(execution_context, workunit, request)
         .await
         .map_err(|e| throw(&e))?;
 

@@ -11,7 +11,9 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
-use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{
+  in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
+};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
@@ -57,13 +59,21 @@ impl crate::CommandRunner for CommandRunner {
 
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
+    let cache_failures = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+    let digest = crate::digest(req.clone(), &self.metadata);
+    let key = digest.hash;
+
     let context2 = context.clone();
-    in_workunit!(
-      context2.workunit_store,
+    let cache_read_result = in_workunit!(
+      context.workunit_store.clone(),
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
@@ -72,15 +82,6 @@ impl crate::CommandRunner for CommandRunner {
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-        let digest = crate::digest(req.clone(), &self.metadata);
-        let key = digest.hash;
-
-        let cache_failures = req
-          .0
-          .values()
-          .any(|process| process.cache_scope == ProcessCacheScope::Always);
-
-        let command_runner = self.clone();
         match self.lookup(key).await {
           Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
             let lookup_elapsed = cache_lookup_start.elapsed();
@@ -88,11 +89,11 @@ impl crate::CommandRunner for CommandRunner {
             if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
               let time_saved = time_saved.as_millis() as u64;
               workunit.increment_counter(Metric::LocalCacheTotalTimeSavedMs, time_saved);
-              context
+              context2
                 .workunit_store
                 .record_observation(ObservationMetric::LocalCacheTimeSavedMs, time_saved);
             }
-            return Ok(result);
+            Ok(result)
           }
           Err(err) => {
             debug!(
@@ -101,17 +102,36 @@ impl crate::CommandRunner for CommandRunner {
             );
             workunit.increment_counter(Metric::LocalCacheReadErrors, 1);
             // Falling through to re-execute.
+            Err(())
           }
           Ok(_) => {
             // Either we missed, or we hit for a failing result.
             workunit.increment_counter(Metric::LocalCacheRequestsUncached, 1);
             // Falling through to execute.
+            Err(())
           }
         }
+      }
+      .boxed()
+    )
+    .await;
 
-        let result = command_runner.underlying.run(req, context.clone()).await?;
-        if result.exit_code == 0 || cache_failures {
-          if let Err(err) = command_runner.store(key, &result).await {
+    if let Ok(result) = cache_read_result {
+      return Ok(result);
+    }
+
+    let result = self.underlying.run(context.clone(), workunit, req).await?;
+    if result.exit_code == 0 || cache_failures {
+      let result = result.clone();
+      in_workunit!(
+        context.workunit_store.clone(),
+        "local_cache_write".to_owned(),
+        WorkunitMetadata {
+          level: Level::Trace,
+          ..WorkunitMetadata::default()
+        },
+        |workunit| async move {
+          if let Err(err) = self.store(key, &result).await {
             warn!(
               "Error storing process execution result to local cache: {} - ignoring and continuing",
               err
@@ -119,11 +139,10 @@ impl crate::CommandRunner for CommandRunner {
             workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
           }
         }
-        Ok(result)
-      }
-      .boxed()
-    )
-    .await
+      )
+      .await;
+    }
+    Ok(result)
   }
 }
 

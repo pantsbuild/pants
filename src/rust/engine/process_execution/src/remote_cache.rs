@@ -18,7 +18,9 @@ use parking_lot::Mutex;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
-use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{
+  in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
+};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -532,8 +534,9 @@ enum CacheErrorType {
 impl crate::CommandRunner for CommandRunner {
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
@@ -554,11 +557,14 @@ impl crate::CommandRunner for CommandRunner {
           cache_lookup_start,
           &command,
           action_digest,
-          self.underlying.run(req, context.clone()),
+          self.underlying.run(context.clone(), workunit, req),
         )
         .await?
     } else {
-      (self.underlying.run(req, context.clone()).await?, false)
+      (
+        self.underlying.run(context.clone(), workunit, req).await?,
+        false,
+      )
     };
 
     if !hit_cache && result.exit_code == 0 && self.cache_write {
