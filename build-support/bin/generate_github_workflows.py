@@ -182,6 +182,10 @@ def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
         pants_virtualenv_cache(),
+        # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
+        # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
+        # which are how the bootstrap jobs share the compiled binaries with the other jobs like
+        # `lint` and `test`.
         {
             "name": "Get Engine Hash",
             "id": "get-engine-hash",
@@ -214,10 +218,7 @@ def native_engine_so_download() -> Step:
     return {
         "name": "Download native_engine.so",
         "uses": "actions/download-artifact@v2",
-        "with": {
-            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-            "path": "src/python/pants/engine/internals/",
-        },
+        "with": {"name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}"},
     }
 
 

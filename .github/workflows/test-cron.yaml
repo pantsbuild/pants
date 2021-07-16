@@ -341,7 +341,6 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: src/python/pants/engine/internals/
     - name: Lint
       run: './pants validate ''**''
 
@@ -420,7 +419,6 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: src/python/pants/engine/internals/
     - name: Run Python tests
       run: './pants test ::
 
@@ -499,7 +497,6 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: src/python/pants/engine/internals/
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test ::
 
