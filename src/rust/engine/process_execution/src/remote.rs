@@ -759,38 +759,21 @@ impl crate::CommandRunner for CommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action stored locally for {:?}", action)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| ensure_action_stored_locally(&self.store, &command, &action),
-    )
-    .await?;
+    let (command_digest, action_digest) =
+      ensure_action_stored_locally(&self.store, &command, &action).await?;
 
     // Check the remote Action Cache to see if this request was already computed.
     // If so, return immediately with the result.
     let context2 = context.clone();
-    let cached_response_opt = in_workunit!(
-      context.workunit_store.clone(),
-      "check_action_cache".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("check action cache for {:?}", action_digest)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| check_action_cache(
-        action_digest,
-        &self.metadata,
-        self.platform,
-        &context2,
-        self.action_cache_client.clone(),
-        self.store.clone(),
-        false,
-      ),
+    let cached_response_opt = check_action_cache(
+      &command,
+      action_digest,
+      &self.metadata,
+      self.platform,
+      &context2,
+      self.action_cache_client.clone(),
+      self.store.clone(),
+      false,
     )
     .await?;
     debug!(
@@ -1348,13 +1331,15 @@ fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
   request
 }
 
-/// Check the remote Action Cache for a cached result of running the given `action_digest`.
+/// Check the remote Action Cache for a cached result of running the given `command`, with the
+/// given `action_digest`.
 ///
 /// This check is necessary because some RE servers do not short-circuit the Execute method
 /// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
 /// explicitly in order to avoid duplicating already-cached work. This behavior matches
 /// the Bazel RE client.
 pub async fn check_action_cache(
+  command: &Command,
   action_digest: Digest,
   metadata: &ProcessMetadata,
   platform: Platform,
@@ -1368,7 +1353,10 @@ pub async fn check_action_cache(
     "check_action_cache".to_owned(),
     WorkunitMetadata {
       level: Level::Trace,
-      desc: Some(format!("check action cache for {:?}", action_digest)),
+      desc: Some(format!(
+        "check action cache for {:?} ({:?})",
+        command, action_digest
+      )),
       ..WorkunitMetadata::default()
     },
     |workunit| async move {
@@ -1400,16 +1388,31 @@ pub async fn check_action_cache(
           let response =
             populate_fallible_execution_result(store.clone(), &action_result, platform, false)
               .await?;
+          // TODO: This should move inside the retry_call above, both in order to be retried, and
+          // to ensure that we increment a miss if we fail to eagerly fetch.
           if eager_fetch {
-            future::try_join_all(vec![
-              store.ensure_local_has_file(response.stdout_digest).boxed(),
-              store.ensure_local_has_file(response.stderr_digest).boxed(),
-              store
-                .ensure_local_has_recursive_directory(response.output_directory)
-                .boxed(),
-            ])
+            let response = response.clone();
+            in_workunit!(
+              context.workunit_store.clone(),
+              "eager_fetch_action_cache".to_owned(),
+              WorkunitMetadata {
+                level: Level::Trace,
+                desc: Some(format!("eagerly fetching from action cache")),
+                ..WorkunitMetadata::default()
+              },
+              |_workunit| async move {
+                future::try_join_all(vec![
+                  store.ensure_local_has_file(response.stdout_digest).boxed(),
+                  store.ensure_local_has_file(response.stderr_digest).boxed(),
+                  store
+                    .ensure_local_has_recursive_directory(response.output_directory)
+                    .boxed(),
+                ])
+                .await
+              }
+            )
             .await?;
-          };
+          }
           workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
           Ok(Some(response))
         }

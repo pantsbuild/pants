@@ -348,12 +348,14 @@ impl CommandRunner {
     &self,
     context: Context,
     cache_lookup_start: Instant,
+    command: &Command,
     action_digest: Digest,
     mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
+        command,
         action_digest,
         &self.metadata,
         self.platform,
@@ -542,24 +544,15 @@ impl crate::CommandRunner for CommandRunner {
       make_execute_request(&request, self.metadata.clone())?;
 
     // Ensure the action and command are stored locally.
-    let command2 = command.clone();
-    let (command_digest, action_digest) = in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action stored locally for {:?}", action)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| crate::remote::ensure_action_stored_locally(&self.store, &command2, &action),
-    )
-    .await?;
+    let (command_digest, action_digest) =
+      crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
     let (result, hit_cache) = if self.cache_read {
       self
         .speculate_read_action_cache(
           context.clone(),
           cache_lookup_start,
+          &command,
           action_digest,
           self.underlying.run(req, context.clone()),
         )
