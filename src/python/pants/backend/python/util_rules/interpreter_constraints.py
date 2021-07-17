@@ -192,7 +192,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         """
         if self.includes_python2():
             return "2.7"
-        max_expected_py3_patch_version = 15  # The current max is 3.6.12.
+        max_expected_py3_patch_version = 15  # The current max is 3.6.13.
         for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
             if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
                 return major_minor
@@ -201,7 +201,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
     ) -> bool:
-        # Assume any 3.x release has no more than 15 releases. The max is currently 3.6.12.
+        # Assume any 3.x release has no more than 15 releases. The max is currently 3.6.13.
         patch_versions = list(reversed(range(0, 15)))
         # We only need to look at the prior Python release. For example, consider Python 3.8+
         # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
@@ -233,8 +233,71 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             allowed_versions=["3.8", "3.9", "3.10"], prior_version="3.7"
         )
 
+    def partition_by_major_minor_versions(self) -> tuple[InterpreterConstraints, ...]:
+        """Create a distinct InterpreterConstraints value for each CPython major-minor version that
+        is compatible with the original constraints."""
+        if any(req.project_name != "CPython" for req in self):
+            raise AssertionError(
+                "This function only works with CPython interpreter constraints for now."
+            )
+
+        def all_valid_patch_versions(major_minor: str, last_patch: int) -> list[int]:
+            return [
+                p
+                for p in range(0, last_patch + 1)
+                for req in self
+                if req.specifier.contains(f"{major_minor}.{p}")  # type: ignore[attr-defined]
+            ]
+
+        result = []
+
+        def maybe_add_version(major_minor: str, next_major_minor: str, last_patch: int) -> None:
+            valid_patch_versions = all_valid_patch_versions(major_minor, last_patch)
+            if not valid_patch_versions:
+                return
+
+            if len(valid_patch_versions) == 1:
+                result.append(
+                    InterpreterConstraints([f"=={major_minor}.{valid_patch_versions[0]}"])
+                )
+                return
+
+            min_constraint = (
+                f">={major_minor}"
+                if valid_patch_versions[0] == 0
+                else f">={major_minor}.{valid_patch_versions[0]}"
+            )
+            max_constraint = (
+                f"<{next_major_minor}"
+                if valid_patch_versions[-1] == last_patch
+                else f"<={major_minor}.{valid_patch_versions[-1]}"
+            )
+            merged_constraint = f"{min_constraint},{max_constraint}"
+
+            skipped = _not_in_contiguous_range(valid_patch_versions)
+            if skipped:
+                skipped_constraints = ",".join(f"!={major_minor}.{p}" for p in skipped)
+                merged_constraint += f",{skipped_constraints}"
+
+            result.append(InterpreterConstraints([merged_constraint]))
+
+        maybe_add_version("2.7", "2.8", 18)
+        maybe_add_version("3.5", "3.6", 11)
+        maybe_add_version("3.6", "3.7", 15)
+        maybe_add_version("3.7", "3.8", 15)
+        maybe_add_version("3.8", "3.9", 15)
+        maybe_add_version("3.9", "3.10", 15)
+        maybe_add_version("3.10", "3.11", 15)
+        return tuple(result)
+
     def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)
 
     def debug_hint(self) -> str:
         return str(self)
+
+
+def _not_in_contiguous_range(nums: list[int]) -> list[int]:
+    # Expects list to already be sorted and have 1+ elements.
+    expected = {i for i in range(nums[0], nums[-1])}
+    return sorted(expected - set(nums))
