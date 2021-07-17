@@ -104,8 +104,7 @@ def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
         }
         for t in ts
     ]
-    data = dict(targets=targets, excludeDefaults=exclude_defaults)
-    return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
+    return f"{json.dumps(targets, indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
