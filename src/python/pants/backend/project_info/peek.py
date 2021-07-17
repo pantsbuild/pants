@@ -32,6 +32,7 @@ class PeekSubsystem(Outputting, GoalSubsystem):
     """
 
     name = "peek"
+    help = "Display BUILD target info"
 
     @classmethod
     def register_options(cls, register):
