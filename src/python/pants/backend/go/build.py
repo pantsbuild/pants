@@ -33,6 +33,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 _logger = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ async def build_target(
         Digest, MergeDigests([d for _, d in import_config_digests.values()])
     )
 
-    input_root_digests = {source_files.snapshot.digest, merged_packages_digest}
+    input_root_digests = OrderedSet([source_files.snapshot.digest, merged_packages_digest])
     import_config: List[str] = ["# import config"]
     for import_path, (fp, _) in import_config_digests.items():
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
@@ -228,7 +229,7 @@ async def package_go_binary(
         Digest, MergeDigests([d for _, d in import_config_digests.values()])
     )
 
-    input_root_digests = {built_main_go_package.object_digest, merged_packages_digest}
+    input_root_digests = OrderedSet([built_main_go_package.object_digest, merged_packages_digest])
     import_config: List[str] = ["# import config"]
     for import_path, (fp, _) in import_config_digests.items():
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
