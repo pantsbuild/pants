@@ -109,6 +109,7 @@ async def build_docker_image(
 ) -> BuiltPackage:
     dockerfile = field_set.dockerfile.value
     source_path = path.dirname(dockerfile)
+    image_tag = ":".join([field_set.address.target_name, field_set.image_version.value])
 
     # get docker binary
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="build docker images"))
@@ -154,7 +155,7 @@ async def build_docker_image(
             context,
             source_path,
             dockerfile,
-            f"{field_set.address.target_name}:{field_set.image_version.value}",
+            image_tag,
         ),
     )
 
@@ -163,7 +164,9 @@ async def build_docker_image(
         (
             BuiltPackageArtifact(
                 relpath=None,
-                # extra_log_lines=(
+                extra_log_lines=(
+                    f"To try out the image interactively: docker run -it --rm {image_tag} [entrypoint args...]",
+                ),
                 #     *result.stdout.decode().split("\n"),
                 #     *result.stderr.decode().split("\n"),
                 # ),
