@@ -5,8 +5,14 @@ import os
 
 import pytest
 
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DigestContents, FileContent, \
-    Directory
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    Directory,
+    FileContent,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     BinaryPathRequest,
@@ -79,10 +85,14 @@ def test_env(rule_runner: RuleRunner) -> None:
 def test_output_digest(rule_runner: RuleRunner, working_directory) -> None:
     # Test that the output files are relative to the working directory, both in how
     # they're specified, and their paths in the output_digest.
-    input_digest = rule_runner.request(
-        Digest,
-        [CreateDigest([Directory(working_directory)])],
-    ) if working_directory else EMPTY_DIGEST
+    input_digest = (
+        rule_runner.request(
+            Digest,
+            [CreateDigest([Directory(working_directory)])],
+        )
+        if working_directory
+        else EMPTY_DIGEST
+    )
     process = Process(
         input_digest=input_digest,
         argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
