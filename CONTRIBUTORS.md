@@ -33,6 +33,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Christopher Livingston
 + Christopher Neugebauer
 + Cody Gibb
++ Colin Taylor
 + Craig Schertz
 + Cristian Matache
 + Damon Revoe
