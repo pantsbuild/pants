@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
             
 import pytest
-from pants.backend.docker.dockerfile import Dockerfile, DockerfileCommand, BaseImage, InvalidDockerfileCommandArgument
+from pants.backend.docker.dockerfile import Dockerfile, DockerfileCommand, BaseImage, InvalidDockerfileCommandArgument, EntryPoint
 from textwrap import dedent
 
 
@@ -17,8 +17,18 @@ from textwrap import dedent
         "FROM --platform=linux/amd64 custom.registry:443/full/blown:1.2.3 AS stage",
         BaseImage(image="full/blown", tag="1.2.3", name="stage", registry="custom.registry:443", platform="linux/amd64")
     ),
+    ("ENTRYPOINT command", EntryPoint("command", tuple(), form=EntryPoint.Form.SHELL)),
+    (
+        "ENTRYPOINT command param1 param2",
+        EntryPoint("command", arguments=("param1", "param2",), form=EntryPoint.Form.SHELL),
+    ),
+    ("""ENTRYPOINT ["command"]""", EntryPoint("command", tuple(), form=EntryPoint.Form.EXEC)),
+    (
+        """ENTRYPOINT ["command", "param1", "param2"]""",
+        EntryPoint("command", arguments=("param1", "param2",), form=EntryPoint.Form.EXEC),
+    ),
 ])
-def test_decode_from_command(command_line, expect):
+def test_decode_dockerfile_command(command_line, expect):
     if isinstance(expect, DockerfileCommand):
         assert expect == DockerfileCommand.decode(command_line)
     else:
@@ -31,7 +41,7 @@ def test_decode_from_command(command_line, expect):
         dedent(
             """\
             FROM baseimage:tag
-            # ENTRYPOINT ["main", "arg1", "arg2"]
+            ENTRYPOINT ["main", "arg1", "arg2"]
             # ENV option=value
             # COPY src/path/a dst/path/1
             # COPY src/path/b dst/path/2
@@ -39,7 +49,8 @@ def test_decode_from_command(command_line, expect):
             """
         ),
         Dockerfile(
-            baseimage=BaseImage("baseimage", tag="tag")
+            baseimage=BaseImage(image="baseimage", tag="tag"),
+            entry_point=EntryPoint(executable="main", arguments=("arg1", "arg2",), form=EntryPoint.Form.EXEC),
         ),
     ),
 ])
@@ -49,6 +60,38 @@ def test_parse_dockerfile(contents, expect):
     else:
         with expect:
             Dockerfile.parse(contents)
+
+
+@pytest.mark.parametrize('dockerfile, expect', [
+    (
+        Dockerfile(
+            baseimage=BaseImage("baseimage", tag="tag"),
+            entry_point=EntryPoint(executable="main", arguments=("arg1", "arg2",), form=EntryPoint.Form.EXEC),
+        ),
+        dedent(
+            """\
+            FROM baseimage:tag
+            ENTRYPOINT ["main", "arg1", "arg2"]
+            """
+        ),
+    ),
+    (
+        Dockerfile(
+            entry_point=EntryPoint(executable="main", arguments=("arg1", "arg2",), form=EntryPoint.Form.SHELL),
+        ),
+        dedent(
+            """\
+            ENTRYPOINT main arg1 arg2
+            """
+        ),
+    ),
+])
+def test_compile_dockerfile(dockerfile, expect):
+    if isinstance(expect, str):
+        assert expect.strip() == dockerfile.compile().strip()
+    else:
+        with expect:
+            dockerfile.compile()
 
 
 @pytest.mark.parametrize('contents, expect', [

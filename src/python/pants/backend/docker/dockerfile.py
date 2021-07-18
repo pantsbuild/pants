@@ -3,10 +3,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from enum import Enum
+from dataclasses import dataclass, fields
 #from textwrap import dedent
-from typing import Any, Dict, Generator, Pattern, Optional, Type, Union
+from typing import Any, Dict, Generator, Pattern, Optional, Type, Union, Tuple
 
 
 class DockerfileError (Exception):
@@ -19,12 +21,12 @@ class InvalidDockerfileCommandArgument(DockerfileError):
 
 class DockerfileCommand(ABC):
     """Base class for dockerfile commands encoding/decoding."""
-    command = "<OVERRIDE ME>"
+    _command = "<OVERRIDE ME>"
 
     @classmethod
     def _command_class(cls, command: str) -> Optional[Type["DockerfileCommand"]]:
         for cmd_cls in cls.__subclasses__():
-            if cmd_cls.command == command:
+            if cmd_cls._command == command:
                 return cmd_cls
         return None
 
@@ -43,7 +45,7 @@ class DockerfileCommand(ABC):
 
     def encode(self) -> str:
         """Convert command to string representation for a Dockerfile."""
-        return " ".join([self.command, *self.encode_arg()])
+        return " ".join([self._command, *self.encode_arg()])
 
     @staticmethod
     def _decode_arg_regexp(regexp: Union[Pattern, str], arg: str) -> Dict[str, Optional[str]]:
@@ -78,6 +80,8 @@ class BaseImage(DockerfileCommand):
     https://docs.docker.com/engine/reference/builder/#from
 
     """
+    _command = "FROM"
+
     image: str
     name: Optional[str] = None
     tag: Optional[str] = None
@@ -85,7 +89,6 @@ class BaseImage(DockerfileCommand):
     platform: Optional[str] = None
     registry: Optional[str] = None
 
-    command = "FROM"
     _arg_regexp = re.compile(
         r"""
         ^
@@ -116,17 +119,67 @@ class BaseImage(DockerfileCommand):
     def encode_arg(self) -> Generator[str, None, None]:
         if self.platform:
             yield f"--platform={self.platform}"
-        yield self.image
+
+        image = self.image
+        if self.registry:
+            image = "/".join([self.registry, self.image])
         if self.digest:
-            yield f"@{self.digest}"
+            image += f"@{self.digest}"
         elif self.tag:
-            yield f":{self.tag}"
+            image += f":{self.tag}"
+
+        yield image
+
         if self.name:
             yield f"AS {self.name}"
 
     @classmethod
     def decode_arg(cls, arg: str) -> Dict[str, Optional[str]]:
         return cls._decode_arg_regexp(cls._arg_regexp, arg)
+
+
+@dataclass(frozen=True)
+class EntryPoint(DockerfileCommand):
+    """An ENTRYPOINT allows you to configure a container that will run as an executable.
+
+        ENTRYPOINT ["executable", "param1", "param2"]  # form: exec
+        ENTRYPOINT command param1 param2               # form: shell
+
+    https://docs.docker.com/engine/reference/builder/#entrypoint
+
+    """
+    _command = "ENTRYPOINT"
+
+    class Form(Enum):
+        EXEC = "exec"
+        SHELL = "shell"
+
+    executable: str
+    arguments: Optional[Tuple[str, ...]] = None
+    form: Form = Form.EXEC
+
+    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
+        dockerfile_attrs['entry_point'] = self
+
+    def encode_arg(self) -> Generator[str, None, None]:
+        if self.form is EntryPoint.Form.EXEC:
+            yield json.dumps([self.executable, *(self.arguments or [])])
+        else:
+            yield self.executable
+            if self.arguments:
+                yield " ".join(self.arguments)
+
+    @classmethod
+    def decode_arg(cls, arg: str) -> Dict[str, Optional[str]]:
+        if arg.startswith("["):
+            form = EntryPoint.Form.EXEC
+            cmd_line = json.loads(arg)
+        else:
+            form = EntryPoint.Form.SHELL
+            cmd_line = arg.split(" ")
+        return dict(executable=cmd_line[0], arguments=tuple(cmd_line[1:]), form=form)
+
+
 
     # "RUN": ,
     # "CMD": ,
@@ -135,7 +188,6 @@ class BaseImage(DockerfileCommand):
     # "ENV": ,
     # "ADD": ,
     # "COPY": ,
-    # "ENTRYPOINT": ,
     # "VOLUME": ,
     # "USER": ,
     # "WORKDIR": ,
@@ -148,7 +200,8 @@ class BaseImage(DockerfileCommand):
 
 @dataclass(frozen=True)
 class Dockerfile:
-    baseimage: BaseImage
+    baseimage: BaseImage = None
+    entry_point: EntryPoint = None
 
     @classmethod
     def parse(cls, dockerfile_source: str) -> "Dockerfile":
@@ -159,6 +212,15 @@ class Dockerfile:
                 cmd.register(attrs)
 
         return Dockerfile(**attrs)
+
+    def compile(self) -> str:
+        return "\n".join(self._encode_fields())
+
+    def _encode_fields(self) -> Generator[str, None, None]:
+        for fld in fields(self):
+            value = getattr(self, fld.name)
+            if value:
+                yield value.encode()
 
     @staticmethod
     def _iter_command_lines(dockerfile_source: str) -> Generator[str, None, None]:
