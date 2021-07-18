@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
             
 import pytest
-from pants.backend.docker.dockerfile import Dockerfile, DockerfileCommand, BaseImage, InvalidDockerfileCommandArgument, EntryPoint
+from pants.backend.docker.dockerfile import Dockerfile, DockerfileCommand, BaseImage, InvalidDockerfileCommandArgument, EntryPoint, Copy
 from textwrap import dedent
 
 
@@ -27,6 +27,10 @@ from textwrap import dedent
         """ENTRYPOINT ["command", "param1", "param2"]""",
         EntryPoint("command", arguments=("param1", "param2",), form=EntryPoint.Form.EXEC),
     ),
+    ("COPY foo /bar/", Copy(src=("foo",), dest="/bar/")),
+    ("COPY foo bar baz quux/", Copy(src=("foo", "bar", "baz",), dest="quux/")),
+    ("""COPY ["foo bar", "/foo-bar"]""", Copy(src=("foo bar",), dest="/foo-bar")),
+    ("COPY --chown=bin:staff files* /somedir/", Copy(src=("files*",), dest="/somedir/", chown="bin:staff")),
 ])
 def test_decode_dockerfile_command(command_line, expect):
     if isinstance(expect, DockerfileCommand):
@@ -67,11 +71,15 @@ def test_parse_dockerfile(contents, expect):
         Dockerfile(
             baseimage=BaseImage("baseimage", tag="tag"),
             entry_point=EntryPoint(executable="main", arguments=("arg1", "arg2",), form=EntryPoint.Form.EXEC),
+            copy=(
+                Copy(("source/test.txt",), "/opt/dir/", chown="1"),
+            ),
         ),
         dedent(
             """\
             FROM baseimage:tag
             ENTRYPOINT ["main", "arg1", "arg2"]
+            COPY --chown=1 source/test.txt /opt/dir/
             """
         ),
     ),

@@ -23,6 +23,9 @@ class DockerfileCommand(ABC):
     """Base class for dockerfile commands encoding/decoding."""
     _command = "<OVERRIDE ME>"
 
+    def _append(self, attr: str, dockerfile_attrs: Dict[str, Any]) -> None:
+        dockerfile_attrs[attr] = (*dockerfile_attrs.get(attr, tuple()), self)
+
     @classmethod
     def _command_class(cls, command: str) -> Optional[Type["DockerfileCommand"]]:
         for cmd_cls in cls.__subclasses__():
@@ -180,6 +183,64 @@ class EntryPoint(DockerfileCommand):
         return dict(executable=cmd_line[0], arguments=tuple(cmd_line[1:]), form=form)
 
 
+@dataclass(frozen=True)
+class Copy(DockerfileCommand):
+    """The COPY instruction copies new files or directories from <src> and adds them
+    to the filesystem of the container at the path <dest>.
+
+        COPY [--chown=<user>:<group>] <src>... <dest>
+        COPY [--chown=<user>:<group>] ["<src>",... "<dest>"]
+
+    https://docs.docker.com/engine/reference/builder/#copy
+
+    """
+    _command = "COPY"
+
+    src: Tuple[str]
+    dest: str
+    chown: str = None
+
+    _arg_regexp = re.compile(
+        r"""
+        ^
+        # optional chown
+        (--chown=(?P<chown>\S+)\s+)?
+
+        # paths, will be post processed
+        (?P<paths>.+)
+        $
+        """,
+        re.VERBOSE
+    )
+
+    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
+        self._append("copy", dockerfile_attrs)
+
+    def encode_arg(self) -> Generator[str, None, None]:
+        if self.chown:
+            yield f"--chown={self.chown}"
+
+        paths = [*self.src, self.dest]
+        if any(" " in s for s in paths if s):
+            yield json.dumps(paths)
+        else:
+            for path in paths:
+                yield path
+
+    @classmethod
+    def decode_arg(cls, arg: str) -> Dict[str, Optional[str]]:
+        args = cls._decode_arg_regexp(cls._arg_regexp, arg)
+        paths_string = args.pop('paths') or ""
+        if paths_string.startswith("["):
+            paths = json.loads(paths_string)
+        else:
+            paths = paths_string.split()
+
+        if len(paths) > 1:
+            args['src'] = tuple(paths[:-1])
+            args['dest'] = paths[-1]
+        return args
+
 
     # "RUN": ,
     # "CMD": ,
@@ -202,6 +263,7 @@ class EntryPoint(DockerfileCommand):
 class Dockerfile:
     baseimage: BaseImage = None
     entry_point: EntryPoint = None
+    copy: Tuple[Copy, ...] = None
 
     @classmethod
     def parse(cls, dockerfile_source: str) -> "Dockerfile":
@@ -220,7 +282,11 @@ class Dockerfile:
         for fld in fields(self):
             value = getattr(self, fld.name)
             if value:
-                yield value.encode()
+                if isinstance(value, tuple):
+                    for v in value:
+                        yield v.encode()
+                else:
+                    yield value.encode()
 
     @staticmethod
     def _iter_command_lines(dockerfile_source: str) -> Generator[str, None, None]:
