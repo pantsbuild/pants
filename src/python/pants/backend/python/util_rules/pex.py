@@ -520,18 +520,21 @@ class VenvScriptWriter:
         script_path: PurePath,
         venv_executable: PurePath,
     ) -> VenvScript:
-        env_vars = (
-            f"{name}={shlex.quote(value)}"
-            for name, value in pex_environment.environment_dict(python_configured=True).items()
-        )
         # Ensure that the pex is executed from a path relative to the shim script, so
         # that running from within a working directory works properly.
         # NB: No method for determining the path of the current script is entirely foolproof,
         #  but BASH_SOURCE works fine in our specific case (and has been available since bash-3.0,
         #  released in 2004, so it seems safe to assume it's available).
-        local_pex_bin = '"${BASH_SOURCE%/*}/"' + shlex.quote(self.pex.name)
-        target_venv_executable = shlex.quote(str(venv_executable))
-        venv_dir = shlex.quote(str(self.venv_dir))
+        sandbox_root = '"${BASH_SOURCE%/*}"'
+
+        env_vars = (
+            f"{name}={os.path.join(sandbox_root, shlex.quote(value)) if name == 'PEX_ROOT' else shlex.quote(value)}"
+            for name, value in pex_environment.environment_dict(python_configured=True).items()
+        )
+
+        local_pex_bin = os.path.join(sandbox_root, shlex.quote(self.pex.name))
+        target_venv_executable = os.path.join(sandbox_root, shlex.quote(str(venv_executable)))
+        venv_dir = os.path.join(os.path.join(sandbox_root, shlex.quote(str(self.venv_dir))))
         execute_pex_args = " ".join(
             # Don't quote the BASH_SOURCE dereference in local_pex_bin.
             arg if arg == local_pex_bin else shlex.quote(arg)
