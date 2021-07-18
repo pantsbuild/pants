@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass
 from os import path
-from typing import List
+from typing import Optional, Tuple
 
 from pants.backend.docker.target_types import (
     DockerContext,
@@ -14,7 +14,15 @@ from pants.backend.docker.target_types import (
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestContents,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.process import (
     BinaryNotFoundError,
     BinaryPath,
@@ -26,6 +34,7 @@ from pants.engine.process import (
     SearchPath,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.addresses import Address
 from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
@@ -36,6 +45,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
@@ -47,7 +57,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class DockerPackages:
     artifacts: Digest
-    built: List[BuiltPackage]
+    built: Tuple[BuiltPackage, ...]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -60,11 +70,18 @@ class DockerBinary(BinaryPath):
 
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
-    def build_image(self, digest: Digest, build_root: str, dockerfile: str, tag: str):
+    def build_image(
+        self, tag: str, digest: Digest, build_root: str, dockerfile: Optional[str] = None
+    ):
+        args = [self.path, "build", "-t", tag]
+        if dockerfile:
+            args.extend(["-f", dockerfile])
+        args.append(build_root)
+
         return Process(
-            argv=(self.path, "build", "-t", tag, "-f", dockerfile, build_root),
+            argv=tuple(args),
             input_digest=digest,
-            description=f"Building docker image {tag} from {dockerfile}",
+            description=f"Building docker image {tag}",
         )
 
 
@@ -108,8 +125,10 @@ async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
     dockerfile = field_set.dockerfile.value
-    source_path = path.dirname(dockerfile)
-    image_tag = ":".join([field_set.address.target_name, field_set.image_version.value])
+    source_path = field_set.address.spec_path
+    image_tag = ":".join(
+        s for s in [field_set.address.target_name, field_set.image_version.value] if s
+    )
 
     # get docker binary
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="build docker images"))
@@ -121,13 +140,17 @@ async def build_docker_image(
     )
 
     # get dockerfile
-    dockerfile_digest = await Get(
-        Digest,
-        PathGlobs(
-            [dockerfile],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{field_set.address}'s `{field_set.dockerfile.alias}` field",
-        ),
+    dockerfile_digest = (
+        await Get(
+            Digest,
+            PathGlobs(
+                [dockerfile],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"{field_set.address}'s `{field_set.dockerfile.alias}` field",
+            ),
+        )
+        if dockerfile
+        else None
     )
 
     # get packages
@@ -139,11 +162,13 @@ async def build_docker_image(
     context = await Get(
         Digest,
         MergeDigests(
-            (
+            d
+            for d in (
                 dockerfile_digest,
                 target_sources.snapshot.digest,
                 packages_digest,
             )
+            if d
         ),
     )
 
@@ -152,10 +177,10 @@ async def build_docker_image(
         ProcessResult,
         Process,
         docker.build_image(
+            image_tag,
             context,
             source_path,
             dockerfile,
-            image_tag,
         ),
     )
 
@@ -212,7 +237,22 @@ class InjectDockerDependencies(InjectDependenciesRequest):
 
 @rule
 async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
-    """..."""
+    """Inspects COPY instructions in the Dockerfile for references to known targets"""
+    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    dockerfile = original_tgt.target[Dockerfile]
+    if not dockerfile.value:
+        return InjectedDependencies()
+
+    dockerfile_digest = await Get(
+        Digest, 
+        PathGlobs(
+            [dockerfile.value],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{original_tgt.target.address}'s `{dockerfile.alias}` field",
+        ),
+    )
+    dockerfile_contents = await Get(DigestContents, Digest, dockerfile_digest)
+    print(f"\n\nCONTENTS: {dockerfile_contents}\n\n")
     return InjectedDependencies()
 
 

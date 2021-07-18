@@ -17,7 +17,10 @@ class Dockerfile(StringField):
     @classmethod
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
-        return path.join(address.spec_path, value_or_default)
+        if value_or_default:
+            return path.join(address.spec_path, value_or_default)
+
+        return None
 
 
 class DockerContext(Sources):
