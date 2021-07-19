@@ -7,8 +7,9 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
 from enum import Enum
-
 from typing import Any, Dict, Generator, Optional, Pattern, Tuple, Type, Union
+
+from pants.backend.docker.dependencies import DockerfileDependenciesMixin
 
 
 class DockerfileError(Exception):
@@ -270,7 +271,7 @@ class Copy(DockerfileCommand):
 
 
 @dataclass(frozen=True)
-class Dockerfile:
+class Dockerfile(DockerfileDependenciesMixin):
     baseimage: BaseImage = None
     entry_point: EntryPoint = None
     copy: Tuple[Copy, ...] = None

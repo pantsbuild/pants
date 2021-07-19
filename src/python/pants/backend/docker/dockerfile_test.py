@@ -199,7 +199,7 @@ def test_compile_dockerfile(dockerfile, expect):
                     --flags=here\
                     --on-several=lines\
                     should work
-            
+
                 # ignore comments
 
                 COPY this here

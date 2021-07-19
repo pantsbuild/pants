@@ -3,18 +3,18 @@
 
 import logging
 from dataclasses import dataclass
-from os import path
 from typing import Optional, Tuple
 
+from pants.backend.docker.dockerfile import Dockerfile
 from pants.backend.docker.target_types import (
     DockerContext,
     DockerDependencies,
-    Dockerfile,
+    DockerfileField,
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     AddPrefix,
     Digest,
@@ -45,10 +45,10 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    UnparsedAddressInputs,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,39 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
 
 
 @dataclass(frozen=True)
+class DockerfileRequest:
+    address: Address
+    dockerfile: DockerfileField
+
+
+@dataclass(frozen=True)
+class DockerfileDigest:
+    digest: Digest
+    dockerfile: Dockerfile
+
+
+@rule
+async def get_dockerfile(request: DockerfileRequest) -> DockerfileDigest:
+    dockerfile = request.dockerfile.value
+    digest = (
+        await Get(
+            Digest,
+            PathGlobs(
+                [dockerfile],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"{request.address}'s `{request.dockerfile.alias}` field",
+            ),
+        )
+        if dockerfile
+        else None
+    )
+    contents = await Get(DigestContents, Digest, digest) if digest else None
+    return DockerfileDigest(
+        digest=digest, dockerfile=Dockerfile.parse(contents[0].content.decode() if contents else "")
+    )
+
+
+@dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet):
     required_fields = (Dockerfile,)
 
@@ -124,7 +157,6 @@ class DockerFieldSet(PackageFieldSet):
 async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
-    dockerfile = field_set.dockerfile.value
     source_path = field_set.address.spec_path
     image_tag = ":".join(
         s for s in [field_set.address.target_name, field_set.image_version.value] if s
@@ -140,17 +172,8 @@ async def build_docker_image(
     )
 
     # get dockerfile
-    dockerfile_digest = (
-        await Get(
-            Digest,
-            PathGlobs(
-                [dockerfile],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"{field_set.address}'s `{field_set.dockerfile.alias}` field",
-            ),
-        )
-        if dockerfile
-        else None
+    dockerfile = await Get(
+        DockerfileDigest, DockerfileRequest(field_set.address, field_set.dockerfile)
     )
 
     # get packages
@@ -164,7 +187,7 @@ async def build_docker_image(
         MergeDigests(
             d
             for d in (
-                dockerfile_digest,
+                dockerfile.digest,
                 target_sources.snapshot.digest,
                 packages_digest,
             )
@@ -180,7 +203,7 @@ async def build_docker_image(
             image_tag,
             context,
             source_path,
-            dockerfile,
+            field_set.dockerfile.value,
         ),
     )
 
@@ -190,7 +213,9 @@ async def build_docker_image(
             BuiltPackageArtifact(
                 relpath=None,
                 extra_log_lines=(
+                    f"Built docker image: {image_tag}",
                     f"To try out the image interactively: docker run -it --rm {image_tag} [entrypoint args...]",
+                    f"To push your image: docker push {image_tag}",
                 ),
                 #     *result.stdout.decode().split("\n"),
                 #     *result.stderr.decode().split("\n"),
@@ -239,21 +264,21 @@ class InjectDockerDependencies(InjectDependenciesRequest):
 async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
     """Inspects COPY instructions in the Dockerfile for references to known targets."""
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    dockerfile = original_tgt.target[Dockerfile]
-    if not dockerfile.value:
+    dockerfile_field = original_tgt.target[DockerfileField]
+    if not dockerfile_field.value:
         return InjectedDependencies()
 
     dockerfile_digest = await Get(
-        Digest,
-        PathGlobs(
-            [dockerfile.value],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{original_tgt.target.address}'s `{dockerfile.alias}` field",
+        DockerfileDigest, DockerfileRequest(original_tgt.target.address, dockerfile_field)
+    )
+    addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            list(dockerfile_digest.dockerfile.putative_target_addresses()),
+            owning_address=original_tgt.target.address,
         ),
     )
-    dockerfile_contents = await Get(DigestContents, Digest, dockerfile_digest)
-    print(f"\n\nCONTENTS: {dockerfile_contents}\n\n")
-    return InjectedDependencies()
+    return InjectedDependencies(addresses)
 
 
 def rules():

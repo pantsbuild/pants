@@ -5,11 +5,10 @@ from os import path
 from typing import Optional
 
 from pants.engine.addresses import Address
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
 
 
-class Dockerfile(StringField):
+class DockerfileField(StringField):
     alias = "dockerfile"
     default = "Dockerfile"
     help = "Name of the Dockerfile to use when building the docker image."
@@ -49,7 +48,7 @@ class DockerImage(Target):
         *COMMON_TARGET_FIELDS,
         DockerDependencies,
         DockerImageVersion,
-        Dockerfile,
+        DockerfileField,
         DockerContext,
     )
     help = "A Docker image."

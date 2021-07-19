@@ -9,6 +9,7 @@ from pants.backend.docker.rules import (
     DockerBinary,
     DockerDependencies,
     InjectDockerDependencies,
+    get_dockerfile,
     inject_docker_dependencies,
 )
 from pants.backend.docker.target_types import DockerImage
@@ -39,6 +40,7 @@ def test_docker_build_image():
 def test_inject_docker_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
+            get_dockerfile,
             inject_docker_dependencies,
             QueryRule(InjectedDependencies, [InjectDockerDependencies]),
         ],
