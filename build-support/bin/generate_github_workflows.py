@@ -389,26 +389,34 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     }
     if not cron:
 
-        def build_wheels_step(*, is_macos: bool) -> Step:
-            step = {
-                "name": "Build wheels and fs_util",
-                "run": dedent(
-                    # We use MODE=debug on PR builds to speed things up, given that those are only
-                    # smoke tests of our release process.
-                    """\
-                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh build-wheels
-                    USE_PY38=true ./build-support/bin/release.sh build-wheels
-                    USE_PY39=true ./build-support/bin/release.sh build-wheels
-                    ./build-support/bin/release.sh build-fs-util
-                    """
-                ),
-                "if": DONT_SKIP_WHEELS,
-                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"},
-            }
-            if is_macos:
-                step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
-            return step
+        def build_steps(*, is_macos: bool) -> list[Step]:
+            env = {"PANTS_CONFIG_FILES": "+['pants.ci.toml']", **(MACOS_ENV if is_macos else {})}
+            return [
+                {
+                    "name": "Build wheels",
+                    "run": dedent(
+                        # We use MODE=debug on PR builds to speed things up, given that those are
+                        # only smoke tests of our release process.
+                        """\
+                        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                        ./build-support/bin/release.sh build-wheels
+                        USE_PY38=true ./build-support/bin/release.sh build-wheels
+                        USE_PY39=true ./build-support/bin/release.sh build-wheels
+                        ./build-support/bin/release.sh build-fs-util
+                        """
+                    ),
+                    "if": DONT_SKIP_WHEELS,
+                    "env": env,
+                },
+                {
+                    "name": "Build fs_util",
+                    "run": "./build-support/bin/release.sh build-fs-util",
+                    # We only build fs_util on branch builds, given that Pants compilation already
+                    # checks the code compiles and the release process is simple and low-stakes.
+                    "if": "github.event_name == 'push'",
+                    "env": env,
+                },
+            ]
 
         deploy_to_s3_step = {
             "name": "Deploy to S3",
@@ -441,7 +449,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                             ),
                         },
                         setup_toolchain_auth(),
-                        build_wheels_step(is_macos=False),
+                        *build_steps(is_macos=False),
                         upload_log_artifacts(name="wheels-linux"),
                         deploy_to_s3_step,
                     ],
@@ -461,7 +469,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
                         *rust_caches(),
-                        build_wheels_step(is_macos=True),
+                        *build_steps(is_macos=True),
                         upload_log_artifacts(name="wheels-macos"),
                         deploy_to_s3_step,
                     ],
