@@ -915,7 +915,7 @@ async fn workunit_to_py_value(
   }
 
   match workunit.state {
-    WorkunitState::Started { start_time } => {
+    WorkunitState::Started { start_time, .. } => {
       let duration = start_time
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|_| Duration::default());

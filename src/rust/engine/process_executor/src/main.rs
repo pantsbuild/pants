@@ -43,7 +43,7 @@ use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, Proce
 use prost::Message;
 use store::{Store, StoreWrapper};
 use structopt::StructOpt;
-use workunit_store::WorkunitStore;
+use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};
 
 #[derive(StructOpt)]
 struct CommandSpec {
@@ -300,10 +300,18 @@ async fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = runner
-    .run(request.into(), Context::default())
-    .await
-    .expect("Error executing");
+  let result = in_workunit!(
+    workunit_store.clone(),
+    "process_executor".to_owned(),
+    WorkunitMetadata::default(),
+    |workunit| async move {
+      runner
+        .run(Context::default(), workunit, request.into())
+        .await
+    }
+  )
+  .await
+  .expect("Error executing");
 
   if let Some(output) = args.materialize_output_to {
     store

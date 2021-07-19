@@ -17,12 +17,14 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{
+  in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
+};
 
 use crate::remote::make_execute_request;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessMetadata, RemoteCacheWarningsBehavior,
+  ProcessCacheScope, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use grpc_util::retry::status_is_retryable;
 
@@ -343,13 +345,16 @@ impl CommandRunner {
     &self,
     context: Context,
     cache_lookup_start: Instant,
+    command: &Command,
     action_digest: Digest,
+    request: &Process,
     mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
         action_digest,
+        command,
         &self.metadata,
         self.platform,
         &context,
@@ -382,6 +387,7 @@ impl CommandRunner {
       "remote_cache_read_speculation".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
+        desc: Some(format!("Remote cache lookup: {}", request.description)),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
@@ -396,7 +402,18 @@ impl CommandRunner {
                 context2
                   .workunit_store
                   .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-                }
+              }
+              // When we successfully use the cache, we change the description and increase the level
+              // (but not so much that it will be logged by default).
+              workunit.update_metadata(|initial| WorkunitMetadata {
+                desc: initial
+                  .desc
+                  .as_ref()
+                  .map(|desc| format!("Hit: {}", desc)),
+                level: Level::Debug,
+                ..initial
+
+              });
               Ok((cached_response, true))
             } else {
               // Note that we don't increment a counter here, as there is nothing of note in this
@@ -525,8 +542,9 @@ enum CacheErrorType {
 impl crate::CommandRunner for CommandRunner {
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
@@ -535,35 +553,34 @@ impl crate::CommandRunner for CommandRunner {
       .ok_or_else(|| "No compatible Process found for checking remote cache.".to_owned())?;
     let (action, command, _execute_request) =
       make_execute_request(&request, self.metadata.clone())?;
+    let write_failures_to_cache = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
 
     // Ensure the action and command are stored locally.
-    let command2 = command.clone();
-    let (command_digest, action_digest) = in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action stored locally for {:?}", action)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| crate::remote::ensure_action_stored_locally(&self.store, &command2, &action),
-    )
-    .await?;
+    let (command_digest, action_digest) =
+      crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
     let (result, hit_cache) = if self.cache_read {
       self
         .speculate_read_action_cache(
           context.clone(),
           cache_lookup_start,
+          &command,
           action_digest,
-          self.underlying.run(req, context.clone()),
+          &request,
+          self.underlying.run(context.clone(), workunit, req),
         )
         .await?
     } else {
-      (self.underlying.run(req, context.clone()).await?, false)
+      (
+        self.underlying.run(context.clone(), workunit, req).await?,
+        false,
+      )
     };
 
-    if !hit_cache && result.exit_code == 0 && self.cache_write {
+    if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
       // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
       // counter is recorded, given that the cache write is async and may still be executing after
       // the Pants session has finished and workunits are no longer processed.

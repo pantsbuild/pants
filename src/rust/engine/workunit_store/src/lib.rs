@@ -31,6 +31,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap};
 use std::future::Future;
+use std::sync::atomic::{self, AtomicBool};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -67,6 +68,18 @@ impl std::fmt::Display for SpanId {
 
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
+///
+/// Workunits form a tree of running, blocked, and completed work, with parent ids propagated via
+/// thread-local state.
+///
+/// While running (the Started state), a copy of a Workunit is generally kept on the stack by the
+/// `in_workunit!` macro, while another copy of the same Workunit is recorded in the WorkunitStore.
+/// Most of the fields of the Workunit are immutable, but an atomic "blocked" flag can be set to
+/// temporarily mark the running Workunit as being in a blocked state.
+///
+/// When the `in_workunit!` macro exits, the Workunit on the stack is completed by storing any
+/// local mutated values as the final value of the Workunit.
+///
 #[derive(Clone, Debug)]
 pub struct Workunit {
   pub name: String,
@@ -120,10 +133,31 @@ impl Workunit {
   }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub enum WorkunitState {
-  Started { start_time: SystemTime },
-  Completed { time_span: TimeSpan },
+  Started {
+    start_time: SystemTime,
+    blocked: Arc<AtomicBool>,
+  },
+  Completed {
+    time_span: TimeSpan,
+  },
+}
+
+impl WorkunitState {
+  fn completed(&self) -> bool {
+    match self {
+      WorkunitState::Completed { .. } => true,
+      WorkunitState::Started { .. } => false,
+    }
+  }
+
+  fn blocked(&self) -> bool {
+    match self {
+      WorkunitState::Started { blocked, .. } => blocked.load(atomic::Ordering::Relaxed),
+      WorkunitState::Completed { .. } => false,
+    }
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -137,7 +171,6 @@ pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
   pub level: Level,
-  pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, ArtifactOutput)>,
@@ -150,7 +183,6 @@ impl Default for WorkunitMetadata {
       level: Level::Info,
       desc: None,
       message: None,
-      blocked: false,
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
@@ -242,7 +274,7 @@ impl StreamingWorkunitData {
 
         if should_emit(&started) {
           started.parent_id =
-            first_matched_parent(&workunit_records, started.parent_id, should_emit);
+            first_matched_parent(&workunit_records, started.parent_id, |_| false, should_emit);
           started_workunits.push(started);
         }
       }
@@ -261,7 +293,7 @@ impl StreamingWorkunitData {
                 log::warn!("Workunit {} was already completed", span_id);
                 continue;
               }
-              WorkunitState::Started { start_time } => {
+              WorkunitState::Started { start_time, .. } => {
                 TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
               }
             };
@@ -274,8 +306,12 @@ impl StreamingWorkunitData {
             workunit_records.insert(span_id, workunit.clone());
 
             if should_emit(&workunit) {
-              workunit.parent_id =
-                first_matched_parent(&workunit_records, workunit.parent_id, should_emit);
+              workunit.parent_id = first_matched_parent(
+                &workunit_records,
+                workunit.parent_id,
+                |_| false,
+                should_emit,
+              );
               completed_workunits.push(workunit);
             }
           }
@@ -342,7 +378,7 @@ impl HeavyHittersData {
             log::warn!("Workunit {} was already completed", span_id);
             return;
           }
-          WorkunitState::Started { start_time } => {
+          WorkunitState::Started { start_time, .. } => {
             TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
           }
         };
@@ -394,7 +430,7 @@ impl HeavyHittersData {
       .flat_map(|span_id: SpanId| {
         let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
         match workunit {
-          Some(workunit) if !workunit.metadata.blocked => {
+          Some(workunit) if !workunit.state.blocked() => {
             Self::duration_for(now, workunit).map(|d| (d, span_id))
           }
           _ => None,
@@ -406,9 +442,12 @@ impl HeavyHittersData {
     let mut res = HashMap::new();
     while let Some((_dur, span_id)) = queue.pop() {
       // If the leaf is visible or has a visible parent, emit it.
-      if let Some(span_id) =
-        first_matched_parent(&inner.workunit_records, Some(span_id), Self::is_visible)
-      {
+      if let Some(span_id) = first_matched_parent(
+        &inner.workunit_records,
+        Some(span_id),
+        |wu| wu.state.completed(),
+        Self::is_visible,
+      ) {
         let workunit = inner.workunit_records.get(&span_id).unwrap();
         if let Some(effective_name) = workunit.metadata.desc.as_ref() {
           let maybe_duration = Self::duration_for(now, &workunit);
@@ -423,51 +462,49 @@ impl HeavyHittersData {
     res
   }
 
-  fn render_straggling_workunits(&self, duration_threshold: Duration) -> Option<String> {
+  fn straggling_workunits(&self, duration_threshold: Duration) -> Vec<(Duration, String)> {
     self.refresh_store();
     let now = SystemTime::now();
     let inner = self.inner.lock();
 
-    let mut matching_visible_parents = inner
+    let matching_visible_parents = inner
       .graph
       .externals(petgraph::Direction::Outgoing)
       .map(|entry| inner.graph[entry])
       .flat_map(|span_id: SpanId| inner.workunit_records.get(&span_id))
       .filter_map(|workunit| match Self::duration_for(now, workunit) {
-        Some(duration) if !workunit.metadata.blocked && duration >= duration_threshold => {
+        Some(duration) if !workunit.state.blocked() && duration >= duration_threshold => {
           first_matched_parent(
             &inner.workunit_records,
             Some(workunit.span_id),
+            |wu| wu.state.completed(),
             Self::is_visible,
           )
           .and_then(|span_id| inner.workunit_records.get(&span_id))
           .and_then(|wu| wu.metadata.desc.as_ref())
-          .map(|desc| (duration, desc))
+          .map(|desc| (desc.clone(), duration))
         }
         _ => None,
       })
-      .collect::<Vec<_>>();
+      .collect::<HashMap<_, _>>();
 
     if matching_visible_parents.is_empty() {
-      return None;
+      return vec![];
     }
 
-    // NB: We sort before stringifying the Duration to get Duration ordering.
-    matching_visible_parents.sort();
-    matching_visible_parents.dedup();
-
-    Some(format!(
-      "Long running tasks:\n  {}",
-      matching_visible_parents
-        .into_iter()
-        .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
-        .collect::<Vec<_>>()
-        .join("\n  "),
-    ))
+    let mut stragglers = matching_visible_parents
+      .into_iter()
+      .map(|(k, v)| (v, k))
+      .collect::<Vec<_>>();
+    // NB: Because the Duration is first in the tuple, we get ascending Duration order.
+    stragglers.sort();
+    stragglers
   }
 
   fn is_visible(workunit: &Workunit) -> bool {
-    workunit.metadata.level <= Level::Debug && workunit.metadata.desc.is_some()
+    workunit.metadata.level <= Level::Debug
+      && workunit.metadata.desc.is_some()
+      && matches!(workunit.state, WorkunitState::Started { .. })
   }
 
   fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
@@ -488,13 +525,19 @@ pub struct HeavyHittersInnerStore {
 fn first_matched_parent(
   workunit_records: &HashMap<SpanId, Workunit>,
   mut span_id: Option<SpanId>,
+  is_terminal: impl Fn(&Workunit) -> bool,
   is_visible: impl Fn(&Workunit) -> bool,
 ) -> Option<SpanId> {
   while let Some(current_span_id) = span_id {
     let workunit = workunit_records.get(&current_span_id);
 
-    // Is the current workunit visible?
     if let Some(ref workunit) = workunit {
+      // Should we continue visiting parents?
+      if is_terminal(workunit) {
+        break;
+      }
+
+      // Is the current workunit visible?
       if is_visible(workunit) {
         return Some(current_span_id);
       }
@@ -525,17 +568,16 @@ impl WorkunitStore {
     }))
   }
 
-  pub fn log_straggling_workunits(&self, threshold: Duration) {
-    if let Some(stragglers_msg) = self
-      .heavy_hitters_data
-      .render_straggling_workunits(threshold)
-    {
-      log::info!("{}", stragglers_msg)
-    }
+  ///
+  /// Return visible workunits which have been running longer than the duration_threshold, sorted
+  /// in ascending order by their duration.
+  ///
+  pub fn straggling_workunits(&self, threshold: Duration) -> Vec<(Duration, String)> {
+    self.heavy_hitters_data.straggling_workunits(threshold)
   }
 
   ///
-  /// Find the longest running leaf workunits, and render their first visible parents.
+  /// Find the longest running leaf workunits, and return their first visible parents.
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     self.heavy_hitters_data.heavy_hitters(k)
@@ -554,6 +596,7 @@ impl WorkunitStore {
       parent_id,
       state: WorkunitState::Started {
         start_time: std::time::SystemTime::now(),
+        blocked: Arc::new(AtomicBool::new(false)),
       },
       metadata,
       counters: HashMap::new(),
@@ -619,7 +662,7 @@ impl WorkunitStore {
       .unwrap();
 
     let start_time = match workunit.state {
-      WorkunitState::Started { start_time } => start_time,
+      WorkunitState::Started { start_time, .. } => start_time,
       _ => {
         log::warn!("Workunit {} was already completed", span_id);
         return;
@@ -645,7 +688,10 @@ impl WorkunitStore {
       name,
       span_id,
       parent_id,
-      state: WorkunitState::Started { start_time },
+      state: WorkunitState::Started {
+        start_time,
+        blocked: Arc::new(AtomicBool::new(false)),
+      },
       metadata,
       counters: HashMap::new(),
     };
@@ -722,10 +768,16 @@ impl WorkunitStore {
     Ok(result)
   }
 
-  pub fn setup_for_tests() -> WorkunitStore {
+  pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
     let store = WorkunitStore::new(false);
     store.init_thread_state(None);
-    store
+    let workunit = store.start_workunit(
+      SpanId(0),
+      "testing".to_owned(),
+      None,
+      WorkunitMetadata::default(),
+    );
+    (store.clone(), RunningWorkunit::new(store, workunit))
   }
 }
 
@@ -853,6 +905,20 @@ impl RunningWorkunit {
     }
   }
 
+  ///
+  /// Marks the workunit as being blocked until the returned token is dropped.
+  ///
+  pub fn blocking(&mut self) -> BlockingWorkunitToken {
+    let mut token = BlockingWorkunitToken(None);
+    if let Some(ref mut workunit) = self.workunit {
+      if let WorkunitState::Started { blocked, .. } = &mut workunit.state {
+        blocked.store(true, atomic::Ordering::Relaxed);
+        token.0 = Some(blocked.clone());
+      }
+    }
+    token
+  }
+
   pub fn complete(&mut self) {
     if let Some(workunit) = self.workunit.take() {
       self.store.complete_workunit(workunit);
@@ -864,6 +930,16 @@ impl Drop for RunningWorkunit {
   fn drop(&mut self) {
     if let Some(workunit) = self.workunit.take() {
       self.store.cancel_workunit(workunit);
+    }
+  }
+}
+
+pub struct BlockingWorkunitToken(Option<Arc<AtomicBool>>);
+
+impl Drop for BlockingWorkunitToken {
+  fn drop(&mut self) {
+    if let Some(blocked) = self.0.take() {
+      blocked.store(false, atomic::Ordering::Relaxed);
     }
   }
 }
