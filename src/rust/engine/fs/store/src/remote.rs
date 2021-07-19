@@ -12,11 +12,13 @@ use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
+use grpc_util::{
+  headers_to_interceptor_fn, identity_interceptor_fn, layered_service, status_to_str,
+};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tonic::{Code, Interceptor, Request, Status};
+use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
@@ -26,8 +28,10 @@ pub struct ByteStore {
   upload_timeout: Duration,
   rpc_attempts: usize,
   interceptor: Option<Interceptor>,
-  byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
-  cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
+  byte_stream_client:
+    Arc<ByteStreamClient<Box<dyn tonic::client::GrpcService<tonic::body::BoxBody>>>>,
+  cas_client:
+    Arc<ContentAddressableStorageClient<Box<dyn tonic::client::GrpcService<tonic::body::BoxBody>>>>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -90,14 +94,14 @@ impl ByteStore {
 
     let byte_stream_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ByteStreamClient::with_interceptor(channel.clone(), interceptor.clone()),
-      None => ByteStreamClient::new(channel.clone()),
+      None => ByteStreamClient::with_interceptor(channel.clone(), &identity_interceptor_fn),
     });
 
     let cas_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
         ContentAddressableStorageClient::with_interceptor(channel, interceptor.clone())
       }
-      None => ContentAddressableStorageClient::new(channel),
+      None => ContentAddressableStorageClient::with_interceptor(channel, &identity_interceptor_fn),
     });
 
     Ok(ByteStore {
@@ -106,8 +110,8 @@ impl ByteStore {
       upload_timeout,
       rpc_attempts: rpc_retries + 1,
       interceptor,
-      byte_stream_client,
-      cas_client,
+      byte_stream_client: Box::new(byte_stream_client) as _,
+      cas_client: Box::new(cas_client) as _,
     })
   }
 

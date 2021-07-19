@@ -144,6 +144,12 @@ pub fn headers_to_metadata_map(headers: &BTreeMap<String, String>) -> Result<Met
   Ok(metadata_map)
 }
 
+pub fn identity_interceptor_fn(
+  request: tonic::Request<()>,
+) -> Result<tonic::Request<()>, tonic::Status> {
+  Ok(request)
+}
+
 pub fn headers_to_interceptor_fn(
   headers: &BTreeMap<String, String>,
 ) -> Result<
