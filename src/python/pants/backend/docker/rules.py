@@ -178,14 +178,6 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     return InjectedDependencies(addresses)
 
 
-def rules():
-    return [
-        *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
-        UnionRule(PackageFieldSet, DockerFieldSet),
-    ]
-
-
 # -----------------------------------------------------------------------------------------------
 # Docker binary
 # -----------------------------------------------------------------------------------------------
@@ -343,3 +335,16 @@ async def build_docker_image(
             ),
         ),
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Export Rules
+# -----------------------------------------------------------------------------------------------
+
+
+def rules():
+    return [
+        *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
+        UnionRule(PackageFieldSet, DockerFieldSet),
+    ]
