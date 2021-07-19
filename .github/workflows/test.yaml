@@ -330,7 +330,7 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
-      name: Build wheels and fs_util
+      name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
         ./build-support/bin/release.sh build-wheels
@@ -342,6 +342,11 @@ jobs:
         ./build-support/bin/release.sh build-fs-util
 
         '
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
+      if: github.event_name == 'push'
+      name: Build fs_util
+      run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v2
@@ -422,7 +427,7 @@ jobs:
         ARCHFLAGS: -arch x86_64
         PANTS_CONFIG_FILES: +['pants.ci.toml']
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
-      name: Build wheels and fs_util
+      name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
         ./build-support/bin/release.sh build-wheels
@@ -434,6 +439,12 @@ jobs:
         ./build-support/bin/release.sh build-fs-util
 
         '
+    - env:
+        ARCHFLAGS: -arch x86_64
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
+      if: github.event_name == 'push'
+      name: Build fs_util
+      run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v2
