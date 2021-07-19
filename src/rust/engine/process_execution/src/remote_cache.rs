@@ -25,7 +25,7 @@ use workunit_store::{
 use crate::remote::make_execute_request;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessMetadata, RemoteCacheWarningsBehavior,
+  ProcessCacheScope, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use grpc_util::retry::status_is_retryable;
 
@@ -357,8 +357,8 @@ impl CommandRunner {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
-        command,
         action_digest,
+        command,
         &self.metadata,
         self.platform,
         &context,
@@ -545,6 +545,10 @@ impl crate::CommandRunner for CommandRunner {
       .ok_or_else(|| "No compatible Process found for checking remote cache.".to_owned())?;
     let (action, command, _execute_request) =
       make_execute_request(&request, self.metadata.clone())?;
+    let write_failures_to_cache = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
@@ -577,7 +581,7 @@ impl crate::CommandRunner for CommandRunner {
       });
     }
 
-    if !hit_cache && result.exit_code == 0 && self.cache_write {
+    if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
       // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
       // counter is recorded, given that the cache write is async and may still be executing after
       // the Pants session has finished and workunits are no longer processed.

@@ -767,8 +767,8 @@ impl crate::CommandRunner for CommandRunner {
     // If so, return immediately with the result.
     let context2 = context.clone();
     let cached_response_opt = check_action_cache(
-      &command,
       action_digest,
+      &command,
       &self.metadata,
       self.platform,
       &context2,
@@ -1332,16 +1332,16 @@ fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
   request
 }
 
-/// Check the remote Action Cache for a cached result of running the given `command`, with the
-/// given `action_digest`.
+/// Check the remote Action Cache for a cached result of running the given `command` and the Action
+/// with the given `action_digest`.
 ///
-/// This check is necessary because some RE servers do not short-circuit the Execute method
+/// This check is necessary because some REAPI servers do not short-circuit the Execute method
 /// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
 /// explicitly in order to avoid duplicating already-cached work. This behavior matches
 /// the Bazel RE client.
 pub async fn check_action_cache(
-  command: &Command,
   action_digest: Digest,
+  command: &Command,
   metadata: &ProcessMetadata,
   platform: Platform,
   context: &Context,

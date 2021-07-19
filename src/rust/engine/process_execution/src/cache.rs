@@ -64,7 +64,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
-    let cache_failures = req
+    let write_failures_to_cache = req
       .0
       .values()
       .any(|process| process.cache_scope == ProcessCacheScope::Always);
@@ -83,7 +83,7 @@ impl crate::CommandRunner for CommandRunner {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
         match self.lookup(key).await {
-          Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
+          Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
             let lookup_elapsed = cache_lookup_start.elapsed();
             workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
             if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
@@ -128,7 +128,7 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     let result = self.underlying.run(context.clone(), workunit, req).await?;
-    if result.exit_code == 0 || cache_failures {
+    if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
       in_workunit!(
         context.workunit_store.clone(),
