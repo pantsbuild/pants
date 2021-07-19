@@ -237,7 +237,7 @@ class AsyncFieldMixin(Field):
     def __repr__(self) -> str:
         return (
             f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "
-            "value={repr(self.value)}, default={repr(self.default)})"
+            f"value={repr(self.value)}, default={repr(self.default)})"
         )
 
     def __hash__(self) -> int:

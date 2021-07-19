@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.docker.dockerfile import Dockerfile
 from pants.backend.docker.target_types import (
-    DockerContext,
     DockerDependencies,
-    DockerfileField,
+    DockerImageSources,
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
@@ -36,12 +36,14 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
     Sources,
+    Target,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -54,10 +56,131 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
+# -----------------------------------------------------------------------------------------------
+# Dockerfile
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DockerfileRequest:
+    """Request to parse Dockerfile."""
+
+    sources: DockerImageSources
+
+
+@dataclass(frozen=True)
+class DockerfileDigest:
+    """Parsed Dockerfile response."""
+
+    digest: Digest
+    dockerfile: Dockerfile
+
+
+@rule
+async def parse_dockerfile(request: DockerfileRequest) -> DockerfileDigest:
+    dockerfile = request.sources.value[0]
+    digest = (
+        await Get(
+            Digest,
+            PathGlobs(
+                [os.path.join(request.sources.address.spec_path, dockerfile)],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"{request.sources.address}'s `{request.sources.alias}` field",
+            ),
+        )
+        if dockerfile
+        else None
+    )
+    contents = await Get(DigestContents, Digest, digest) if digest else None
+
+    source = contents[0].content.decode() if contents else ""
+    logger.debug(f"Parse {dockerfile}:\n{source}")
+    parsed = Dockerfile.parse(source)
+    logger.debug(f"Result: {parsed}")
+
+    return DockerfileDigest(digest=digest, dockerfile=parsed)
+
+
+# -----------------------------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
 class DockerPackages:
-    artifacts: Digest
-    built: Tuple[BuiltPackage, ...]
+    artifacts: Optional[Digest] = None
+    built: Tuple[BuiltPackage, ...] = tuple()
+
+
+@rule
+async def get_packages(targets: Targets) -> DockerPackages:
+    if not targets:
+        return DockerPackages()
+
+    logger.debug(
+        f"""Get packages for Docker image from: {", ".join(str(t.address) for t in targets)}"""
+    )
+
+    target_packages = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets)
+    )
+    built_packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in target_packages.field_sets
+    )
+
+    if not built_packages:
+        return DockerPackages()
+
+    artifacts = []
+
+    for pkg in built_packages:
+        artifacts.append(
+            await Get(
+                Digest,
+                DigestSubset(
+                    pkg.digest,
+                    PathGlobs(artifact.relpath for artifact in pkg.artifacts if artifact.relpath),
+                ),
+            )
+        )
+
+    digest = await Get(Digest, MergeDigests(artifacts))
+    logger.debug(
+        f"""Packages for Docker image: {", ".join(a.relpath for p in built_packages for a in p.artifacts)}"""
+    )
+
+    return DockerPackages(artifacts=digest, built=built_packages)
+
+
+class InjectDockerDependencies(InjectDependenciesRequest):
+    inject_for = DockerDependencies
+
+
+@rule
+async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
+    """Inspects COPY instructions in the Dockerfile for references to known targets."""
+    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    sources = original_tgt.target[DockerImageSources]
+    if not sources.value:
+        return InjectedDependencies()
+
+    dockerfile_digest = await Get(DockerfileDigest, DockerfileRequest(sources))
+    addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            list(dockerfile_digest.dockerfile.putative_target_addresses()),
+            owning_address=original_tgt.target.address,
+        ),
+    )
+    return InjectedDependencies(addresses)
+
+
+def rules():
+    return [
+        *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
+        UnionRule(PackageFieldSet, DockerFieldSet),
+    ]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -111,46 +234,60 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
 
 
 @dataclass(frozen=True)
-class DockerfileRequest:
-    address: Address
-    dockerfile: DockerfileField
+class DockerBuildContext:
+    digest: Digest
 
 
 @dataclass(frozen=True)
-class DockerfileDigest:
-    digest: Digest
-    dockerfile: Dockerfile
+class DockerBuildContextRequest:
+    address: Address
+    source_path: str
+    targets: Tuple[Target, ...]
 
 
 @rule
-async def get_dockerfile(request: DockerfileRequest) -> DockerfileDigest:
-    dockerfile = request.dockerfile.value
-    digest = (
-        await Get(
-            Digest,
-            PathGlobs(
-                [dockerfile],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"{request.address}'s `{request.dockerfile.alias}` field",
-            ),
-        )
-        if dockerfile
-        else None
+async def create_docker_build_context(request: DockerBuildContextRequest) -> DockerBuildContext:
+    # get all source files
+    sources = await Get(SourceFiles, SourceFilesRequest([t.get(Sources) for t in request.targets]))
+
+    # get all dependent targets
+    dependencies_targets = await MultiGet(
+        Get(Targets, DependenciesRequest(t.get(Dependencies))) for t in request.targets
     )
-    contents = await Get(DigestContents, Digest, digest) if digest else None
-    return DockerfileDigest(
-        digest=digest, dockerfile=Dockerfile.parse(contents[0].content.decode() if contents else "")
+
+    # get all packages from those targets
+    dependencies_packages = await MultiGet(
+        Get(DockerPackages, Targets, dep_targets) for dep_targets in dependencies_targets
     )
+
+    # copy packages to context root
+    packages_digest = await MultiGet(
+        Get(Digest, AddPrefix(package.artifacts, request.source_path))
+        for package in dependencies_packages
+        if package.artifacts
+    )
+
+    # merge build context
+    context = await Get(
+        Digest,
+        MergeDigests(
+            d
+            for d in (
+                sources.snapshot.digest,
+                *packages_digest,
+            )
+            if d
+        ),
+    )
+    return DockerBuildContext(context)
 
 
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet):
-    required_fields = (Dockerfile,)
+    required_fields = (DockerImageSources,)
 
-    build_context: DockerContext
-    dockerfile: Dockerfile
+    sources: DockerImageSources
     image_version: DockerImageVersion
-    dependencies: DockerDependencies
 
 
 @rule(level=LogLevel.DEBUG)
@@ -162,37 +299,11 @@ async def build_docker_image(
         s for s in [field_set.address.target_name, field_set.image_version.value] if s
     )
 
-    # get docker binary
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="build docker images"))
-
-    # get source files
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
-    target_sources = await Get(
-        SourceFiles, SourceFilesRequest([t.get(Sources) for t in transitive_targets.closure])
-    )
-
-    # get dockerfile
-    dockerfile = await Get(
-        DockerfileDigest, DockerfileRequest(field_set.address, field_set.dockerfile)
-    )
-
-    # get packages
-    dep_targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
-    dep_packages = await Get(DockerPackages, Targets, dep_targets)
-    packages_digest = await Get(Digest, AddPrefix(dep_packages.artifacts, source_path))
-
-    # merge build context
     context = await Get(
-        Digest,
-        MergeDigests(
-            d
-            for d in (
-                dockerfile.digest,
-                target_sources.snapshot.digest,
-                packages_digest,
-            )
-            if d
-        ),
+        DockerBuildContext,
+        DockerBuildContextRequest(field_set.address, source_path, transitive_targets.closure),
     )
 
     # run docker build
@@ -201,10 +312,16 @@ async def build_docker_image(
         Process,
         docker.build_image(
             image_tag,
-            context,
+            context.digest,
             source_path,
-            field_set.dockerfile.value,
+            os.path.join(source_path, field_set.sources.value[0]),
         ),
+    )
+
+    logger.debug(
+        "Docker build output for {image_tag}:\n"
+        f"{result.stdout.decode()}\n"
+        f"{result.stderr.decode()}"
     )
 
     return BuiltPackage(
@@ -217,73 +334,6 @@ async def build_docker_image(
                     f"To try out the image interactively: docker run -it --rm {image_tag} [entrypoint args...]",
                     f"To push your image: docker push {image_tag}",
                 ),
-                #     *result.stdout.decode().split("\n"),
-                #     *result.stderr.decode().split("\n"),
-                # ),
             ),
         ),
     )
-
-
-# -----------------------------------------------------------------------------------------------
-# Dependencies
-# -----------------------------------------------------------------------------------------------
-
-
-@rule
-async def get_packages(targets: Targets) -> DockerPackages:
-    target_packages = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets)
-    )
-    built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in target_packages.field_sets
-    )
-
-    artifacts = []
-
-    for pkg in built_packages:
-        artifacts.append(
-            await Get(
-                Digest,
-                DigestSubset(
-                    pkg.digest,
-                    PathGlobs(artifact.relpath for artifact in pkg.artifacts if artifact.relpath),
-                ),
-            )
-        )
-
-    digest = await Get(Digest, MergeDigests(artifacts))
-    return DockerPackages(artifacts=digest, built=built_packages)
-
-
-class InjectDockerDependencies(InjectDependenciesRequest):
-    inject_for = DockerDependencies
-
-
-@rule
-async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
-    """Inspects COPY instructions in the Dockerfile for references to known targets."""
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    dockerfile_field = original_tgt.target[DockerfileField]
-    if not dockerfile_field.value:
-        return InjectedDependencies()
-
-    dockerfile_digest = await Get(
-        DockerfileDigest, DockerfileRequest(original_tgt.target.address, dockerfile_field)
-    )
-    addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            list(dockerfile_digest.dockerfile.putative_target_addresses()),
-            owning_address=original_tgt.target.address,
-        ),
-    )
-    return InjectedDependencies(addresses)
-
-
-def rules():
-    return [
-        *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
-        UnionRule(PackageFieldSet, DockerFieldSet),
-    ]
