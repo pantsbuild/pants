@@ -1,4 +1,4 @@
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping, cast
 
 from pkg_resources import Requirement
 
-from pants.engine.addresses import Address, Addresses, BuildFileAddress
+from pants.engine.addresses import Address, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
@@ -130,11 +130,8 @@ class _PeekJsonEncoder(json.JSONEncoder):
 async def peek(
     console: Console,
     subsys: PeekSubsystem,
-    addresses: Addresses,
+    targets: UnexpandedTargets,
 ) -> Peek:
-    targets: Iterable[Target]
-    targets = await Get(UnexpandedTargets, Addresses, addresses)
-
     if subsys.output_type == OutputOptions.RAW:
         build_file_addresses = await MultiGet(
             Get(BuildFileAddress, Address, t.address) for t in targets
