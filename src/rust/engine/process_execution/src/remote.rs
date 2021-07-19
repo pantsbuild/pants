@@ -805,7 +805,10 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata {
-        level: Level::Trace,
+        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+        // renders at the Process's level.
+        level: request.level,
+        desc: Some(request.description.clone()),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {

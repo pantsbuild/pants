@@ -1272,7 +1272,13 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
-      NodeKey::MultiPlatformExecuteProcess(ref mpp) => mpp.process.workunit_level(),
+      NodeKey::MultiPlatformExecuteProcess(..) => {
+        // NB: The Node for a Process is statically rendered at Debug (rather than at
+        // Process.level) because it is very likely to wrap a BoundedCommandRunner which
+        // will block the workunit. We don't want to render at the Process's actual level
+        // until we're certain that it has begun executing (if at all).
+        Level::Debug
+      }
       NodeKey::DownloadedFile(..) => Level::Debug,
       _ => Level::Trace,
     }
@@ -1285,7 +1291,7 @@ impl NodeKey {
   fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.workunit_name(),
+      NodeKey::MultiPlatformExecuteProcess(..) => "multi_platform_process".to_string(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
       NodeKey::Paths(..) => "paths".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
@@ -1309,7 +1315,10 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.process.user_facing_name()),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => {
+        // NB: See Self::workunit_level for more information on why this is prefixed.
+        Some(format!("Scheduling: {}", mp_epr.process.user_facing_name()))
+      }
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }

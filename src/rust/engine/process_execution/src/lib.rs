@@ -324,10 +324,6 @@ impl MultiPlatformProcess {
       .map(|(_platforms, process)| process.level)
       .unwrap_or(Level::Info)
   }
-
-  pub fn workunit_name(&self) -> String {
-    "multi_platform_process".to_string()
-  }
 }
 
 impl From<Process> for MultiPlatformProcess {
