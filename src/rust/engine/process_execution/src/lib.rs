@@ -30,19 +30,20 @@
 #[macro_use]
 extern crate derivative;
 
-use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-pub use log::Level;
-use remexec::ExecutedActionMetadata;
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Arc;
-use workunit_store::{in_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
+
+pub use log::Level;
 
 use async_semaphore::AsyncSemaphore;
+use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use hashing::{Digest, EMPTY_FINGERPRINT};
+use remexec::ExecutedActionMetadata;
+use serde::{Deserialize, Serialize};
+use workunit_store::{RunningWorkunit, WorkunitStore};
 
 pub mod cache;
 #[cfg(test)]
@@ -323,10 +324,6 @@ impl MultiPlatformProcess {
       .map(|(_platforms, process)| process.level)
       .unwrap_or(Level::Info)
   }
-
-  pub fn workunit_name(&self) -> String {
-    "multi_platform_process".to_string()
-  }
 }
 
 impl From<Process> for MultiPlatformProcess {
@@ -475,8 +472,9 @@ pub trait CommandRunner: Send + Sync {
   ///
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String>;
 
   ///
@@ -532,38 +530,21 @@ impl BoundedCommandRunner {
 impl CommandRunner for BoundedCommandRunner {
   async fn run(
     &self,
-    mut req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    mut req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let name = format!("{}-waiting", req.workunit_name());
-    let desc = req.user_facing_name();
-    let outer_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      desc: Some(format!("(Waiting) {}", desc)),
-      // We don't want to display the workunit associated with processes waiting on a
-      // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
-      // on the workunit metadata in order to prevent this.
-      blocked: true,
-      ..WorkunitMetadata::default()
-    };
-
-    let bounded_fut = {
-      let inner = self.inner.clone();
-      let semaphore = self.inner.1.clone();
-      let context = context.clone();
-      let name = format!("{}-running", req.workunit_name());
-
-      semaphore.with_acquired(move |concurrency_id| {
+    let semaphore = self.inner.1.clone();
+    let inner = self.inner.clone();
+    let blocking_token = workunit.blocking();
+    semaphore
+      .with_acquired(|concurrency_id| {
         log::debug!(
           "Running {} under semaphore with concurrency id: {}",
-          desc,
+          req.user_facing_name(),
           concurrency_id
         );
-        let metadata = WorkunitMetadata {
-          level: req.workunit_level(),
-          desc: Some(desc),
-          ..WorkunitMetadata::default()
-        };
+        std::mem::drop(blocking_token);
 
         for (_, process) in req.0.iter_mut() {
           if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
@@ -574,39 +555,9 @@ impl CommandRunner for BoundedCommandRunner {
           }
         }
 
-        in_workunit!(
-          context.workunit_store.clone(),
-          name,
-          metadata,
-          |workunit| async move {
-            let res = inner.0.run(req, context).await;
-            if let Ok(FallibleProcessResultWithPlatform {
-              stdout_digest,
-              stderr_digest,
-              exit_code,
-              ..
-            }) = res
-            {
-              workunit.update_metadata(|initial| WorkunitMetadata {
-                stdout: Some(stdout_digest),
-                stderr: Some(stderr_digest),
-                user_metadata: vec![(
-                  "exit_code".to_string(),
-                  UserMetadataItem::ImmediateId(exit_code as i64),
-                )],
-                ..initial
-              })
-            }
-            res
-          },
-        )
+        inner.0.run(context, workunit, req)
       })
-    };
-
-    in_workunit!(context.workunit_store, name, outer_metadata, |_workunit| {
-      bounded_fut
-    })
-    .await
+      .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

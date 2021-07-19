@@ -21,7 +21,7 @@ use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
 use uuid::Uuid;
-use workunit_store::{UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration, UserMetadataPyValue, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -320,10 +320,20 @@ impl Session {
           .unwrap_or(false)
         {
           *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
-          self
+          let straggling_workunits = self
             .state
             .workunit_store
-            .log_straggling_workunits(straggler_threshold);
+            .straggling_workunits(straggler_threshold);
+          if !straggling_workunits.is_empty() {
+            log::info!(
+              "Long running tasks:\n  {}",
+              straggling_workunits
+                .into_iter()
+                .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
+                .collect::<Vec<_>>()
+                .join("\n  ")
+            );
+          }
         }
       }
     }
