@@ -7,12 +7,11 @@ from textwrap import dedent
 
 from pants.backend.docker.rules import (
     DockerBinary,
-    DockerDependencies,
     InjectDockerDependencies,
     inject_docker_dependencies,
     parse_dockerfile,
 )
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerDependencies, DockerImage
 from pants.backend.python.target_types import PexBinary
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest

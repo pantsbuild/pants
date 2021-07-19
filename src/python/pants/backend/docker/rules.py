@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.docker.dependencies import DockerfileDependencies
 from pants.backend.docker.dockerfile import Dockerfile
 from pants.backend.docker.target_types import (
     DockerDependencies,
@@ -14,7 +15,7 @@ from pants.backend.docker.target_types import (
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
     Digest,
@@ -47,7 +48,6 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    UnparsedAddressInputs,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -72,12 +72,15 @@ class DockerfileRequest:
 class DockerfileDigest:
     """Parsed Dockerfile response."""
 
-    digest: Digest
+    digest: Optional[Digest]
     dockerfile: Dockerfile
 
 
 @rule
 async def parse_dockerfile(request: DockerfileRequest) -> DockerfileDigest:
+    if not request.sources.value:
+        return DockerfileDigest(None, Dockerfile())
+
     dockerfile = request.sources.value[0]
     digest = (
         await Get(
@@ -144,10 +147,10 @@ async def get_packages(targets: Targets) -> DockerPackages:
             )
         )
 
+    packages_str = ", ".join(a.relpath for p in built_packages for a in p.artifacts if a.relpath)
+    logger.debug(f"Packages for Docker image: {packages_str}")
+
     digest = await Get(Digest, MergeDigests(artifacts))
-    logger.debug(
-        f"""Packages for Docker image: {", ".join(a.relpath for p in built_packages for a in p.artifacts)}"""
-    )
 
     return DockerPackages(artifacts=digest, built=built_packages)
 
@@ -168,7 +171,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
-            list(dockerfile_digest.dockerfile.putative_target_addresses()),
+            DockerfileDependencies(dockerfile_digest.dockerfile).putative_target_addresses(),
             owning_address=original_tgt.target.address,
         ),
     )
@@ -294,6 +297,7 @@ class DockerFieldSet(PackageFieldSet):
 async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
+    dockerfile = field_set.sources.value[0] if field_set.sources.value else "Dockerfile"
     source_path = field_set.address.spec_path
     image_tag = ":".join(
         s for s in [field_set.address.target_name, field_set.image_version.value] if s
@@ -303,7 +307,9 @@ async def build_docker_image(
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     context = await Get(
         DockerBuildContext,
-        DockerBuildContextRequest(field_set.address, source_path, transitive_targets.closure),
+        DockerBuildContextRequest(
+            field_set.address, source_path, tuple(transitive_targets.closure)
+        ),
     )
 
     # run docker build
@@ -314,7 +320,7 @@ async def build_docker_image(
             image_tag,
             context.digest,
             source_path,
-            os.path.join(source_path, field_set.sources.value[0]),
+            os.path.join(source_path, dockerfile),
         ),
     )
 

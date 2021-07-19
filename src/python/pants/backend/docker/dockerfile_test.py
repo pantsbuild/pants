@@ -1,4 +1,3 @@
-# -*- mode: python -*-
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -6,14 +5,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.dockerfile import (
+from pants.backend.docker.commands import (
     BaseImage,
     Copy,
-    Dockerfile,
     DockerfileCommand,
     EntryPoint,
     InvalidDockerfileCommandArgument,
 )
+from pants.backend.docker.dockerfile import Dockerfile
 
 
 @pytest.mark.parametrize(
