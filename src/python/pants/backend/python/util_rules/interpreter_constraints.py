@@ -291,10 +291,11 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         maybe_add_version("2.7", "2.8", 18)
         maybe_add_version("3.5", "3.6", 11)
         maybe_add_version("3.6", "3.7", 15)
-        maybe_add_version("3.7", "3.8", 15)
-        maybe_add_version("3.8", "3.9", 15)
-        maybe_add_version("3.9", "3.10", 15)
-        maybe_add_version("3.10", "3.11", 15)
+        maybe_add_version("3.7", "3.8", 20)
+        maybe_add_version("3.8", "3.9", 20)
+        maybe_add_version("3.9", "3.10", 20)
+        maybe_add_version("3.10", "3.11", 20)
+        maybe_add_version("3.11", "3.12", 20)
         return tuple(result)
 
     def __str__(self) -> str:
