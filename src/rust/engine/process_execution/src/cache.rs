@@ -77,6 +77,7 @@ impl crate::CommandRunner for CommandRunner {
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
+        desc: Some(format!("Local cache lookup: {}", req.user_facing_name())),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
@@ -93,6 +94,13 @@ impl crate::CommandRunner for CommandRunner {
                 .workunit_store
                 .record_observation(ObservationMetric::LocalCacheTimeSavedMs, time_saved);
             }
+            // When we successfully use the cache, we change the description and increase the level
+            // (but not so much that it will be logged by default).
+            workunit.update_metadata(|initial| WorkunitMetadata {
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              level: Level::Debug,
+              ..initial
+            });
             Ok(result)
           }
           Err(err) => {

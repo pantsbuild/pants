@@ -352,6 +352,7 @@ impl CommandRunner {
     cache_lookup_start: Instant,
     command: &Command,
     action_digest: Digest,
+    request: &Process,
     mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
     // A future to read from the cache and log the results accordingly.
@@ -391,6 +392,7 @@ impl CommandRunner {
       "remote_cache_read_speculation".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
+        desc: Some(format!("Remote cache lookup: {}", request.description)),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
@@ -405,7 +407,18 @@ impl CommandRunner {
                 context2
                   .workunit_store
                   .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-                }
+              }
+              // When we successfully use the cache, we change the description and increase the level
+              // (but not so much that it will be logged by default).
+              workunit.update_metadata(|initial| WorkunitMetadata {
+                desc: initial
+                  .desc
+                  .as_ref()
+                  .map(|desc| format!("Hit: {}", desc)),
+                level: Level::Debug,
+                ..initial
+
+              });
               Ok((cached_response, true))
             } else {
               // Note that we don't increment a counter here, as there is nothing of note in this
@@ -561,6 +574,7 @@ impl crate::CommandRunner for CommandRunner {
           cache_lookup_start,
           &command,
           action_digest,
+          &request,
           self.underlying.run(context.clone(), workunit, req),
         )
         .await?
@@ -570,16 +584,6 @@ impl crate::CommandRunner for CommandRunner {
         false,
       )
     };
-
-    if hit_cache {
-      workunit.update_metadata(|initial| WorkunitMetadata {
-        desc: initial
-          .desc
-          .as_ref()
-          .map(|desc| format!("Hit remote cache: {}", desc)),
-        ..initial
-      });
-    }
 
     if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
       // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
