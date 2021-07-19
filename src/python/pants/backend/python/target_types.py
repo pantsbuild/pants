@@ -227,6 +227,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
     val: Optional[EntryPoint]
+    file_name_used: bool
 
 
 @dataclass(frozen=True)
