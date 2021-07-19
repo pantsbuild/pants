@@ -14,9 +14,11 @@ from pants.backend.docker.target_types import (
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     Digest,
     DigestContents,
@@ -278,29 +280,41 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet):
+class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
     sources: DockerImageSources
     image_version: DockerImageVersion
+
+    @property
+    def dockerfile_name(self) -> str:
+        if not self.sources.value:
+            return "Dockerfile"
+        return self.sources.value[0]
+
+    @property
+    def dockerfile_path(self) -> str:
+        return os.path.join(self.source_path, self.dockerfile_name)
+
+    @property
+    def source_path(self) -> str:
+        return self.address.spec_path
+
+    @property
+    def image_tag(self) -> str:
+        return ":".join(s for s in [self.address.target_name, self.image_version.value] if s)
 
 
 @rule(level=LogLevel.DEBUG)
 async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
-    dockerfile = field_set.sources.value[0] if field_set.sources.value else "Dockerfile"
-    source_path = field_set.address.spec_path
-    image_tag = ":".join(
-        s for s in [field_set.address.target_name, field_set.image_version.value] if s
-    )
-
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="build docker images"))
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     context = await Get(
         DockerBuildContext,
         DockerBuildContextRequest(
-            field_set.address, source_path, tuple(transitive_targets.closure)
+            field_set.address, field_set.source_path, tuple(transitive_targets.closure)
         ),
     )
 
@@ -309,15 +323,15 @@ async def build_docker_image(
         ProcessResult,
         Process,
         docker.build_image(
-            image_tag,
+            field_set.image_tag,
             context.digest,
-            source_path,
-            os.path.join(source_path, dockerfile),
+            field_set.source_path,
+            field_set.dockerfile_path,
         ),
     )
 
     logger.debug(
-        "Docker build output for {image_tag}:\n"
+        "Docker build output for {field_set.image_tag}:\n"
         f"{result.stdout.decode()}\n"
         f"{result.stderr.decode()}"
     )
@@ -328,11 +342,32 @@ async def build_docker_image(
             BuiltPackageArtifact(
                 relpath=None,
                 extra_log_lines=(
-                    f"Built docker image: {image_tag}",
-                    f"To try out the image interactively: docker run -it --rm {image_tag} [entrypoint args...]",
-                    f"To push your image: docker push {image_tag}",
+                    f"Built docker image: {field_set.image_tag}",
+                    f"To try out the image interactively: docker run -it --rm {field_set.image_tag} [entrypoint args...]",
+                    f"  or using pants: ./pants run {field_set.address} -- [args...]",
+                    f"To push your image: docker push {field_set.image_tag}",
                 ),
             ),
+        ),
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Export Rules
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def create_docker_image_run_request(field_set: DockerFieldSet) -> RunRequest:
+    docker = await Get(DockerBinary, DockerBinaryRequest(rationale="run docker images"))
+    return RunRequest(
+        digest=EMPTY_DIGEST,
+        args=(
+            docker.path,
+            "run",
+            "-it",
+            "--rm",
+            field_set.image_tag,
         ),
     )
 
@@ -347,4 +382,5 @@ def rules():
         *collect_rules(),
         UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
         UnionRule(PackageFieldSet, DockerFieldSet),
+        UnionRule(RunFieldSet, DockerFieldSet),
     ]
