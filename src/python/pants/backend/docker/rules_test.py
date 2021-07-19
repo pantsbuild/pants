@@ -4,16 +4,21 @@
 from hashlib import sha256
 from os import path
 from textwrap import dedent
-from pants.engine.addresses import Address
-from pants.backend.python.target_types import PexBinary
-from pants.backend.docker.rules import DockerBinary, InjectDockerDependencies, DockerDependencies, inject_docker_dependencies
+
+from pants.backend.docker.rules import (
+    DockerBinary,
+    DockerDependencies,
+    InjectDockerDependencies,
+    inject_docker_dependencies,
+)
 from pants.backend.docker.target_types import DockerImage
+from pants.backend.python.target_types import PexBinary
+from pants.engine.addresses import Address
 from pants.engine.fs import Digest
 from pants.engine.process import Process
+from pants.engine.target import InjectedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.engine.target import (
-    InjectedDependencies,
-)
+
 
 def test_docker_build_image():
     source_path = "src/test/repo"
@@ -71,4 +76,6 @@ def test_inject_docker_dependencies() -> None:
         InjectedDependencies,
         [InjectDockerDependencies(tgt[DockerDependencies])],
     )
-    assert injected == InjectedDependencies([Address("project/hello/main", target_name="main_binary")])
+    assert injected == InjectedDependencies(
+        [Address("project/hello/main", target_name="main_binary")]
+    )

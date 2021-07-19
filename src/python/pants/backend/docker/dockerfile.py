@@ -2,25 +2,26 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 import json
+import re
 from abc import ABC, abstractmethod
-from enum import Enum
 from dataclasses import dataclass, fields
-#from textwrap import dedent
-from typing import Any, Dict, Generator, Pattern, Optional, Type, Union, Tuple
+from enum import Enum
+
+from typing import Any, Dict, Generator, Optional, Pattern, Tuple, Type, Union
 
 
-class DockerfileError (Exception):
+class DockerfileError(Exception):
     pass
 
 
 class InvalidDockerfileCommandArgument(DockerfileError):
-    """Invalid syntax for the Dockerfile command"""
+    """Invalid syntax for the Dockerfile command."""
 
 
 class DockerfileCommand(ABC):
     """Base class for dockerfile commands encoding/decoding."""
+
     _command = "<OVERRIDE ME>"
 
     def _append(self, attr: str, dockerfile_attrs: Dict[str, Any]) -> None:
@@ -39,7 +40,7 @@ class DockerfileCommand(ABC):
 
     @classmethod
     def decode(cls, command_line: str) -> Optional["DockerfileCommand"]:
-        """Parse a Dockerfile command"""
+        """Parse a Dockerfile command."""
         cmd, _, arg = command_line.partition(" ")
         cmd_cls = cls._command_class(cmd)
         if cmd_cls:
@@ -60,7 +61,7 @@ class DockerfileCommand(ABC):
     @classmethod
     @abstractmethod
     def decode_arg(cls, arg: str) -> Dict[str, Optional[str]]:
-        """Parse command arguments"""
+        """Parse command arguments."""
 
     @abstractmethod
     def encode_arg(self) -> Generator[str, None, None]:
@@ -73,16 +74,16 @@ class DockerfileCommand(ABC):
 
 @dataclass(frozen=True)
 class BaseImage(DockerfileCommand):
-    """The FROM instruction initializes a new build stage and sets the Base Image
-    for subsequent instructions.
+    """The FROM instruction initializes a new build stage and sets the Base Image for subsequent
+    instructions.
 
         FROM [--platform=<platform>] <image> [AS <name>]
         FROM [--platform=<platform>] <image>[:<tag>] [AS <name>]
         FROM [--platform=<platform>] <image>[@<digest>] [AS <name>]
 
     https://docs.docker.com/engine/reference/builder/#from
-
     """
+
     _command = "FROM"
 
     image: str
@@ -113,11 +114,11 @@ class BaseImage(DockerfileCommand):
         (\s+AS\s+(?P<name>\S+))?
         $
         """,
-        re.VERBOSE
+        re.VERBOSE,
     )
 
     def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        dockerfile_attrs['baseimage'] = self
+        dockerfile_attrs["baseimage"] = self
 
     def encode_arg(self) -> Generator[str, None, None]:
         if self.platform:
@@ -149,8 +150,8 @@ class EntryPoint(DockerfileCommand):
         ENTRYPOINT command param1 param2               # form: shell
 
     https://docs.docker.com/engine/reference/builder/#entrypoint
-
     """
+
     _command = "ENTRYPOINT"
 
     class Form(Enum):
@@ -162,7 +163,7 @@ class EntryPoint(DockerfileCommand):
     form: Form = Form.EXEC
 
     def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        dockerfile_attrs['entry_point'] = self
+        dockerfile_attrs["entry_point"] = self
 
     def encode_arg(self) -> Generator[str, None, None]:
         if self.form is EntryPoint.Form.EXEC:
@@ -185,38 +186,48 @@ class EntryPoint(DockerfileCommand):
 
 @dataclass(frozen=True)
 class Copy(DockerfileCommand):
-    """The COPY instruction copies new files or directories from <src> and adds them
-    to the filesystem of the container at the path <dest>.
+    """The COPY instruction copies new files or directories from <src> and adds them to the
+    filesystem of the container at the path <dest>.
 
         COPY [--chown=<user>:<group>] <src>... <dest>
         COPY [--chown=<user>:<group>] ["<src>",... "<dest>"]
 
-    https://docs.docker.com/engine/reference/builder/#copy
+        COPY --from=<name> ...
 
+    https://docs.docker.com/engine/reference/builder/#copy
     """
+
     _command = "COPY"
 
     src: Tuple[str]
     dest: str
     chown: str = None
+    copy_from: str = None
 
     _arg_regexp = re.compile(
         r"""
         ^
-        # optional chown
-        (--chown=(?P<chown>\S+)\s+)?
+        # optional flags
+        (?:
+          (--chown=(?P<chown>\S+)\s+)
+          |
+          (--from=(?P<copy_from>\S+)\s+)
+        )*
 
         # paths, will be post processed
         (?P<paths>.+)
         $
         """,
-        re.VERBOSE
+        re.VERBOSE,
     )
 
     def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
         self._append("copy", dockerfile_attrs)
 
     def encode_arg(self) -> Generator[str, None, None]:
+        if self.copy_from:
+            yield f"--from={self.copy_from}"
+
         if self.chown:
             yield f"--chown={self.chown}"
 
@@ -230,17 +241,16 @@ class Copy(DockerfileCommand):
     @classmethod
     def decode_arg(cls, arg: str) -> Dict[str, Optional[str]]:
         args = cls._decode_arg_regexp(cls._arg_regexp, arg)
-        paths_string = args.pop('paths') or ""
+        paths_string = args.pop("paths") or ""
         if paths_string.startswith("["):
             paths = json.loads(paths_string)
         else:
             paths = paths_string.split()
 
         if len(paths) > 1:
-            args['src'] = tuple(paths[:-1])
-            args['dest'] = paths[-1]
+            args["src"] = tuple(paths[:-1])
+            args["dest"] = paths[-1]
         return args
-
 
     # "RUN": ,
     # "CMD": ,

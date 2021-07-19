@@ -14,6 +14,7 @@ from pants.backend.docker.target_types import (
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     AddPrefix,
     Digest,
@@ -34,7 +35,6 @@ from pants.engine.process import (
     SearchPath,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.addresses import Address
 from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
@@ -237,14 +237,14 @@ class InjectDockerDependencies(InjectDependenciesRequest):
 
 @rule
 async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
-    """Inspects COPY instructions in the Dockerfile for references to known targets"""
+    """Inspects COPY instructions in the Dockerfile for references to known targets."""
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     dockerfile = original_tgt.target[Dockerfile]
     if not dockerfile.value:
         return InjectedDependencies()
 
     dockerfile_digest = await Get(
-        Digest, 
+        Digest,
         PathGlobs(
             [dockerfile.value],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
