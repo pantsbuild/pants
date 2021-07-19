@@ -262,24 +262,31 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 )
                 return
 
-            min_constraint = (
-                f">={major_minor}"
-                if valid_patch_versions[0] == 0
-                else f">={major_minor}.{valid_patch_versions[0]}"
-            )
-            max_constraint = (
-                f"<{next_major_minor}"
-                if valid_patch_versions[-1] == last_patch
-                else f"<={major_minor}.{valid_patch_versions[-1]}"
-            )
-            merged_constraint = f"{min_constraint},{max_constraint}"
+            skipped_patch_versions = _not_in_contiguous_range(valid_patch_versions)
+            first_patch_supported = valid_patch_versions[0] == 0
+            last_patch_supported = valid_patch_versions[-1] == last_patch
+            if not skipped_patch_versions and first_patch_supported and last_patch_supported:
+                constraint = f"=={major_minor}.*"
+            else:
+                min_constraint = (
+                    f">={major_minor}"
+                    if first_patch_supported
+                    else f">={major_minor}.{valid_patch_versions[0]}"
+                )
+                max_constraint = (
+                    f"<{next_major_minor}"
+                    if last_patch_supported
+                    else f"<={major_minor}.{valid_patch_versions[-1]}"
+                )
+                if skipped_patch_versions:
+                    skipped_constraints = ",".join(
+                        f"!={major_minor}.{p}" for p in skipped_patch_versions
+                    )
+                    constraint = f"{min_constraint},{max_constraint},{skipped_constraints}"
+                else:
+                    constraint = f"{min_constraint},{max_constraint}"
 
-            skipped = _not_in_contiguous_range(valid_patch_versions)
-            if skipped:
-                skipped_constraints = ",".join(f"!={major_minor}.{p}" for p in skipped)
-                merged_constraint += f",{skipped_constraints}"
-
-            result.append(InterpreterConstraints([merged_constraint]))
+            result.append(InterpreterConstraints([constraint]))
 
         maybe_add_version("2.7", "2.8", 18)
         maybe_add_version("3.5", "3.6", 11)
