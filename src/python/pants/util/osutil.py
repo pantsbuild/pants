@@ -6,7 +6,7 @@ import logging
 import os
 import posix
 from functools import reduce
-from typing import Optional, Set
+from typing import Iterable, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -58,49 +58,31 @@ def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
     return uname_result.sysname.lower()
 
 
-def normalize_arch_name(os_name: str) -> str:
+def normalize_arch_name(arch_name: str) -> str:
     """
     :API: public
     """
-    normalized = _find_normalized(os_name, ARCH_ALIASES)
-    if normalized is not None:
-        return normalized
-    else:
-        logger.warning(
-            "Unknown architecture name: {bad}, known names are: {known}".format(
-                bad=os_name, known=", ".join(sorted(known_arch_names()))
-            )
-        )
-        return os_name
+    return _normalize(arch_name, ARCH_ALIASES, "architecture")
 
 
 def normalize_os_name(os_name: str) -> str:
     """
     :API: public
     """
-    normalized = _find_normalized(os_name, OS_ALIASES)
-    if normalized is not None:
-        return normalized
+    return _normalize(os_name, OS_ALIASES, "operating system")
+
+
+def _normalize(name: str, aliases: dict[str, set[str]], warning_hint: str) -> str:
+    for proper_name, alias_set in aliases.items():
+        if name in alias_set:
+            return proper_name
     else:
         logger.warning(
-            "Unknown operating system name: {bad}, known names are: {known}".format(
-                bad=os_name, known=", ".join(sorted(known_os_names()))
+            "Unknown {hint} name: {bad}, known names are: {known}".format(
+                hint=warning_hint, bad=name, known=", ".join(sorted(values(aliases)))
             )
         )
-        return os_name
-
-
-def _find_normalized(alias: str, aliases: dict[str, set[str]]) -> Optional[str]:
-    """ Finds the canonical name for a given alias. Used for OS and architecture names. 
-    
-    :API: private
-    """
-    
-    for proper_name, alias_set in aliases.items():
-        if alias in alias_set:
-            return proper_name
-
-    return None
+        return name
 
 
 def get_normalized_os_name() -> str:
@@ -111,12 +93,8 @@ def get_normalized_arch_name() -> str:
     return normalize_arch_name(get_arch_name())
 
 
-def known_os_names() -> Set[str]:
-    return reduce(set.union, OS_ALIASES.values())
-
-
-def known_os_names() -> Set[str]:
-    return reduce(set.union, OS_ALIASES.values())
+def values(aliases: dict[str, set[str]]) -> set[str]:
+    return reduce(set.union, aliases.values())
 
 
 # From kill(2) on OSX 10.13:
