@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Iterable, List, Union
+from typing import Any, Iterable, List
 
 import pytest
 from packaging.version import Version
@@ -33,7 +33,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 PyprojectAttr = TypedDict(
     "PyprojectAttr",
     {
-        "extras": Union[List[str], str],
+        "extras": List[str],
         "git": str,
         "rev": str,
         "branch": str,
@@ -163,8 +163,19 @@ def empty_pyproject_toml() -> PyProjectToml:
 
 
 def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
-    # Tested with git/path/url in those respective tests.
-    attr = PyprojectAttr({"version": "1.0.0", "extras": "[extra1]"})
+    # The case where we have both extras and path/url are tested in
+    # test_handle_path/url respectively.
+    attr = PyprojectAttr({"version": "1.0.0", "extras": ["extra1"]})
+    assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
+
+    attr_git = PyprojectAttr(
+        {"git": "https://github.com/requests/requests.git", "extras": ["extra1"]}
+    )
+    assert (
+        handle_dict_attr("requests", attr_git, empty_pyproject_toml)
+        == "requests[extra1] @ git+https://github.com/requests/requests.git"
+    )
+
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
     attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]})
     assert (
@@ -227,7 +238,7 @@ def test_handle_path_arg(tmp_path: Path) -> None:
 
     file_attr = PyprojectAttr({"path": "../../my_py_proj.whl"})
     file_attr_mark = PyprojectAttr({"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"})
-    file_attr_extras = PyprojectAttr({"path": "../../my_py_proj.whl", "extras": "[extra1]"})
+    file_attr_extras = PyprojectAttr({"path": "../../my_py_proj.whl", "extras": ["extra1"]})
     dir_attr = PyprojectAttr({"path": "../../my_py_proj"})
 
     assert (
@@ -265,7 +276,7 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
         == "my_py_proj @ https://my-site.com/mydep.whl"
     )
 
-    attr_with_extra = PyprojectAttr({"extras": "[extra1]"})
+    attr_with_extra = PyprojectAttr({"extras": ["extra1"]})
     attr_with_extra.update(attr)
     assert (
         handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml)

@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Iterator, List, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
 
 import toml
 from packaging.version import InvalidVersion, Version
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 PyprojectAttr = TypedDict(
     "PyprojectAttr",
     {
-        "extras": Union[List[str], str],
+        "extras": List[str],
         "git": str,
         "rev": str,
         "branch": str,
@@ -232,8 +232,6 @@ def handle_dict_attr(
     extras_lookup = attributes.get("extras")
     if isinstance(extras_lookup, list):
         extras_str = f"[{','.join(extras_lookup)}]"
-    elif isinstance(extras_lookup, str):
-        extras_str = f"{extras_lookup}"
     else:
         extras_str = ""
 
@@ -280,9 +278,6 @@ def parse_single_dependency(
     pyproject_toml: PyProjectToml,
 ) -> Iterator[Requirement]:
 
-    # TODO(Liam Wilson): Type hints are a bit of a mess at the moment; I think the best way to
-    # clean this up is a TypedDict for the attributes argument; almost everything else loses a
-    # decent amount of information.
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield Requirement.parse(
