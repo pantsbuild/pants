@@ -5,7 +5,7 @@ from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
@@ -84,8 +84,8 @@ class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):
 @rule
 def setup_bandit_lockfile(
     _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
-) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(mypy_protobuf)
+) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(mypy_protobuf)
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):

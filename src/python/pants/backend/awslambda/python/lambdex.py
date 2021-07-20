@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -32,10 +32,8 @@ class LambdexLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule
-def setup_lambdex_lockfile(
-    _: LambdexLockfileSentinel, lambdex: Lambdex
-) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(lambdex)
+def setup_lambdex_lockfile(_: LambdexLockfileSentinel, lambdex: Lambdex) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(lambdex)
 
 
 def rules():

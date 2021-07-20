@@ -7,7 +7,7 @@ import os.path
 from typing import Iterable, cast
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -108,8 +108,8 @@ class BlackLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule
-def setup_black_lockfile(_: BlackLockfileSentinel, black: Black) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(black)
+def setup_black_lockfile(_: BlackLockfileSentinel, black: Black) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(black)
 
 
 def rules():
