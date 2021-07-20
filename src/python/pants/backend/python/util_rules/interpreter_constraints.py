@@ -35,6 +35,10 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
+# The current maxes are 2.7.18 and 3.6.13.
+_EXPECTED_LAST_PATCH_VERSION = 18
+
+
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
@@ -166,7 +170,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             args.extend(["--interpreter-constraint", str(constraint)])
         return args
 
-    def _includes_version(self, major_minor: str, last_patch: int) -> bool:
+    def _includes_version(
+        self, major_minor: str, last_patch: int = _EXPECTED_LAST_PATCH_VERSION
+    ) -> bool:
         patch_versions = list(reversed(range(0, last_patch + 1)))
         for req in self:
             if any(
@@ -181,28 +187,23 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         This will return True even if the code works with Python 3 too, so long as at least one of
         the constraints works with Python 2.
         """
-        last_py27_patch_version = 18
-        return self._includes_version("2.7", last_patch=last_py27_patch_version)
+        return self._includes_version("2.7")
 
-    def minimum_python_version(self) -> str | None:
+    def minimum_python_version(self, interpreter_universe: Iterable[str]) -> str | None:
         """Find the lowest major.minor Python version that will work with these constraints.
 
         The constraints may also be compatible with later versions; this is the lowest version that
         still works.
         """
-        if self.includes_python2():
-            return "2.7"
-        max_expected_py3_patch_version = 15  # The current max is 3.6.12.
-        for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
-            if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
+        for major_minor in sorted(interpreter_universe, key=_major_minor_to_int):
+            if self._includes_version(major_minor):
                 return major_minor
         return None
 
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
     ) -> bool:
-        # Assume any 3.x release has no more than 15 releases. The max is currently 3.6.12.
-        patch_versions = list(reversed(range(0, 15)))
+        patch_versions = list(reversed(range(0, _EXPECTED_LAST_PATCH_VERSION)))
         # We only need to look at the prior Python release. For example, consider Python 3.8+
         # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
         # `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work correctly as
@@ -223,14 +224,18 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 return False
         return True
 
-    def requires_python38_or_newer(self) -> bool:
+    def requires_python38_or_newer(self, interpreter_universe: Iterable[str]) -> bool:
         """Checks if the constraints are all for Python 3.8+.
 
         This will return False if Python 3.8 is allowed, but prior versions like 3.7 are also
         allowed.
         """
+
+        py38_and_later = [
+            interp for interp in interpreter_universe if _major_minor_to_int(interp) >= (3, 8)
+        ]
         return self._requires_python3_version_or_newer(
-            allowed_versions=["3.8", "3.9", "3.10"], prior_version="3.7"
+            allowed_versions=py38_and_later, prior_version="3.7"
         )
 
     def __str__(self) -> str:
@@ -238,3 +243,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
     def debug_hint(self) -> str:
         return str(self)
+
+
+def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
+    return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
