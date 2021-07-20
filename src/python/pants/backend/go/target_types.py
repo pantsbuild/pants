@@ -42,6 +42,7 @@ class GoModule(Target):
         Dependencies,
         GoModuleSources,
     )
+    help = "First-party Go module."
 
 
 # `go_external_module`
@@ -49,10 +50,12 @@ class GoModule(Target):
 
 class GoExternalModulePath(StringField):
     alias = "path"
+    help = "Module path to a Go module"
 
 
 class GoExternalModuleVersion(StringField):
     alias = "version"
+    help = "Version of a Go module"
 
 
 class GoExternalModule(Target):
@@ -64,6 +67,7 @@ class GoExternalModule(Target):
         GoExternalModuleVersion,
         GoImportPath,
     )
+    help = "External Go module."
 
 
 # `go_binary` target

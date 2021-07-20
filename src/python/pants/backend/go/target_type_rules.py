@@ -2,15 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.go.target_types import GoModuleSources, GoPackageDependencies
 from pants.base.specs import AddressSpecs, AscendantAddresses, SiblingAddresses
-from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    UnexpandedTargets,
-    WrappedTarget,
-)
+from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, UnexpandedTargets
 from pants.engine.unions import UnionRule
 
 
