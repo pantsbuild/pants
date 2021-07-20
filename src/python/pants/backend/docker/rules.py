@@ -352,11 +352,6 @@ async def build_docker_image(
     )
 
 
-# -----------------------------------------------------------------------------------------------
-# Export Rules
-# -----------------------------------------------------------------------------------------------
-
-
 @rule
 async def create_docker_image_run_request(field_set: DockerFieldSet) -> RunRequest:
     docker = await Get(DockerBinary, DockerBinaryRequest(rationale="run docker images"))

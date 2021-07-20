@@ -250,19 +250,3 @@ class Copy(DockerfileCommand):
             args["src"] = tuple(paths[:-1])
             args["dest"] = paths[-1]
         return args
-
-    # "RUN": ,
-    # "CMD": ,
-    # "LABEL": ,
-    # "EXPOSE": ,
-    # "ENV": ,
-    # "ADD": ,
-    # "COPY": ,
-    # "VOLUME": ,
-    # "USER": ,
-    # "WORKDIR": ,
-    # "ARG": ,
-    # "ONBUILD": ,
-    # "STOPSIGNAL": ,
-    # "HEALTHCHECK": ,
-    # "SHELL": ,
