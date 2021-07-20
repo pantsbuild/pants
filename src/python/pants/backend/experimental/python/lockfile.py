@@ -66,7 +66,7 @@ class PythonLockfile:
 
 @dataclass(frozen=True)
 class PythonLockfileRequest:
-    requirements: FrozenOrderedSet[str, ...]
+    requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
     dest: str
     description: str
