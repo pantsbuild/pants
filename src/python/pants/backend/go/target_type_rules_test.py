@@ -3,11 +3,11 @@
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModule, GoModuleGoVersion, GoPackage
+from pants.backend.go.target_types import GoModule, GoModuleSources, GoPackage
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
-from pants.engine.target import Dependencies, DependenciesRequest, Target, Targets
+from pants.engine.target import Dependencies, DependenciesRequest, Target, UnexpandedTargets
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -17,6 +17,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(UnexpandedTargets, (Addresses,)),
         ],
         target_types=[GoPackage, GoModule],
     )
@@ -24,8 +25,8 @@ def rule_runner() -> RuleRunner:
 
 def assert_go_module_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
     addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
-    targets = rule_runner.request(Targets, [addresses])
-    go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModuleGoVersion)]
+    targets = rule_runner.request(UnexpandedTargets, [addresses])
+    go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModuleSources)]
     assert len(go_module_targets) == 1
     assert go_module_targets[0].address == expected_address
 

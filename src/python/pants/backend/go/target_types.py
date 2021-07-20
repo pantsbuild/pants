@@ -31,33 +31,8 @@ class GoPackage(Target):
 # `go_module` target
 
 
-class GoModuleGoVersion(StringField):
-    alias = "go_version"
-    # TODO: Set default to match the active `GoLangDisribution`.
-    default = "1.16"
-
-
-# class GoModuleGoModSource(Sources):
-#     alias = "gomod"
-#     default = ["go.mod"]
-#     # TODO: This does not handle a missing go.mod file.
-#     expected_num_files = 1
-#
-#
-# class GoModuleGoSumSource(Sources):
-#     alias = "gosum"
-#     default = ["go.sum"]
-#     # TODO: This does not handle a missing go.sum file.
-#     expected_num_files = 1
-#     help = "The source file containing the go.sum file."
-#
-#
-# class GoModuleImportPathReplacements(StringSequenceField):
-#     alias = "replacements"
-#     help = (
-#         "Import path replacements where each item is in the form ORIGINAL,REPLACEMENT. "
-#         "This will be inferred from the go.mod file."
-#     )
+class GoModuleSources(Sources):
+    default = ("go.mod", "go.sum")
 
 
 class GoModule(Target):
@@ -65,10 +40,7 @@ class GoModule(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        GoModuleGoVersion,
-        GoImportPath,
-        # GoModuleGoModSource,
-        # GoModuleGoSumSource,
+        GoModuleSources,
     )
 
 
