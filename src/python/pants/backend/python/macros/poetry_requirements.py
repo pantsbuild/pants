@@ -214,18 +214,14 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     if not markers_lookup and not python_lookup:
         return base
 
-    result = base
-    if markers_lookup or python_lookup:
-        result += ";"
-        result += "("
+    result = f"{base};("
+
     if markers_lookup:
-        result += markers_lookup
-        result += ")"
+        result += f"{markers_lookup})"
     if python_lookup and markers_lookup:
         result += " and ("
     if python_lookup:
-        result += python_lookup
-        result += ")"
+        result += f"{python_lookup})"
 
     return result
 
