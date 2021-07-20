@@ -10,4 +10,9 @@ def target_types():
 
 
 def rules():
-    return [*build.rules(), *distribution.rules(), *import_analysis.rules(), *target_type_rules.rules()]
+    return [
+        *build.rules(),
+        *distribution.rules(),
+        *import_analysis.rules(),
+        *target_type_rules.rules(),
+    ]
