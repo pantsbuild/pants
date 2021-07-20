@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 PyprojectAttr = TypedDict(
     "PyprojectAttr",
     {
-        "extras": Union[List[str],str],
+        "extras": Union[List[str], str],
         "git": str,
         "rev": str,
         "branch": str,
@@ -230,9 +230,9 @@ def handle_dict_attr(
     fp = str(pyproject_toml.toml_relpath)
 
     extras_lookup = attributes.get("extras")
-    if type(extras_lookup) == list:
+    if isinstance(extras_lookup, list):
         extras_str = f"[{','.join(extras_lookup)}]"
-    elif type(extras_lookup) == str:
+    elif isinstance(extras_lookup, str):
         extras_str = f"{extras_lookup}"
     else:
         extras_str = ""
@@ -296,7 +296,7 @@ def parse_single_dependency(
     elif isinstance(attributes, dict):
         # E.g. `foo = {version = "~1.1"}`.
         pyproject_attr = cast(PyprojectAttr, attributes)
-        req_str = handle_dict_attr(proj_name,pyproject_attr, pyproject_toml)
+        req_str = handle_dict_attr(proj_name, pyproject_attr, pyproject_toml)
         if req_str:
             yield Requirement.parse(req_str)
     elif isinstance(attributes, list):

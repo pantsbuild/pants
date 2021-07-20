@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Dict, Iterable, Union,List
-from typing_extensions import TypedDict
+from typing import Any, Iterable, List, Union
 
 import pytest
 from packaging.version import Version
 from pkg_resources import Requirement
+from typing_extensions import TypedDict
 
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirements,
@@ -33,7 +33,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 PyprojectAttr = TypedDict(
     "PyprojectAttr",
     {
-        "extras": Union[List[str],str],
+        "extras": Union[List[str], str],
         "git": str,
         "rev": str,
         "branch": str,
@@ -46,6 +46,7 @@ PyprojectAttr = TypedDict(
     },
     total=False,
 )
+
 
 @pytest.mark.parametrize(
     "test, exp",
@@ -103,36 +104,41 @@ def test_handle_str(test, exp) -> None:
 
 
 def test_add_markers() -> None:
-    # case with just mark
 
-    attr_mark = {"markers": "platform_python_implementation == 'CPython'"}
+    attr_mark = PyprojectAttr({"markers": "platform_python_implementation == 'CPython'"})
     assert (
         add_markers("foo==1.0.0", attr_mark, "somepath")
         == "foo==1.0.0;platform_python_implementation == 'CPython'"
     )
 
-    # case with adv mark
-    attr_mark_adv = {
-        "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'"
-    }
+    attr_mark_adv = PyprojectAttr(
+        {"markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'"}
+    )
     assert (
         add_markers("foo==1.0.0", attr_mark_adv, "somepath")
         == "foo==1.0.0;(platform_python_implementation == 'CPython' or sys_platform == 'win32')"
     )
-    # case with basic mark basic py
-    attr_basic_both = {"python": "3.6", **attr_mark}
+    attr_basic_both = PyprojectAttr({"python": "3.6"})
+    attr_basic_both.update(attr_mark)
+
     assert (
         add_markers("foo==1.0.0", attr_basic_both, "somepath")
         == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
     )
-    # case with adv py basic mark
-    attr_adv_py_both = {"python": "^3.6", **attr_mark}
+    attr_adv_py_both = PyprojectAttr(
+        {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
+    )
     assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
         "foo==1.0.0;platform_python_implementation == 'CPython' and "
         "python_version >= '3.6' and python_version< '4.0'"
     )
 
-    attr_adv_both = {"python": "^3.6", **attr_mark_adv}
+    attr_adv_both = PyprojectAttr(
+        {
+            "python": "^3.6",
+            "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'",
+        }
+    )
     assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
         "foo==1.0.0;(platform_python_implementation == 'CPython' or "
         "sys_platform == 'win32') and python_version >= '3.6' and python_version< '4.0'"
@@ -160,7 +166,7 @@ def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
     # Tested with git/path/url in those respective tests.
     attr = PyprojectAttr({"version": "1.0.0", "extras": "[extra1]"})
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
-    attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2","extra3"]})
+    attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]})
     assert (
         handle_dict_attr("requests", attr_multi, empty_pyproject_toml)
         == "requests[extra1,extra2,extra3] ==1.0.0"
@@ -168,23 +174,26 @@ def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
 
 
 def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
-    def assert_git(extra_opts: Dict[str, str], suffix: str) -> None:
-        attr = PyprojectAttr({"git":"https://github.com/requests/requests.git", **extra_opts})
+    def assert_git(extra_opts: PyprojectAttr, suffix: str) -> None:
+        attr = PyprojectAttr({"git": "https://github.com/requests/requests.git"})
+        attr.update(extra_opts)
         assert (
             handle_dict_attr("requests", attr, empty_pyproject_toml)
             == f"requests @ git+https://github.com/requests/requests.git{suffix}"
         )
 
     assert_git({}, "")
-    assert_git({"branch": "main"}, "@main")
-    assert_git({"tag": "v1.1.1"}, "@v1.1.1")
-    assert_git({"rev": "1a2b3c4d"}, "#1a2b3c4d")
+    assert_git(PyprojectAttr({"branch": "main"}), "@main")
+    assert_git(PyprojectAttr({"tag": "v1.1.1"}), "@v1.1.1")
+    assert_git(PyprojectAttr({"rev": "1a2b3c4d"}), "#1a2b3c4d")
     assert_git(
-        {
-            "branch": "main",
-            "markers": "platform_python_implementation == 'CPython'",
-            "python": "3.6",
-        },
+        PyprojectAttr(
+            {
+                "branch": "main",
+                "markers": "platform_python_implementation == 'CPython'",
+                "python": "3.6",
+            }
+        ),
         "@main;platform_python_implementation == 'CPython' and python_version == '3.6'",
     )
 
@@ -256,13 +265,15 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
         == "my_py_proj @ https://my-site.com/mydep.whl"
     )
 
-    attr_with_extra = PyprojectAttr({**attr, "extras": "[extra1]"})
+    attr_with_extra = PyprojectAttr({"extras": "[extra1]"})
+    attr_with_extra.update(attr)
     assert (
         handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml)
         == "my_py_proj[extra1] @ https://my-site.com/mydep.whl"
     )
 
-    attr_with_mark = PyprojectAttr({**attr, "markers": "os_name=='darwin'"})
+    attr_with_mark = PyprojectAttr({"markers": "os_name=='darwin'"})
+    attr_with_mark.update(attr)
     assert (
         handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml)
         == "my_py_proj @ https://my-site.com/mydep.whl;os_name=='darwin'"
