@@ -416,7 +416,6 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "name": "foo",
             "version": "1.2.3",
             "plugin_demo": "hello world",
-            "package_dir": {"": "src"},
             "packages": tuple(),
             "namespace_packages": tuple(),
             "package_data": {},

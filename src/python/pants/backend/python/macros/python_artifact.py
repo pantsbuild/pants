@@ -2,35 +2,35 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 
 def _normalize_entry_points(
-    entry_points: Optional[Dict[str, Union[List[str], Dict[str, str]]]]
-) -> Optional[Dict[str, Dict[str, str]]]:
+    entry_points: Dict[str, Union[List[str], Dict[str, str]]]
+) -> Dict[str, Dict[str, str]]:
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
-    if not entry_points:
-        return None
-
     if not isinstance(entry_points, collections.abc.Mapping):
         raise ValueError(
             f"The `entry_points` in `setup_py()` must be a dictionary, "
-            f"but was {entry_points!r} with type {type(entry_points)}"
+            f"but was {entry_points!r} with type {type(entry_points).__name__}."
         )
 
     def _values_to_entry_points(values):
         if isinstance(values, collections.abc.Mapping):
             return values
-        if isinstance(values, collections.abc.Iterable):
+        if isinstance(values, collections.abc.Iterable) and not isinstance(values, str):
             for entry_point in values:
                 if not isinstance(entry_point, str) or "=" not in entry_point:
                     raise ValueError(
-                        f"Invalid `entry_point`, expected `<name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]`, but got {entry_point!r}"
+                        f"Invalid `entry_point`, expected `<name> = <entry point>`, "
+                        f"but got {entry_point!r}."
                     )
 
             return dict(tuple(map(str.strip, entry_point.split("=", 1))) for entry_point in values)
         raise ValueError(
-            f"The values of the `entry_points` dictionary in `setup_py()` must be a list of strings or a dictionary of string to string, but got {values!r} of type {type(values)}"
+            f"The values of the `entry_points` dictionary in `setup_py()` must be "
+            f"a list of strings or a dictionary of string to string, "
+            f"but got {values!r} of type {type(values).__name__}."
         )
 
     return {section: _values_to_entry_points(values) for section, values in entry_points.items()}
@@ -53,10 +53,9 @@ class PythonArtifact:
                 f"{type(name)}."
             )
 
-        # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
-        entry_points = _normalize_entry_points(kwargs.get("entry_points"))
-        if entry_points:
-            kwargs["entry_points"] = entry_points
+        if "entry_points" in kwargs:
+            # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
+            kwargs["entry_points"] = _normalize_entry_points(kwargs["entry_points"])
 
         self._kw: Dict[str, Any] = kwargs
         self._binaries = {}

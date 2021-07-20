@@ -578,13 +578,6 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             )
         entry_point = binary[PexEntryPointField].value
         url = "https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point"
-        if not entry_point:
-            raise InvalidEntryPoint(
-                "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
-                f"{exported_addr} must explicitly set the `entry_point` field, but "
-                f"{binary.address} left the field off. Set `entry_point` to either "
-                f"`app.py:func` or the longhand `path.to.app:func`. See {url}."
-            )
         if not entry_point.function:
             raise InvalidEntryPoint(
                 "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
@@ -594,20 +587,17 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             )
         entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
 
-    entry_point_sources = cast(
-        Dict[str, Dict[str, Dict[str, str]]], recursive_defaultdict_factory()
-    )
     binary_entry_points = await MultiGet(
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
         for request in entry_point_requests
     )
+    source_with_binaries = dict()
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         if binary_entry_point.val is not None:
-            entry_point_sources[f"{exported_addr} `provides.with_binaries()`"]["console_scripts"][
-                key
-            ] = binary_entry_point.val.spec
+            source_with_binaries[key] = binary_entry_point.val.spec
 
     # Collect entry points from `python_distribution(entry_points=...)`
+    source_entry_points = dict()
     if exported_target.target.has_field(PythonDistributionEntryPoints):
         entry_points_field = await Get(
             ResolvedPythonDistributionEntryPoints,
@@ -618,16 +608,21 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
         if entry_points_field.val:
             for key, section in entry_points_field.val.items():
-                entry_point_sources[f"{exported_addr} `entry_points`"][key] = {
+                source_entry_points[key] = {
                     name: entry_point.spec for name, entry_point in section.items()
                 }
 
-    # Collect any entry points from the setup_py() target
+    # Collect any entry points from the setup_py() object.
+    source_provides = dict()
     if "entry_points" in setup_kwargs:
-        entry_point_sources[f"{exported_addr} `provides.entry_points`"] = setup_kwargs[
-            "entry_points"
-        ]
+        source_provides = setup_kwargs["entry_points"]
 
+    # Gather entry points with source description for any error messages when merging them.
+    entry_point_sources = {
+        f"{exported_addr} `provides.with_binaries()`": {"console_scripts": source_with_binaries},
+        f"{exported_addr} `entry_points`": source_entry_points,
+        f"{exported_addr} `provides.entry_points`": source_provides,
+    }
     # Merge all collected entry points and add them to the dist's entry points.
     entry_points = merge_entry_points(*list(entry_point_sources.items()))
     if entry_points:
@@ -1013,16 +1008,18 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 
 def merge_entry_points(
-    *entry_points: Tuple[str, Dict[str, Dict[str, str]]]
+    *all_entry_points_with_descriptions_of_source: Tuple[str, Dict[str, Dict[str, str]]]
 ) -> Dict[str, List[str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     # keep source_name info for each entry_point until we have merged all
     # sources, so we can provide better error messages in case of conflicts
     merged = cast(
-        Dict[str, Dict[str, List[Tuple[str, str]]]], defaultdict(partial(defaultdict, list))
+        # this gives us a two level deep defaultdict with the inner values being of list type
+        Dict[str, Dict[str, List[Tuple[str, str]]]],
+        defaultdict(partial(defaultdict, list)),
     )
 
-    for source_name, source_entry_points in entry_points:
+    for source_name, source_entry_points in all_entry_points_with_descriptions_of_source:
         for section, values in source_entry_points.items():
             for name, entry_point in values.items():
                 merged[section][name].append((source_name, entry_point))
@@ -1042,11 +1039,6 @@ def merge_entry_points(
         ]
         for section, merged_entry_points in merged.items()
     }
-
-
-def recursive_defaultdict_factory():
-    """Arbitrarily deeply nested defaultdicts."""
-    return defaultdict(recursive_defaultdict_factory)
 
 
 def rules():

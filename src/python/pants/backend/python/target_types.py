@@ -728,21 +728,41 @@ class PythonProvidesField(ScalarField, ProvidesField):
 class PythonDistributionEntryPoints(NestedDictStringToStringField, AsyncFieldMixin):
     alias = "entry_points"
     required = False
-    help = (
-        "The entry points for setup.py. Pants will infer a dependency on "
-        "the owner of the entry point modules.\n\n"
-        "The syntax for entry points is specified as a target or standard setuptools entry point reference:\n"
-        "`<name> = [//<target>][:<name>]`\n"
-        "`<name> = [<package>.[<subpackage>.]]<module>[:<object>.<object>]`\n\n"
-        "Target addresses [https://www.pantsbuild.org/docs/targets#target-addresses]\n"
-        "Setuptools [https://setuptools.readthedocs.io/en/latest/userguide/entry_point.html]."
+    help = dedent(
+        """\
+        Any entry points, such as `console_scripts` and `gui_scripts`.
+
+        Specify as a nested dictionary, with a dictionary for each type of entry point,
+        e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to
+        either a setuptools entry point ("path.to.module:func") or a Pants target address to a
+        pex_binary target.
+        Example:
+
+            entry_points={
+              "console_scripts": {
+                "my-script": "project.app:main",
+                "another-script": "project/subdir:pex_binary_tgt"
+              }
+            }
+
+        Note that Pants will assume any value that starts with `:` or with `/` in it, is a target
+        address to a pex_binary target. Otherwise, it will assume it's a setuptools entry point as
+        defined by
+        https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use
+        `//` as a prefix for target addresses if you need to disambiguate.
+
+        Pants will attempt to infer dependencies, which you can confirm by running:
+
+            ./pants dependencies <python_distribution target address>
+
+        """
     )
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
 @dataclass(frozen=True)
 class ResolvedPythonDistributionEntryPoints:
-    val: Optional[FrozenDict[str, FrozenDict[str, EntryPoint]]]
+    val: FrozenDict[str, FrozenDict[str, EntryPoint]] = FrozenDict()
 
 
 @dataclass(frozen=True)

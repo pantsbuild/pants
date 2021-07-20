@@ -396,7 +396,10 @@ def test_inject_python_distribution_dependencies() -> None:
         "project",
         dedent(
             """\
-            pex_binary(name="my_binary", entry_point="who_knows.module")
+            pex_binary(name="my_binary", entry_point="who_knows.module:main")
+
+            python_library(name="my_library", sources=["app.py"])
+
             python_distribution(
                 name="dist-a",
                 provides=setup_py(
@@ -404,7 +407,6 @@ def test_inject_python_distribution_dependencies() -> None:
                 ).with_binaries({"my_cmd": ":my_binary"})
             )
 
-            python_library(name="my_library", sources=["app.py"])
             python_distribution(
                 name="dist-b",
                 provides=setup_py(
@@ -412,30 +414,41 @@ def test_inject_python_distribution_dependencies() -> None:
                 ),
                 entry_points={
                     "console_scripts":{
-                        "b_cmd": "project.app:main"
+                        "b_cmd": "project.app:main",
+                        "cmd_2": "//project:my_binary",
                     }
                 },
             )
             """
         ),
     )
+    rule_runner.create_file("who_knows/module.py")
+    rule_runner.add_to_build_file(
+        "who_knows",
+        dedent(
+            """\
+            python_library(name="random_lib", sources=["module.py"])
+            """
+        ),
+    )
 
-    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+    def assert_injected(address: Address, *expected: Address) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
             [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
         )
-        assert injected == InjectedDependencies([expected] if expected else [])
+        assert injected == InjectedDependencies(expected)
 
     assert_injected(
         Address("project", target_name="dist-a"),
-        expected=Address("project", target_name="my_binary"),
+        Address("project", target_name="my_binary"),
     )
 
     assert_injected(
         Address("project", target_name="dist-b"),
-        expected=Address("project", relative_file_path="app.py", target_name="my_library"),
+        Address("project", relative_file_path="app.py", target_name="my_library"),
+        Address("who_knows", relative_file_path="module.py", target_name="random_lib"),
     )
 
 
