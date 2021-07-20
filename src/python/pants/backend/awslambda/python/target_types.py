@@ -65,6 +65,7 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
 @dataclass(frozen=True)
 class ResolvedPythonAwsHandler:
     val: str
+    file_name_used: bool
 
 
 @dataclass(frozen=True)
@@ -84,7 +85,7 @@ async def resolve_python_aws_handler(
     # If it's already a module, simply use that. Otherwise, convert the file name into a module
     # path.
     if not path.endswith(".py"):
-        return ResolvedPythonAwsHandler(handler_val)
+        return ResolvedPythonAwsHandler(handler_val, file_name_used=False)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
@@ -113,7 +114,7 @@ async def resolve_python_aws_handler(
     stripped_source_path = os.path.relpath(handler_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPythonAwsHandler(f"{normalized_path}:{func}")
+    return ResolvedPythonAwsHandler(f"{normalized_path}:{func}", file_name_used=True)
 
 
 class PythonAwsLambdaDependencies(Dependencies):
@@ -144,6 +145,9 @@ async def inject_lambda_handler_dependency(
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
         address,
+        # If the handler was specified as a file, like `app.py`, we know the module must
+        # live in the python_awslambda's directory or subdirectory, so the owners must be ancestors.
+        owners_must_be_ancestors=handler.file_name_used,
         import_reference="module",
         context=(
             f"The python_awslambda target {address} has the field "
@@ -151,7 +155,9 @@ async def inject_lambda_handler_dependency(
             f"to the Python module `{module}`"
         ),
     )
-    maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
+    maybe_disambiguated = explicitly_provided_deps.disambiguated(
+        owners.ambiguous, owners_must_be_ancestors=handler.file_name_used
+    )
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )

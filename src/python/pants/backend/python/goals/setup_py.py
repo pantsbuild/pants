@@ -462,9 +462,8 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             level=LogLevel.DEBUG,
         ),
     )
-    output_digest = await Get(
-        Digest, RemovePrefix(result.output_digest, os.path.join(chroot_prefix, dist_dir))
-    )
+    # Note that output_digest paths are relative to the working_directory.
+    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
     return RunSetupPyResult(output_digest)
 
 

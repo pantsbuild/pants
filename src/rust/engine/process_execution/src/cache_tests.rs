@@ -7,7 +7,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
-use workunit_store::WorkunitStore;
+use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
@@ -85,16 +85,18 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
   (process, script_path, script_dir)
 }
 
-async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
+async fn run_roundtrip(script_exit_code: i8, workunit: &mut RunningWorkunit) -> RoundtripResults {
   let (local, store, _local_runner_dir) = create_local_runner();
   let (process, script_path, _script_dir) = create_script(script_exit_code);
 
-  let local_result = local.run(process.clone().into(), Context::default()).await;
+  let local_result = local
+    .run(Context::default(), workunit, process.clone().into())
+    .await;
 
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());
 
   let uncached_result = caching
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), workunit, process.clone().into())
     .await;
 
   assert_eq!(local_result, uncached_result);
@@ -103,7 +105,9 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
   // cache was successfully used.
   std::fs::remove_file(&script_path).unwrap();
-  let maybe_cached_result = caching.run(process.into(), Context::default()).await;
+  let maybe_cached_result = caching
+    .run(Context::default(), workunit, process.into())
+    .await;
 
   RoundtripResults {
     uncached: uncached_result,
@@ -113,15 +117,15 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
 #[tokio::test]
 async fn cache_success() {
-  WorkunitStore::setup_for_tests();
-  let results = run_roundtrip(0).await;
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let results = run_roundtrip(0, &mut workunit).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
 async fn failures_not_cached() {
-  WorkunitStore::setup_for_tests();
-  let results = run_roundtrip(1).await;
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let results = run_roundtrip(1, &mut workunit).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
@@ -129,7 +133,7 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn recover_from_missing_store_contents() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let (local, store, _local_runner_dir) = create_local_runner();
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());
@@ -137,7 +141,7 @@ async fn recover_from_missing_store_contents() {
 
   // Run once to cache the process.
   let first_result = caching
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
 
@@ -170,7 +174,7 @@ async fn recover_from_missing_store_contents() {
 
   // Ensure that we don't fail if we re-run.
   let second_result = caching
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
 

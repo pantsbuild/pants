@@ -6,6 +6,7 @@
 This is a separate module to avoid circular dependencies. Note that all types used by call sites are
 defined in `target_types.py`.
 """
+
 import dataclasses
 import os.path
 
@@ -53,12 +54,12 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
 
     # Case #1.
     if ep_val.module in ("<none>", "<None>"):
-        return ResolvedPexEntryPoint(None)
+        return ResolvedPexEntryPoint(None, file_name_used=False)
 
     # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
     # into a module path (cases #4 and #5).
     if not ep_val.module.endswith(".py"):
-        return ResolvedPexEntryPoint(ep_val)
+        return ResolvedPexEntryPoint(ep_val, file_name_used=False)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, ep_val.module)
@@ -88,7 +89,9 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPexEntryPoint(dataclasses.replace(ep_val, module=normalized_path))
+    return ResolvedPexEntryPoint(
+        dataclasses.replace(ep_val, module=normalized_path), file_name_used=True
+    )
 
 
 class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
@@ -116,6 +119,9 @@ async def inject_pex_binary_entry_point_dependency(
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
         address,
+        # If the entry point was specified as a file, like `app.py`, we know the module must
+        # live in the pex_binary's directory or subdirectory, so the owners must be ancestors.
+        owners_must_be_ancestors=entry_point.file_name_used,
         import_reference="module",
         context=(
             f"The pex_binary target {address} has the field "
@@ -123,7 +129,9 @@ async def inject_pex_binary_entry_point_dependency(
             f"maps to the Python module `{entry_point.val.module}`"
         ),
     )
-    maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
+    maybe_disambiguated = explicitly_provided_deps.disambiguated(
+        owners.ambiguous, owners_must_be_ancestors=entry_point.file_name_used
+    )
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )

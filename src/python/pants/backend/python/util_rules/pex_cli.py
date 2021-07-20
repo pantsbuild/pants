@@ -39,6 +39,7 @@ class PexBinary(TemplatedExternalTool):
 
     default_version = "v2.1.42"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
+    version_constraints = ">=2.1.42, <3.0"
 
     @classproperty
     def default_known_versions(cls):

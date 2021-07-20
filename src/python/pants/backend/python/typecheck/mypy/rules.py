@@ -139,7 +139,9 @@ def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
 
 
 @rule
-async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> TypecheckResult:
+async def mypy_typecheck_partition(
+    partition: MyPyPartition, mypy: MyPy, python_setup: PythonSetup
+) -> TypecheckResult:
     plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
     plugin_transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
@@ -156,7 +158,9 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     python_version = (
         None
         if partition.python_version_already_configured
-        else partition.interpreter_constraints.minimum_python_version()
+        else partition.interpreter_constraints.minimum_python_version(
+            python_setup.interpreter_universe
+        )
     )
 
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
@@ -168,7 +172,9 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         partition.interpreter_constraints
         if (
             mypy.options.is_default("interpreter_constraints")
-            and partition.interpreter_constraints.requires_python38_or_newer()
+            and partition.interpreter_constraints.requires_python38_or_newer(
+                python_setup.interpreter_universe
+            )
         )
         else mypy.interpreter_constraints
     )

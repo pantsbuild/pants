@@ -180,7 +180,11 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
 def test_interpreter_constraints_minimum_python_version(
     constraints: List[str], expected: str
 ) -> None:
-    assert InterpreterConstraints(constraints).minimum_python_version() == expected
+    universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ics = InterpreterConstraints(constraints)
+    assert ics.minimum_python_version(universe) == expected
+    assert ics.minimum_python_version(reversed(universe)) == expected
+    assert ics.minimum_python_version(sorted(universe)) == expected
 
 
 @pytest.mark.parametrize(
@@ -197,7 +201,11 @@ def test_interpreter_constraints_minimum_python_version(
     ],
 )
 def test_interpreter_constraints_require_python38(constraints) -> None:
-    assert InterpreterConstraints(constraints).requires_python38_or_newer() is True
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.requires_python38_or_newer(universe) is True
+    assert ics.requires_python38_or_newer(reversed(universe)) is True
+    assert ics.requires_python38_or_newer(sorted(universe)) is True
 
 
 @pytest.mark.parametrize(
@@ -214,7 +222,11 @@ def test_interpreter_constraints_require_python38(constraints) -> None:
     ],
 )
 def test_interpreter_constraints_do_not_require_python38(constraints):
-    assert InterpreterConstraints(constraints).requires_python38_or_newer() is False
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.requires_python38_or_newer(universe) is False
+    assert ics.requires_python38_or_newer(reversed(universe)) is False
+    assert ics.requires_python38_or_newer(sorted(universe)) is False
 
 
 def test_group_field_sets_by_constraints() -> None:
@@ -309,6 +321,14 @@ def test_not_in_contiguous_range(nums, expected) -> None:
 def test_partition_by_major_minor_version(
     constraints: list[str], expected: list[list[str]]
 ) -> None:
-    assert InterpreterConstraints(constraints).partition_by_major_minor_versions() == tuple(
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.partition_by_major_minor_versions(universe) == tuple(
+        InterpreterConstraints(x) for x in expected
+    )
+    assert ics.partition_by_major_minor_versions(reversed(universe)) == tuple(
+        InterpreterConstraints(x) for x in expected
+    )
+    assert ics.partition_by_major_minor_versions(sorted(universe)) == tuple(
         InterpreterConstraints(x) for x in expected
     )
