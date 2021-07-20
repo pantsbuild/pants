@@ -29,7 +29,7 @@ use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
@@ -247,8 +247,9 @@ impl super::CommandRunner for CommandRunner {
   ///
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    _workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
@@ -256,7 +257,10 @@ impl super::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "run_local_process".to_owned(),
       WorkunitMetadata {
-        level: Level::Trace,
+        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+        // renders at the Process's level.
+        level: req.level,
+        desc: Some(req.description.clone()),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {

@@ -133,7 +133,9 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PexRequest(
             output_filename="pylint.pex",
             internal_only=True,
-            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
+            requirements=PexRequirements(
+                [*pylint.all_requirements, *plugin_requirements.req_strings]
+            ),
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )

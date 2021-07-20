@@ -8,6 +8,7 @@ use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
 use tokio::net::TcpStream;
+use workunit_store::RunningWorkunit;
 
 use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::nailgun::nailgun_pool::NailgunProcessName;
@@ -140,14 +141,15 @@ impl CommandRunner {
 impl super::CommandRunner for CommandRunner {
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
+    workunit: &mut RunningWorkunit,
+    req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-      return self.inner.run(req, context).await;
+      return self.inner.run(context, workunit, req).await;
     }
     debug!("Running request under nailgun:\n {:#?}", &original_request);
 

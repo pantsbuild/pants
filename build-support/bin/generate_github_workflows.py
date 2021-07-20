@@ -32,7 +32,8 @@ Env = Dict[str, str]
 # ----------------------------------------------------------------------
 
 
-NATIVE_ENGINE_SO_FILES = [
+NATIVE_FILES = [
+    ".pants",
     "src/python/pants/engine/internals/native_engine.so",
     "src/python/pants/engine/internals/native_engine_pyo3.so",
     "src/python/pants/engine/internals/native_engine.so.metadata",
@@ -181,42 +182,43 @@ def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
         pants_virtualenv_cache(),
+        # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
+        # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
+        # which are how the bootstrap jobs share the compiled binaries with the other jobs like
+        # `lint` and `test`.
         {
-            "name": "Get Engine Hash",
+            "name": "Get native engine hash",
             "id": "get-engine-hash",
             "run": 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"\n',
             "shell": "bash",
         },
         {
-            "name": "Cache Native Engine",
+            "name": "Cache native engine",
             "uses": "actions/cache@v2",
             "with": {
-                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
+                "path": "\n".join(NATIVE_FILES),
                 "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
             },
         },
     ]
 
 
-def native_engine_so_upload() -> Step:
+def native_binaries_upload() -> Step:
     return {
-        "name": "Upload native_engine.so",
+        "name": "Upload native binaries",
         "uses": "actions/upload-artifact@v2",
         "with": {
-            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-            "path": "\n".join(NATIVE_ENGINE_SO_FILES),
+            "name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}",
+            "path": "\n".join(NATIVE_FILES),
         },
     }
 
 
-def native_engine_so_download() -> Step:
+def native_binaries_download() -> Step:
     return {
-        "name": "Download native_engine.so",
+        "name": "Download native binaries",
         "uses": "actions/download-artifact@v2",
-        "with": {
-            "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-            "path": "src/python/pants/engine/internals/",
-        },
+        "with": {"name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}"},
     }
 
 
@@ -283,7 +285,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     ),
                 },
                 upload_log_artifacts(name="bootstrap-linux"),
-                native_engine_so_upload(),
+                native_binaries_upload(),
                 {
                     "name": "Test and Lint Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -312,7 +314,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
@@ -329,7 +331,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
@@ -350,7 +352,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                native_engine_so_upload(),
+                native_binaries_upload(),
                 {
                     "name": "Test Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -376,7 +378,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
-                native_engine_so_download(),
+                native_binaries_download(),
                 {
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
@@ -387,26 +389,34 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     }
     if not cron:
 
-        def build_wheels_step(*, is_macos: bool) -> Step:
-            step = {
-                "name": "Build wheels and fs_util",
-                "run": dedent(
-                    # We use MODE=debug on PR builds to speed things up, given that those are only
-                    # smoke tests of our release process.
-                    """\
-                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh build-wheels
-                    USE_PY38=true ./build-support/bin/release.sh build-wheels
-                    USE_PY39=true ./build-support/bin/release.sh build-wheels
-                    ./build-support/bin/release.sh build-fs-util
-                    """
-                ),
-                "if": DONT_SKIP_WHEELS,
-                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"},
-            }
-            if is_macos:
-                step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
-            return step
+        def build_steps(*, is_macos: bool) -> list[Step]:
+            env = {"PANTS_CONFIG_FILES": "+['pants.ci.toml']", **(MACOS_ENV if is_macos else {})}
+            return [
+                {
+                    "name": "Build wheels",
+                    "run": dedent(
+                        # We use MODE=debug on PR builds to speed things up, given that those are
+                        # only smoke tests of our release process.
+                        """\
+                        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                        ./build-support/bin/release.sh build-wheels
+                        USE_PY38=true ./build-support/bin/release.sh build-wheels
+                        USE_PY39=true ./build-support/bin/release.sh build-wheels
+                        ./build-support/bin/release.sh build-fs-util
+                        """
+                    ),
+                    "if": DONT_SKIP_WHEELS,
+                    "env": env,
+                },
+                {
+                    "name": "Build fs_util",
+                    "run": "./build-support/bin/release.sh build-fs-util",
+                    # We only build fs_util on branch builds, given that Pants compilation already
+                    # checks the code compiles and the release process is simple and low-stakes.
+                    "if": "github.event_name == 'push'",
+                    "env": env,
+                },
+            ]
 
         deploy_to_s3_step = {
             "name": "Deploy to S3",
@@ -439,7 +449,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                             ),
                         },
                         setup_toolchain_auth(),
-                        build_wheels_step(is_macos=False),
+                        *build_steps(is_macos=False),
                         upload_log_artifacts(name="wheels-linux"),
                         deploy_to_s3_step,
                     ],
@@ -459,7 +469,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
                         *rust_caches(),
-                        build_wheels_step(is_macos=True),
+                        *build_steps(is_macos=True),
                         upload_log_artifacts(name="wheels-macos"),
                         deploy_to_s3_step,
                     ],

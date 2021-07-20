@@ -192,7 +192,7 @@ async def infer_shell_dependencies(
                     import_reference="file",
                     context=f"The target {address} sources `{import_path}`",
                 )
-                maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(ambiguous)
+                maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
     return InferredDependencies(sorted(result), sibling_dependencies_inferrable=True)

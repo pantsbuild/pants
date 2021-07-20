@@ -12,19 +12,14 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
+    Pex,
     PexPlatforms,
     PexRequest,
-    PexRequirements,
-    TwoStepPex,
     VenvPex,
     VenvPexProcess,
 )
-from pants.backend.python.util_rules.pex_from_targets import (
-    PexFromTargetsRequest,
-    TwoStepPexFromTargetsRequest,
-)
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -75,34 +70,33 @@ async def package_python_awslambda(
         platform += "m"
     if (py_major, py_minor) == (2, 7):
         platform += "u"
-    pex_request = TwoStepPexFromTargetsRequest(
-        PexFromTargetsRequest(
-            addresses=[field_set.address],
-            internal_only=False,
-            main=None,
-            output_filename=output_filename,
-            platforms=PexPlatforms([platform]),
-            additional_args=[
-                # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
-                "--manylinux=manylinux2014",
-                # When we're executing Pex on Linux, allow a local interpreter to be resolved if
-                # available and matching the AMI platform.
-                "--resolve-local-platforms",
-            ],
-        )
+
+    pex_request = PexFromTargetsRequest(
+        addresses=[field_set.address],
+        internal_only=False,
+        main=None,
+        output_filename=output_filename,
+        platforms=PexPlatforms([platform]),
+        additional_args=[
+            # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+            "--manylinux=manylinux2014",
+            # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+            # available and matching the AMI platform.
+            "--resolve-local-platforms",
+        ],
     )
 
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=PexRequirements(lambdex.all_requirements),
-        interpreter_constraints=InterpreterConstraints(lambdex.interpreter_constraints),
+        requirements=lambdex.pex_requirements,
+        interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),
-        Get(TwoStepPex, TwoStepPexFromTargetsRequest, pex_request),
+        Get(Pex, PexFromTargetsRequest, pex_request),
         Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
@@ -129,7 +123,7 @@ async def package_python_awslambda(
         VenvPexProcess(
             lambdex_pex,
             argv=("build", "-e", handler.val, output_filename),
-            input_digest=pex_result.pex.digest,
+            input_digest=pex_result.digest,
             output_files=(output_filename,),
             description=f"Setting up handler in {output_filename}",
         ),

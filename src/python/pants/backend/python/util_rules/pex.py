@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -53,11 +54,50 @@ from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
-class PexRequirements(DeduplicatedCollection[str]):
-    sort_input = True
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PexRequirements:
+    req_strings: FrozenOrderedSet[str]
+    file_content: FileContent | None
+    file_path: str | None
+    file_path_description_of_origin: str | None
+    is_lockfile: bool
+
+    def __init__(
+        self,
+        req_strings: Iterable[str] = (),
+        *,
+        file_content: FileContent | None = None,
+        file_path: str | None = None,
+        file_path_description_of_origin: str | None = None,
+        is_lockfile: bool = False,
+    ) -> None:
+        self.req_strings = FrozenOrderedSet(sorted(req_strings))
+        self.file_content = file_content
+        self.file_path = file_path
+        self.file_path_description_of_origin = file_path_description_of_origin
+        self.is_lockfile = is_lockfile
+
+        if self.file_path and not self.file_path_description_of_origin:
+            raise ValueError(
+                "You must specify `file_path_description_of_origin` if `file_path` is set."
+            )
+        if self.req_strings and self.file_path:
+            raise ValueError(
+                "You should only specify `req_strings` or `file_path`, but both were set."
+            )
+        if self.req_strings and self.file_content:
+            raise ValueError(
+                "You should only specify `req_strings` or `file_content`, but both were set."
+            )
+        if self.file_path and self.file_content:
+            raise ValueError(
+                "You should only specify `file_content` or `file_path`, but both were set."
+            )
 
     @classmethod
     def create_from_requirement_fields(
@@ -68,6 +108,16 @@ class PexRequirements(DeduplicatedCollection[str]):
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
+
+    def __repr__(self) -> str:
+        if self.file_content:
+            return f"PexRequirements(file_content=FileContent({self.file_content.path}, ...))"
+        if self.file_path:
+            return f"PexRequirements(file_path={self.file_path})"
+        return f"PexRequirements({list(self.req_strings)!r})"
+
+    def __bool__(self) -> bool:
+        return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -173,38 +223,12 @@ class PexRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class TwoStepPexRequest:
-    """A request to create a PEX in two steps.
-
-    First we create a requirements-only pex. Then we create the full pex on top of that
-    requirements pex, instead of having the full pex directly resolve its requirements.
-
-    This allows us to re-use the requirements-only pex when no requirements have changed (which is
-    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
-    over and over again.
-    """
-
-    pex_request: PexRequest
-
-
-@dataclass(frozen=True)
 class Pex:
     """Wrapper for a digest containing a pex file created with some filename."""
 
     digest: Digest
     name: str
     python: PythonExecutable | None
-
-
-@dataclass(frozen=True)
-class TwoStepPex:
-    """The result of creating a PEX in two steps.
-
-    TODO(9320): A workaround for https://github.com/pantsbuild/pants/issues/9320. Really we
-      just want the rules to directly return a Pex.
-    """
-
-    pex: Pex
 
 
 logger = logging.getLogger(__name__)
@@ -310,6 +334,9 @@ async def build_pex(
             ]
         )
 
+    if request.requirements.is_lockfile:
+        argv.append("--no-transitive")
+
     python: PythonExecutable | None = None
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
@@ -342,30 +369,55 @@ async def build_pex(
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
 
+    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
+    #  requirements, which could lead to problems. Support shading python binaries.
+    #  See: https://github.com/pantsbuild/pants/issues/9206
+    if request.pex_path:
+        argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
+
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
+    sources_digest_as_subdir = await Get(
+        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    )
 
-    argv.extend(request.requirements)
+    additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
+    repository_pex_digest = (
+        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
+    )
 
     constraint_file_digest = EMPTY_DIGEST
-    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
+    if (
+        not request.requirements.is_lockfile and request.apply_requirement_constraints
+    ) and python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])
         constraint_file_digest = await Get(
             Digest,
             PathGlobs(
                 [python_setup.requirement_constraints],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="the option `[python-setup].requirement-constraints`",
+                description_of_origin="the option `[python-setup].requirement_constraints`",
             ),
         )
 
-    sources_digest_as_subdir = await Get(
-        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
-    )
-    additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
-    repository_pex_digest = (
-        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
-    )
+    requirements_file_digest = EMPTY_DIGEST
+    if request.requirements.file_path:
+        argv.extend(["--requirement", request.requirements.file_path])
+        requirements_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [request.requirements.file_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=request.requirements.file_path_description_of_origin,
+            ),
+        )
+    elif request.requirements.file_content:
+        argv.extend(["--requirement", request.requirements.file_content.path])
+        requirements_file_digest = await Get(
+            Digest, CreateDigest([request.requirements.file_content])
+        )
+    else:
+        argv.extend(request.requirements.req_strings)
 
     merged_digest = await Get(
         Digest,
@@ -374,24 +426,28 @@ async def build_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                requirements_file_digest,
                 repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),
             )
         ),
     )
-    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
-    #  requirements, which could lead to problems. Support shading python binaries.
-    #  See: https://github.com/pantsbuild/pants/issues/9206
-    if request.pex_path:
-        argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
     description = request.description
     if description is None:
-        if request.requirements:
+        if request.requirements.req_strings:
             description = (
                 f"Building {request.output_filename} with "
-                f"{pluralize(len(request.requirements), 'requirement')}: "
-                f"{', '.join(request.requirements)}"
+                f"{pluralize(len(request.requirements.req_strings), 'requirement')}: "
+                f"{', '.join(request.requirements.req_strings)}"
+            )
+        elif request.requirements.file_path:
+            description = (
+                f"Building {request.output_filename} from {request.requirements.file_path}"
+            )
+        elif request.requirements.file_content:
+            description = (
+                f"Building {request.output_filename} from {request.requirements.file_content.path}"
             )
         else:
             description = f"Building {request.output_filename}"
@@ -464,15 +520,25 @@ class VenvScriptWriter:
         script_path: PurePath,
         venv_executable: PurePath,
     ) -> VenvScript:
+        # Ensure that the pex is executed from a path relative to the shim script, so
+        # that running from within a working directory works properly.
+        # NB: No method for determining the path of the current script is entirely foolproof,
+        #  but BASH_SOURCE works fine in our specific case (and has been available since bash-3.0,
+        #  released in 2004, so it seems safe to assume it's available).
+        sandbox_root = '"${BASH_SOURCE%/*}"'
+
         env_vars = (
-            f"{name}={shlex.quote(value)}"
+            f"{name}={os.path.join(sandbox_root, shlex.quote(value)) if name == 'PEX_ROOT' else shlex.quote(value)}"
             for name, value in pex_environment.environment_dict(python_configured=True).items()
         )
-        target_venv_executable = shlex.quote(str(venv_executable))
-        venv_dir = shlex.quote(str(self.venv_dir))
+
+        local_pex_bin = os.path.join(sandbox_root, shlex.quote(self.pex.name))
+        target_venv_executable = os.path.join(sandbox_root, shlex.quote(str(venv_executable)))
+        venv_dir = os.path.join(os.path.join(sandbox_root, shlex.quote(str(self.venv_dir))))
         execute_pex_args = " ".join(
-            shlex.quote(arg)
-            for arg in pex_environment.create_argv(self.pex.name, python=self.pex.python)
+            # Don't quote the BASH_SOURCE dereference in local_pex_bin.
+            arg if arg == local_pex_bin else shlex.quote(arg)
+            for arg in pex_environment.create_argv(local_pex_bin, python=self.pex.python)[1:]
         )
 
         script = dedent(
@@ -630,41 +696,6 @@ async def create_venv_pex(
     )
 
 
-@rule(level=LogLevel.DEBUG)
-async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
-    """Create a PEX in two steps: a requirements-only PEX and then a full PEX from it."""
-    request = two_step_pex_request.pex_request
-    req_pex_name = "__requirements.pex"
-
-    repository_pex: Pex | None = None
-
-    # Create a pex containing just the requirements.
-    if request.requirements:
-        repository_pex = await Get(
-            Pex,
-            PexRequest(
-                output_filename=req_pex_name,
-                internal_only=request.internal_only,
-                requirements=request.requirements,
-                interpreter_constraints=request.interpreter_constraints,
-                platforms=request.platforms,
-                # TODO: Do we need to pass all the additional args to the requirements pex creation?
-                #  Some of them may affect resolution behavior, but others may be irrelevant.
-                #  For now we err on the side of caution.
-                additional_args=request.additional_args,
-                description=(
-                    f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
-                    f"{', '.join(request.requirements)}"
-                ),
-            ),
-        )
-
-    # Now create a full PEX on top of the requirements PEX.
-    full_pex_request = dataclasses.replace(request, repository_pex=repository_pex)
-    full_pex = await Get(Pex, PexRequest, full_pex_request)
-    return TwoStepPex(pex=full_pex)
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexProcess:
@@ -673,6 +704,7 @@ class PexProcess:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None
+    working_directory: str | None
     extra_env: FrozenDict[str, str] | None
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
@@ -688,6 +720,7 @@ class PexProcess:
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest | None = None,
+        working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -700,6 +733,7 @@ class PexProcess:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.working_directory = working_directory
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
@@ -711,7 +745,12 @@ class PexProcess:
 @rule
 async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvironment) -> Process:
     pex = request.pex
-    argv = pex_environment.create_argv(pex.name, *request.argv, python=pex.python)
+    pex_bin = (
+        os.path.relpath(pex.name, request.working_directory)
+        if request.working_directory
+        else pex.name
+    )
+    argv = pex_environment.create_argv(pex_bin, *request.argv, python=pex.python)
     env = {
         **pex_environment.environment_dict(python_configured=pex.python is not None),
         **(request.extra_env or {}),
@@ -726,6 +765,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvi
         description=request.description,
         level=request.level,
         input_digest=input_digest,
+        working_directory=request.working_directory,
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
@@ -744,6 +784,7 @@ class VenvPexProcess:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None
+    working_directory: str | None
     extra_env: FrozenDict[str, str] | None
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
@@ -759,6 +800,7 @@ class VenvPexProcess:
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest | None = None,
+        working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -771,6 +813,7 @@ class VenvPexProcess:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.working_directory = working_directory
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
@@ -784,7 +827,12 @@ async def setup_venv_pex_process(
     request: VenvPexProcess, pex_environment: SandboxPexEnvironment
 ) -> Process:
     venv_pex = request.venv_pex
-    argv = (venv_pex.pex.argv0, *request.argv)
+    pex_bin = (
+        os.path.relpath(venv_pex.pex.argv0, request.working_directory)
+        if request.working_directory
+        else venv_pex.pex.argv0
+    )
+    argv = (pex_bin, *request.argv)
     input_digest = (
         await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
@@ -795,6 +843,7 @@ async def setup_venv_pex_process(
         description=request.description,
         level=request.level,
         input_digest=input_digest,
+        working_directory=request.working_directory,
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,

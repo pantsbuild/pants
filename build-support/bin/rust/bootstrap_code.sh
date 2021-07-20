@@ -51,17 +51,6 @@ function _build_native_code() {
 }
 
 function bootstrap_native_code() {
-  # We expose a safety valve to skip compilation iff the user already has `native_engine.so`. This
-  # can result in using a stale `native_engine.so`, but we trust that the user knows what
-  # they're doing.
-  if [[ "${SKIP_NATIVE_ENGINE_SO_BOOTSTRAP}" == "true" ]]; then
-    if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_ENGINE_RESOURCE_PYO3}" ]]; then
-      die "You requested to override bootstrapping native_engine.so and native_engine_pyo3.so via the env var" \
-        "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the files do not exist at" \
-        "${NATIVE_ENGINE_RESOURCE} and ${NATIVE_ENGINE_BINARY_PYO3}. This is not safe to do."
-    fi
-    return
-  fi
   # Bootstraps the native code only if needed.
   local engine_version_calculated
   engine_version_calculated="$(calculate_current_hash)"
@@ -69,62 +58,63 @@ function bootstrap_native_code() {
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
-  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f \
-    "${NATIVE_ENGINE_RESOURCE_PYO3}" || ! -f \
-    "${NATIVE_CLIENT_PATH}" || \
-    "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
 
-    _build_native_code || die
-
-    # If bootstrapping the native engine fails, don't attempt to run pants
-    # afterwards.
-    local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-    local -r native_binary_pyo3="${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
-    if [[ ! -f "${native_binary}" ]]; then
-      die "Failed to build native engine, file missing at ${native_binary}."
-    fi
-    if [[ ! -f "${native_binary_pyo3}" ]]; then
-      die "Failed to build native engine, file missing at ${native_binary_pyo3}."
-    fi
-
-    # If bootstrapping the native client fails, don't attempt to run pants afterwards.
-    if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
-      die "Failed to build native client."
-    fi
-
-    # Pick up Cargo.lock changes if any caused by the `cargo build`.
-    engine_version_calculated="$(calculate_current_hash)"
-
-    # Create the native engine resource.
-    # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
-    #  process from being killed when recompiling.
-    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}" "${NATIVE_CLIENT_PATH}"
-    cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
-    cp "${native_binary_pyo3}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
-    cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
-
-    # Create the accompanying metadata file.
-    local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
-    echo "engine_version: ${engine_version_calculated}" > "${metadata_file}"
-    echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
-
-    # Here we set up a file lock via bash tricks to avoid concurrent `mv` failing.
-    if {
-      set -C # Set noclobber temporarily to ensure file creation via `>` is atomic and exclusive.
-      echo 2> /dev/null "$$" > "${NATIVE_ENGINE_RESOURCE_METADATA}.lock"
-    }; then
-      # N.B.: We want the NATIVE_ENGINE_RESOURCE_METADATA env var to be expanded now.
-      # See: https://github.com/koalaman/shellcheck/wiki/SC2064
-      #
-      # shellcheck disable=SC2064
-      trap "rm -f ${NATIVE_ENGINE_RESOURCE_METADATA}.lock" RETURN
-      mv "${metadata_file}" "${NATIVE_ENGINE_RESOURCE_METADATA}"
-    else
-      local -r locked_by="$(
-        cat "${NATIVE_ENGINE_RESOURCE_METADATA}.lock" 2 > /dev/null || echo "<unknown>"
-      )"
-      echo >&2 "Process $$ yielding to concurrent bootstrap by pid ${locked_by}."
-    fi
-    set +C
+  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f \
+    "${NATIVE_ENGINE_RESOURCE_PYO3}" && -f \
+    "${NATIVE_CLIENT_PATH}" && \
+    "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
+    return 0
   fi
+
+  _build_native_code || die
+
+  # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
+  local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+  local -r native_binary_pyo3="${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
+  if [[ ! -f "${native_binary}" ]]; then
+    die "Failed to build native engine, file missing at ${native_binary}."
+  fi
+  if [[ ! -f "${native_binary_pyo3}" ]]; then
+    die "Failed to build native engine, file missing at ${native_binary_pyo3}."
+  fi
+
+  # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
+  if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
+    die "Failed to build native client."
+  fi
+
+  # Pick up Cargo.lock changes if any caused by the `cargo build`.
+  engine_version_calculated="$(calculate_current_hash)"
+
+  # Create the native engine resource.
+  # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
+  #  process from being killed when recompiling.
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}" "${NATIVE_CLIENT_PATH}"
+  cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
+  cp "${native_binary_pyo3}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
+  cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
+
+  # Create the accompanying metadata file.
+  local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
+  echo "engine_version: ${engine_version_calculated}" > "${metadata_file}"
+  echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
+
+  # Here we set up a file lock via bash tricks to avoid concurrent `mv` failing.
+  if {
+    set -C # Set noclobber temporarily to ensure file creation via `>` is atomic and exclusive.
+    echo 2> /dev/null "$$" > "${NATIVE_ENGINE_RESOURCE_METADATA}.lock"
+  }; then
+    # N.B.: We want the NATIVE_ENGINE_RESOURCE_METADATA env var to be expanded now.
+    # See: https://github.com/koalaman/shellcheck/wiki/SC2064
+    #
+    # shellcheck disable=SC2064
+    trap "rm -f ${NATIVE_ENGINE_RESOURCE_METADATA}.lock" RETURN
+    mv "${metadata_file}" "${NATIVE_ENGINE_RESOURCE_METADATA}"
+  else
+    local -r locked_by="$(
+      cat "${NATIVE_ENGINE_RESOURCE_METADATA}.lock" 2 > /dev/null || echo "<unknown>"
+    )"
+    echo >&2 "Process $$ yielding to concurrent bootstrap by pid ${locked_by}."
+  fi
+  set +C
 }

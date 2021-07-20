@@ -170,7 +170,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             mypy.options.is_default("interpreter_constraints")
             and partition.interpreter_constraints.requires_python38_or_newer()
         )
-        else InterpreterConstraints(mypy.interpreter_constraints)
+        else mypy.interpreter_constraints
     )
 
     plugin_sources_get = Get(
@@ -209,7 +209,9 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             output_filename="mypy.pex",
             internal_only=True,
             main=mypy.main,
-            requirements=PexRequirements((*mypy.all_requirements, *plugin_requirements)),
+            requirements=PexRequirements(
+                (*mypy.all_requirements, *plugin_requirements.req_strings)
+            ),
             interpreter_constraints=tool_interpreter_constraints,
         ),
     )
@@ -329,9 +331,10 @@ async def mypy_typecheck(
 
     interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
-        interpreter_constraints = InterpreterConstraints.create_from_targets(
-            transitive_targets.closure, python_setup
-        ) or InterpreterConstraints(mypy.interpreter_constraints)
+        interpreter_constraints = (
+            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+            or mypy.interpreter_constraints
+        )
         interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
             transitive_targets
         )

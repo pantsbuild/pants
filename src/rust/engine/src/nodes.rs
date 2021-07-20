@@ -11,7 +11,7 @@ use std::time::Duration;
 use std::{self, fmt};
 
 use async_trait::async_trait;
-use futures::future::{self, FutureExt, TryFutureExt};
+use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::StreamExt;
 use url::Url;
 
@@ -39,7 +39,7 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  in_workunit, ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  in_workunit, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -87,7 +87,11 @@ impl StoreFileByDigest<Failure> for Context {
 pub trait WrappedNode: Into<NodeKey> {
   type Item: TryFrom<NodeOutput>;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Self::Item>;
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Self::Item>;
 }
 
 ///
@@ -127,12 +131,12 @@ impl Select {
     Select::new(params, product, entry)
   }
 
-  async fn select_product(
+  fn select_product(
     &self,
     context: &Context,
     product: TypeId,
     caller_description: &str,
-  ) -> NodeResult<Value> {
+  ) -> BoxFuture<NodeResult<Value>> {
     let edges = context
       .core
       .rule_graph
@@ -142,33 +146,32 @@ impl Select {
           "Tried to select product {} for {} but found no edges",
           product, caller_description
         ))
-      })?;
+      });
+    let params = self.params.clone();
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &edges)
-      .run_wrapped_node(context)
-      .await
+    async move {
+      let edges = edges?;
+      Select::new_from_edges(params, product, &edges)
+        .run(context)
+        .await
+    }
+    .boxed()
   }
-}
 
-// TODO: This is a Node only because it is used as a root in the graph, but it should never be
-// requested using context.get
-#[async_trait]
-impl WrappedNode for Select {
-  type Item = Value;
-
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+  async fn run(self, context: Context) -> NodeResult<Value> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
-          &tasks::Rule::Task(ref task) => context
-            .get(Task {
-              params: self.params.clone(),
-              product: self.product,
-              task: task.clone(),
-              entry: Arc::new(self.entry.clone()),
-            })
-            .await
-            .map(|output| output.value),
+          &tasks::Rule::Task(ref task) => {
+            context
+              .get(Task {
+                params: self.params.clone(),
+                product: self.product,
+                task: task.clone(),
+                entry: Arc::new(self.entry.clone()),
+              })
+              .await
+          }
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
@@ -201,6 +204,26 @@ impl WrappedNode for Select {
         panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
     }
+  }
+}
+
+///
+/// NB: This is a Node so that it can be used as a root in the graph, but it should otherwise
+/// never be requested as a Node using context.get. Select is a thin proxy to other Node types
+/// (which it requests using context.get), and memoizing it would be redundant.
+///
+/// Instead, use `Select::run` to run the Select logic without memoizing it.
+///
+#[async_trait]
+impl WrappedNode for Select {
+  type Item = Value;
+
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Value> {
+    self.run(context).await
   }
 }
 
@@ -369,7 +392,11 @@ impl From<MultiPlatformExecuteProcess> for NodeKey {
 impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+  ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
     if context
@@ -386,9 +413,19 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       );
 
       let res = command_runner
-        .run(request, execution_context)
+        .run(execution_context, workunit, request)
         .await
         .map_err(|e| throw(&e))?;
+
+      workunit.update_metadata(|initial| WorkunitMetadata {
+        stdout: Some(res.stdout_digest),
+        stderr: Some(res.stderr_digest),
+        user_metadata: vec![(
+          "exit_code".to_string(),
+          UserMetadataItem::ImmediateId(res.exit_code as i64),
+        )],
+        ..initial
+      });
 
       Ok(ProcessResult(res))
     } else {
@@ -416,7 +453,11 @@ pub struct LinkDest(PathBuf);
 impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<LinkDest> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<LinkDest> {
     let node = self;
     let link_dest = context
       .core
@@ -444,7 +485,11 @@ pub struct DigestFile(pub File);
 impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<hashing::Digest> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<hashing::Digest> {
     let content = context
       .core
       .vfs
@@ -477,7 +522,11 @@ pub struct Scandir(Dir);
 impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Arc<DirectoryListing>> {
     let directory_listing = context
       .core
       .vfs
@@ -549,7 +598,11 @@ impl Paths {
 impl WrappedNode for Paths {
   type Item = Arc<Vec<PathStat>>;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Arc<Vec<PathStat>>> {
     let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
@@ -569,7 +622,11 @@ pub struct SessionValues;
 impl WrappedNode for SessionValues {
   type Item = Value;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Value> {
     Ok(context.session.session_values())
   }
 }
@@ -691,7 +748,11 @@ impl Snapshot {
 impl WrappedNode for Snapshot {
   type Item = Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Digest> {
     let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)
@@ -892,7 +953,11 @@ impl DownloadedFile {
 impl WrappedNode for DownloadedFile {
   type Item = Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Digest> {
     let value = externs::val_for(&self.0);
     let url_str = externs::getattr_as_string(&value, "url");
 
@@ -928,10 +993,13 @@ pub struct Task {
 impl Task {
   async fn gen_get(
     context: &Context,
+    workunit: &mut RunningWorkunit,
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeResult<Vec<Value>> {
+    // While waiting for dependencies, mark the workunit for this Task blocked.
+    let _blocking_token = workunit.blocking();
     let get_futures = gets
       .into_iter()
       .map(|get| {
@@ -977,11 +1045,9 @@ impl Task {
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
         params.put(get.input);
-        async move {
-          let entry = entry_res?;
-          Select::new(params, get.output, entry)
-            .run_wrapped_node(context.clone())
-            .await
+        match entry_res {
+          Ok(entry) => Select::new(params, get.output, entry).run(context).boxed(),
+          Err(e) => future::err(e).boxed(),
         }
       })
       .collect::<Vec<_>>();
@@ -993,7 +1059,8 @@ impl Task {
   /// it completes with a result Value.
   ///
   async fn generate(
-    context: Context,
+    context: &Context,
+    workunit: &mut RunningWorkunit,
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
@@ -1005,11 +1072,11 @@ impl Task {
       let entry = entry.clone();
       match externs::generator_send(&generator, &input)? {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, &params, &entry, vec![get]).await?;
+          let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, &params, &entry, gets).await?;
+          let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
           input = externs::store_tuple(values);
         }
         externs::GeneratorResponse::Break(val) => {
@@ -1030,21 +1097,19 @@ impl fmt::Debug for Task {
   }
 }
 
-pub struct PythonRuleOutput {
-  value: Value,
-  new_level: Option<log::Level>,
-  message: Option<String>,
-  new_artifacts: Vec<(String, ArtifactOutput)>,
-  new_metadata: Vec<(String, Value)>,
-}
-
 #[async_trait]
 impl WrappedNode for Task {
-  type Item = PythonRuleOutput;
+  type Item = Value;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<PythonRuleOutput> {
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Value> {
     let params = self.params;
     let deps = {
+      // While waiting for dependencies, mark ourselves blocking.
+      let _blocking_token = workunit.blocking();
       let edges = &context
         .core
         .rule_graph
@@ -1056,7 +1121,7 @@ impl WrappedNode for Task {
           .clause
           .into_iter()
           .map(|type_id| {
-            Select::new_from_edges(params.clone(), type_id, edges).run_wrapped_node(context.clone())
+            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1073,7 +1138,7 @@ impl WrappedNode for Task {
     let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
-      result_val = Self::generate(context.clone(), params, entry, result_val).await?;
+      result_val = Self::generate(&context, workunit, params, entry, result_val).await?;
       result_type = externs::get_type_for(&result_val);
     }
 
@@ -1090,13 +1155,26 @@ impl WrappedNode for Task {
       } else {
         (None, None, Vec::new(), Vec::new())
       };
-      Ok(PythonRuleOutput {
-        value: result_val,
-        new_level,
-        message,
-        new_artifacts,
-        new_metadata,
-      })
+      workunit.update_metadata(|mut metadata| {
+        if let Some(new_level) = new_level {
+          metadata.level = new_level;
+        }
+        metadata.message = message;
+        metadata.artifacts.extend(new_artifacts);
+        metadata
+          .user_metadata
+          .extend(new_metadata.into_iter().map(|(key, val)| {
+            let py_value_handle = UserMetadataPyValue::new();
+            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
+            context.session.with_metadata_map(|map| {
+              let val = val.clone();
+              map.insert(py_value_handle.clone(), val);
+            });
+            (key, umi)
+          }));
+        metadata
+      });
+      Ok(result_val)
     } else {
       Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
@@ -1194,6 +1272,13 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
+      NodeKey::MultiPlatformExecuteProcess(..) => {
+        // NB: The Node for a Process is statically rendered at Debug (rather than at
+        // Process.level) because it is very likely to wrap a BoundedCommandRunner which
+        // will block the workunit. We don't want to render at the Process's actual level
+        // until we're certain that it has begun executing (if at all).
+        Level::Debug
+      }
       NodeKey::DownloadedFile(..) => Level::Debug,
       _ => Level::Trace,
     }
@@ -1206,7 +1291,7 @@ impl NodeKey {
   fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.workunit_name(),
+      NodeKey::MultiPlatformExecuteProcess(..) => "multi_platform_process".to_string(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
       NodeKey::Paths(..) => "paths".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
@@ -1230,7 +1315,10 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.process.user_facing_name()),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => {
+        // NB: See Self::workunit_level for more information on why this is prefixed.
+        Some(format!("Scheduling: {}", mp_epr.process.user_facing_name()))
+      }
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
@@ -1302,112 +1390,95 @@ impl Node for NodeKey {
       level: self.workunit_level(),
       ..WorkunitMetadata::default()
     };
-    let metadata2 = metadata.clone();
-
-    let result_future = async move {
-      let metadata = metadata2;
-      // To avoid races, we must ensure that we have installed a watch for the subject before
-      // executing the node logic. But in case of failure, we wait to see if the Node itself
-      // fails, and prefer that error message if so (because we have little control over the
-      // error messages of the watch API).
-      let maybe_watch = if let Some(path) = self.fs_subject() {
-        if let Some(watcher) = &context.core.watcher {
-          let abs_path = context.core.build_root.join(path);
-          watcher
-            .watch(abs_path)
-            .map_err(|e| Context::mk_error(&e))
-            .await
-        } else {
-          Ok(())
-        }
-      } else {
-        Ok(())
-      };
-
-      let mut level = metadata.level;
-      let mut message = None;
-      let mut artifacts = Vec::new();
-      let mut user_metadata = Vec::new();
-
-      let context2 = context.clone();
-      let mut result = match self {
-        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-        NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-        NodeKey::MultiPlatformExecuteProcess(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-            .await
-        }
-        NodeKey::ReadLink(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::LinkDest)
-            .await
-        }
-        NodeKey::Scandir(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::DirectoryListing)
-            .await
-        }
-        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-        NodeKey::Paths(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Paths).await,
-        NodeKey::SessionValues(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Task(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|python_rule_output| {
-              if let Some(new_level) = python_rule_output.new_level {
-                level = new_level;
-              }
-              message = python_rule_output.message;
-              artifacts = python_rule_output.new_artifacts;
-              user_metadata = python_rule_output.new_metadata;
-              NodeOutput::Value(python_rule_output.value)
-            })
-            .await
-        }
-      };
-
-      result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
-
-      // If both the Node and the watch failed, prefer the Node's error message.
-      match (&result, maybe_watch) {
-        (Ok(_), Ok(_)) => {}
-        (Err(_), _) => {}
-        (Ok(_), Err(e)) => {
-          result = Err(e);
-        }
-      }
-
-      let session = context2.session;
-      let final_metadata = WorkunitMetadata {
-        level,
-        message,
-        artifacts,
-        user_metadata: user_metadata
-          .into_iter()
-          .map(|(key, val)| {
-            let py_value_handle = UserMetadataPyValue::new();
-            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
-            session.with_metadata_map(|map| {
-              let val = val.clone();
-              map.insert(py_value_handle.clone(), val);
-            });
-            (key, umi)
-          })
-          .collect(),
-        ..metadata
-      };
-      (result, final_metadata)
-    };
 
     in_workunit!(
       workunit_store_handle.store,
       workunit_name,
       metadata,
       |workunit| async move {
-        let (res, final_metadata) = result_future.await;
-        workunit.update_metadata(|_| final_metadata);
-        res
+        // To avoid races, we must ensure that we have installed a watch for the subject before
+        // executing the node logic. But in case of failure, we wait to see if the Node itself
+        // fails, and prefer that error message if so (because we have little control over the
+        // error messages of the watch API).
+        let maybe_watch = if let Some(path) = self.fs_subject() {
+          if let Some(watcher) = &context.core.watcher {
+            let abs_path = context.core.build_root.join(path);
+            watcher
+              .watch(abs_path)
+              .map_err(|e| Context::mk_error(&e))
+              .await
+          } else {
+            Ok(())
+          }
+        } else {
+          Ok(())
+        };
+
+        let mut result = match self {
+          NodeKey::DigestFile(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Digest)
+              .await
+          }
+          NodeKey::DownloadedFile(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Digest)
+              .await
+          }
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+              .await
+          }
+          NodeKey::ReadLink(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::LinkDest)
+              .await
+          }
+          NodeKey::Scandir(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::DirectoryListing)
+              .await
+          }
+          NodeKey::Select(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Value)
+              .await
+          }
+          NodeKey::Snapshot(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Digest)
+              .await
+          }
+          NodeKey::Paths(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Paths)
+              .await
+          }
+          NodeKey::SessionValues(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Value)
+              .await
+          }
+          NodeKey::Task(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Value)
+              .await
+          }
+        };
+
+        // If both the Node and the watch failed, prefer the Node's error message.
+        match (&result, maybe_watch) {
+          (Ok(_), Ok(_)) => {}
+          (Err(_), _) => {}
+          (Ok(_), Err(e)) => {
+            result = Err(e);
+          }
+        }
+
+        result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
+
+        result
       }
     )
     .await
@@ -1505,23 +1576,6 @@ impl NodeOutput {
       | NodeOutput::LinkDest(_)
       | NodeOutput::Paths(_)
       | NodeOutput::Value(_) => vec![],
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for PythonRuleOutput {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::Value(v) => Ok(PythonRuleOutput {
-        value: v,
-        new_level: None,
-        message: None,
-        new_artifacts: Vec::new(),
-        new_metadata: Vec::new(),
-      }),
-      _ => Err(()),
     }
   }
 }

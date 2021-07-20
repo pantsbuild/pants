@@ -32,6 +32,8 @@ from pants.option.custom_types import (
 from pants.option.errors import (
     BooleanConversionError,
     BooleanOptionNameWithNo,
+    DefaultMemberValueType,
+    DefaultValueType,
     FromfileError,
     ImplicitValIsNone,
     InvalidKwarg,
@@ -501,6 +503,41 @@ class Parser:
         is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
         if not is_enum and member_type not in self._allowed_member_types:
             error(InvalidMemberType, member_type=member_type.__name__)
+
+        # check type of default value
+        default_value = kwargs.get("default")
+        if default_value is not None:
+            if isinstance(default_value, str) and type_arg != str:
+                # attempt to parse default value, for correctness..
+                # custom function types may implement their own validation
+                default_value = self.to_value_type(default_value, type_arg, member_type, "")
+                if hasattr(default_value, "val"):
+                    default_value = default_value.val
+
+                # fall through to type check, to verify that custom types returned a value of correct type
+
+            if isinstance(type_arg, type) and not isinstance(default_value, type_arg):
+                error(
+                    DefaultValueType,
+                    option_type=type_arg.__name__,
+                    default_value=kwargs["default"],
+                    value_type=type(default_value).__name__,
+                )
+
+            # verify list member types (this is not done by the custom list value type)
+            if type_arg == list:
+                for member_val in default_value:
+                    if not isinstance(member_type, type):
+                        # defer value validation to custom type
+                        member_type(member_val)
+
+                    elif not isinstance(member_val, member_type):
+                        error(
+                            DefaultMemberValueType,
+                            member_type=member_type.__name__,
+                            member_value=member_val,
+                            value_type=type(member_val).__name__,
+                        )
 
         if (
             "passthrough" in kwargs

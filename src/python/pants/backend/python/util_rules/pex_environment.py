@@ -132,7 +132,7 @@ async def find_pex_python(
     global_options: GlobalOptions,
 ) -> PexEnvironment:
     pex_relevant_environment = await Get(
-        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT"])
+        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT", "ASDF_DIR", "ASDF_DATA_DIR"])
     )
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python

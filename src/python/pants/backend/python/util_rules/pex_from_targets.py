@@ -18,13 +18,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexPlatforms,
-    PexRequest,
-    PexRequirements,
-    TwoStepPexRequest,
-)
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -163,21 +157,6 @@ class PexFromTargetsRequest:
         )
 
 
-@dataclass(frozen=True)
-class TwoStepPexFromTargetsRequest:
-    """Request to create a PEX from the closure of a set of targets, in two steps.
-
-    First we create a requirements-only pex. Then we create the full pex on top of that
-    requirements pex, instead of having the full pex directly resolve its requirements.
-
-    This allows us to re-use the requirements-only pex when no requirements have changed (which is
-    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
-    over and over again.
-    """
-
-    pex_from_targets_request: PexFromTargetsRequest
-
-
 @rule(level=LogLevel.DEBUG)
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     if request.direct_deps_only:
@@ -251,7 +230,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         name_reqs = set()  # E.g., foobar>=1.2.3
         name_req_projects = set()
 
-        for req_str in exact_reqs:
+        for req_str in exact_reqs.req_strings:
             req = Requirement.parse(req_str)
             if req.url:  # type: ignore[attr-defined]
                 url_reqs.add(req)
@@ -288,8 +267,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 #  name requirements but different subsets of URL requirements. Fortunately since
                 #  all these repository pexes will have identical pinned versions of everything,
                 #  this is not a correctness issue, only a performance one.
-                # TODO: Address this as part of providing proper lockfile support. However we
-                #  generate lockfiles, they must be able to include URL requirements.
                 all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
                 repository_pex = await Get(
                     Pex,
@@ -311,6 +288,28 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].resolve_all_constraints` is enabled, so "
             "`[python-setup].requirement_constraints` must also be set."
         )
+    elif python_setup.lockfile:
+        # TODO(#12314): This does not handle the case where requirements are disjoint to the
+        #  lockfile. We should likely regenerate the lockfile (or warn/error), as the inputs have
+        #  changed.
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                description=f"Resolving {python_setup.lockfile}",
+                output_filename="lockfile.pex",
+                internal_only=request.internal_only,
+                requirements=PexRequirements(
+                    file_path=python_setup.lockfile,
+                    file_path_description_of_origin=(
+                        "the option `[python-setup].experimental_lockfile`"
+                    ),
+                    is_lockfile=True,
+                ),
+                interpreter_constraints=interpreter_constraints,
+                platforms=request.platforms,
+                additional_args=request.additional_args,
+            ),
+        )
 
     return PexRequest(
         output_filename=request.output_filename,
@@ -325,12 +324,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_args=request.additional_args,
         description=description,
     )
-
-
-@rule
-async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoStepPexRequest:
-    pex_request = await Get(PexRequest, PexFromTargetsRequest, req.pex_from_targets_request)
-    return TwoStepPexRequest(pex_request=pex_request)
 
 
 def rules():

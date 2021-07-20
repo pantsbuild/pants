@@ -95,11 +95,16 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
             )
 
     @classmethod
+    def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
+        """One place to create scope info, to allow subclasses to inject custom scope args."""
+        return ScopeInfo(**scope_info_kwargs)
+
+    @classmethod
     def get_scope_info(cls) -> ScopeInfo:
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
         if cls.options_scope is None:
             raise OptionsError(f"{cls.__name__} must set options_scope.")
-        return ScopeInfo(scope=cast(str, cls.options_scope), optionable_cls=cls)
+        return cls.create_scope_info(scope=cast(str, cls.options_scope), optionable_cls=cls)
 
     @classmethod
     def subscope(cls, scope) -> str:

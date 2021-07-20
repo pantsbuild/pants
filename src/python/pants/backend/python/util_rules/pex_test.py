@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os.path
+import re
 import textwrap
 import zipfile
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import CreateDigest, Digest, Directory, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -73,7 +74,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
             QueryRule(PexPEX, ()),
-        ]
+        ],
     )
 
 
@@ -268,12 +269,77 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
     assert b"ftp_proxy=dummyproxy" in result.stdout
 
 
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
+    sources = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                (
+                    FileContent(
+                        path="main.py",
+                        content=textwrap.dedent(
+                            """
+                            import os
+                            cwd = os.getcwd()
+                            print(f"CWD: {cwd}")
+                            for path, dirs, _ in os.walk(cwd):
+                                for name in dirs:
+                                    print(f"DIR: {os.path.relpath(os.path.join(path, name), cwd)}")
+                            """
+                        ).encode(),
+                    ),
+                )
+            ),
+        ],
+    )
+
+    pex_output = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=pex_type,
+        main=EntryPoint("main"),
+        sources=sources,
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+    )
+
+    pex = pex_output["pex"]
+    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
+
+    dirpath = "foo/bar/baz"
+    runtime_files = rule_runner.request(Digest, [CreateDigest([Directory(path=dirpath)])])
+
+    dirpath_parts = os.path.split(dirpath)
+    for i in range(0, len(dirpath_parts)):
+        working_dir = os.path.join(*dirpath_parts[:i]) if i > 0 else None
+        expected_subdir = os.path.join(*dirpath_parts[i:]) if i < len(dirpath_parts) else None
+        process = rule_runner.request(
+            Process,
+            [
+                pex_process_type(
+                    pex,
+                    description="Run the pex and check its cwd",
+                    working_directory=working_dir,
+                    input_digest=runtime_files,
+                )
+            ],
+        )
+        result = rule_runner.request(ProcessResult, [process])
+        output_str = result.stdout.decode()
+        mo = re.search(r"CWD: (.*)\n", output_str)
+        assert mo is not None
+        reported_cwd = mo.group(1)
+        if working_dir:
+            assert reported_cwd.endswith(working_dir)
+        if expected_subdir:
+            assert f"DIR: {expected_subdir}" in output_str
+
+
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
     pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
-    assert set(parse_requirements(requirements)).issubset(
+    assert set(parse_requirements(requirements.req_strings)).issubset(
         set(parse_requirements(pex_info["requirements"]))
     )
 
