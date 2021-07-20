@@ -18,7 +18,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::{WorkunitState, WorkunitStore};
+use workunit_store::WorkunitStore;
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
@@ -817,7 +817,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
 
 #[tokio::test]
 async fn sends_headers() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
@@ -889,7 +889,7 @@ async fn sends_headers() {
     build_id: String::from("marmosets"),
   };
   command_runner
-    .run(execute_request, context)
+    .run(context, &mut workunit, execute_request)
     .await
     .expect("Execution failed");
 
@@ -1208,7 +1208,6 @@ async fn initial_response_error() {
 
 #[tokio::test]
 async fn initial_response_missing_response_and_error() {
-  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1478,7 +1477,7 @@ async fn execute_missing_file_uploads_if_known() {
 
 #[tokio::test]
 async fn execute_missing_file_errors_if_unknown() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let missing_digest = TestDirectory::containing_roland().digest();
 
   let mock_server = {
@@ -1530,7 +1529,7 @@ async fn execute_missing_file_errors_if_unknown() {
   .unwrap();
 
   let error = runner
-    .run(cat_roland_request(), Context::default())
+    .run(Context::default(), &mut workunit, cat_roland_request())
     .await
     .expect_err("Want error");
   assert_contains(&error, &format!("{}", missing_digest.hash));
@@ -1716,7 +1715,7 @@ async fn extract_execute_response_other_status() {
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkunitStore::setup_for_tests();
+  let (mut workunit_store, _) = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1739,48 +1738,19 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let got_workunit_items: HashSet<(String, WorkunitState)> =
+  let got_workunit_items: HashSet<String> =
     workunit_store.with_latest_workunits(log::Level::Trace, |_, completed| {
       completed
         .iter()
-        .map(|workunit| (workunit.name.clone(), workunit.state.clone()))
+        .map(|workunit| workunit.name.clone())
         .collect()
     });
 
-  use concrete_time::Duration;
-  use concrete_time::TimeSpan;
-
   let wanted_workunit_items = hashset! {
-    (String::from("remote execution action scheduling"),
-     WorkunitState::Completed {
-      time_span: TimeSpan {
-        start: Duration::new(0, 0),
-        duration: Duration::new(1, 0),
-      }
-    },
-    ),
-    (String::from("remote execution worker input fetching"),
-     WorkunitState::Completed {
-        time_span: TimeSpan {
-          start: Duration::new(2, 0),
-          duration: Duration::new(1, 0),
-        }
-      }),
-    (String::from("remote execution worker command executing"),
-     WorkunitState::Completed {
-        time_span: TimeSpan {
-          start: Duration::new(4, 0),
-          duration: Duration::new(1, 0),
-        }
-      }),
-      (String::from("remote execution worker output uploading"),
-      WorkunitState::Completed {
-        time_span: TimeSpan {
-          start: Duration::new(6, 0),
-          duration: Duration::new(1, 0),
-        }
-      }),
-
+    String::from("remote execution action scheduling"),
+    String::from("remote execution worker input fetching"),
+    String::from("remote execution worker command executing"),
+    String::from("remote execution worker output uploading"),
   };
 
   assert!(got_workunit_items.is_superset(&wanted_workunit_items));
@@ -2189,7 +2159,10 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   command_runner: R,
   store: Store,
 ) -> Result<RemoteTestResult, String> {
-  let original = command_runner.run(request, Context::default()).await?;
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let original = command_runner
+    .run(Context::default(), &mut workunit, request)
+    .await?;
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
     .await?
@@ -2234,13 +2207,16 @@ async fn run_command_remote(
   address: String,
   request: MultiPlatformProcess,
 ) -> Result<RemoteTestResult, String> {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .tree(&TestTree::roland_at_root())
     .build();
   let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux);
-  let original = command_runner.run(request, Context::default()).await?;
+  let original = command_runner
+    .run(Context::default(), &mut workunit, request)
+    .await?;
 
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())

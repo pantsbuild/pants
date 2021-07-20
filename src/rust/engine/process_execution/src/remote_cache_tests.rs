@@ -16,7 +16,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use tokio::time::sleep;
-use workunit_store::WorkunitStore;
+use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
@@ -58,8 +58,9 @@ impl MockLocalCommandRunner {
 impl CommandRunnerTrait for MockLocalCommandRunner {
   async fn run(
     &self,
-    _req: MultiPlatformProcess,
     _context: Context,
+    _workunit: &mut RunningWorkunit,
+    _req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
@@ -180,7 +181,7 @@ fn insert_into_action_cache(
 
 #[tokio::test]
 async fn cache_read_success() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
@@ -190,7 +191,7 @@ async fn cache_read_success() {
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
@@ -200,7 +201,7 @@ async fn cache_read_success() {
 /// If the cache has any issues during reads, we should gracefully fallback to the local runner.
 #[tokio::test]
 async fn cache_read_skipped_on_errors() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
@@ -211,7 +212,7 @@ async fn cache_read_skipped_on_errors() {
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -223,9 +224,9 @@ async fn cache_read_skipped_on_errors() {
 /// the cached result with its non-existent digests.
 #[tokio::test]
 async fn cache_read_eager_fetch() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  async fn run_process(eager_fetch: bool) -> (i32, usize) {
+  async fn run_process(eager_fetch: bool, workunit: &mut RunningWorkunit) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
     let (cache_runner, action_cache) =
@@ -242,7 +243,7 @@ async fn cache_read_eager_fetch() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(process.clone().into(), Context::default())
+      .run(Context::default(), workunit, process.clone().into())
       .await
       .unwrap();
 
@@ -250,20 +251,25 @@ async fn cache_read_eager_fetch() {
     (remote_result.exit_code, final_local_count)
   }
 
-  let (lazy_exit_code, lazy_local_call_count) = run_process(false).await;
+  let (lazy_exit_code, lazy_local_call_count) = run_process(false, &mut workunit).await;
   assert_eq!(lazy_exit_code, 0);
   assert_eq!(lazy_local_call_count, 0);
 
-  let (eager_exit_code, eager_local_call_count) = run_process(true).await;
+  let (eager_exit_code, eager_local_call_count) = run_process(true, &mut workunit).await;
   assert_eq!(eager_exit_code, 1);
   assert_eq!(eager_local_call_count, 1);
 }
 
 #[tokio::test]
 async fn cache_read_speculation() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  async fn run_process(local_delay_ms: u64, remote_delay_ms: u64, cache_hit: bool) -> (i32, usize) {
+  async fn run_process(
+    local_delay_ms: u64,
+    remote_delay_ms: u64,
+    cache_hit: bool,
+    workunit: &mut RunningWorkunit,
+  ) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
     let (cache_runner, action_cache) =
@@ -276,7 +282,7 @@ async fn cache_read_speculation() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(process.clone().into(), Context::default())
+      .run(Context::default(), workunit, process.clone().into())
       .await
       .unwrap();
 
@@ -285,24 +291,24 @@ async fn cache_read_speculation() {
   }
 
   // Case 1: remote is faster than local.
-  let (exit_code, local_call_count) = run_process(200, 0, true).await;
+  let (exit_code, local_call_count) = run_process(200, 0, true, &mut workunit).await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
   // Case 2: local is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 200, true).await;
+  let (exit_code, local_call_count) = run_process(0, 200, true, &mut workunit).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
   // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(200, 0, false).await;
+  let (exit_code, local_call_count) = run_process(200, 0, false, &mut workunit).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 }
 
 #[tokio::test]
 async fn cache_write_success() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
@@ -312,7 +318,7 @@ async fn cache_write_success() {
   assert!(action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);
@@ -333,7 +339,7 @@ async fn cache_write_success() {
 
 #[tokio::test]
 async fn cache_write_not_for_failures() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
@@ -343,7 +349,7 @@ async fn cache_write_not_for_failures() {
   assert!(action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 1);
@@ -357,7 +363,7 @@ async fn cache_write_not_for_failures() {
 /// Cache writes should be async and not block the CommandRunner from returning.
 #[tokio::test]
 async fn cache_write_does_not_block() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
   let (cache_runner, action_cache) =
@@ -368,7 +374,7 @@ async fn cache_write_does_not_block() {
   assert!(action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
-    .run(process.clone().into(), Context::default())
+    .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);
@@ -535,8 +541,9 @@ async fn make_action_result_basic() {
   impl CommandRunnerTrait for MockCommandRunner {
     async fn run(
       &self,
-      _req: MultiPlatformProcess,
       _context: Context,
+      _workunit: &mut RunningWorkunit,
+      _req: MultiPlatformProcess,
     ) -> Result<FallibleProcessResultWithPlatform, String> {
       unimplemented!()
     }
@@ -546,7 +553,6 @@ async fn make_action_result_basic() {
     }
   }
 
-  WorkunitStore::setup_for_tests();
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();

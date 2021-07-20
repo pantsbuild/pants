@@ -68,8 +68,8 @@ impl AsyncSemaphore {
   ///
   pub async fn with_acquired<F, B, O>(self, f: F) -> O
   where
-    F: FnOnce(usize) -> B + Send + 'static,
-    B: Future<Output = O> + Send + 'static,
+    F: FnOnce(usize) -> B,
+    B: Future<Output = O>,
   {
     let permit = self.acquire().await;
     let res = f(permit.id).await;

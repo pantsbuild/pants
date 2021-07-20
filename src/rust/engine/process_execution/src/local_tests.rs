@@ -18,7 +18,7 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::WorkunitStore;
+use workunit_store::{RunningWorkunit, WorkunitStore};
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -30,8 +30,6 @@ struct LocalTestResult {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
     .await
     .unwrap();
@@ -45,8 +43,6 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(Process::new(owned_string_vec(&[
     "/bin/bash",
     "-c",
@@ -64,8 +60,6 @@ async fn stdout_and_stderr_and_exit_code() {
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  WorkunitStore::setup_for_tests();
-
   // Launch a process that kills itself with a signal.
   let result = run_command_locally(Process::new(owned_string_vec(&[
     "/bin/bash",
@@ -85,8 +79,6 @@ async fn capture_exit_code_signal() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env() {
-  WorkunitStore::setup_for_tests();
-
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
   env.insert("BAR".to_string(), "not foo".to_string());
@@ -116,8 +108,6 @@ async fn env() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  WorkunitStore::setup_for_tests();
-
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
     env.insert("FOO".to_string(), "foo".to_string());
@@ -133,8 +123,6 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  WorkunitStore::setup_for_tests();
-
   let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
     .expect_err("Want Err");
@@ -144,8 +132,6 @@ async fn binary_not_found() {
 
 #[tokio::test]
 async fn output_files_none() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(Process::new(owned_string_vec(&[
     &find_bash(),
     "-c",
@@ -162,8 +148,6 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -187,8 +171,6 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -217,8 +199,6 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -246,8 +226,6 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -274,8 +252,6 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -303,8 +279,6 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -329,8 +303,6 @@ async fn output_overlapping_file_and_dir() {
 
 #[tokio::test]
 async fn append_only_cache_created() {
-  WorkunitStore::setup_for_tests();
-
   let name = "geo";
   let dest = format!(".cache/{}", name);
   let cache_name = CacheName::new(name.to_owned()).unwrap();
@@ -351,8 +323,6 @@ async fn append_only_cache_created() {
 
 #[tokio::test]
 async fn jdk_symlink() {
-  WorkunitStore::setup_for_tests();
-
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let roland = TestData::roland().bytes();
   std::fs::write(
@@ -377,7 +347,7 @@ async fn jdk_symlink() {
 
 #[tokio::test]
 async fn test_directory_preservation() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
@@ -414,6 +384,7 @@ async fn test_directory_preservation() {
     process,
     preserved_work_root.clone(),
     false,
+    &mut workunit,
     Some(store),
     Some(executor),
   )
@@ -457,7 +428,7 @@ async fn test_directory_preservation() {
 
 #[tokio::test]
 async fn test_directory_preservation_error() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
@@ -469,6 +440,7 @@ async fn test_directory_preservation_error() {
     Process::new(vec!["doesnotexist".to_owned()]),
     preserved_work_root.clone(),
     false,
+    &mut workunit,
     None,
     None,
   )
@@ -482,8 +454,6 @@ async fn test_directory_preservation_error() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -514,8 +484,6 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  WorkunitStore::setup_for_tests();
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -539,8 +507,6 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
-  WorkunitStore::setup_for_tests();
-
   let argv = vec![
     find_bash(),
     "-c".to_owned(),
@@ -561,7 +527,7 @@ async fn timeout() {
 
 #[tokio::test]
 async fn working_directory() {
-  WorkunitStore::setup_for_tests();
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
@@ -595,6 +561,7 @@ async fn working_directory() {
     process,
     work_dir.path().to_owned(),
     true,
+    &mut workunit,
     Some(store),
     Some(executor),
   )
@@ -612,15 +579,17 @@ async fn working_directory() {
 }
 
 async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
-  run_command_locally_in_dir(req, work_dir_path, true, None, None).await
+  run_command_locally_in_dir(req, work_dir_path, true, &mut workunit, None, None).await
 }
 
 async fn run_command_locally_in_dir(
   req: Process,
   dir: PathBuf,
   cleanup: bool,
+  workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, String> {
@@ -636,7 +605,7 @@ async fn run_command_locally_in_dir(
     NamedCaches::new(named_cache_dir.path().to_owned()),
     cleanup,
   );
-  let original = runner.run(req.into(), Context::default()).await?;
+  let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
     .await?
