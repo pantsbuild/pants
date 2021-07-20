@@ -27,8 +27,8 @@ class Shfmt(TemplatedExternalTool):
         "https://github.com/mvdan/sh/releases/download/{version}/shfmt_{version}_{platform}"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "darwin_arm64", 
-        "macos_x86_64": "darwin_amd64", 
+        "macos_arm64": "darwin_arm64",
+        "macos_x86_64": "darwin_amd64",
         "linux_x86_64": "linux_amd64",
     }
 

@@ -67,8 +67,8 @@ class CoursierBinary(TemplatedExternalTool):
         "https://github.com/coursier/coursier/releases/download/{version}/cs-{platform}"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "x86_64-apple-darwin", 
-        "macos_x86_64": "x86_64-apple-darwin", 
+        "macos_arm64": "x86_64-apple-darwin",
+        "macos_x86_64": "x86_64-apple-darwin",
         "linux_x86_64": "x86_64-pc-linux",
     }
 

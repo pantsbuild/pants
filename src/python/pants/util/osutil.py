@@ -1,12 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import errno
 import logging
 import os
 import posix
 from functools import reduce
-from typing import Iterable, Optional, Set, Dict
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,7 @@ def normalize_os_name(os_name: str) -> str:
     return _normalize(os_name, OS_ALIASES, "operating system")
 
 
-def _normalize(name: str, aliases: Dict[str, Set[str]], warning_hint: str) -> str:
+def _normalize(name: str, aliases: dict[str, set[str]], warning_hint: str) -> str:
     for proper_name, alias_set in aliases.items():
         if name in alias_set:
             return proper_name
@@ -93,7 +95,7 @@ def get_normalized_arch_name() -> str:
     return normalize_arch_name(get_arch_name())
 
 
-def _values(aliases: Dict[str, Set[str]]) -> Set[str]:
+def _values(aliases: dict[str, set[str]]) -> set[str]:
     return reduce(set.union, aliases.values())
 
 

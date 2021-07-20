@@ -30,8 +30,7 @@ class SuccinctCodeCounter(TemplatedExternalTool):
         "2.12.0|linux-x86_64|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
     ]
     default_url_template = (
-        "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-"
-        "{platform}.zip"
+        "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-" "{platform}.zip"
     )
     default_url_platform_mapping = {
         "macos_arm64": "x86_64-apple-darwin",  # TODO: use native arm64 binary for version 3.0

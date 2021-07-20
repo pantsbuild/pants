@@ -19,7 +19,7 @@ class Platform(Enum):
 
     @classmethod
     def _missing_(cls, old_platform):
-        ''' Support access to old Intel platform designators by name. '''
+        """Support access to old Intel platform designators by name."""
         if old_platform == "linux":
             Platform.deprecated_due_to_no_architecture()
             return cls.linux_x86_64
@@ -31,26 +31,28 @@ class Platform(Enum):
 
     @memoized_classproperty
     def linux(cls) -> Platform:
-        ''' Deprecated, backward-compatible notation for linux on Intel. '''
+        """Deprecated, backward-compatible notation for linux on Intel."""
         Platform.deprecated_due_to_no_architecture()
-        return cls.linux_x86_64
+        return Platform.linux_x86_64
 
     @memoized_classproperty
     def darwin(cls) -> Platform:
-        ''' Deprecated, backward-compatible notation for Mac OS on Intel. '''
+        """Deprecated, backward-compatible notation for Mac OS on Intel."""
         Platform.deprecated_due_to_no_architecture()
-        return cls.macos_x86_64
+        return Platform.macos_x86_64
 
     def matches(self, value):
-        ''' Returns true if the provided value is the value for this platform,
-        or if the provided value is the value for the deprecated platform symbol
-        from before we qualified based on architecture. When deprecation is complete,
-        replace uses of this method with `platform.value == value`. '''
+        """Returns true if the provided value is the value for this platform, or if the provided
+        value is the value for the deprecated platform symbol from before we qualified based on
+        architecture.
+
+        When deprecation is complete, replace uses of this method with `platform.value == value`.
+        """
         if self.value == value:
             return True
         elif value == "linux" and self == Platform.linux_x86_64:
             Platform.deprecated_due_to_no_architecture()
-            return True 
+            return True
         elif value == "darwin" and self == Platform.macos_x86_64:
             Platform.deprecated_due_to_no_architecture()
             return True
@@ -65,10 +67,9 @@ class Platform(Enum):
     @staticmethod
     def deprecated_due_to_no_architecture():
         deprecated.warn_or_error(
-            removal_version="2.100.0.dev0", 
-            entity="Using a platform without an architecture qualifier (`linux` or `darwin`). `x86_64` is assumed for now.", 
+            removal_version="2.8.0.dev0",
+            entity="Using a platform without an architecture qualifier (`linux` or `darwin`). `x86_64` is assumed for now.",
             hint="Use the qualified platforms `linux_x86_64` or `macos_x86_64` for Intel architectures, or `macos_arm64` for ARM.",
-            start_version="2.7.0.dev0",
             print_warning=True,
         )
 
@@ -82,4 +83,3 @@ def current_platform() -> Platform:
 
 def rules() -> Iterable[Rule]:
     return collect_rules()
-

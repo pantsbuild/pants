@@ -28,8 +28,8 @@ class Shellcheck(TemplatedExternalTool):
         "{version}.{platform}.tar.xz"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "darwin.x86_64", 
-        "macos_x86_64": "darwin.x86_64", 
+        "macos_arm64": "darwin.x86_64",
+        "macos_x86_64": "darwin.x86_64",
         "linux_x86_64": "linux.x86_64",
     }
 
