@@ -65,10 +65,10 @@ class Platform(Enum):
     @staticmethod
     def deprecated_due_to_no_architecture():
         deprecated.warn_or_error(
-            removal_version="2.100", 
+            removal_version="2.100.0.dev0", 
             entity="Using a platform without an architecture qualifier (`linux` or `darwin`). `x86_64` is assumed for now.", 
             hint="Use the qualified platforms `linux_x86_64` or `macos_x86_64` for Intel architectures, or `macos_arm64` for ARM.",
-            start_version="2.6",
+            start_version="2.7.0.dev0",
             print_warning=True,
         )
 
