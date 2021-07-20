@@ -211,16 +211,23 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     # markers, we evaluate them as one whole, and then AND with the new marker for the Python constraint.
     # E.g. (marker1 AND marker2 OR marker3...) AND (python_version)
     # rather than (marker1 AND marker2 OR marker3 AND python_version)
-    return (
-        f"{base}"
-        f"{';' if len(markers_lookup) > 0 else ''}"
-        f"{'(' if (' and ' in markers_lookup or ' or ' in markers_lookup) else ''}"
-        f"{markers_lookup}"
-        f"{';' if python_lookup and not markers_lookup else ''}"
-        f"{')' if (' and ' in markers_lookup or ' or ' in markers_lookup) else ''}"
-        f"{' and ' if python_lookup and markers_lookup else ''}"
-        f"{python_lookup}"
-    )
+    if not markers_lookup and not python_lookup:
+        return base
+
+    result = base
+    if markers_lookup or python_lookup:
+        result += ";"
+        result += "("
+    if markers_lookup:
+        result += markers_lookup
+        result += ")"
+    if python_lookup and markers_lookup:
+        result += " and ("
+    if python_lookup:
+        result += python_lookup
+        result += ")"
+
+    return result
 
 
 def handle_dict_attr(

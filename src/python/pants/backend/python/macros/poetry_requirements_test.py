@@ -5,15 +5,15 @@ from __future__ import annotations
 
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Iterable, List
+from typing import Any, Iterable
 
 import pytest
 from packaging.version import Version
 from pkg_resources import Requirement
-from typing_extensions import TypedDict
 
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirements,
+    PyprojectAttr,
     PyProjectToml,
     add_markers,
     get_max_caret,
@@ -29,23 +29,6 @@ from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-
-PyprojectAttr = TypedDict(
-    "PyprojectAttr",
-    {
-        "extras": List[str],
-        "git": str,
-        "rev": str,
-        "branch": str,
-        "python": str,
-        "markers": str,
-        "tag": str,
-        "version": str,
-        "url": str,
-        "path": str,
-    },
-    total=False,
-)
 
 
 @pytest.mark.parametrize(
@@ -108,7 +91,7 @@ def test_add_markers() -> None:
     attr_mark = PyprojectAttr({"markers": "platform_python_implementation == 'CPython'"})
     assert (
         add_markers("foo==1.0.0", attr_mark, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython'"
+        == "foo==1.0.0;(platform_python_implementation == 'CPython')"
     )
 
     attr_mark_adv = PyprojectAttr(
@@ -123,14 +106,14 @@ def test_add_markers() -> None:
 
     assert (
         add_markers("foo==1.0.0", attr_basic_both, "somepath")
-        == "foo==1.0.0;platform_python_implementation == 'CPython' and python_version == '3.6'"
+        == "foo==1.0.0;(platform_python_implementation == 'CPython') and (python_version == '3.6')"
     )
     attr_adv_py_both = PyprojectAttr(
         {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
     )
     assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
-        "foo==1.0.0;platform_python_implementation == 'CPython' and "
-        "python_version >= '3.6' and python_version< '4.0'"
+        "foo==1.0.0;(platform_python_implementation == 'CPython') and "
+        "(python_version >= '3.6' and python_version< '4.0')"
     )
 
     attr_adv_both = PyprojectAttr(
@@ -141,7 +124,7 @@ def test_add_markers() -> None:
     )
     assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
         "foo==1.0.0;(platform_python_implementation == 'CPython' or "
-        "sys_platform == 'win32') and python_version >= '3.6' and python_version< '4.0'"
+        "sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')"
     )
 
 
@@ -205,7 +188,7 @@ def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
                 "python": "3.6",
             }
         ),
-        "@main;platform_python_implementation == 'CPython' and python_version == '3.6'",
+        "@main;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
     )
 
 
@@ -253,7 +236,7 @@ def test_handle_path_arg(tmp_path: Path) -> None:
 
     assert (
         handle_dict_attr("my_py_proj", file_attr_mark, one_pyproject_toml)
-        == f"my_py_proj @ file://{external_file};os_name=='darwin'"
+        == f"my_py_proj @ file://{external_file};(os_name=='darwin')"
     )
 
     assert (
@@ -287,7 +270,7 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
     attr_with_mark.update(attr)
     assert (
         handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml)
-        == "my_py_proj @ https://my-site.com/mydep.whl;os_name=='darwin'"
+        == "my_py_proj @ https://my-site.com/mydep.whl;(os_name=='darwin')"
     )
 
 
@@ -301,18 +284,18 @@ def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
         attr = PyprojectAttr({"version": "1.2.3", "python": py_req})
         assert handle_dict_attr("foo", attr, empty_pyproject_toml) == f"foo ==1.2.3;{suffix}"
 
-    assert_py_constraints("3.6", "python_version == '3.6'")
-    assert_py_constraints("3.6 || 3.7", "(python_version == '3.6') or (python_version == '3.7')")
-    assert_py_constraints(">3.6,!=3.7", "python_version > '3.6' and python_version != '3.7'")
+    assert_py_constraints("3.6", "(python_version == '3.6')")
+    assert_py_constraints("3.6 || 3.7", "((python_version == '3.6') or (python_version == '3.7'))")
+    assert_py_constraints(">3.6,!=3.7", "(python_version > '3.6' and python_version != '3.7')")
     assert_py_constraints(
         ">3.6 || 3.5,3.4",
-        "(python_version > '3.6') or (python_version == '3.5' and python_version == '3.4')",
+        "((python_version > '3.6') or (python_version == '3.5' and python_version == '3.4'))",
     )
     assert_py_constraints(
         "~3.6 || ^3.7",
         (
-            "(python_version >= '3.6' and python_version< '3.7') or "
-            "(python_version >= '3.7' and python_version< '4.0')"
+            "((python_version >= '3.6' and python_version< '3.7') or "
+            "(python_version >= '3.7' and python_version< '4.0'))"
         ),
     )
 
