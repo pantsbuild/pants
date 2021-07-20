@@ -4,7 +4,7 @@
 from typing import Tuple, cast
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -67,8 +67,8 @@ class DocformatterLockfileSentinel(PythonToolLockfileSentinel):
 @rule
 def setup_lockfile_request(
     _: DocformatterLockfileSentinel, docformatter: Docformatter
-) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(docformatter)
+) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(docformatter)
 
 
 def rules():
