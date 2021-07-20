@@ -32,6 +32,7 @@ class GoPackage(Target):
 
 
 class GoModuleSources(Sources):
+    alias = "_sources"
     default = ("go.mod", "go.sum")
 
 
