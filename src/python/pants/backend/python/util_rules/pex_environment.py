@@ -235,7 +235,6 @@ class CompletePexEnvironment:
         """
         d = dict(
             PATH=create_path_env_var(self._pex_environment.path),
-            PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             PEX_ROOT=str(self.pex_root),
             **self._pex_environment.subprocess_environment_dict,
