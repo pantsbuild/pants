@@ -7,7 +7,7 @@ import os.path
 from typing import Iterable, cast
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -132,8 +132,8 @@ class IsortLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule
-def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(isort)
+def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(isort)
 
 
 def rules():

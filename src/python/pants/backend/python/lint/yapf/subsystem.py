@@ -7,7 +7,7 @@ import os.path
 from typing import Iterable, cast
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -123,8 +123,8 @@ class YapfLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule
-def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(yapf)
+def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(yapf)
 
 
 def rules():

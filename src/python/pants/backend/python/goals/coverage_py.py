@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple, cast
 import toml
 
 from pants.backend.experimental.python.lockfile import (
-    PythonToolLockfileRequest,
+    PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -224,8 +224,8 @@ class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
 @rule
 def setup_coverage_lockfile(
     _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
-) -> PythonToolLockfileRequest:
-    return PythonToolLockfileRequest.from_tool(coverage)
+) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(coverage)
 
 
 @dataclass(frozen=True)

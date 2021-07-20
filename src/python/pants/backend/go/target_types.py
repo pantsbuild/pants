@@ -15,13 +15,63 @@ class GoPackageSources(GoSources):
 class GoImportPath(StringField):
     # TODO: Infer the import path from the closest ancestor `go_module` target once that target is supported.
     alias = "import_path"
-    help = "Import path in Go code to import this package."
+    help = "Import path in Go code to import this package or module."
+
+
+class GoPackageDependencies(Dependencies):
+    pass
 
 
 class GoPackage(Target):
     alias = "go_package"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoPackageSources, GoImportPath)
+    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependencies, GoPackageSources, GoImportPath)
     help = "A single Go package."
+
+
+# `go_module` target
+
+
+class GoModuleSources(Sources):
+    alias = "_sources"
+    default = ("go.mod", "go.sum")
+
+
+class GoModule(Target):
+    alias = "go_module"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        GoModuleSources,
+    )
+    help = "First-party Go module."
+
+
+# `go_external_module`
+
+
+class GoExternalModulePath(StringField):
+    alias = "path"
+    help = "Module path to a Go module"
+
+
+class GoExternalModuleVersion(StringField):
+    alias = "version"
+    help = "Version of a Go module"
+
+
+class GoExternalModule(Target):
+    alias = "go_external_module"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        GoExternalModulePath,
+        GoExternalModuleVersion,
+        GoImportPath,
+    )
+    help = "External Go module."
+
+
+# `go_binary` target
 
 
 class GoBinaryName(StringField):

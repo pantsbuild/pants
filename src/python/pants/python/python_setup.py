@@ -55,7 +55,7 @@ class PythonSetup(Subsystem):
                 "This is used by Pants to robustly handle interpreter constraints, such as knowing "
                 "when generating lockfiles which Python versions to check if your code is "
                 "using.\n\n"
-                "This does not set your code's interpreter constraints. Instead, to set your "
+                "This does not control which interpreter your code will use. Instead, to set your "
                 "interpreter constraints, update `[python-setup].interpreter_constraints`, the "
                 "`interpreter_constraints` field, and relevant tool options like "
                 "`[isort].interpreter_constraints` to tell Pants which interpreters your code "
