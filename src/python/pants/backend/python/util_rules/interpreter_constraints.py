@@ -238,6 +238,70 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             allowed_versions=py38_and_later, prior_version="3.7"
         )
 
+    def partition_by_major_minor_versions(
+        self, interpreter_universe: Iterable[str]
+    ) -> tuple[InterpreterConstraints, ...]:
+        """Create a distinct InterpreterConstraints value for each CPython major-minor version that
+        is compatible with the original constraints."""
+        if any(req.project_name != "CPython" for req in self):
+            raise AssertionError(
+                "This function only works with CPython interpreter constraints for now."
+            )
+
+        def all_valid_patch_versions(major_minor: str) -> list[int]:
+            return [
+                p
+                for p in range(0, _EXPECTED_LAST_PATCH_VERSION + 1)
+                for req in self
+                if req.specifier.contains(f"{major_minor}.{p}")  # type: ignore[attr-defined]
+            ]
+
+        result = []
+
+        def maybe_add_version(major_minor: str) -> None:
+            major, minor = _major_minor_to_int(major_minor)
+            next_major_minor = f"{major}.{minor + 1}"
+
+            valid_patch_versions = all_valid_patch_versions(major_minor)
+            if not valid_patch_versions:
+                return
+
+            if len(valid_patch_versions) == 1:
+                result.append(
+                    InterpreterConstraints([f"=={major_minor}.{valid_patch_versions[0]}"])
+                )
+                return
+
+            skipped_patch_versions = _not_in_contiguous_range(valid_patch_versions)
+            first_patch_supported = valid_patch_versions[0] == 0
+            last_patch_supported = valid_patch_versions[-1] == _EXPECTED_LAST_PATCH_VERSION
+            if not skipped_patch_versions and first_patch_supported and last_patch_supported:
+                constraint = f"=={major_minor}.*"
+            else:
+                min_constraint = (
+                    f">={major_minor}"
+                    if first_patch_supported
+                    else f">={major_minor}.{valid_patch_versions[0]}"
+                )
+                max_constraint = (
+                    f"<{next_major_minor}"
+                    if last_patch_supported
+                    else f"<={major_minor}.{valid_patch_versions[-1]}"
+                )
+                if skipped_patch_versions:
+                    skipped_constraints = ",".join(
+                        f"!={major_minor}.{p}" for p in skipped_patch_versions
+                    )
+                    constraint = f"{min_constraint},{max_constraint},{skipped_constraints}"
+                else:
+                    constraint = f"{min_constraint},{max_constraint}"
+
+            result.append(InterpreterConstraints([constraint]))
+
+        for major_minor in sorted(interpreter_universe, key=_major_minor_to_int):
+            maybe_add_version(major_minor)
+        return tuple(result)
+
     def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)
 
@@ -247,3 +311,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
+
+
+def _not_in_contiguous_range(nums: list[int]) -> list[int]:
+    # Expects list to already be sorted and have 1+ elements.
+    expected = {i for i in range(nums[0], nums[-1])}
+    return sorted(expected - set(nums))
