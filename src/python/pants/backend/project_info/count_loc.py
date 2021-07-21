@@ -35,7 +35,7 @@ class SuccinctCodeCounter(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "x86_64-apple-darwin",  # TODO: use native arm64 binary for version 3.0
         "macos_x86_64": "x86_64-apple-darwin",
-        "linux-x86_64": "x86_64-unknown-linux",
+        "linux_x86_64": "x86_64-unknown-linux",
     }
 
     @classmethod
