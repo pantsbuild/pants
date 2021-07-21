@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Dict, List, Mapping, Set, Tuple, cast
+from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
@@ -591,13 +591,15 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
         for request in entry_point_requests
     )
-    source_with_binaries = dict()
-    for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
-        if binary_entry_point.val is not None:
-            source_with_binaries[key] = binary_entry_point.val.spec
+
+    entry_points_from_with_binaries = {
+        key: binary_entry_point.val.spec
+        for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points)
+        if binary_entry_point.val is not None
+    }
 
     # Collect entry points from `python_distribution(entry_points=...)`
-    source_entry_points = dict()
+    entry_points_from_field = {}
     if exported_target.target.has_field(PythonDistributionEntryPoints):
         entry_points_field = await Get(
             ResolvedPythonDistributionEntryPoints,
@@ -606,22 +608,22 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             ),
         )
 
-        if entry_points_field.val:
-            for key, section in entry_points_field.val.items():
-                source_entry_points[key] = {
-                    name: entry_point.spec for name, entry_point in section.items()
-                }
+        entry_points_from_field = {
+            key: {name: pexable.entry_point.spec for name, pexable in section.items()}
+            for key, section in entry_points_field.val.items()
+        }
 
-    # Collect any entry points from the setup_py() object.
-    source_provides = dict()
-    if "entry_points" in setup_kwargs:
-        source_provides = setup_kwargs["entry_points"]
+    # Collect any entry points from the setup_py() object. Note that this was already normalized in
+    # `python_artifacts.py`.
+    entry_points_from_provides = setup_kwargs.get("entry_points", {})
 
     # Gather entry points with source description for any error messages when merging them.
     entry_point_sources = {
-        f"{exported_addr} `provides.with_binaries()`": {"console_scripts": source_with_binaries},
-        f"{exported_addr} `entry_points`": source_entry_points,
-        f"{exported_addr} `provides.entry_points`": source_provides,
+        f"{exported_addr} `provides.with_binaries()`": {
+            "console_scripts": entry_points_from_with_binaries
+        },
+        f"{exported_addr} `entry_points`": entry_points_from_field,
+        f"{exported_addr} `provides.entry_points`": entry_points_from_provides,
     }
     # Merge all collected entry points and add them to the dist's entry points.
     entry_points = merge_entry_points(*list(entry_point_sources.items()))
@@ -919,7 +921,7 @@ def find_packages(
     """
     # Find all packages implied by the sources.
     packages: Set[str] = set()
-    package_data: Dict[str, List[str]] = defaultdict(list)
+    package_data: DefaultDict[str, List[str]] = defaultdict(list)
     for python_file in python_files:
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
@@ -1011,25 +1013,23 @@ def merge_entry_points(
     *all_entry_points_with_descriptions_of_source: Tuple[str, Dict[str, Dict[str, str]]]
 ) -> Dict[str, List[str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
-    # keep source_name info for each entry_point until we have merged all
-    # sources, so we can provide better error messages in case of conflicts
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
-        Dict[str, Dict[str, List[Tuple[str, str]]]],
+        DefaultDict[str, DefaultDict[str, List[Tuple[str, str]]]],
         defaultdict(partial(defaultdict, list)),
     )
 
-    for source_name, source_entry_points in all_entry_points_with_descriptions_of_source:
+    for description_of_source, source_entry_points in all_entry_points_with_descriptions_of_source:
         for section, values in source_entry_points.items():
             for name, entry_point in values.items():
-                merged[section][name].append((source_name, entry_point))
+                merged[section][name].append((description_of_source, entry_point))
 
     def _merge_entry_point(section, name, values):
         if len(values) > 1:
             raise ValueError(
                 f"Multiple entry_points registered for {section} {name} in: {', '.join(v[0] for v in values)}"
             )
-        for source_name, entry_point in values:
+        for _, entry_point in values:
             return f"{name}={entry_point}"
 
     return {

@@ -8,10 +8,11 @@ defined in `target_types.py`.
 """
 
 import dataclasses
+import logging
 import os.path
 from collections import defaultdict
 from textwrap import dedent
-from typing import Generator, Tuple
+from typing import DefaultDict, Dict, Generator, Optional, Tuple
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
@@ -22,6 +23,7 @@ from pants.backend.python.target_types import (
     PexEntryPointField,
     PythonDistributionDependencies,
     PythonDistributionEntryPoints,
+    PythonDistributionPexableEntryPoint,
     PythonProvidesField,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
@@ -43,14 +45,18 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Determining the entry point for a `pex_binary` target")
+@rule(desc="Determining the entry point for a `pex_binary` target", level=LogLevel.DEBUG)
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
     address = request.entry_point_field.address
@@ -158,14 +164,14 @@ def _classify_entry_points(
 ) -> Generator[Tuple[bool, str, str, str], None, None]:
     """Looks at each entry point to see if it is a target address or not.
 
-    Returns a tuple of tuples: IsTarget, section, name, ref.
+    Yields tuples: is_target, section, name, ref.
     """
     for section, values in entry_points.items():
         for name, ref in values.items():
             yield ref.startswith(":") or "/" in ref, section, name, ref
 
 
-@rule(desc="Determining the entry points for a `python_distribution` target")
+@rule(desc="Determining the entry points for a `python_distribution` target", level=LogLevel.DEBUG)
 async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:
@@ -192,8 +198,11 @@ async def resolve_python_distribution_entry_points(
     for target in targets:
         if not target.has_field(PexEntryPointField):
             raise InvalidFieldException(
-                f'The "entry_points" target address {target.address} does not resolve '
-                f"to a pex_binary, but: {target.alias}"
+                "All target addresses in the entry_points field must be for pex_binary targets, "
+                f"but the target {address} includes the value {target.address}, which has the "
+                f"target type {target.alias}.\n\n"
+                'Alternatively, you can use a module like "project.app:main". '
+                f"See {doc_url('python-distributions')}."
             )
 
     binary_entry_points = await MultiGet(
@@ -207,14 +216,21 @@ async def resolve_python_distribution_entry_points(
         target.address: entry_point for target, entry_point in zip(targets, binary_entry_points)
     }
 
-    entry_points: dict[str, dict[str, EntryPoint]] = defaultdict(dict)
+    entry_points: DefaultDict[str, Dict[str, PythonDistributionPexableEntryPoint]] = defaultdict(
+        dict
+    )
 
-    # parse refs/replace with resolved pex entry point, and validate console entry points have function
+    # Parse refs/replace with resolved pex entry point, and validate console entry points have function.
     for is_target, section, name, ref in classified_entry_points:
+        owner: Optional[Address] = None
         if is_target:
-            entry_point = binary_entry_point_by_address[address_by_ref[ref]].val
-            # ResolvedPexEntryPoint.val is Optional[EntryPoint]
+            owner = address_by_ref[ref]
+            entry_point = binary_entry_point_by_address[owner].val
             if entry_point is None:
+                logger.warning(
+                    f"The entry point {name} in {section} references a pex binary {ref}, "
+                    f"which has set its entry point to '<none>'."
+                )
                 continue
         else:
             entry_point = EntryPoint.parse(ref, f"{name} for {address} {section}")
@@ -232,7 +248,7 @@ async def resolve_python_distribution_entry_points(
                 )
             )
 
-        entry_points[section][name] = entry_point
+        entry_points[section][name] = PythonDistributionPexableEntryPoint(entry_point, owner)
 
     return ResolvedPythonDistributionEntryPoints(
         FrozenDict({key: FrozenDict(value) for key, value in entry_points.items()})
@@ -262,28 +278,32 @@ async def inject_python_distribution_dependencies(
         ),
     )
 
-    entry_point_addresses = Addresses()
-
-    if entry_points.val:
+    if not entry_points.val:
+        entry_point_addresses = Addresses()
+    else:
+        entry_point_addresses = entry_points.pex_binary_addresses
         address = original_tgt.target.address
-        all_entry_points = [
+        all_module_entry_points = [
             (key, name, entry_point)
-            for key, section in entry_points.val.items()
+            for key, section in entry_points.explicit_modules.items()
             for name, entry_point in section.items()
         ]
-        all_owners = await MultiGet(
-            Get(PythonModuleOwners, PythonModule(entry_point.module))
-            for _, _, entry_point in all_entry_points
+        all_module_owners = iter(
+            await MultiGet(
+                Get(PythonModuleOwners, PythonModule(entry_point.module))
+                for _, _, entry_point in all_module_entry_points
+            )
         )
-        for (key, name, entry_point), owners in zip(all_entry_points, all_owners):
+        for (key, name, entry_point), owners in zip(all_module_entry_points, all_module_owners):
             field_str = repr({key: {name: entry_point.spec}})
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 owners.ambiguous,
                 address,
                 import_reference="module",
                 context=(
-                    f"The distribution target {address} has the field "
-                    f"`entry_points={field_str}`"
+                    f"The python_distribution target {address} has the field "
+                    f"`entry_points={field_str}`, which maps to the Python module"
+                    f"`{entry_point.module}`"
                 ),
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)

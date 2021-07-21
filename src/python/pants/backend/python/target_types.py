@@ -23,7 +23,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -728,41 +728,80 @@ class PythonProvidesField(ScalarField, ProvidesField):
 class PythonDistributionEntryPoints(NestedDictStringToStringField, AsyncFieldMixin):
     alias = "entry_points"
     required = False
-    help = dedent(
-        """\
-        Any entry points, such as `console_scripts` and `gui_scripts`.
+    help = (
+        "Any entry points, such as `console_scripts` and `gui_scripts`.\n"
+        "\n"
+        "Specify as a nested dictionary, with a dictionary for each type of entry point, "
+        "e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to "
+        'either a setuptools entry point ("path.to.module:func") or a Pants target address to a '
+        "pex_binary target.\n\n"
+        + dedent(
+            """\
+            Example:
 
-        Specify as a nested dictionary, with a dictionary for each type of entry point,
-        e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to
-        either a setuptools entry point ("path.to.module:func") or a Pants target address to a
-        pex_binary target.
-        Example:
+                entry_points={
+                  "console_scripts": {
+                    "my-script": "project.app:main",
+                    "another-script": "project/subdir:pex_binary_tgt"
+                  }
+                }
 
-            entry_points={
-              "console_scripts": {
-                "my-script": "project.app:main",
-                "another-script": "project/subdir:pex_binary_tgt"
-              }
-            }
+            """
+        )
+        + "Note that Pants will assume that any value that either starts with `:` or has `/` in it, "
+        "is a target address to a pex_binary target. Otherwise, it will assume it's a setuptools "
+        "entry point as defined by "
+        "https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use "
+        "`//` as a prefix for target addresses if you need to disambiguate.\n\n"
+        + dedent(
+            """\
+            Pants will attempt to infer dependencies, which you can confirm by running:
 
-        Note that Pants will assume any value that starts with `:` or with `/` in it, is a target
-        address to a pex_binary target. Otherwise, it will assume it's a setuptools entry point as
-        defined by
-        https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use
-        `//` as a prefix for target addresses if you need to disambiguate.
+                ./pants dependencies <python_distribution target address>
 
-        Pants will attempt to infer dependencies, which you can confirm by running:
-
-            ./pants dependencies <python_distribution target address>
-
-        """
+            """
+        )
     )
+
+
+@dataclass(frozen=True)
+class PythonDistributionPexableEntryPoint:
+    """Pexable means that the entry point could be from a pex_binary target."""
+
+    entry_point: EntryPoint
+    pex_binary_address: Optional[Address]
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
 @dataclass(frozen=True)
 class ResolvedPythonDistributionEntryPoints:
-    val: FrozenDict[str, FrozenDict[str, EntryPoint]] = FrozenDict()
+    val: FrozenDict[str, FrozenDict[str, PythonDistributionPexableEntryPoint]] = FrozenDict()
+
+    @property
+    def explicit_modules(self) -> FrozenDict[str, FrozenDict[str, EntryPoint]]:
+        """Filters out all entry points from pex binary targets."""
+        return FrozenDict(
+            {
+                key: FrozenDict(
+                    {
+                        name: pexable.entry_point
+                        for name, pexable in value.items()
+                        if not pexable.pex_binary_address
+                    }
+                )
+                for key, value in self.val.items()
+            }
+        )
+
+    @property
+    def pex_binary_addresses(self) -> Addresses:
+        """Returns the addresses to all pex binary targets owning entry points used."""
+        return Addresses(
+            pexable.pex_binary_address
+            for key, value in self.val.items()
+            for _, pexable in value.items()
+            if pexable.pex_binary_address
+        )
 
 
 @dataclass(frozen=True)

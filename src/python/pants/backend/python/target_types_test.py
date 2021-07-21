@@ -419,6 +419,16 @@ def test_inject_python_distribution_dependencies() -> None:
                     }
                 },
             )
+
+            python_distribution(
+                name="third_dep",
+                provides=setup_py(name="my-third"),
+                entry_points={
+                    "color-plugins":{
+                        "my-ansi-colors": "colors",
+                    }
+                }
+            )
             """
         ),
     )
@@ -432,7 +442,7 @@ def test_inject_python_distribution_dependencies() -> None:
         ),
     )
 
-    def assert_injected(address: Address, *expected: Address) -> None:
+    def assert_injected(address: Address, expected: List[Address]) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
@@ -442,13 +452,22 @@ def test_inject_python_distribution_dependencies() -> None:
 
     assert_injected(
         Address("project", target_name="dist-a"),
-        Address("project", target_name="my_binary"),
+        [Address("project", target_name="my_binary")],
     )
 
     assert_injected(
         Address("project", target_name="dist-b"),
-        Address("project", relative_file_path="app.py", target_name="my_library"),
-        Address("who_knows", relative_file_path="module.py", target_name="random_lib"),
+        [
+            Address("project", target_name="my_binary"),
+            Address("project", relative_file_path="app.py", target_name="my_library"),
+        ],
+    )
+
+    assert_injected(
+        Address("project", target_name="third_dep"),
+        [
+            Address("", target_name="ansicolors"),
+        ],
     )
 
 
