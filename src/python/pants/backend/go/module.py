@@ -27,7 +27,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Targets, WrappedTarget
+from pants.engine.target import Targets, WrappedTarget, UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -60,14 +60,15 @@ def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
     minimum_go_version = None
     for line in raw_text.decode("utf-8").splitlines():
         parts = line.strip().split()
-        if parts[0] == "module":
-            if module_path is not None:
-                raise ValueError("Multiple `module` directives found in go.mod file.")
-            module_path = parts[1]
-        elif parts[0] == "go":
-            if minimum_go_version is not None:
-                raise ValueError("Multiple `go` directives found in go.mod file.")
-            minimum_go_version = parts[1]
+        if len(parts) >= 2:
+            if parts[0] == "module":
+                if module_path is not None:
+                    raise ValueError("Multiple `module` directives found in go.mod file.")
+                module_path = parts[1]
+            elif parts[0] == "go":
+                if minimum_go_version is not None:
+                    raise ValueError("Multiple `go` directives found in go.mod file.")
+                minimum_go_version = parts[1]
     return module_path, minimum_go_version
 
 
@@ -97,8 +98,10 @@ async def resolve_go_module(
         goroot.get_request(platform),
     )
 
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
-    target = wrapped_target.target
+    # wrapped_target = await Get(WrappedTarget, Address, request.address)
+    # target = wrapped_target.target
+    targets = await Get(UnexpandedTargets, Address, request.address)
+    target = targets[0]
 
     sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
     flattened_sources_digest = await Get(
@@ -106,9 +109,8 @@ async def resolve_go_module(
     )
     flattened_sources_snapshot = await Get(Snapshot, Digest, flattened_sources_digest)
     if (
-        len(flattened_sources_snapshot.files) != 2
+        len(flattened_sources_snapshot.files) not in (1, 2)
         or "go.mod" not in flattened_sources_snapshot.files
-        or "go.sum" not in flattened_sources_snapshot.files
     ):
         raise ValueError(f"Incomplete go_module sources: files={flattened_sources_snapshot.files}")
 
