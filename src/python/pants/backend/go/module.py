@@ -2,25 +2,32 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import textwrap
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
-from pants.backend.go.target_types import GoModule, GoModuleSources
+from pants.backend.go.target_types import GoModuleSources
 from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.console import Console
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot, CreateDigest, FileContent, \
-    Workspace, DigestContents
-from pants.engine.goal import GoalSubsystem, Goal
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+    Workspace,
+)
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult, BashBinary
-from pants.engine.rules import rule, collect_rules, goal_rule
-from pants.engine.target import WrappedTarget, Targets
+from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.target import Targets, WrappedTarget
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -60,7 +67,7 @@ def basic_parse_go_mod(raw_text: bytes) -> Tuple[str, str]:
             if minimum_go_version is not None:
                 raise ValueError("Multiple `go` directives found in go.mod file.")
             minimum_go_version = parts[1]
-    return (module_path, minimum_go_version)
+    return module_path, minimum_go_version
 
 
 # Parse the output of `go mod download` into a list of module descriptors.
@@ -78,7 +85,10 @@ def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
 
 @rule
 async def resolve_go_module(
-    request: ResolveGoModuleRequest, goroot: GoLangDistribution, platform: Platform, bash: BashBinary,
+    request: ResolveGoModuleRequest,
+    goroot: GoLangDistribution,
+    platform: Platform,
+    bash: BashBinary,
 ) -> ResolvedGoModule:
     downloaded_goroot = await Get(
         DownloadedExternalTool,
@@ -89,10 +99,10 @@ async def resolve_go_module(
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
-    sources = await Get(
-        SourceFiles, SourceFilesRequest([target.get(GoModuleSources)])
+    sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
+    flattened_sources_digest = await Get(
+        Digest, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
     )
-    flattened_sources_digest = await Get(Digest, RemovePrefix(sources.snapshot.digest, request.address.spec_path))
     flattened_sources_snapshot = await Get(Snapshot, Digest, flattened_sources_digest)
     if (
         len(flattened_sources_snapshot.files) != 2
@@ -122,7 +132,8 @@ async def resolve_go_module(
     )
 
     input_root_digest = await Get(
-        Digest, MergeDigests([flattened_sources_digest, downloaded_goroot.digest, analyze_script_digest])
+        Digest,
+        MergeDigests([flattened_sources_digest, downloaded_goroot.digest, analyze_script_digest]),
     )
 
     process = Process(
@@ -135,6 +146,7 @@ async def resolve_go_module(
 
     result = await Get(ProcessResult, Process, process)
 
+    # Parse the go.mod for the module path and minimum Go version.
     module_path = None
     minimum_go_version = None
     digest_contents = await Get(DigestContents, Digest, flattened_sources_digest)
@@ -153,9 +165,11 @@ async def resolve_go_module(
     )
 
 
+# TODO: Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
+# tool to help update go.sum while developing the Go plugin and will probably change.
 class GoResolveSubsystem(GoalSubsystem):
     name = "go-resolve"
-    help = "Resolve Go go.mod and update go.sum accordingly. "
+    help = "Resolve a Go module's go.mod and update go.sum accordingly."
 
 
 class GoResolveGoal(Goal):
@@ -163,9 +177,16 @@ class GoResolveGoal(Goal):
 
 
 @goal_rule
-async def run_go_resolve(targets: Targets, console: Console,     workspace: Workspace,) -> GoResolveGoal:
-    workspace.write_digest()
-
+async def run_go_resolve(targets: Targets, console: Console, workspace: Workspace) -> GoResolveGoal:
+    for tgt in targets:
+        if tgt.has_field(GoModuleSources):
+            resolved_go_module = await Get(ResolvedGoModule, Address, tgt.address)
+            # TODO: Only update the files if they actually changed.
+            workspace.write_digest(resolved_go_module.digest, path_prefix=tgt.address.spec_path)
+            console.write_stdout(f"{tgt.address}: Updated go.mod and go.sum.")
+        else:
+            console.write_stdout(f"{tgt.address}: Skipping because target is not a `go_module`.")
+    return GoResolveGoal(exit_code=0)
 
 
 def rules():
