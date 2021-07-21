@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-import ijson
+import ijson  # type: ignore
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.target_types import GoModuleSources
@@ -53,8 +53,9 @@ class ResolveGoModuleRequest:
 
 
 # Perform a minimal parsing of go.mod for the `module` and `go` directives. Full resolution of go.mod is left to
-# the go toolchain.
-def basic_parse_go_mod(raw_text: bytes) -> Tuple[str, str]:
+# the go toolchain. This could also probably be replaced by a go shim to make use of:
+# https://pkg.go.dev/golang.org/x/mod/modfile
+def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
     module_path = None
     minimum_go_version = None
     for line in raw_text.decode("utf-8").splitlines():
@@ -180,7 +181,7 @@ class GoResolveGoal(Goal):
 async def run_go_resolve(targets: Targets, console: Console, workspace: Workspace) -> GoResolveGoal:
     for tgt in targets:
         if tgt.has_field(GoModuleSources):
-            resolved_go_module = await Get(ResolvedGoModule, Address, tgt.address)
+            resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(tgt.address))
             # TODO: Only update the files if they actually changed.
             workspace.write_digest(resolved_go_module.digest, path_prefix=tgt.address.spec_path)
             console.write_stdout(f"{tgt.address}: Updated go.mod and go.sum.")

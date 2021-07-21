@@ -7,28 +7,23 @@ from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.target_types import GoExternalModule, GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
-from pants.engine import process, fs
-from pants.engine.internals import graph
-from pants.engine.process import BashBinary
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
-            *graph.rules(),
-            *process.rules(),
-            *fs.rules(),
             *module.rules(),
             QueryRule(ResolvedGoModule, [ResolveGoModuleRequest]),
-            QueryRule(BashBinary, ()),
         ],
         target_types=[GoPackage, GoModule, GoExternalModule],
     )
+    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
+    return rule_runner
 
 
 def test_basic_parse_go_mod() -> None:
