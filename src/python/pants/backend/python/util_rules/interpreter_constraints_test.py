@@ -296,39 +296,37 @@ def test_not_in_contiguous_range(nums, expected) -> None:
 
 
 @pytest.mark.parametrize(
-    "constraints,expected",
+    "constraints,expected_raw",
     (
         # Input constraints already are for a single interpreter version.
-        (["==3.7.5"], [["==3.7.5"]]),
-        (["==3.7.*"], [["==3.7.*"]]),
-        ([">=3.7,<3.8"], [["==3.7.*"]]),
-        ([">=3.7.5,<3.7.7"], [[">=3.7.5,<=3.7.6"]]),
-        ([">=3.7.5,<3.8"], [[">=3.7.5,<3.8"]]),
-        ([">=3.7.5,<3.8,!=3.7.7"], [[">=3.7.5,<3.8,!=3.7.7"]]),
-        ([">=3.7.5,<3.7.12,!=3.7.7,!=3.7.8"], [[">=3.7.5,<=3.7.11,!=3.7.7,!=3.7.8"]]),
+        (["==3.7.5"], {"3.7": "==3.7.5"}),
+        (["==3.7.*"], {"3.7": "==3.7.*"}),
+        ([">=3.7,<3.8"], {"3.7": "==3.7.*"}),
+        ([">=3.7.5,<3.7.7"], {"3.7": ">=3.7.5,<=3.7.6"}),
+        ([">=3.7.5,<3.8"], {"3.7": ">=3.7.5,<3.8"}),
+        ([">=3.7.5,<3.8,!=3.7.7"], {"3.7": ">=3.7.5,<3.8,!=3.7.7"}),
+        ([">=3.7.5,<3.7.12,!=3.7.7,!=3.7.8"], {"3.7": ">=3.7.5,<=3.7.11,!=3.7.7,!=3.7.8"}),
         # Input constraints are for multiple interpreters, but only a single constraint.
-        ([">=3.7,<3.9"], [["==3.7.*"], ["==3.8.*"]]),
-        ([">=3.7.5,<3.9.2,!=3.8.0"], [[">=3.7.5,<3.8"], [">=3.8.1,<3.9"], [">=3.9,<=3.9.1"]]),
+        ([">=3.7,<3.9"], {"3.7": "==3.7.*", "3.8": "==3.8.*"}),
+        (
+            [">=3.7.5,<3.9.2,!=3.8.0"],
+            {"3.7": ">=3.7.5,<3.8", "3.8": ">=3.8.1,<3.9", "3.9": ">=3.9,<=3.9.1"},
+        ),
         # Input constraints have multiple elements, which get ORed, but each is for a single
         # interpreter version.
-        (["==3.7.5", "==3.8.6"], [["==3.7.5"], ["==3.8.6"]]),
-        (["==3.7.*", "==3.8.*"], [["==3.7.*"], ["==3.8.*"]]),
-        ([">=3.7.5,<3.8", ">=3.9.5,<3.10"], [[">=3.7.5,<3.8"], [">=3.9.5,<3.10"]]),
-        (["==2.7.*", ">=3.6,<3.8"], [["==2.7.*"], ["==3.6.*"], ["==3.7.*"]]),
-        ([">=2.7.4,<2.7.7", "==2.7.5"], [[">=2.7.4,<=2.7.6"]]),
+        (["==3.7.5", "==3.8.6"], {"3.7": "==3.7.5", "3.8": "==3.8.6"}),
+        (["==3.7.*", "==3.8.*"], {"3.7": "==3.7.*", "3.8": "==3.8.*"}),
+        ([">=3.7.5,<3.8", ">=3.9.5,<3.10"], {"3.7": ">=3.7.5,<3.8", "3.9": ">=3.9.5,<3.10"}),
+        (["==2.7.*", ">=3.6,<3.8"], {"2.7": "==2.7.*", "3.6": "==3.6.*", "3.7": "==3.7.*"}),
+        ([">=2.7.4,<2.7.7", "==2.7.5"], {"2.7": ">=2.7.4,<=2.7.6"}),
     ),
 )
 def test_partition_by_major_minor_version(
-    constraints: list[str], expected: list[list[str]]
+    constraints: list[str], expected_raw: dict[str, str]
 ) -> None:
     ics = InterpreterConstraints(constraints)
+    expected = {k: InterpreterConstraints([v]) for k, v in expected_raw.items()}
     universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
-    assert ics.partition_by_major_minor_versions(universe) == tuple(
-        InterpreterConstraints(x) for x in expected
-    )
-    assert ics.partition_by_major_minor_versions(reversed(universe)) == tuple(
-        InterpreterConstraints(x) for x in expected
-    )
-    assert ics.partition_by_major_minor_versions(sorted(universe)) == tuple(
-        InterpreterConstraints(x) for x in expected
-    )
+    assert ics.partition_by_major_minor_versions(universe) == expected
+    assert ics.partition_by_major_minor_versions(reversed(universe)) == expected
+    assert ics.partition_by_major_minor_versions(sorted(universe)) == expected

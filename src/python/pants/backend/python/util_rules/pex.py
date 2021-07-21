@@ -24,6 +24,7 @@ from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
+    MaybePythonExecutable,
     PexRuntimeEnvironment,
     PythonExecutable,
     SandboxPexEnvironment,
@@ -43,6 +44,7 @@ from pants.engine.fs import (
 from pants.engine.platform import Platform
 from pants.engine.process import (
     BashBinary,
+    FallibleProcessResult,
     MultiPlatformProcess,
     Process,
     ProcessCacheScope,
@@ -234,15 +236,14 @@ class Pex:
 logger = logging.getLogger(__name__)
 
 
-@rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
-async def find_interpreter(
+@rule
+async def maybe_find_python_interpreter(
     interpreter_constraints: InterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
-) -> PythonExecutable:
-    formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
+) -> MaybePythonExecutable:
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         PexCliProcess(
-            description=f"Find interpreter for constraints: {formatted_constraints}",
+            description=f"Find interpreter for constraints: {interpreter_constraints}",
             # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
             # Normally, this would start an isolated repl. By passing `--`, we force the repl to
             # instead act as an interpreter (the selected one) and tell us about itself. The upshot
@@ -275,19 +276,31 @@ async def find_interpreter(
             ),
             level=LogLevel.DEBUG,
             # NB: We want interpreter discovery to re-run fairly frequently
-            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
-            # per-Session). See #10769 for a solution that is less of a tradeoff.
+            # (PER_RESTART_SUCCESSFUL), but not PER_SESSION. See #10769 for a solution that is
+            # less of a tradeoff.
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
-    path, fingerprint = result.stdout.decode().strip().splitlines()
-
     if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
 
-    return PythonExecutable(path=path, fingerprint=fingerprint)
+    if result.exit_code != 0:
+        return MaybePythonExecutable(None, result)
+    path, fingerprint = result.stdout.decode().strip().splitlines()
+    return MaybePythonExecutable(PythonExecutable(path=path, fingerprint=fingerprint), None)
+
+
+class PythonInterpreterNotFound(Exception):
+    pass
+
+
+@rule
+def upcast_maybe_python_executable(mpe: MaybePythonExecutable) -> PythonExecutable:
+    if not mpe.python:
+        raise PythonInterpreterNotFound()
+    return mpe.python
 
 
 @dataclass(frozen=True)

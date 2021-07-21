@@ -14,7 +14,13 @@ from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVa
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
+from pants.engine.process import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+    FallibleProcessResult,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.option.subsystem import Subsystem
@@ -94,6 +100,16 @@ class PexRuntimeEnvironment(Subsystem):
         if level < 0 or level > 9:
             raise ValueError("verbosity level must be between 0 and 9")
         return level
+
+
+@dataclass(frozen=True)
+class MaybePythonExecutable:
+    python: PythonExecutable | None
+    _process_result: FallibleProcessResult | None
+
+    def __post_init__(self) -> None:
+        if not self.python and not self._process_result:
+            raise ValueError("Must set either `python` or `_process_result`.")
 
 
 class PythonExecutable(BinaryPath, EngineAwareReturnType):

@@ -240,9 +240,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
     def partition_by_major_minor_versions(
         self, interpreter_universe: Iterable[str]
-    ) -> tuple[InterpreterConstraints, ...]:
+    ) -> dict[str, InterpreterConstraints]:
         """Create a distinct InterpreterConstraints value for each CPython major-minor version that
-        is compatible with the original constraints."""
+        is compatible with the original constraints.
+
+        Returns a dictionary of `major_minor_version: str` to `InterpreterConstraints`.
+        """
         if any(req.project_name != "CPython" for req in self):
             raise AssertionError(
                 "This function only works with CPython interpreter constraints for now."
@@ -256,7 +259,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 if req.specifier.contains(f"{major_minor}.{p}")  # type: ignore[attr-defined]
             ]
 
-        result = []
+        result = {}
 
         def maybe_add_version(major_minor: str) -> None:
             major, minor = _major_minor_to_int(major_minor)
@@ -267,8 +270,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 return
 
             if len(valid_patch_versions) == 1:
-                result.append(
-                    InterpreterConstraints([f"=={major_minor}.{valid_patch_versions[0]}"])
+                result[major_minor] = InterpreterConstraints(
+                    [f"=={major_minor}.{valid_patch_versions[0]}"]
                 )
                 return
 
@@ -296,11 +299,11 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 else:
                     constraint = f"{min_constraint},{max_constraint}"
 
-            result.append(InterpreterConstraints([constraint]))
+            result[major_minor] = InterpreterConstraints([constraint])
 
         for major_minor in sorted(interpreter_universe, key=_major_minor_to_int):
             maybe_add_version(major_minor)
-        return tuple(result)
+        return result
 
     def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)
