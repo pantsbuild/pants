@@ -66,8 +66,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         options_scope = "my-external-tool"
         default_version = "1.2.3"
         default_known_versions = [
-          "1.2.3|darwin|deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
-          "1.2.3|linux |1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
+          "1.2.3|linux_x86_64|cafebabacafebabacafebabacafebabacafebabacafebabacafebabacafebaba|878986",
+          "1.2.3|macos_arm64 |deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
+          "1.2.3|macos_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
         ]
 
         version_constraints = ">=1.2.3, <2.0"
@@ -139,7 +140,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
               - `length` is the expected length of the download file in bytes, as emmitted by
                 `wc -c`
 
-            E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+            E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
             Values are space-stripped, so pipes can be indented for readability if necessary.
             """
