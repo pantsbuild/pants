@@ -28,7 +28,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
+from pants.engine.target import UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
