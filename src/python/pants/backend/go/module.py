@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import logging
 import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
@@ -12,7 +13,6 @@ from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.console import Console
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -31,6 +31,8 @@ from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ class ResolveGoModuleRequest:
 # Perform a minimal parsing of go.mod for the `module` and `go` directives. Full resolution of go.mod is left to
 # the go toolchain. This could also probably be replaced by a go shim to make use of:
 # https://pkg.go.dev/golang.org/x/mod/modfile
+# TODO: Add full path to expections for applicable go.mod.
 def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
     module_path = None
     minimum_go_version = None
@@ -101,22 +104,23 @@ async def resolve_go_module(
 
     targets = await Get(UnexpandedTargets, Addresses([request.address]))
     if not targets:
-        raise ValueError(f"Address `{request.address}` did not resolve to any targets.")
+        raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
     elif len(targets) > 1:
-        raise ValueError(f"Address `{request.address}` resolved to multiple targets.")
+        raise AssertionError(f"Address `{request.address}` resolved to multiple targets.")
     target = targets[0]
 
     sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
-    flattened_sources_digest = await Get(
-        Digest, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
+    flattened_sources_snapshot = await Get(
+        Snapshot, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
     )
-    flattened_sources_snapshot = await Get(Snapshot, Digest, flattened_sources_digest)
     if (
         len(flattened_sources_snapshot.files) not in (1, 2)
         or "go.mod" not in flattened_sources_snapshot.files
     ):
         raise ValueError(f"Incomplete go_module sources: files={flattened_sources_snapshot.files}")
 
+    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
+    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
     analyze_script_digest = await Get(
         Digest,
         CreateDigest(
@@ -139,7 +143,9 @@ async def resolve_go_module(
 
     input_root_digest = await Get(
         Digest,
-        MergeDigests([flattened_sources_digest, downloaded_goroot.digest, analyze_script_digest]),
+        MergeDigests(
+            [flattened_sources_snapshot.digest, downloaded_goroot.digest, analyze_script_digest]
+        ),
     )
 
     process = Process(
@@ -155,7 +161,7 @@ async def resolve_go_module(
     # Parse the go.mod for the module path and minimum Go version.
     module_path = None
     minimum_go_version = None
-    digest_contents = await Get(DigestContents, Digest, flattened_sources_digest)
+    digest_contents = await Get(DigestContents, Digest, flattened_sources_snapshot.digest)
     for entry in digest_contents:
         if entry.path == "go.mod":
             module_path, minimum_go_version = basic_parse_go_mod(entry.content)
@@ -183,19 +189,17 @@ class GoResolveGoal(Goal):
 
 
 @goal_rule
-async def run_go_resolve(
-    targets: UnexpandedTargets, console: Console, workspace: Workspace
-) -> GoResolveGoal:
+async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> GoResolveGoal:
+    # TODO: Use MultiGet to resolve the go_module targets.
+    # TODO: Combine all of the go.sum's into a single Digest to write.
     for target in targets:
         if target.has_field(GoModuleSources) and not target.address.is_file_target:
             resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
             # TODO: Only update the files if they actually changed.
             workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
-            console.write_stdout(f"{target.address}: Updated go.mod and go.sum.\n")
+            _logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
         else:
-            console.write_stdout(
-                f"{target.address}: Skipping because target is not a `go_module`.\n"
-            )
+            _logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
     return GoResolveGoal(exit_code=0)
 
 
