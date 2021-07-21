@@ -72,7 +72,7 @@ use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
 pub enum Platform {
   Macos_x86_64,
   Macos_arm64,
