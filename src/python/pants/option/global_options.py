@@ -734,18 +734,6 @@ class GlobalOptions(Subsystem):
                 "Add a '*' to the list to capture all known scopes."
             ),
         )
-        register(
-            "--stats-complete-async",
-            advanced=True,
-            type=bool,
-            default=not is_in_container(),
-            help=(
-                "True if stats recording should be allowed to complete asynchronously when `pantsd` "
-                "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
-                "To reduce data loss, this flag defaults to false inside of containers, such as "
-                "when run with Docker."
-            ),
-        )
 
         register(
             "--pants-ignore",
@@ -1415,6 +1403,18 @@ class GlobalOptions(Subsystem):
             default=1.0,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
+        )
+        register(
+            "--streaming-workunits-complete-async",
+            advanced=True,
+            type=bool,
+            default=not is_in_container(),
+            help=(
+                "True if stats recording should be allowed to complete asynchronously when `pantsd` "
+                "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
+                "To reduce data loss, this flag defaults to false inside of containers, such as "
+                "when run with Docker."
+            ),
         )
 
     @classmethod

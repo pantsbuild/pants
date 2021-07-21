@@ -254,7 +254,7 @@ class LocalPantsRunner:
                 callbacks=self._get_workunits_callbacks(),
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
                 allow_async_completion=(
-                    global_options.pantsd and global_options.stats_complete_async
+                    global_options.pantsd and global_options.streaming_workunits_complete_async
                 ),
             )
             with streaming_reporter:
