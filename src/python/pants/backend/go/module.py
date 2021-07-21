@@ -113,11 +113,6 @@ async def resolve_go_module(
     flattened_sources_snapshot = await Get(
         Snapshot, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
     )
-    if (
-        len(flattened_sources_snapshot.files) not in (1, 2)
-        or "go.mod" not in flattened_sources_snapshot.files
-    ):
-        raise ValueError(f"Incomplete go_module sources: files={flattened_sources_snapshot.files}")
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
     # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
