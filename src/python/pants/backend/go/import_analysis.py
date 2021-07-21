@@ -6,7 +6,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Dict
 
-import ijson  # type: ignore
+import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest

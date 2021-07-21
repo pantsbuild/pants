@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-import ijson  # type: ignore
+import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.target_types import GoModuleSources

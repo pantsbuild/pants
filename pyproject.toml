@@ -55,6 +55,7 @@ module = [
     "freezegun",
     "hdrh",
     "hdrh.histogram",
+    "ijson",
     "pex.*",
     "psutil",
     "pystache",
