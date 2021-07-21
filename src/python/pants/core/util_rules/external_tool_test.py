@@ -26,17 +26,17 @@ class FooBar(ExternalTool):
     options_scope = "foobar"
     default_version = "3.4.7"
     default_known_versions = [
-        "3.2.0|darwin   |1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
-        "3.2.0|linux_ppc|39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
-        "3.2.0|linux    |c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "3.4.7|darwin   |9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
-        "3.4.7|linux    |a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
+        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
+        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
+        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
+        "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
     ]
 
     def generate_url(self, plat: Platform) -> str:
-        if plat == Platform.darwin:
+        if plat == Platform.macos_x86_64:
             plat_str = "osx-x86_64"
-        elif plat == Platform.linux:
+        elif plat == Platform.linux_x86_64:
             plat_str = "linux-x86_64"
         else:
             raise ExternalToolError()
@@ -51,16 +51,17 @@ class TemplatedFooBar(TemplatedExternalTool):
     options_scope = "foobar"
     default_version = "3.4.7"
     default_known_versions = [
-        "3.2.0|darwin   |1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
-        "3.2.0|linux_ppc|39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
-        "3.2.0|linux    |c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "3.4.7|darwin   |9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
-        "3.4.7|linux    |a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
+        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
+        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
+        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
+        "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {
-        "darwin": "osx-x86_64",
-        "linux": "linux-x86_64",
+        "macos_x86_64": "osx-x86_64",
+        "macos_arm64": "osx-x86_64",
+        "linux_x86_64": "linux-x86_64",
     }
 
     def generate_exe(self, plat: Platform) -> str:
@@ -96,21 +97,21 @@ def test_generate_request() -> None:
         "https://foobar.org/bin/v3.2.0/foobar-3.2.0-osx-x86_64.tgz",
         123346,
         "1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8",
-        Platform.darwin,
+        Platform.macos_x86_64,
         "3.2.0",
     )
     do_test(
         "https://foobar.org/bin/v3.4.7/foobar-3.4.7-linux-x86_64.tgz",
         134213,
         "a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
-        Platform.linux,
+        Platform.linux_x86_64,
         "3.4.7",
     )
 
     with pytest.raises(UnknownVersion):
         create_subsystem(
             FooBar, version="9.9.9", known_versions=FooBar.default_known_versions
-        ).get_request(Platform.darwin)
+        ).get_request(Platform.macos_x86_64)
 
 
 class ConstrainedTool(TemplatedExternalTool):
@@ -119,16 +120,17 @@ class ConstrainedTool(TemplatedExternalTool):
     version_constraints = ">3.2.1, <3.8"
     default_version = "v3.4.7"
     default_known_versions = [
-        "v3.2.0|darwin   |1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
-        "v3.2.0|linux_ppc|39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
-        "v3.2.0|linux    |c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "v3.4.7|darwin   |9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
-        "v3.4.7|linux    |a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
+        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
+        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
+        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
+        "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {
-        "darwin": "osx-x86_64",
-        "linux": "linux-x86_64",
+        "macos_x86_64": "osx-x86_64",
+        "macos_arm64": "osx-x86_64",
+        "linux_x86_64": "linux-x86_64",
     }
 
     def generate_exe(self, plat: Platform) -> str:
@@ -155,7 +157,7 @@ class ConstrainedTool(TemplatedExternalTool):
             "v3.2.2",
             UnsupportedVersionUsage.RaiseError,
             pytest.raises(
-                UnknownVersion, match="No known version of foobar v3.2.2 for darwin found in"
+                UnknownVersion, match="No known version of foobar v3.2.2 for macos_x86_64 found in"
             ),
             None,
         ),
@@ -182,7 +184,7 @@ class ConstrainedTool(TemplatedExternalTool):
             "v3.8.0",
             UnsupportedVersionUsage.LogWarning,
             pytest.raises(
-                UnknownVersion, match="No known version of foobar v3.8.0 for darwin found in"
+                UnknownVersion, match="No known version of foobar v3.8.0 for macos_x86_64 found in"
             ),
             [
                 (
@@ -210,7 +212,7 @@ def test_version_constraints(caplog, version, action, assert_expectation, expect
             known_versions=ConstrainedTool.default_known_versions,
             url_template=ConstrainedTool.default_url_template,
             url_platform_mapping=ConstrainedTool.default_url_platform_mapping,
-        ).get_request(Platform.darwin)
+        ).get_request(Platform.macos_x86_64)
 
     if expect_logged:
         assert len(caplog.records) == len(expect_logged)
