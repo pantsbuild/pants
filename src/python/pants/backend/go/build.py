@@ -76,16 +76,6 @@ class GoBinaryFieldSet(PackageFieldSet):
     output_path: OutputPathField
 
 
-@dataclass(frozen=True)
-class EnrichedGoLangDistribution:
-    stdlib_packages: FrozenDict[str, str]
-
-
-@dataclass(frozen=True)
-class EnrichGoLangDistributionRequest:
-    downloaded_goroot: DownloadedExternalTool
-
-
 @goal_rule
 async def run_go_build(targets: Targets) -> GoBuildGoal:
     await MultiGet(
