@@ -11,6 +11,7 @@ from pants.backend.go.target_types import GoModuleSources
 from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (
     CreateDigest,
@@ -27,7 +28,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Targets, WrappedTarget, UnexpandedTargets
+from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -98,9 +99,11 @@ async def resolve_go_module(
         goroot.get_request(platform),
     )
 
-    # wrapped_target = await Get(WrappedTarget, Address, request.address)
-    # target = wrapped_target.target
-    targets = await Get(UnexpandedTargets, Address, request.address)
+    targets = await Get(UnexpandedTargets, Addresses([request.address]))
+    if not targets:
+        raise ValueError(f"Address `{request.address}` did not resolve to any targets.")
+    elif len(targets) > 1:
+        raise ValueError(f"Address `{request.address}` resolved to multiple targets.")
     target = targets[0]
 
     sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
@@ -180,15 +183,19 @@ class GoResolveGoal(Goal):
 
 
 @goal_rule
-async def run_go_resolve(targets: Targets, console: Console, workspace: Workspace) -> GoResolveGoal:
-    for tgt in targets:
-        if tgt.has_field(GoModuleSources):
-            resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(tgt.address))
+async def run_go_resolve(
+    targets: UnexpandedTargets, console: Console, workspace: Workspace
+) -> GoResolveGoal:
+    for target in targets:
+        if target.has_field(GoModuleSources) and not target.address.is_file_target:
+            resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
             # TODO: Only update the files if they actually changed.
-            workspace.write_digest(resolved_go_module.digest, path_prefix=tgt.address.spec_path)
-            console.write_stdout(f"{tgt.address}: Updated go.mod and go.sum.")
+            workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
+            console.write_stdout(f"{target.address}: Updated go.mod and go.sum.\n")
         else:
-            console.write_stdout(f"{tgt.address}: Skipping because target is not a `go_module`.")
+            console.write_stdout(
+                f"{target.address}: Skipping because target is not a `go_module`.\n"
+            )
     return GoResolveGoal(exit_code=0)
 
 
