@@ -20,6 +20,7 @@ from pants.base.build_environment import (
     get_buildroot,
     get_default_pants_config_file,
     get_pants_cachedir,
+    is_in_container,
     pants_version,
 )
 from pants.engine.environment import CompleteEnvironment
@@ -731,6 +732,18 @@ class GlobalOptions(Subsystem):
                 "Options may be selected by joining the scope and the option with a ^ character, "
                 "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
                 "Add a '*' to the list to capture all known scopes."
+            ),
+        )
+        register(
+            "--stats-complete-async",
+            advanced=True,
+            type=bool,
+            default=not is_in_container(),
+            help=(
+                "True if stats recording should be allowed to complete asynchronously when `pantsd` "
+                "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
+                "To reduce data loss, this flag defaults to false inside of containers, such as "
+                "when run with Docker."
             ),
         )
 

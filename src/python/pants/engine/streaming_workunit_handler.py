@@ -182,7 +182,7 @@ class StreamingWorkunitHandler:
         options_bootstrapper: OptionsBootstrapper,
         specs: Specs,
         report_interval_seconds: float,
-        pantsd: bool,
+        allow_async_completion: bool,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
@@ -202,7 +202,7 @@ class StreamingWorkunitHandler:
                 # TODO(10092) The max verbosity should be a per-client setting, rather than a global
                 #  setting.
                 max_workunit_verbosity=max_workunit_verbosity,
-                pantsd=pantsd,
+                allow_async_completion=allow_async_completion,
             )
             if callbacks
             else None
@@ -229,7 +229,7 @@ class _InnerHandler(threading.Thread):
         callbacks: Iterable[WorkunitsCallback],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
-        pantsd: bool,
+        allow_async_completion: bool,
     ) -> None:
         super().__init__(daemon=True)
         self.scheduler = scheduler
@@ -240,7 +240,7 @@ class _InnerHandler(threading.Thread):
         self.max_workunit_verbosity = max_workunit_verbosity
         # TODO: Have a thread per callback so that some callbacks can always finish async even
         #  if others must be finished synchronously.
-        self.block_until_complete = not pantsd or any(
+        self.block_until_complete = not allow_async_completion or any(
             callback.can_finish_async is False for callback in self.callbacks
         )
         # Get the parent thread's logging destination. Note that this thread has not yet started
@@ -271,7 +271,14 @@ class _InnerHandler(threading.Thread):
     def end(self) -> None:
         self.stop_request.set()
         if self.block_until_complete:
+            logger.debug(
+                "Async completion is disabled: waiting for workunit callbacks to complete..."
+            )
             super().join()
+        else:
+            logger.debug(
+                "Async completion is enabled: workunit callbacks will complete in the background."
+            )
 
 
 def rules():
