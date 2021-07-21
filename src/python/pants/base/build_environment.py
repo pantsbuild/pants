@@ -3,6 +3,7 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
@@ -34,6 +35,17 @@ def get_pants_cachedir() -> str:
 def get_default_pants_config_file() -> str:
     """Return the default location of the Pants config file."""
     return os.path.join(get_buildroot(), "pants.toml")
+
+
+def is_in_container() -> bool:
+    """Return true if this process is likely running inside of a container."""
+    # https://stackoverflow.com/a/49944991/38265 and https://github.com/containers/podman/issues/3586
+    cgroup = Path("/proc/self/cgroup")
+    return (
+        Path("/.dockerenv").exists()
+        or Path("/run/.containerenv").exists()
+        or (cgroup.exists() and "docker" in cgroup.read_text("utf-8"))
+    )
 
 
 _Git: Optional[Git] = None
