@@ -1,7 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
+from typing import Sequence
+
 from pants.engine.rules import collect_rules
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    InvalidFieldException,
+    Sources,
+    StringField,
+    Target,
+)
 
 
 class GoSources(Sources):
@@ -34,6 +44,12 @@ class GoPackage(Target):
 class GoModuleSources(Sources):
     alias = "_sources"
     default = ("go.mod", "go.sum")
+    expected_num_files = range(1, 3)
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        super().validate_resolved_files(files)
+        if "go.mod" not in [os.path.basename(f) for f in files]:
+            raise InvalidFieldException(f"""No go.mod file was found for target {self.address}.""")
 
 
 class GoModule(Target):
