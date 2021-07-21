@@ -14,7 +14,6 @@ from pants.engine.process import rules as process_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-
 # TODO(#12293): Stabilize network flakiness.
 pytestmark = pytest.mark.skip
 
