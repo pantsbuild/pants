@@ -52,23 +52,24 @@ def test_relocated_files() -> None:
         dest: str,
         expected: str,
     ) -> None:
-        rule_runner.create_file(original)
-        rule_runner.add_to_build_file(
-            "",
-            dedent(
-                f"""\
-                files(name="original", sources=[{repr(original)}])
+        rule_runner.write_files(
+            {
+                original: "",
+                "BUILD": dedent(
+                    f"""\
+                    files(name="original", sources=[{repr(original)}])
 
-                relocated_files(
-                    name="relocated",
-                    files_targets=[":original"],
-                    src={repr(src)},
-                    dest={repr(dest)},
-                )
-                """
-            ),
-            overwrite=True,
+                    relocated_files(
+                        name="relocated",
+                        files_targets=[":original"],
+                        src={repr(src)},
+                        dest={repr(dest)},
+                    )
+                    """
+                ),
+            }
         )
+
         tgt = rule_runner.get_target(Address("", target_name="relocated"))
         result = rule_runner.request(
             GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, tgt)]
@@ -169,47 +170,43 @@ def test_archive() -> None:
         ["--backend-packages=pants.backend.python"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
     )
 
-    rule_runner.create_file("resources/d1.json", "{'k': 1}")
-    rule_runner.create_file("resources/d2.json", "{'k': 2}")
-    rule_runner.add_to_build_file(
-        "resources",
-        dedent(
-            """\
-            files(name='original_files', sources=['*.json'])
+    rule_runner.write_files(
+        {
+            "resources/d1.json": "{'k': 1}",
+            "resources/d2.json": "{'k': 2}",
+            "resources/BUILD": dedent(
+                """\
+                files(name='original_files', sources=['*.json'])
 
-            relocated_files(
-                name='relocated_files',
-                files_targets=[':original_files'],
-                src="resources",
-                dest="data",
-            )
-            """
-        ),
-    )
+                relocated_files(
+                    name='relocated_files',
+                    files_targets=[':original_files'],
+                    src="resources",
+                    dest="data",
+                )
+                """
+            ),
+            "project/app.py": "print('hello world!')",
+            "project/BUILD": "pex_binary(entry_point='app.py')",
+            "BUILD": dedent(
+                """\
+                archive(
+                    name="archive1",
+                    packages=["project"],
+                    files=["resources:original_files"],
+                    format="zip",
+                )
 
-    rule_runner.create_file("project/app.py", "print('hello world!')")
-    rule_runner.add_to_build_file("project", "pex_binary(entry_point='app.py')")
-
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            archive(
-                name="archive1",
-                packages=["project"],
-                files=["resources:original_files"],
-                format="zip",
-            )
-
-            archive(
-                name="archive2",
-                packages=[":archive1"],
-                files=["resources:relocated_files"],
-                format="tar",
-                output_path="output/archive2.tar",
-            )
-            """
-        ),
+                archive(
+                    name="archive2",
+                    packages=[":archive1"],
+                    files=["resources:relocated_files"],
+                    format="tar",
+                    output_path="output/archive2.tar",
+                )
+                """
+            ),
+        }
     )
 
     def get_archive(target_name: str) -> FileContent:

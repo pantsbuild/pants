@@ -22,36 +22,31 @@ def rule_runner() -> RuleRunner:
 
 
 def setup_project(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "lib1", "python_library(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])"
+    rule_runner.write_files(
+        {
+            "lib1/BUILD": "python_library(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])",
+            # We leave off `interpreter_constraints`, which results in using
+            # `[python-setup].interpreter_constraints` instead. Also, we create files so that we
+            # can test how file addresses render.
+            "lib2/a.py": "",
+            "lib2/b.py": "",
+            "lib2/BUILD": "python_library()",
+            "app/BUILD": dedent(
+                """\
+                python_library(
+                    sources=[],
+                    dependencies=['lib1', 'lib2/a.py', 'lib2/b.py'],
+                    interpreter_constraints=['==3.7.*'],
+                )
+                """
+            ),
+        }
     )
-
-    # We leave off `interpreter_constraints`, which results in using
-    # `[python-setup].interpreter_constraints` instead. Also, we create files so that we can test
-    # how file addresses render.
-    rule_runner.create_file("lib2/a.py")
-    rule_runner.create_file("lib2/b.py")
-    rule_runner.add_to_build_file("lib2", "python_library()")
-
-    rule_runner.add_to_build_file(
-        "app",
-        dedent(
-            """\
-            python_library(
-              sources=[],
-              dependencies=['lib1', 'lib2/a.py', 'lib2/b.py'],
-              interpreter_constraints=['==3.7.*'],
-            )
-            """
-        ),
-    )
-
     rule_runner.set_options(["--python-setup-interpreter-constraints=['>=3.6']"])
 
 
 def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.create_file("f.txt")
-    rule_runner.add_to_build_file("", "files(name='tgt', sources=['f.txt'])")
+    rule_runner.write_files({"f.txt": "", "BUILD": "files(name='tgt', sources=['f.txt'])"})
     result = rule_runner.run_goal_rule(PyConstraintsGoal, args=["f.txt"])
     assert result.exit_code == 0
     assert len(caplog.records) == 1
