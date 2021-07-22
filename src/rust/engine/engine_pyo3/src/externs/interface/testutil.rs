@@ -36,9 +36,7 @@ impl PyStubCASBuilder {
       .take()
       .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
     // NB: A Tokio runtime must be used when building StubCAS.
-    py_executor
-      .0
-      .enter(|| Ok(PyStubCAS(builder.build())))
+    py_executor.0.enter(|| Ok(PyStubCAS(builder.build())))
   }
 }
 

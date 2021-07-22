@@ -26,7 +26,7 @@ impl PyExecutor {
   #[new]
   fn __new__(core_threads: usize, max_threads: usize) -> PyResult<Self> {
     task_executor::Executor::global(core_threads, max_threads)
-      .map(|executor| PyExecutor(executor))
+      .map(PyExecutor)
       .map_err(PyException::new_err)
   }
 }
