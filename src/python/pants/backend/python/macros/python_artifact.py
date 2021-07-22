@@ -6,13 +6,13 @@ from typing import Any, Dict, List, Union
 
 
 def _normalize_entry_points(
-    entry_points: Dict[str, Union[List[str], Dict[str, str]]]
+    all_entry_points: Dict[str, Union[List[str], Dict[str, str]]]
 ) -> Dict[str, Dict[str, str]]:
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
-    if not isinstance(entry_points, collections.abc.Mapping):
+    if not isinstance(all_entry_points, collections.abc.Mapping):
         raise ValueError(
             f"The `entry_points` in `setup_py()` must be a dictionary, "
-            f"but was {entry_points!r} with type {type(entry_points).__name__}."
+            f"but was {all_entry_points!r} with type {type(all_entry_points).__name__}."
         )
 
     def _values_to_entry_points(values):
@@ -33,7 +33,9 @@ def _normalize_entry_points(
             f"but got {values!r} of type {type(values).__name__}."
         )
 
-    return {section: _values_to_entry_points(values) for section, values in entry_points.items()}
+    return {
+        category: _values_to_entry_points(values) for category, values in all_entry_points.items()
+    }
 
 
 class PythonArtifact:
