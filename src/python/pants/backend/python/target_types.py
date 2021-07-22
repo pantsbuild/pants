@@ -725,7 +725,7 @@ class PythonProvidesField(ScalarField, ProvidesField):
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
-class PythonDistributionEntryPoints(NestedDictStringToStringField, AsyncFieldMixin):
+class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFieldMixin):
     alias = "entry_points"
     required = False
     help = (
@@ -765,8 +765,8 @@ class PythonDistributionEntryPoints(NestedDictStringToStringField, AsyncFieldMix
 
 
 @dataclass(frozen=True)
-class PythonDistributionPexableEntryPoint:
-    """Pexable means that the entry point could be from a pex_binary target."""
+class PythonDistributionEntryPoint:
+    """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
     entry_point: EntryPoint
     pex_binary_address: Optional[Address]
@@ -775,21 +775,22 @@ class PythonDistributionPexableEntryPoint:
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
 @dataclass(frozen=True)
 class ResolvedPythonDistributionEntryPoints:
-    val: FrozenDict[str, FrozenDict[str, PythonDistributionPexableEntryPoint]] = FrozenDict()
+    # E.g. {"console_scripts": {"ep": PythonDistributionEntryPoint(...)}}.
+    val: FrozenDict[str, FrozenDict[str, PythonDistributionEntryPoint]] = FrozenDict()
 
     @property
     def explicit_modules(self) -> FrozenDict[str, FrozenDict[str, EntryPoint]]:
         """Filters out all entry points from pex binary targets."""
         return FrozenDict(
             {
-                key: FrozenDict(
+                category: FrozenDict(
                     {
-                        name: pexable.entry_point
-                        for name, pexable in value.items()
-                        if not pexable.pex_binary_address
+                        ep_name: ep_val.entry_point
+                        for ep_name, ep_val in entry_points.items()
+                        if not ep_val.pex_binary_address
                     }
                 )
-                for key, value in self.val.items()
+                for category, entry_points in self.val.items()
             }
         )
 
@@ -797,10 +798,10 @@ class ResolvedPythonDistributionEntryPoints:
     def pex_binary_addresses(self) -> Addresses:
         """Returns the addresses to all pex binary targets owning entry points used."""
         return Addresses(
-            pexable.pex_binary_address
-            for key, value in self.val.items()
-            for _, pexable in value.items()
-            if pexable.pex_binary_address
+            ep_val.pex_binary_address
+            for category, entry_points in self.val.items()
+            for ep_val in entry_points.values()
+            if ep_val.pex_binary_address
         )
 
 
@@ -809,7 +810,7 @@ class ResolvePythonDistributionEntryPointsRequest:
     """Looks at the entry points to see if it is a setuptools entry point, or a BUILD target address
     that should be resolved into a setuptools entry point."""
 
-    entry_points_field: PythonDistributionEntryPoints
+    entry_points_field: PythonDistributionEntryPointsField
 
 
 class SetupPyCommandsField(StringSequenceField):
@@ -830,7 +831,7 @@ class PythonDistribution(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonDistributionDependencies,
-        PythonDistributionEntryPoints,
+        PythonDistributionEntryPointsField,
         PythonProvidesField,
         SetupPyCommandsField,
     )

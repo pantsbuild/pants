@@ -17,7 +17,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexEntryPointField,
-    PythonDistributionEntryPoints,
+    PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
@@ -600,17 +600,17 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Collect entry points from `python_distribution(entry_points=...)`
     entry_points_from_field = {}
-    if exported_target.target.has_field(PythonDistributionEntryPoints):
+    if exported_target.target.has_field(PythonDistributionEntryPointsField):
         entry_points_field = await Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
-                exported_target.target[PythonDistributionEntryPoints]
+                exported_target.target[PythonDistributionEntryPointsField]
             ),
         )
 
         entry_points_from_field = {
-            key: {name: pexable.entry_point.spec for name, pexable in section.items()}
-            for key, section in entry_points_field.val.items()
+            category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
+            for category, entry_points in entry_points_field.val.items()
         }
 
     # Collect any entry points from the setup_py() object. Note that this was already normalized in
@@ -1020,24 +1020,27 @@ def merge_entry_points(
     )
 
     for description_of_source, source_entry_points in all_entry_points_with_descriptions_of_source:
-        for section, values in source_entry_points.items():
-            for name, entry_point in values.items():
-                merged[section][name].append((description_of_source, entry_point))
+        for category, entry_points in source_entry_points.items():
+            for ep_name, entry_point in entry_points.items():
+                merged[category][ep_name].append((description_of_source, entry_point))
 
-    def _merge_entry_point(section, name, values):
-        if len(values) > 1:
+    def _merge_entry_point(
+        category: str, name: str, entry_points_with_source: List[Tuple[str, str]]
+    ):
+        if len(entry_points_with_source) > 1:
             raise ValueError(
-                f"Multiple entry_points registered for {section} {name} in: {', '.join(v[0] for v in values)}"
+                f"Multiple entry_points registered for {category} {name} in: "
+                f"{', '.join(ep_source for ep_source, _ in entry_points_with_source)}"
             )
-        for _, entry_point in values:
+        for _, entry_point in entry_points_with_source:
             return f"{name}={entry_point}"
 
     return {
-        section: [
-            _merge_entry_point(section, name, values)
-            for name, values in merged_entry_points.items()
+        category: [
+            _merge_entry_point(category, name, entry_points_with_source)
+            for name, entry_points_with_source in merged_entry_points.items()
         ]
-        for section, merged_entry_points in merged.items()
+        for category, merged_entry_points in merged.items()
     }
 
 
