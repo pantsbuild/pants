@@ -84,10 +84,35 @@ impl Platform {
     let platform_info =
       uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
     match platform_info {
-      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => Ok(Platform::Linux_x86_64),
-      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "arm64" => Ok(Platform::Macos_arm64),
-      uname::Info { ref sysname, ref machine, .. } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "x86_64" => Ok(Platform::Macos_x86_64),
-      uname::Info { ref sysname, ref machine, .. } => Err(format!("Found unknown system/arch name pair {} {}", sysname, machine)),
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => {
+        Ok(Platform::Linux_x86_64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "arm64" => {
+        Ok(Platform::Macos_arm64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "darwin" && machine.to_lowercase() == "x86_64" => {
+        Ok(Platform::Macos_x86_64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } => Err(format!(
+        "Found unknown system/arch name pair {} {}",
+        sysname, machine
+      )),
     }
   }
 }
