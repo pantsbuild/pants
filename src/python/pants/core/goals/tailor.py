@@ -67,7 +67,7 @@ def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
     for field in tgt_type.core_fields:
         if issubclass(field, Sources):
             return field.default or tuple()
-    raise ValueError(f"Target type {tgt_type.__name__} does not have a sources field.")
+    return tuple()
 
 
 @frozen_after_init
@@ -117,9 +117,11 @@ class PutativeTarget:
         comments: Iterable[str] = tuple(),
         build_file_name: str = "BUILD",
     ):
-        owned_sources = (
-            (kwargs or {}).get("sources") or default_sources_for_target_type(target_type) or tuple()
-        )
+        maybe_owned_sources = (kwargs or {}).get("sources")
+        default_sources = default_sources_for_target_type(target_type)
+        if (maybe_owned_sources or triggering_sources) and default_sources is None:
+            raise ValueError(f"Target type {target_type.__name__} does not have a sources field.")
+        owned_sources = maybe_owned_sources or default_sources or tuple()
         return cls(
             path,
             name,
