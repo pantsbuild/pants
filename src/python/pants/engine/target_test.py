@@ -22,6 +22,7 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NestedDictStringToStringField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -705,6 +706,45 @@ def test_dict_string_to_string_field() -> None:
         default = FrozenDict({"default": "val"})
 
     assert ExampleDefault(None, addr).value == FrozenDict({"default": "val"})
+
+
+def test_nested_dict_string_to_string_field() -> None:
+    class Example(NestedDictStringToStringField):
+        alias = "example"
+
+    addr = Address("", target_name="example")
+
+    assert Example(None, address=addr).value is None
+    assert Example({}, address=addr).value == FrozenDict()
+    assert Example({"greeting": {"hello": "world"}}, address=addr).value == FrozenDict(
+        {"greeting": FrozenDict({"hello": "world"})}
+    )
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, address=addr)
+
+    for v in [
+        0,
+        object(),
+        "hello",
+        ["hello"],
+        ["hello", "world"],
+        {"hello": 0},
+        {0: "world"},
+        {"hello": "world"},
+    ]:
+        assert_invalid_type(v)
+
+    # Regression test that a default can be set.
+    class ExampleDefault(NestedDictStringToStringField):
+        alias = "example"
+        # Note that we use `FrozenDict` so that the object can be hashable.
+        default = FrozenDict({"nest": FrozenDict({"default": "val"})})
+
+    assert ExampleDefault(None, address=addr).value == FrozenDict(
+        {"nest": FrozenDict({"default": "val"})}
+    )
 
 
 def test_dict_string_to_string_sequence_field() -> None:
