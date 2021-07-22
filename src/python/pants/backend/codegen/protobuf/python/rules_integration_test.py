@@ -92,69 +92,57 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
     #  * Protobuf files can import other protobuf files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
 
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
+                package dir1;
 
-            package dir1;
+                message Person {
+                  string name = 1;
+                  int32 id = 2;
+                  string email = 3;
+                }
+                """
+            ),
+            "src/protobuf/dir1/f2.proto": dedent(
+                """\
+                syntax = "proto3";
 
-            message Person {
-              string name = 1;
-              int32 id = 2;
-              string email = 3;
-            }
-            """
-        ),
+                package dir1;
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_library()",
+            "src/protobuf/dir2/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package dir2;
+
+                import "dir1/f.proto";
+                """
+            ),
+            "src/protobuf/dir2/BUILD": (
+                "protobuf_library(dependencies=['src/protobuf/dir1'], "
+                "python_source_root='src/python')"
+            ),
+            # Test another source root.
+            "tests/protobuf/test_protos/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package test_protos;
+
+                import "dir2/f.proto";
+                """
+            ),
+            "tests/protobuf/test_protos/BUILD": (
+                "protobuf_library(dependencies=['src/protobuf/dir2'])"
+            ),
+        }
     )
-    rule_runner.create_file(
-        "src/protobuf/dir1/f2.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir1;
-            """
-        ),
-    )
-    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library()")
-
-    rule_runner.create_file(
-        "src/protobuf/dir2/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir2;
-
-            import "dir1/f.proto";
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        "src/protobuf/dir2",
-        "protobuf_library(dependencies=['src/protobuf/dir1'], python_source_root='src/python')",
-    )
-
-    # Test another source root.
-    rule_runner.create_file(
-        "tests/protobuf/test_protos/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package test_protos;
-
-            import "dir2/f.proto";
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        "tests/protobuf/test_protos", "protobuf_library(dependencies=['src/protobuf/dir2'])"
-    )
-
     source_roots = ["src/python", "/src/protobuf", "/tests/protobuf"]
     assert_files_generated(
         rule_runner,
@@ -177,34 +165,36 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
 
 
 def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "protos/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
+    rule_runner.write_files(
+        {
+            "protos/f.proto": dedent(
+                """\
+                syntax = "proto3";
 
-            package protos;
-            """
-        ),
+                package protos;
+                """
+            ),
+            "protos/BUILD": "protobuf_library()",
+        }
     )
-    rule_runner.add_to_build_file("protos", "protobuf_library()")
     assert_files_generated(
         rule_runner, "protos", source_roots=["/"], expected_files=["protos/f_pb2.py"]
     )
 
 
 def test_top_level_python_source_root(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/proto/protos/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
+    rule_runner.write_files(
+        {
+            "src/proto/protos/f.proto": dedent(
+                """\
+                syntax = "proto3";
 
-            package protos;
-            """
-        ),
+                package protos;
+                """
+            ),
+            "src/proto/protos/BUILD": "protobuf_library(python_source_root='.')",
+        }
     )
-    rule_runner.add_to_build_file("src/proto/protos", "protobuf_library(python_source_root='.')")
     assert_files_generated(
         rule_runner,
         "src/proto/protos",
@@ -214,18 +204,17 @@ def test_top_level_python_source_root(rule_runner: RuleRunner) -> None:
 
 
 def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
 
-            package dir1;
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        "src/protobuf/dir1", "protobuf_library(python_source_root='notasourceroot')"
+                package dir1;
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_library(python_source_root='notasourceroot')",
+        }
     )
     with pytest.raises(ExecutionError) as exc:
         assert_files_generated(
@@ -236,23 +225,24 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
 
 
 def test_mypy_plugin(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
 
-            package dir1;
+                package dir1;
 
-            message Person {
-              string name = 1;
-              int32 id = 2;
-              string email = 3;
-            }
-            """
-        ),
+                message Person {
+                  string name = 1;
+                  int32 id = 2;
+                  string email = 3;
+                }
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_library()",
+        }
     )
-    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library()")
     assert_files_generated(
         rule_runner,
         "src/protobuf/dir1",
@@ -263,11 +253,12 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
 
 
 def test_grpc(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(GRPC_PROTO_STANZA),
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
+            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+        }
     )
-    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
     assert_files_generated(
         rule_runner,
         "src/protobuf/dir1",
@@ -277,11 +268,12 @@ def test_grpc(rule_runner: RuleRunner) -> None:
 
 
 def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(GRPC_PROTO_STANZA),
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
+            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+        }
     )
-    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
     assert_files_generated(
         rule_runner,
         "src/protobuf/dir1",
@@ -297,12 +289,12 @@ def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
 
 
 def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protobuf/dir1/f.proto",
-        dedent(GRPC_PROTO_STANZA),
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
+            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+        }
     )
-    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
-
     assert_files_generated(
         rule_runner,
         "src/protobuf/dir1",

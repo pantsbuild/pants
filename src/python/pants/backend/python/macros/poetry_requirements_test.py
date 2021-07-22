@@ -391,8 +391,7 @@ def assert_poetry_requirements(
     expected_targets: Iterable[PythonRequirementLibrary],
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
-    rule_runner.add_to_build_file("", f"{build_file_entry}\n")
-    rule_runner.create_file(pyproject_toml_relpath, pyproject_toml)
+    rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
     targets = rule_runner.request(
         Targets,
         [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],

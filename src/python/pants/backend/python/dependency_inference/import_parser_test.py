@@ -94,7 +94,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
     )
     # We create a second file, in addition to what `assert_imports_parsed` does, to ensure we can
     # handle multiple files belonging to the same target.
-    rule_runner.create_file("project/f2.py", "import second_import")
+    rule_runner.write_files({"project/f2.py": "import second_import"})
     assert_imports_parsed(
         rule_runner,
         content,

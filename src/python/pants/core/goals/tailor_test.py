@@ -118,17 +118,15 @@ def test_make_content_str() -> None:
 
 
 def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
-    dir_structure = {
-        "src/fortran/foo/BUILD": "fortran_library(sources=['bar1.f90'])\n"
-        "fortran_library(name='foo0', sources=['bar2.f90'])",
-        "src/fortran/foo/bar1.f90": "",
-        "src/fortran/foo/bar2.f90": "",
-        "src/fortran/foo/bar3.f90": "",
-    }
-
-    for path, content in dir_structure.items():
-        rule_runner.create_file(path, content)
-
+    rule_runner.write_files(
+        {
+            "src/fortran/foo/BUILD": "fortran_library(sources=['bar1.f90'])\n"
+            "fortran_library(name='foo0', sources=['bar2.f90'])",
+            "src/fortran/foo/bar1.f90": "",
+            "src/fortran/foo/bar2.f90": "",
+            "src/fortran/foo/bar3.f90": "",
+        }
+    )
     ptgt = PutativeTarget(
         "src/fortran/foo", "foo", "fortran_library", ["bar3.f90"], FortranLibrarySources.default
     )
@@ -152,7 +150,7 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("foo.f90", "")
+    rule_runner.write_files({"foo.f90": ""})
     ptgt = PutativeTarget("", "", "fortran_library", ["foo.f90"], FortranLibrarySources.default)
     unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
     ptgts = unpts.putative_targets
@@ -174,17 +172,15 @@ def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
 
 
 def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
-    dir_structure = {
-        "src/fortran/foo/BUILD": "fortran_library(sources=['bar/baz1.f90'])",
-        "src/fortran/foo/bar/BUILD": "fortran_library(sources=['baz2.f90'])",
-        "src/fortran/foo/bar/baz1.f90": "",
-        "src/fortran/foo/bar/baz2.f90": "",
-        "src/fortran/foo/bar/baz3.f90": "",
-    }
-
-    for path, content in dir_structure.items():
-        rule_runner.create_file(path, content)
-
+    rule_runner.write_files(
+        {
+            "src/fortran/foo/BUILD": "fortran_library(sources=['bar/baz1.f90'])",
+            "src/fortran/foo/bar/BUILD": "fortran_library(sources=['baz2.f90'])",
+            "src/fortran/foo/bar/baz1.f90": "",
+            "src/fortran/foo/bar/baz2.f90": "",
+            "src/fortran/foo/bar/baz3.f90": "",
+        }
+    )
     ptgt = PutativeTarget(
         "src/fortran/foo/bar",
         "bar0",
@@ -204,7 +200,7 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
 
 
 def test_edit_build_files(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("src/fortran/foo/BUILD", 'fortran_library(sources=["bar1.f90"])')
+    rule_runner.write_files({"src/fortran/foo/BUILD": 'fortran_library(sources=["bar1.f90"])'})
     rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
     req = EditBuildFilesRequest(
         PutativeTargets(
@@ -423,16 +419,17 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
 
 
 def test_all_owned_sources(rule_runner: RuleRunner) -> None:
-    for path in [
-        "dir/a.f90",
-        "dir/b.f90",
-        "dir/a_test.f90",
-        "dir/unowned.txt",
-        "unowned.txt",
-        "unowned.f90",
-    ]:
-        rule_runner.create_file(path)
-    rule_runner.add_to_build_file("dir", "fortran_library()\nfortran_tests(name='tests')")
+    rule_runner.write_files(
+        {
+            "dir/a.f90": "",
+            "dir/b.f90": "",
+            "dir/a_test.f90": "",
+            "dir/unowned.txt": "",
+            "dir/BUILD": "fortran_library()\nfortran_tests(name='tests')",
+            "unowned.txt": "",
+            "unowned.f90": "",
+        }
+    )
     assert rule_runner.request(AllOwnedSources, []) == AllOwnedSources(
         ["dir/a.f90", "dir/b.f90", "dir/a_test.f90"]
     )

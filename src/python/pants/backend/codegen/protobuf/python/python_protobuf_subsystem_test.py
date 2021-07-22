@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
-
 from pants.backend.codegen.protobuf.python import python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     InjectPythonProtobufDependencies,
@@ -29,14 +27,8 @@ def test_inject_dependencies() -> None:
         ]
     )
     # Note that injected deps can be any target type for `--python-protobuf-runtime-dependencies`.
-    rule_runner.add_to_build_file(
-        "protos",
-        dedent(
-            """\
-            protobuf_library()
-            files(name="injected_dep", sources=[])
-            """
-        ),
+    rule_runner.write_files(
+        {"protos/BUILD": "protobuf_library()\nfiles(name='injected_dep', sources=[])"}
     )
     tgt = rule_runner.get_target(Address("protos"))
     injected = rule_runner.request(

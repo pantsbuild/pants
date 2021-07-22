@@ -34,13 +34,11 @@ def assert_pipenv_requirements(
     expected_targets: Iterable[PythonRequirementLibrary],
     pipfile_lock_relpath: str = "Pipfile.lock",
 ) -> None:
-    rule_runner.add_to_build_file("", f"{build_file_entry}\n")
-    rule_runner.create_file(pipfile_lock_relpath, dumps(pipfile_lock))
+    rule_runner.write_files({"BUILD": build_file_entry, pipfile_lock_relpath: dumps(pipfile_lock)})
     targets = rule_runner.request(
         Targets,
         [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
     )
-
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 
