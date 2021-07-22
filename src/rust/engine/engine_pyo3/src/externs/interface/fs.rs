@@ -1,7 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use fs::{GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching};
 use pyo3::exceptions::PyValueError;
@@ -67,7 +67,7 @@ fn match_path_globs(
     Ok(
       paths
         .into_iter()
-        .filter(|p| path_globs.matches(&PathBuf::from(p)))
+        .filter(|p| path_globs.matches(&Path::new(p)))
         .collect(),
     )
   })
