@@ -619,7 +619,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Gather entry points with source description for any error messages when merging them.
     entry_point_sources = {
-        f"{exported_addr} `provides.with_binaries()`": {
+        f"{exported_addr}'s field `provides=setup_py().with_binaries()`": {
             "console_scripts": entry_points_from_with_binaries
         },
         f"{exported_addr} `entry_points`": entry_points_from_field,
