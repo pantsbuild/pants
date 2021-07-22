@@ -79,6 +79,9 @@ pub struct Workunit {
 
 impl Workunit {
   fn log_workunit_state(&self, canceled: bool) {
+    if !log::log_enabled!(self.metadata.level) {
+      return;
+    }
     let state = match (&self.state, canceled) {
       (_, true) => "Canceled:",
       (WorkunitState::Started { .. }, _) => "Starting:",
