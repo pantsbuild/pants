@@ -111,7 +111,7 @@ async def pants_setup_kwargs(
     hardcoded_kwargs = dict(
         version=VERSION,
         long_description=long_description,
-        long_description_content_type="text/x-rst",
+        long_description_content_type="text/markdown",
         url="https://github.com/pantsbuild/pants",
         project_urls={
             "Documentation": "https://www.pantsbuild.org/",
