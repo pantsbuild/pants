@@ -6,7 +6,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Dict
 
-import ijson  # type: ignore
+import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -69,6 +69,8 @@ async def analyze_imports_for_golang_distribution(
         goroot.get_request(platform),
     )
 
+    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
+    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
     analyze_script_digest = await Get(
         Digest,
         CreateDigest(
