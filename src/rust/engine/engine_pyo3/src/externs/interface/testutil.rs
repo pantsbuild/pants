@@ -17,52 +17,42 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
-struct PyStubCASBuilder {
-  builder: Arc<Mutex<Option<StubCASBuilder>>>,
-}
+struct PyStubCASBuilder(Arc<Mutex<Option<StubCASBuilder>>>);
 
 #[pymethods]
 impl PyStubCASBuilder {
   fn always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
-    let mut builder_opt = self.builder.lock();
+    let mut builder_opt = self.0.lock();
     let builder = builder_opt
       .take()
       .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
     *builder_opt = Some(builder.always_errors());
-    Ok(PyStubCASBuilder {
-      builder: self.builder.clone(),
-    })
+    Ok(PyStubCASBuilder(self.0.clone()))
   }
 
   fn build(&mut self, py_executor: PyExecutor) -> PyResult<PyStubCAS> {
-    let mut builder_opt = self.builder.lock();
+    let mut builder_opt = self.0.lock();
     let builder = builder_opt
       .take()
       .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
     // NB: A Tokio runtime must be used when building StubCAS.
-    py_executor.executor.enter(|| {
-      Ok(PyStubCAS {
-        stub_cas: builder.build(),
-      })
-    })
+    py_executor.0.enter(|| Ok(PyStubCAS(builder.build())))
   }
 }
 
 #[pyclass]
-struct PyStubCAS {
-  stub_cas: StubCAS,
-}
+struct PyStubCAS(StubCAS);
 
 #[pymethods]
 impl PyStubCAS {
   #[classmethod]
   fn builder(_cls: &PyType) -> PyStubCASBuilder {
     let builder = Arc::new(Mutex::new(Some(StubCAS::builder())));
-    PyStubCASBuilder { builder }
+    PyStubCASBuilder(builder)
   }
 
   #[getter]
   fn address(&self) -> String {
-    self.stub_cas.address()
+    self.0.address()
   }
 }

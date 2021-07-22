@@ -21,16 +21,14 @@ fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
 
 #[pyclass]
 #[derive(Debug, Clone)]
-struct PyExecutor {
-  executor: task_executor::Executor,
-}
+struct PyExecutor(task_executor::Executor);
 
 #[pymethods]
 impl PyExecutor {
   #[new]
   fn __new__(core_threads: usize, max_threads: usize) -> PyResult<Self> {
     task_executor::Executor::global(core_threads, max_threads)
-      .map(|executor| PyExecutor { executor })
+      .map(PyExecutor)
       .map_err(PyException::new_err)
   }
 }
