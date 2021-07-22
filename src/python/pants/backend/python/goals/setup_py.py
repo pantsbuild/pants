@@ -623,7 +623,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "console_scripts": entry_points_from_with_binaries
         },
         f"{exported_addr} `entry_points`": entry_points_from_field,
-        f"{exported_addr} `provides.entry_points`": entry_points_from_provides,
+        f"{exported_addr}'s field `provides=setup_py(..., entry_points={...})`": entry_points_from_provides,
     }
     # Merge all collected entry points and add them to the dist's entry points.
     entry_points = merge_entry_points(*list(entry_point_sources.items()))
