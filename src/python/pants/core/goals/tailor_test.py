@@ -65,6 +65,11 @@ class FortranTests(Target):
     core_fields = (FortranTestsSources,)
 
 
+class FortranModule(Target):
+    alias = "fortran_module"
+    core_fields = tuple()
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -83,6 +88,7 @@ def rule_runner() -> RuleRunner:
 def test_default_sources_for_target_type() -> None:
     assert default_sources_for_target_type(FortranLibrary) == FortranLibrarySources.default
     assert default_sources_for_target_type(FortranTests) == FortranTestsSources.default
+    assert default_sources_for_target_type(FortranModule) == tuple()
 
 
 def test_make_content_str() -> None:
