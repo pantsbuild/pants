@@ -91,10 +91,13 @@ experimental_lockfile = "src/python/pants/backend/python/lint/docformatter/lockf
 
 [flake8]
 config = "build-support/flake8/.flake8"
+# TODO: Write a script to generate all our tool lockfiles. We need to disable custom requirments like this and also
+#  set the ICs to something useful for our users.
 extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0"
 ]
+experimental_lockfile = "src/python/pants/backend/python/lint/flake8/lockfile.txt"
 
 [isort]
 experimental_lockfile = "src/python/pants/backend/python/lint/isort/lockfile.txt"

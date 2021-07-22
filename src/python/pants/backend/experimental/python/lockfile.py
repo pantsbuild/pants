@@ -72,10 +72,18 @@ class PythonLockfileRequest:
     description: str
 
     @classmethod
-    def from_tool(cls, subsystem: PythonToolRequirementsBase) -> PythonLockfileRequest:
+    def from_tool(
+        cls,
+        subsystem: PythonToolRequirementsBase,
+        interpreter_constraints: InterpreterConstraints | None = None,
+    ) -> PythonLockfileRequest:
         return cls(
             requirements=FrozenOrderedSet(subsystem.all_requirements),
-            interpreter_constraints=subsystem.interpreter_constraints,
+            interpreter_constraints=(
+                interpreter_constraints
+                if interpreter_constraints is not None
+                else subsystem.interpreter_constraints
+            ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
         )
