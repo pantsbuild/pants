@@ -25,16 +25,17 @@ class SuccinctCodeCounter(TemplatedExternalTool):
 
     default_version = "2.12.0"
     default_known_versions = [
-        "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
-        "2.12.0|linux|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
+        "2.12.0|macos_arm64 |70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
+        "2.12.0|macos_x86_64|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
+        "2.12.0|linux_x86_64|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
     ]
     default_url_template = (
-        "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-"
-        "x86_64-{platform}.zip"
+        "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-" "{platform}.zip"
     )
     default_url_platform_mapping = {
-        "darwin": "apple-darwin",
-        "linux": "unknown-linux",
+        "macos_arm64": "x86_64-apple-darwin",  # TODO: use native arm64 binary for version 3.0
+        "macos_x86_64": "x86_64-apple-darwin",
+        "linux_x86_64": "x86_64-unknown-linux",
     }
 
     @classmethod

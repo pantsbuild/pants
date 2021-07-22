@@ -883,7 +883,7 @@ async fn sends_headers() {
       String::from("authorization") => String::from("Bearer catnip-will-get-you-anywhere"),
     },
     store,
-    Platform::Linux,
+    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -944,7 +944,7 @@ async fn extract_response_with_digest_stdout() {
     .op
     .unwrap()
     .unwrap(),
-    Platform::Linux,
+    Platform::Linux_x86_64,
   )
   .await
   .unwrap();
@@ -953,7 +953,7 @@ async fn extract_response_with_digest_stdout() {
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Linux);
+  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
@@ -971,7 +971,7 @@ async fn extract_response_with_digest_stderr() {
     .op
     .unwrap()
     .unwrap(),
-    Platform::Linux,
+    Platform::Linux_x86_64,
   )
   .await
   .unwrap();
@@ -980,7 +980,7 @@ async fn extract_response_with_digest_stderr() {
   assert_eq!(result.stderr_bytes, testdata.bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Linux);
+  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
@@ -998,7 +998,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
     .op
     .unwrap()
     .unwrap(),
-    Platform::Darwin,
+    Platform::Macos_x86_64,
   )
   .await
   .unwrap();
@@ -1007,7 +1007,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Darwin);
+  assert_eq!(result.original.platform, Platform::Macos_x86_64);
 }
 
 #[tokio::test]
@@ -1078,7 +1078,7 @@ async fn ensure_inline_stdio_is_stored() {
     None,
     BTreeMap::new(),
     store.clone(),
-    Platform::Linux,
+    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1093,7 +1093,7 @@ async fn ensure_inline_stdio_is_stored() {
   assert_eq!(result.stdout_bytes, test_stdout.bytes());
   assert_eq!(result.stderr_bytes, test_stderr.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.platform, Platform::Linux);
+  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 
   let local_store =
     Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
@@ -1464,7 +1464,7 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     BTreeMap::new(),
     store.clone(),
-    Platform::Linux,
+    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1479,7 +1479,7 @@ async fn execute_missing_file_uploads_if_known() {
   assert_eq!(result.stdout_bytes, roland.bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.platform, Platform::Linux);
+  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 
   {
     let blobs = cas.blobs.lock();
@@ -1535,7 +1535,7 @@ async fn execute_missing_file_errors_if_unknown() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1582,7 +1582,7 @@ async fn extract_execute_response_success() {
     ..Default::default()
   };
 
-  let result = extract_execute_response(operation, Platform::Linux)
+  let result = extract_execute_response(operation, Platform::Linux_x86_64)
     .await
     .unwrap();
 
@@ -1593,7 +1593,7 @@ async fn extract_execute_response_success() {
     result.original.output_directory,
     TestDirectory::nested().digest()
   );
-  assert_eq!(result.original.platform, Platform::Linux);
+  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
@@ -1616,7 +1616,7 @@ async fn extract_execute_response_timeout() {
     ..Default::default()
   };
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Timeout) => (),
     other => assert!(false, "Want timeout error, got {:?}", other),
   };
@@ -1640,7 +1640,7 @@ async fn extract_execute_response_missing_digests() {
     .unwrap();
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux).await,
+    extract_execute_response(operation, Platform::Linux_x86_64).await,
     Err(ExecutionError::MissingDigests(missing_files))
   );
 }
@@ -1661,7 +1661,7 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1681,7 +1681,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1696,7 +1696,7 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1722,7 +1722,7 @@ async fn extract_execute_response_other_status() {
     ..Default::default()
   };
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1746,7 +1746,7 @@ async fn remote_workunits_are_stored() {
     .build();
   let action_cache = mock::StubActionCache::new().unwrap();
   let (command_runner, _store) =
-    create_command_runner(action_cache.address(), &cas, Platform::Linux);
+    create_command_runner(action_cache.address(), &cas, Platform::Linux_x86_64);
 
   command_runner
     .extract_execute_response(OperationOrStatus::Operation(operation))
@@ -2230,7 +2230,7 @@ async fn run_command_remote(
     .directory(&TestDirectory::containing_roland())
     .tree(&TestTree::roland_at_root())
     .build();
-  let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux);
+  let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux_x86_64);
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;

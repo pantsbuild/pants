@@ -235,7 +235,7 @@ impl Core {
             full_store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
-            Platform::Linux,
+            Platform::Linux_x86_64,
             remoting_opts.execution_overall_deadline,
             Duration::from_millis(100),
             remoting_opts.execution_rpc_concurrency,

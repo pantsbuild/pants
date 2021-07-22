@@ -293,7 +293,7 @@ async fn main() {
             root_ca_certs,
             headers,
             store.clone(),
-            Platform::Linux,
+            Platform::Linux_x86_64,
             Duration::from_secs(args.overall_deadline_secs),
             Duration::from_millis(100),
             args.execution_rpc_concurrency,

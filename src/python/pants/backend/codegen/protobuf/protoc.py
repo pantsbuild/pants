@@ -13,16 +13,18 @@ class Protoc(TemplatedExternalTool):
 
     default_version = "3.11.4"
     default_known_versions = [
-        "3.11.4|darwin|8c6af11e1058efe953830ecb38324c0e0fd2fb67df3891896d138c535932e7db|2482119",
-        "3.11.4|linux |6d0f18cd84b918c7b3edd0203e75569e0c8caecb1367bbbe409b45e28514f5be|1591191",
+        "3.11.4|linux_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c8caecb1367bbbe409b45e28514f5be|1591191",
+        "3.11.4|macos_arm64 |8c6af11e1058efe953830ecb38324c0e0fd2fb67df3891896d138c535932e7db|2482119",
+        "3.11.4|macos_x86_64|8c6af11e1058efe953830ecb38324c0e0fd2fb67df3891896d138c535932e7db|2482119",
     ]
     default_url_template = (
         "https://github.com/protocolbuffers/protobuf/releases/download/"
-        "v{version}/protoc-{version}-{platform}-x86_64.zip"
+        "v{version}/protoc-{version}-{platform}.zip"
     )
     default_url_platform_mapping = {
-        "darwin": "osx",
-        "linux": "linux",
+        "linux_x86_64": "linux-x86_64",
+        "macos_arm64": "osx-x86_64",  # May require rosetta, but output is arch-independent
+        "macos_x86_64": "osx-x86_64",
     }
 
     @classmethod
