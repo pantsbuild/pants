@@ -22,15 +22,15 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PutativeTerraformTargetsRequest:
+class PutativeTerraformTargetsRequest(PutativeTargetsRequest):
     pass
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Terraform targets to create")
 async def find_putative_targets(
-    _: PutativeTerraformTargetsRequest, all_owned_sources: AllOwnedSources
+    request: PutativeTerraformTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_terraform_files = await Get(Paths, PathGlobs(["**/*.tf"]))
+    all_terraform_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("*.tf"))
     unowned_terraform_files = set(all_terraform_files.files) - set(all_owned_sources)
 
     putative_targets = []
