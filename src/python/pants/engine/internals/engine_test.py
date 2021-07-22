@@ -314,7 +314,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             max_workunit_verbosity=max_workunit_verbosity,
             specs=Specs.empty(),
             options_bootstrapper=create_options_bootstrapper([]),
-            pantsd=False,
+            allow_async_completion=False,
         )
         return scheduler, tracker, handler
 
@@ -679,7 +679,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         max_workunit_verbosity=LogLevel.TRACE,
         specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
-        pantsd=False,
+        allow_async_completion=False,
     )
     with handler:
         input_1 = CreateDigest(
@@ -739,7 +739,7 @@ def test_process_digests_on_streaming_workunits(
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
-        pantsd=False,
+        allow_async_completion=False,
     )
 
     stdout_process = Process(
@@ -772,7 +772,7 @@ def test_process_digests_on_streaming_workunits(
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
-        pantsd=False,
+        allow_async_completion=False,
     )
     stderr_process = Process(
         argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
@@ -837,7 +837,7 @@ def test_context_object_on_streaming_workunits(
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
-        pantsd=False,
+        allow_async_completion=False,
     )
     stdout_process = Process(
         argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
@@ -899,7 +899,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         options_bootstrapper=create_options_bootstrapper(
             ["--backend-packages=pants.backend.python"]
         ),
-        pantsd=False,
+        allow_async_completion=False,
     )
     stdout_process = Process(
         argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
