@@ -14,6 +14,7 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     DescendantAddresses,
+    MaybeEmptySiblingAddresses,
     SiblingAddresses,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -334,7 +335,7 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
     assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
     assert_resolve_error([AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean))
 
-    # SiblingAddresses require the BUILD file to exist, but are okay if no targets are resolved.
+    # SiblingAddresses requires the BUILD file to exist and at least one match.
     assert_resolve_error(
         [SiblingAddresses("fake")],
         expected=(
@@ -342,7 +343,18 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
             "there."
         ),
     )
-    assert not resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("empty")])
+    assert_resolve_error(
+        [SiblingAddresses("empty")],
+        expected="Address spec 'empty:' does not match any targets",
+    )
+
+    # MaybeEmptySiblingAddresses does not require a BUILD file to exist nor any matches.
+    assert not resolve_address_specs(
+        address_specs_rule_runner, [MaybeEmptySiblingAddresses("fake")]
+    )
+    assert not resolve_address_specs(
+        address_specs_rule_runner, [MaybeEmptySiblingAddresses("empty")]
+    )
 
     # DescendantAddresses requires at least one match, even if BUILD files exist.
     assert_resolve_error(
