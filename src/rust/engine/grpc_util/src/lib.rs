@@ -32,13 +32,19 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use http::header::USER_AGENT;
+use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
+use either::Either;
+use http::header::{HeaderName, USER_AGENT};
+use http::{HeaderMap, HeaderValue};
+use itertools::Itertools;
+use std::iter::FromIterator;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
 use tower::ServiceBuilder;
 
+pub mod headers;
 pub mod hyper;
 pub mod prost;
 pub mod retry;
@@ -46,10 +52,15 @@ pub mod retry;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = ConcurrencyLimit<Channel>;
+pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<Channel>>;
 
-pub fn layered_service(channel: Channel, concurrency_limit: usize) -> LayeredService {
+pub fn layered_service(
+  channel: Channel,
+  concurrency_limit: usize,
+  http_headers: HeaderMap,
+) -> LayeredService {
   ServiceBuilder::new()
+    .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .service(channel)
 }
@@ -144,10 +155,32 @@ pub fn headers_to_metadata_map(headers: &BTreeMap<String, String>) -> Result<Met
   Ok(metadata_map)
 }
 
-pub fn identity_interceptor_fn(
-  request: tonic::Request<()>,
-) -> Result<tonic::Request<()>, tonic::Status> {
-  Ok(request)
+pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
+  let http_headers = headers
+    .iter()
+    .map(|(key, value)| {
+      let header_name = HeaderName::from_str(key.as_str())
+        .map_err(|err| format!("Invalid header name {}: {}", key, err))?;
+
+      let header_value = HeaderValue::from_str(value.as_str())
+        .map_err(|err| format!("Invalid header value {}: {}", value, err))?;
+
+      Ok((header_name, header_value))
+    })
+    .collect::<Vec<Result<(HeaderName, HeaderValue), String>>>();
+
+  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = http_headers
+    .into_iter()
+    .partition_map(|result| match result {
+      Ok(v) => Either::Left(v),
+      Err(err) => Either::Right(err),
+    });
+
+  if !errors.is_empty() {
+    return Err(format!("header conversion errors: {}", errors.join("; ")));
+  }
+
+  Ok(HeaderMap::from_iter(http_headers))
 }
 
 pub fn headers_to_interceptor_fn(

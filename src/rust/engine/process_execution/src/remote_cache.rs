@@ -11,7 +11,8 @@ use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::{
-  headers_to_interceptor_fn, layered_service, retry::retry_call, status_to_str, LayeredService,
+  headers_to_http_header_map, layered_service, retry::retry_call,
+  status_to_str, LayeredService,
 };
 use hashing::Digest;
 use parking_lot::Mutex;
@@ -81,15 +82,13 @@ impl CommandRunner {
       tls_client_config.as_ref(),
       &mut headers,
     )?;
+    let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
+      http_headers,
     );
-    let action_cache_client = Arc::new(if headers.is_empty() {
-      ActionCacheClient::new(channel)
-    } else {
-      ActionCacheClient::with_interceptor(channel, headers_to_interceptor_fn(&headers)?)
-    });
+    let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
     Ok(CommandRunner {
       underlying,

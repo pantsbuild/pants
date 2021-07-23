@@ -15,6 +15,8 @@ fs = { path = ".." }
 futures = "0.3"
 glob = "0.2.11"
 hashing = { path = "../../hashing" }
+http = "0.2"
+http-body = "0.4"
 indexmap = "1.4"
 itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
@@ -31,6 +33,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.22"
 tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
