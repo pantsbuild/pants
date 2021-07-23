@@ -4,6 +4,8 @@
 import collections.abc
 from typing import Any, Dict, List, Union
 
+from pants.base.deprecated import deprecated
+
 
 def _normalize_entry_points(
     all_entry_points: Dict[str, Union[List[str], Dict[str, str]]]
@@ -78,6 +80,52 @@ class PythonArtifact:
     def __str__(self) -> str:
         return self.name
 
+    @deprecated(
+        "2.8.0dev0",
+        """Use `python_distribution(entry_points={"console_scripts":{...}})` instead of
+        `python_distribution(provides=setup_py().with_binaries(...))`.
+
+        The entry points is specified as a nested dictionary, with a dictionary for each type of
+        entry point, e.g. "console_scripts" or "gui_scripts" etc. Each dictionary maps the entry
+        point name to either a setuptools entry point ("path.to.module:func") or a Pants target
+        address to a pex_binary target.
+
+        Any entry point that either starts with `:` or has `/` in it, is considered a target
+        address. Use `//` as prefix for target addresses if you need to disambiguate.
+
+        Example migration, before:
+
+            pex_binary(name="my_library_bin", entry_point="my.library.bin:main")
+
+            python_distribution(
+                provides=setup_py(...).with_binaries({'my_command': ':my_library_bin'})
+            )
+
+        after:
+
+            python_distribution(
+                provides=setup_py(...),
+                entry_points={
+                    'console_scripts': {
+                        'my_command': 'my.library.bin:main'
+                    }
+                }
+            )
+
+        Pants will infer a dependency on the owner of the entry point module (usually a
+        `python_library`, `python_requirement_library` or a `pex_binary` in case a target address where
+        used).
+
+        Please run the following command before and after migrating from
+        `.with_binaries()` to verify that the correct dependencies are inferred.
+
+            ./pants dependencies --transitive path/to:python_distribution
+
+        For more on command line scripts and entry points, see:
+        https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point
+
+        """,
+    )
     def with_binaries(self, *args, **kw):
         """Add binaries tagged to this artifact.
 
