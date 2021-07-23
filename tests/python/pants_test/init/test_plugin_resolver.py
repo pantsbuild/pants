@@ -69,6 +69,7 @@ class PluginResolverTest(unittest.TestCase):
                 env.update(
                     PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
                     PANTS_PYTHON_REPOS_INDEXES="[]",
+                    PANTS_PYTHON_REPOS_TRUST_ENV="False",
                     PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
                 )
                 plugin_list = []
@@ -89,6 +90,7 @@ class PluginResolverTest(unittest.TestCase):
 
             options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
             plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
+            self.assertFalse(plugin_resolver._python_repos.get_network_context()._session.trust_env)
             cache_dir = plugin_resolver.plugin_cache_dir
             yield plugin_resolver.resolve(WorkingSet(entries=[])), root_dir, repo_dir, cache_dir
 
