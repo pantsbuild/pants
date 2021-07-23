@@ -384,7 +384,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                     name='foo', version='1.2.3',
                     entry_points={
                         "console_scripts":{
-                            "foo_qux":"foo.baz.qux",
+                            "foo_qux":"foo.baz.qux:main",
                         },
                         "foo_plugins":[
                             "foo-bar=foo.bar:plugin",
@@ -427,7 +427,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                     "bin_tool=foo.qux.bin:main",
                     "bin_tool2=foo.qux.bin:main",
                     "hello=foo.bin:main",
-                    "foo_qux=foo.baz.qux",
+                    "foo_qux=foo.baz.qux:main",
                 ],
                 "foo_plugins": [
                     "qux=foo.qux",

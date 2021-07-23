@@ -706,7 +706,7 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonProvidesField(ScalarField, ProvidesField):
+class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
@@ -808,9 +808,17 @@ class ResolvedPythonDistributionEntryPoints:
 @dataclass(frozen=True)
 class ResolvePythonDistributionEntryPointsRequest:
     """Looks at the entry points to see if it is a setuptools entry point, or a BUILD target address
-    that should be resolved into a setuptools entry point."""
+    that should be resolved into a setuptools entry point.
 
-    entry_points_field: PythonDistributionEntryPointsField
+    If the `entry_points_field` is present, inspect the specified entry points.
+    If the `provides_field` is present, inspect the `provides_field.kwargs["entry_points"]`.
+
+    This is to support inspecting one or the other depending on use case, using the same
+    logic for resolving pex_binary addresses etc.
+    """
+
+    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
+    provides_field: Optional[PythonProvidesField] = None
 
 
 class SetupPyCommandsField(StringSequenceField):
