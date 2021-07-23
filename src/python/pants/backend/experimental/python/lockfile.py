@@ -77,6 +77,12 @@ class PythonLockfileRequest:
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
     ) -> PythonLockfileRequest:
+        """Create a request for a dedicated lockfile for the tool.
+
+        If the tool determines its interpreter constraints by using the constraints of user code,
+        rather than the option `--interpreter-constraints`, you must pass the arg
+        `interpreter_constraints`.
+        """
         return cls(
             requirements=FrozenOrderedSet(subsystem.all_requirements),
             interpreter_constraints=(

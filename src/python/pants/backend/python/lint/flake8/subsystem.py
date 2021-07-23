@@ -12,11 +12,8 @@ from pants.backend.experimental.python.lockfile import (
 )
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.interpreter_constraints import (
-    InterpreterConstraints,
-    InterpreterConstraintsField,
-)
+from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
@@ -25,6 +22,7 @@ from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 
 
 class Flake8(PythonToolBase):
@@ -114,7 +112,10 @@ class Flake8LockfileSentinel(PythonToolLockfileSentinel):
     pass
 
 
-@rule
+@rule(
+    desc="Determine all Python interpreter versions used by Flake8 in your project",
+    level=LogLevel.DEBUG,
+)
 async def setup_flake8_lockfile(
     _: Flake8LockfileSentinel, flake8: Flake8, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
