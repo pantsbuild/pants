@@ -20,10 +20,20 @@ class DockerDependencies(Dependencies):
     pass
 
 
+class DockerBuildRoot(StringField):
+    alias = "build_root"
+    help = (
+        "Root directory for Docker build context. Default is to use the directory holding the "
+        "Dockerfile. Use '/' to use the project root, thus putting any resource from the entire "
+        "project within scope."
+    )
+
+
 class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        DockerBuildRoot,
         DockerDependencies,
         DockerImageSources,
         DockerImageVersion,

@@ -9,12 +9,14 @@ from typing import Optional, Tuple
 from pants.backend.docker.dependencies import DockerfileDependencies
 from pants.backend.docker.dockerfile import Dockerfile
 from pants.backend.docker.target_types import (
+    DockerBuildRoot,
     DockerDependencies,
     DockerImageSources,
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
@@ -26,6 +28,7 @@ from pants.engine.fs import (
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
+    Snapshot,
 )
 from pants.engine.process import (
     BinaryNotFoundError,
@@ -99,7 +102,7 @@ async def parse_dockerfile(request: DockerfileRequest) -> DockerfileDigest:
     contents = await Get(DigestContents, Digest, digest) if digest else None
 
     source = contents[0].content.decode() if contents else ""
-    logger.debug(f"Parse {dockerfile}:\n{source}")
+    logger.debug(f"Parse {os.path.join(request.sources.address.spec_path, dockerfile)}:\n{source}")
     parsed = Dockerfile.parse(source)
     logger.debug(f"Result: {parsed}")
 
@@ -191,12 +194,12 @@ class DockerBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
     def build_image(
-        self, tag: str, digest: Digest, build_root: str, dockerfile: Optional[str] = None
+        self, tag: str, digest: Digest, context_root: str, dockerfile: Optional[str] = None
     ):
         args = [self.path, "build", "-t", tag]
         if dockerfile:
             args.extend(["-f", dockerfile])
-        args.append(build_root)
+        args.append(context_root)
 
         return Process(
             argv=tuple(args),
@@ -238,33 +241,41 @@ class DockerBuildContext:
 @dataclass(frozen=True)
 class DockerBuildContextRequest:
     address: Address
-    source_path: str
+    context_root: str
     targets: Tuple[Target, ...]
 
 
 @rule
 async def create_docker_build_context(request: DockerBuildContextRequest) -> DockerBuildContext:
-    # get all source files
-    sources = await Get(SourceFiles, SourceFilesRequest([t.get(Sources) for t in request.targets]))
+    # Get all sources.
+    sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            sources_fields=[t.get(Sources) for t in request.targets],
+            for_sources_types=(DockerImageSources, FilesSources, ResourcesSources),
+        ),
+    )
 
-    # get all dependent targets
+    # Get all dependent targets.
     dependencies_targets = await MultiGet(
         Get(Targets, DependenciesRequest(t.get(Dependencies))) for t in request.targets
     )
 
-    # get all packages from those targets
+    # Get all packages from those targets.
     dependencies_packages = await MultiGet(
         Get(DockerPackages, Targets, dep_targets) for dep_targets in dependencies_targets
     )
 
-    # copy packages to context root
-    packages_digest = await MultiGet(
-        Get(Digest, AddPrefix(package.artifacts, request.source_path))
-        for package in dependencies_packages
-        if package.artifacts
+    packages_digest = tuple(
+        package.artifacts for package in dependencies_packages if package.artifacts
     )
+    if request.context_root != ".":
+        # Copy packages to context root.
+        packages_digest = await MultiGet(
+            Get(Digest, AddPrefix(digest, request.context_root)) for digest in packages_digest
+        )
 
-    # merge build context
+    # Merge build context.
     context = await Get(
         Digest,
         MergeDigests(
@@ -276,6 +287,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             if d
         ),
     )
+
     return DockerBuildContext(context)
 
 
@@ -283,8 +295,9 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
-    sources: DockerImageSources
+    build_root: DockerBuildRoot
     image_version: DockerImageVersion
+    sources: DockerImageSources
 
     @property
     def dockerfile_name(self) -> str:
@@ -294,18 +307,23 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
     @property
     def dockerfile_path(self) -> str:
-        return os.path.join(self.source_path, self.dockerfile_name)
+        return os.path.join(self.address.spec_path, self.dockerfile_name)
 
     @property
-    def source_path(self) -> str:
-        return self.address.spec_path
+    def context_root(self) -> str:
+        path = self.build_root.value or self.address.spec_path
+        if os.path.isabs(path):
+            path = os.path.relpath(path, "/")
+        else:
+            path = os.path.join(self.address.spec_path, path)
+        return path
 
     @property
     def image_tag(self) -> str:
         return ":".join(s for s in [self.address.target_name, self.image_version.value] if s)
 
 
-@rule(level=LogLevel.DEBUG)
+@rule
 async def build_docker_image(
     field_set: DockerFieldSet,
 ) -> BuiltPackage:
@@ -314,24 +332,31 @@ async def build_docker_image(
     context = await Get(
         DockerBuildContext,
         DockerBuildContextRequest(
-            field_set.address, field_set.source_path, tuple(transitive_targets.closure)
+            field_set.address, field_set.context_root, tuple(transitive_targets.closure)
         ),
     )
 
-    # run docker build
+    snapshot = await Get(Snapshot, Digest, context.digest)
+    files = "\n".join(snapshot.files)
+    logger.debug(
+        f"Docker build context [build_root: {field_set.context_root}] "
+        f"for {field_set.image_tag!r}:\n"
+        f"{files}"
+    )
+
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
             field_set.image_tag,
             context.digest,
-            field_set.source_path,
+            field_set.context_root,
             field_set.dockerfile_path,
         ),
     )
 
     logger.debug(
-        "Docker build output for {field_set.image_tag}:\n"
+        f"Docker build output for {field_set.image_tag}:\n"
         f"{result.stdout.decode()}\n"
         f"{result.stderr.decode()}"
     )
@@ -343,9 +368,13 @@ async def build_docker_image(
                 relpath=None,
                 extra_log_lines=(
                     f"Built docker image: {field_set.image_tag}",
-                    f"To try out the image interactively: docker run -it --rm {field_set.image_tag} [entrypoint args...]",
-                    f"  or using pants: ./pants run {field_set.address} -- [args...]",
-                    f"To push your image: docker push {field_set.image_tag}",
+                    "To try out the image interactively:",
+                    f"    docker run -it --rm {field_set.image_tag} [entrypoint args...]",
+                    "or using pants:",
+                    f"    ./pants run {field_set.address} -- [args...]",
+                    "To push your image:",
+                    f"    docker push {field_set.image_tag}",
+                    "",
                 ),
             ),
         ),
