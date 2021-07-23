@@ -30,6 +30,7 @@
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::iter::FromIterator;
 use std::str::FromStr;
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
@@ -37,7 +38,6 @@ use either::Either;
 use http::header::{HeaderName, USER_AGENT};
 use http::{HeaderMap, HeaderValue};
 use itertools::Itertools;
-use std::iter::FromIterator;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};

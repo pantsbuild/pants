@@ -11,8 +11,7 @@ use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::{
-  headers_to_http_header_map, layered_service, retry::retry_call,
-  status_to_str, LayeredService,
+  headers_to_http_header_map, layered_service, retry::retry_call, status_to_str, LayeredService,
 };
 use hashing::Digest;
 use parking_lot::Mutex;
