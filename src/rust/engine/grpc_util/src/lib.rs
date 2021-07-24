@@ -138,10 +138,10 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
   let http_headers = headers
     .iter()
     .map(|(key, value)| {
-      let header_name = HeaderName::from_str(key.as_str())
+      let header_name = HeaderName::from_str(&key)
         .map_err(|err| format!("Invalid header name {}: {}", key, err))?;
 
-      let header_value = HeaderValue::from_str(value.as_str())
+      let header_value = HeaderValue::from_str(&value)
         .map_err(|err| format!("Invalid header value {}: {}", value, err))?;
 
       Ok((header_name, header_value))
