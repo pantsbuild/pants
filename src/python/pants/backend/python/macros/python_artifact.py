@@ -85,13 +85,21 @@ class PythonArtifact:
         """Use `python_distribution(entry_points={"console_scripts":{...}})` instead of
         `python_distribution(provides=setup_py().with_binaries(...))`.
 
-        The entry points is specified as a nested dictionary, with a dictionary for each type of
-        entry point, e.g. "console_scripts" or "gui_scripts" etc. Each dictionary maps the entry
-        point name to either a setuptools entry point ("path.to.module:func") or a Pants target
-        address to a pex_binary target.
+        The entry points field was added as a more generic mechanism than
+        `.with_binaries()`. Whereas `.with_binaries()` would only add `console_scripts` to your
+        generated `setup.py`, you can now add other types of entry points like `gui_scripts`. You
+        can also now add a setuptools entry point like `path.to.module:func`, in addition to still
+        being able to sue a Pants target address to a `pex_binary` target.
+
+        Entry points are specified as a nested dictionary, with a dictionary for each type of entry
+        point like `console_scripts` and `gui_scripts`. Each dictionary maps the entry point name to
+        either a setuptools entry point or an address to a `pex_binary` target.
 
         Any entry point that either starts with `:` or has `/` in it, is considered a target
         address. Use `//` as prefix for target addresses if you need to disambiguate.
+
+        To migrate, add a dictionary for `console_scripts` with the same entry point name and
+        `pex_binary` address you were using before.
 
         Example migration, before:
 
@@ -104,7 +112,7 @@ class PythonArtifact:
 
         after:
 
-            pex_binary(name="binary", entry_point="./app.py:main")
+            pex_binary(name="binary", entry_point="app.py:main")
 
             python_distribution(
                 name="dist",
@@ -112,14 +120,10 @@ class PythonArtifact:
                 provides=setup_py(...),
             )
 
-        Pants will infer a dependency on the owner of the entry point module (usually a
-        `python_library`, `python_requirement_library` or a `pex_binary` in case a target address where
-        used).
+        As before, Pants will infer a dependency on the `pex_binary`. You can confirm this by
+        running
 
-        Please run the following command before and after migrating from
-        `.with_binaries()` to verify that the correct dependencies are inferred.
-
-            ./pants dependencies --transitive path/to:python_distribution
+            ./pants dependencies path/to:python_distribution.
 
         For more on command line scripts and entry points, see:
         https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point
