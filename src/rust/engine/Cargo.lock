@@ -720,6 +720,7 @@ dependencies = [
  "parking_lot",
  "pyo3",
  "task_executor",
+ "workunit_store",
 ]
 
 [[package]]

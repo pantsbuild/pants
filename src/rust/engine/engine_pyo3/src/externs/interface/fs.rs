@@ -4,12 +4,13 @@
 use std::path::Path;
 
 use fs::{GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching};
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
+  m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   Ok(())
 }
 
@@ -71,4 +72,17 @@ fn match_path_globs(
         .collect(),
     )
   })
+}
+
+#[pyfunction]
+fn default_cache_path() -> PyResult<String> {
+  fs::default_cache_path()
+    .into_os_string()
+    .into_string()
+    .map_err(|s| {
+      PyTypeError::new_err(format!(
+        "Default cache path {:?} could not be converted to a string.",
+        s
+      ))
+    })
 }

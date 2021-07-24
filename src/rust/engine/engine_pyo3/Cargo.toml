@@ -25,3 +25,4 @@ parking_lot = "0.11"
 pyo3 = "0.14.1"
 task_executor = { path = "../task_executor" }
 testutil_mock = { package = "mock", path = "../testutil/mock" }
+workunit_store = { path = "../workunit_store" }
