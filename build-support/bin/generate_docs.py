@@ -218,7 +218,13 @@ def run_pants_help_all() -> Dict:
         "toolchain.pants.buildsense",
         "toolchain.pants.common",
     ]
-    activated_backends = ["pants.backend.python.lint.bandit", "pants.backend.python.lint.pylint"]
+    activated_backends = [
+        "pants.backend.codegen.protobuf.python",
+        "pants.backend.awslambda.python",
+        "pants.backend.python.lint.bandit",
+        "pants.backend.python.lint.pylint",
+        "pants.backend.python.lint.yapf",
+    ]
     argv = [
         "./pants",
         "--concurrent",

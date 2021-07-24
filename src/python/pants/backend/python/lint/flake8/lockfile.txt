@@ -1,5 +1,4 @@
-#
-# To regenerate, run `./pants tool-lock` on a machine w/ Py37.
+# To regenerate, run `./pants run build-support/bin/generate_all_lockfiles.py`.
 # You MUST manually add back the `python_version` environment markers. (This will be automated.)
 #
 #
