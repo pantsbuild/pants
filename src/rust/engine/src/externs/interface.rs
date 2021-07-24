@@ -73,7 +73,7 @@ use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{
-  ArtifactOutput, Metric, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
+  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
 };
 
 use crate::{
@@ -87,8 +87,6 @@ py_exception!(native_engine, PollTimeout);
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
     .unwrap();
-
-  m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
   m.add(
     py,
@@ -302,8 +300,6 @@ py_module_initializer!(native_engine, |py, m| {
     "session_isolated_shallow_clone",
     py_fn!(py, session_isolated_shallow_clone(a: PySession, b: String)),
   )?;
-
-  m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
 
   m.add(
     py,
@@ -1185,10 +1181,6 @@ fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler, timeout_secs: u64)
   Ok(None)
 }
 
-fn all_counter_names(_: Python) -> CPyResult<Vec<String>> {
-  Ok(Metric::all_metrics())
-}
-
 fn scheduler_execute(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1798,21 +1790,6 @@ fn write_digest(
       Ok(None)
     })
   })
-}
-
-fn default_cache_path(py: Python) -> CPyResult<String> {
-  fs::default_cache_path()
-    .into_os_string()
-    .into_string()
-    .map_err(|s| {
-      PyErr::new::<exc::Exception, _>(
-        py,
-        (format!(
-          "Default cache path {:?} could not be converted to a string.",
-          s
-        ),),
-      )
-    })
 }
 
 fn stdio_initialize(

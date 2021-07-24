@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, native_engine_pyo3
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -244,4 +244,4 @@ class RunTracker:
 
     @property
     def counter_names(self) -> tuple[str, ...]:
-        return tuple(native_engine.all_counter_names())
+        return tuple(native_engine_pyo3.all_counter_names())
