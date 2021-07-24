@@ -81,7 +81,7 @@ class PythonArtifact:
         return self.name
 
     @deprecated(
-        "2.8.0dev0",
+        "2.8.0.dev0",
         """Use `python_distribution(entry_points={"console_scripts":{...}})` instead of
         `python_distribution(provides=setup_py().with_binaries(...))`.
 
@@ -95,21 +95,21 @@ class PythonArtifact:
 
         Example migration, before:
 
-            pex_binary(name="my_library_bin", entry_point="my.library.bin:main")
+            pex_binary(name="binary", entry_point="app.py:main")
 
             python_distribution(
-                provides=setup_py(...).with_binaries({'my_command': ':my_library_bin'})
+                name="dist",
+                provides=setup_py(...).with_binaries({'my_command': ':binary'})
             )
 
         after:
 
+            pex_binary(name="binary", entry_point="./app.py:main")
+
             python_distribution(
+                name="dist",
+                entry_points={'console_scripts': {'my_command': ':binary'}},
                 provides=setup_py(...),
-                entry_points={
-                    'console_scripts': {
-                        'my_command': 'my.library.bin:main'
-                    }
-                }
             )
 
         Pants will infer a dependency on the owner of the entry point module (usually a
