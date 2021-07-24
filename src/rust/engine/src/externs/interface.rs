@@ -63,8 +63,7 @@ use futures::future::FutureExt;
 use futures::future::{self, TryFutureExt};
 use futures::Future;
 use hashing::Digest;
-use log::{self, debug, error, warn, Log};
-use logging::logger::PANTS_LOGGER;
+use log::{self, debug, error, warn};
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
@@ -129,18 +128,6 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "stdio_thread_set_destination",
     py_fn!(py, stdio_thread_set_destination(a: PyStdioDestination)),
-  )?;
-
-  m.add(py, "flush_log", py_fn!(py, flush_log()))?;
-  m.add(
-    py,
-    "write_log",
-    py_fn!(py, write_log(msg: String, level: u64, target: String)),
-  )?;
-  m.add(
-    py,
-    "set_per_run_log_path",
-    py_fn!(py, set_per_run_log_path(a: Option<String>)),
   )?;
 
   m.add(
@@ -1900,21 +1887,6 @@ fn stdio_thread_set_destination(py: Python, stdio_destination: PyStdioDestinatio
   Ok(None)
 }
 
-// TODO: Needs to be thread-local / associated with the Console.
-fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
-  py.allow_threads(|| {
-    PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
-    Ok(None)
-  })
-}
-
-fn write_log(py: Python, msg: String, level: u64, target: String) -> PyUnitResult {
-  py.allow_threads(|| {
-    Logger::log_from_python(&msg, level, &target).expect("Error logging message");
-    Ok(None)
-  })
-}
-
 fn teardown_dynamic_ui(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1927,13 +1899,6 @@ fn teardown_dynamic_ui(
       });
       Ok(None)
     })
-  })
-}
-
-fn flush_log(py: Python) -> PyUnitResult {
-  py.allow_threads(|| {
-    PANTS_LOGGER.flush();
-    Ok(None)
   })
 }
 

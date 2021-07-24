@@ -715,6 +715,8 @@ version = "0.0.1"
 dependencies = [
  "fs",
  "hashing",
+ "log 0.4.11",
+ "logging",
  "mock",
  "nailgun",
  "parking_lot",

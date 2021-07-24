@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Dict, Iterator, cast
 
 import pants.util.logging as pants_logging
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, native_engine_pyo3
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.docutil import doc_url
@@ -31,10 +31,10 @@ class _NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def emit(self, record: LogRecord) -> None:
-        native_engine.write_log(self.format(record), record.levelno, record.name)
+        native_engine_pyo3.write_log(self.format(record), record.levelno, record.name)
 
     def flush(self) -> None:
-        native_engine.flush_log()
+        native_engine_pyo3.flush_log()
 
 
 class _ExceptionFormatter(Formatter):

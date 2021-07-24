@@ -9,7 +9,30 @@ from pants.engine.fs import PathGlobs
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
 
+# ------------------------------------------------------------------------------
+# Scheduler
+# ------------------------------------------------------------------------------
+
+class PyExecutor:
+    def __init__(self, core_threads: int, max_threads: int) -> None: ...
+
+# ------------------------------------------------------------------------------
+# Stdio
+# ------------------------------------------------------------------------------
+
+def write_log(msg: str, level: int, target: str) -> None: ...
+def flush_log() -> None: ...
+def set_per_run_log_path(path: str | None) -> None: ...
+
+# ------------------------------------------------------------------------------
+# FS
+# ------------------------------------------------------------------------------
+
 def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
+
+# ------------------------------------------------------------------------------
+# Nailgun
+# ------------------------------------------------------------------------------
 
 class PyNailgunClient:
     def __init__(self, port: int, executor: PyExecutor) -> None: ...
@@ -21,8 +44,9 @@ class PantsdConnectionException(Exception):
 class PantsdClientException(Exception):
     pass
 
-class PyExecutor:
-    def __init__(self, core_threads: int, max_threads: int) -> None: ...
+# ------------------------------------------------------------------------------
+# Testutil
+# ------------------------------------------------------------------------------
 
 class PyStubCASBuilder:
     def always_errors(self) -> PyStubCASBuilder: ...

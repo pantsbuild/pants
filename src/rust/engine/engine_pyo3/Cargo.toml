@@ -20,6 +20,8 @@ default = []
 [dependencies]
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
+log = "0.4"
+logging = { path = "../logging" }
 nailgun = { path = "../nailgun" }
 parking_lot = "0.11"
 pyo3 = "0.14.1"
