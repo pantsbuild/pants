@@ -82,11 +82,15 @@ class PutativeTarget:
 
     # The sources that triggered creating of this putative target.
     # The putative target will own these sources, but may also glob over other sources.
+    # If the putative target does not have a `sources` field, then this value must be the
+    # empty tuple.
     triggering_sources: Tuple[str, ...]
 
     # The globs of sources owned by this target.
     # If kwargs contains an explicit sources key, it should be identical to this value.
     # Otherwise, this field should contain the default globs that the target type will apply.
+    # If the putative target does not have a `sources` field, then this value must be the
+    # empty tuple.
     # TODO: If target_type is a regular target (and not a macro) we can derive the default
     #  source globs for that type from BuildConfiguration.  However that is fiddly and not
     #  a high priority.

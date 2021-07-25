@@ -66,6 +66,8 @@ class FortranTests(Target):
     core_fields = (FortranTestsSources,)
 
 
+# This target intentionally has no `sources` field in order to test how `tailor` interacts with targets that
+# have no sources. An example of this type of target is `GoExternalModule`.
 class FortranModule(Target):
     alias = "fortran_module"
     core_fields = ()
