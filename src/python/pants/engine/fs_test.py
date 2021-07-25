@@ -1013,19 +1013,19 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_properties(cls: type) -> None:
+def test_digest_properties(cls) -> None:
     digest = cls("a" * 64, 1000)
     assert digest.fingerprint == "a" * 64
     assert digest.serialized_bytes_length == 1000
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_repr(cls: type) -> None:
+def test_digest_repr(cls) -> None:
     assert str(cls("a" * 64, 1)) == f"Digest({repr('a' * 64)}, 1)"
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_hash(cls: type) -> None:
+def test_digest_hash(cls) -> None:
     assert hash(cls("a" * 64, 1)) == -6148914691236517206
     assert hash(cls("b" * 64, 1)) == -4919131752989213765
     # Note that the size bytes is not considered in the hash.
@@ -1033,7 +1033,7 @@ def test_digest_hash(cls: type) -> None:
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_equality(cls: type) -> None:
+def test_digest_equality(cls) -> None:
     digest = cls("a" * 64, 1)
     assert digest == cls("a" * 64, 1)
     assert digest != cls("a" * 64, 1000)
@@ -1045,7 +1045,7 @@ def test_digest_equality(cls: type) -> None:
 @pytest.mark.parametrize(
     "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
 )
-def test_snapshot_properties(snapshot_cls: type, digest_cls) -> None:
+def test_snapshot_properties(snapshot_cls, digest_cls) -> None:
     digest = digest_cls("a" * 64, 1000)
     snapshot = snapshot_cls._create_for_testing(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
@@ -1056,7 +1056,7 @@ def test_snapshot_properties(snapshot_cls: type, digest_cls) -> None:
 @pytest.mark.parametrize(
     "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
 )
-def test_snapshot_hash(snapshot_cls: type, digest_cls) -> None:
+def test_snapshot_hash(snapshot_cls, digest_cls) -> None:
     def assert_hash(
         expected: int,
         *,
@@ -1081,7 +1081,7 @@ def test_snapshot_hash(snapshot_cls: type, digest_cls) -> None:
 @pytest.mark.parametrize(
     "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
 )
-def test_snapshot_equality(snapshot_cls: type, digest_cls) -> None:
+def test_snapshot_equality(snapshot_cls, digest_cls) -> None:
     # Only the digest is used for equality.
     snapshot = snapshot_cls._create_for_testing(
         digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
