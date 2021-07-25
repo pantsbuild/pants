@@ -25,14 +25,24 @@ class JavacBinary:
 
 @rule
 async def setup_javac_binary(coursier: Coursier, javac: JavacSubsystem) -> JavacBinary:
-    javac_wrapper_script = textwrap.dedent(
-        f"""\
-        set -eux
-        javac_path="$({coursier.coursier.exe} java-home --jvm {javac.options.jdk})/bin/javac"
-        /bin/mkdir -p {JavacBinary.classfiles_relpath}
-        exec "${{javac_path}}" "$@"
-        """
-    )
+    if javac.options.jdk == "system":
+        javac_wrapper_script = textwrap.dedent(
+            f"""\
+            set -eux
+            javac_path="$({coursier.coursier.exe} java-home --system-jvm)/bin/javac"
+            /bin/mkdir -p {JavacBinary.classfiles_relpath}
+            exec "${{javac_path}}" "$@"
+            """
+        )
+    else:
+        javac_wrapper_script = textwrap.dedent(
+            f"""\
+            set -eux
+            javac_path="$({coursier.coursier.exe} java-home --jvm {javac.options.jdk})/bin/javac"
+            /bin/mkdir -p {JavacBinary.classfiles_relpath}
+            exec "${{javac_path}}" "$@"
+            """
+        )
     javac_wrapper_script_digest = await Get(
         Digest,
         CreateDigest(
