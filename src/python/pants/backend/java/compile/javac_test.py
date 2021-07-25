@@ -136,6 +136,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
