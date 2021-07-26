@@ -5,7 +5,6 @@ import textwrap
 import pytest
 
 from pants.backend.go import module, target_type_rules
-from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.tailor import (
     PutativeGoExternalModuleTargetsRequest,
     PutativeGoModuleTargetsRequest,
@@ -21,9 +20,7 @@ from pants.core.goals.tailor import (
 )
 from pants.core.goals.tailor import rules as core_tailor_rules
 from pants.core.util_rules import external_tool, source_files
-from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
-from pants.engine.target import DependenciesRequest, UnexpandedTargets
 from pants.testutil.rule_runner import RuleRunner
 
 
