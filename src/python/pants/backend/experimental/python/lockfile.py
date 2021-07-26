@@ -120,8 +120,9 @@ class PythonLockfileRequest:
 async def generate_lockfile(
     req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem
 ) -> PythonLockfile:
+    reqs_filename = "reqs.txt"
     input_requirements = await Get(
-        Digest, CreateDigest([FileContent("reqs.txt", "\n".join(req.requirements).encode())])
+        Digest, CreateDigest([FileContent(reqs_filename, "\n".join(req.requirements).encode())])
     )
 
     pip_compile_pex = await Get(
@@ -139,8 +140,6 @@ async def generate_lockfile(
         ),
     )
 
-    tmp_lockfile = f"{req.dest}.tmp"
-
     generated_lockfile = await Get(
         ProcessResult,
         # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share
@@ -150,15 +149,15 @@ async def generate_lockfile(
             description=req.description,
             # TODO(#12314): Wire up all the pip options like indexes.
             argv=[
-                "reqs.txt",
+                reqs_filename,
                 "--generate-hashes",
-                f"--output-file={tmp_lockfile}",
+                f"--output-file={req.dest}",
                 # NB: This allows pinning setuptools et al, which we must do. This will become
                 # the default in a future version of pip-tools.
                 "--allow-unsafe",
             ],
             input_digest=input_requirements,
-            output_files=(tmp_lockfile,),
+            output_files=(req.dest,),
         ),
     )
 
