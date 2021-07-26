@@ -121,11 +121,11 @@ class PutativeTarget:
         comments: Iterable[str] = tuple(),
         build_file_name: str = "BUILD",
     ):
-        maybe_owned_sources = (kwargs or {}).get("sources")
+        explicit_sources = (kwargs or {}).get("sources")
         default_sources = default_sources_for_target_type(target_type)
-        if (maybe_owned_sources or triggering_sources) and default_sources is None:
+        if (explicit_sources or triggering_sources) and default_sources is None:
             raise ValueError(f"Target type {target_type.__name__} does not have a sources field.")
-        owned_sources = maybe_owned_sources or default_sources or tuple()
+        owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
             name,
