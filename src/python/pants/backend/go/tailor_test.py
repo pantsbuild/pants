@@ -40,10 +40,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(PutativeTargets, [PutativeGoPackageTargetsRequest, AllOwnedSources]),
             QueryRule(PutativeTargets, [PutativeGoModuleTargetsRequest, AllOwnedSources]),
             QueryRule(PutativeTargets, [PutativeGoExternalModuleTargetsRequest, AllOwnedSources]),
-            QueryRule(AllOwnedSources, ()),
-            QueryRule(Addresses, (DependenciesRequest,)),
-            QueryRule(UnexpandedTargets, (Addresses,)),
-            QueryRule(ResolvedGoModule, [ResolveGoModuleRequest]),
         ],
         target_types=[
             GoPackage,
