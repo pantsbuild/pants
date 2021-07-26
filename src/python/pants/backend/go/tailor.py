@@ -15,7 +15,7 @@ from pants.core.goals.tailor import (
     group_by_dir,
 )
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.engine.unions import UnionRule
@@ -110,15 +110,17 @@ async def find_putative_go_external_module_targets(
 
     putative_targets = []
 
-    for go_module_target in go_module_targets:
-        resolved_go_module = await Get(
-            ResolvedGoModule, ResolveGoModuleRequest(go_module_target.address)
-        )
+    resolved_go_modules = await MultiGet(
+        Get(ResolvedGoModule, ResolveGoModuleRequest(go_module_target.address))
+        for go_module_target in go_module_targets
+    )
+
+    for resolved_go_module in resolved_go_modules:
         for module_descriptor in resolved_go_module.modules:
             putative_targets.append(
                 PutativeTarget.for_target_type(
                     GoExternalModule,
-                    go_module_target.address.spec_path,
+                    resolved_go_module.address.spec_path,
                     compute_go_external_module_target_name(
                         module_descriptor.module_path, module_descriptor.module_version
                     ),
