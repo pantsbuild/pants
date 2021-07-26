@@ -44,6 +44,7 @@ class ModuleDescriptor:
 
 @dataclass(frozen=True)
 class ResolvedGoModule:
+    address: Address
     import_path: str
     minimum_go_version: Optional[str]
     modules: FrozenOrderedSet[ModuleDescriptor]
@@ -165,6 +166,7 @@ async def resolve_go_module(
         raise ValueError("No `module` directive found in go.mod.")
 
     return ResolvedGoModule(
+        address=request.address,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
         modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),
