@@ -13,17 +13,34 @@ from pants.backend.docker.rules import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerFieldSet,
+    DockerPackages,
     InjectDockerDependencies,
     build_docker_image,
+    create_docker_build_context,
     inject_docker_dependencies,
     parse_dockerfile,
 )
 from pants.backend.docker.target_types import DockerDependencies, DockerImage
 from pants.backend.python.target_types import PexBinary
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_FILE_DIGEST,
+    EMPTY_SNAPSHOT,
+    AddPrefix,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.process import Process, ProcessResult
-from pants.engine.target import InjectedDependencies, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    DependenciesRequest,
+    InjectedDependencies,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -194,3 +211,46 @@ def test_build_docker_image(target_values, expected_features):
 
     version = expected_features.get("version", "latest")
     assert f"Built docker image: image:{version}" in result.artifacts[0].extra_log_lines
+
+
+def test_create_docker_build_context():
+    request = DockerBuildContextRequest(
+        address=Address("docker/test", target_name="image"), context_root=".", targets=[]
+    )
+
+    result = run_rule_with_mocks(
+        create_docker_build_context,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(
+                output_type=SourceFiles,
+                input_type=SourceFilesRequest,
+                mock=lambda _: SourceFiles(
+                    snapshot=EMPTY_SNAPSHOT,
+                    unrooted_files=tuple(),
+                ),
+            ),
+            MockGet(
+                output_type=Targets,
+                input_type=DependenciesRequest,
+                mock=lambda _: Targets(),
+            ),
+            MockGet(
+                output_type=DockerPackages,
+                input_type=Targets,
+                mock=lambda _: DockerPackages(),
+            ),
+            MockGet(
+                output_type=Digest,
+                input_type=AddPrefix,
+                mock=lambda _: EMPTY_DIGEST,
+            ),
+            MockGet(
+                output_type=Digest,
+                input_type=MergeDigests,
+                mock=lambda _: EMPTY_DIGEST,
+            ),
+        ],
+    )
+
+    assert result.digest == EMPTY_DIGEST
