@@ -123,8 +123,12 @@ class PutativeTarget:
     ):
         explicit_sources = (kwargs or {}).get("sources")
         default_sources = default_sources_for_target_type(target_type)
-        if (explicit_sources or triggering_sources) and default_sources is None:
-            raise ValueError(f"Target type {target_type.__name__} does not have a sources field.")
+        if (explicit_sources or triggering_sources) and not default_sources:
+            raise ValueError(
+                f"A target of type {target_type.__name__} was proposed at "
+                f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
+                "but this target type does not have a `sources` field."
+            )
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
