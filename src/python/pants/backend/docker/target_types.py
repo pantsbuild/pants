@@ -22,10 +22,11 @@ class DockerDependencies(Dependencies):
 
 class DockerBuildRoot(StringField):
     alias = "build_root"
+    default = "."
     help = (
-        "Root directory for Docker build context. Default is to use the directory holding the "
-        "Dockerfile. Use '/' to use the project root, thus putting any resource from the entire "
-        "project within scope."
+        "Root directory for Docker build context. Default is to use the directory of the `BUILD` "
+        "file. Use '/' to use the project root, thus putting any resource from the entire project "
+        "within scope."
     )
 
 

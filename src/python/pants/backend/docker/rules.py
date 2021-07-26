@@ -311,7 +311,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
     @property
     def context_root(self) -> str:
-        path = self.build_root.value or self.address.spec_path
+        path = self.build_root.value or "."
         if os.path.isabs(path):
             path = os.path.relpath(path, "/")
         else:
