@@ -304,6 +304,10 @@ async def generate_all_tool_lockfiles(
     return ToolLockGoal(exit_code=0)
 
 
+BEGIN_LOCKFILE_HEADER = b"# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
+END_LOCKFILE_HEADER = b"# --- END LOCKFILE METADATA ---"
+
+
 # Lockfile metadata for headers
 def lockfile_metadata(invalidation_digest: str) -> bytes:
     """Produces a metadata bytes object for including at the top of a lockfile.
@@ -313,11 +317,15 @@ def lockfile_metadata(invalidation_digest: str) -> bytes:
     """
     return (
         b"""
-# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+%(BEGIN_LOCKFILE_HEADER)b
 # invalidation digest: %(invalidation_digest)s
-# --- END LOCKFILE METADATA ---
+%(END_LOCKFILE_HEADER)b
     """
-        % {b"invalidation_digest": invalidation_digest.encode("ascii")}
+        % {
+            b"BEGIN_LOCKFILE_HEADER": BEGIN_LOCKFILE_HEADER,
+            b"invalidation_digest": invalidation_digest.encode("ascii"),
+            b"END_LOCKFILE_HEADER": END_LOCKFILE_HEADER,
+        }
     ).strip()
 
 
@@ -330,9 +338,9 @@ def read_lockfile_metadata(contents: bytes) -> dict[str, str]:
     in_metadata_block = False
     for line in contents.splitlines():
         line = line.strip()
-        if line == b"# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---":
+        if line == BEGIN_LOCKFILE_HEADER:
             in_metadata_block = True
-        elif line == b"# --- END LOCKFILE METADATA ---":
+        elif line == END_LOCKFILE_HEADER:
             break
         elif in_metadata_block:
             key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
