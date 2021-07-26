@@ -91,6 +91,9 @@ async def find_putative_go_external_module_targets(
     # source files because it infers `go_external_module` targets based on go.mod contents. (This may require
     # invoking `tailor` first to create `go_module` targets and then again to create `go_external_module`
     # targets.)
+    #
+    # TODO: This might better work as a BUILD macro if https://github.com/pantsbuild/pants/issues/7022 is
+    # resolved and macros are able to invoke the engine or processes.
 
     addresses = itertools.chain.from_iterable(
         [
