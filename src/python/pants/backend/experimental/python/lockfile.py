@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from typing import cast
@@ -92,6 +93,20 @@ class PythonLockfileRequest:
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
         )
+
+    @property
+    def hex_digest(self) -> str:
+        """Produces a hex digest of this lockfile's inputs, which should uniquely specify the
+        resolution of this lockfile request.
+
+        Inputs are definted as requirements and interpreter constraints.
+        """
+        m = hashlib.sha256()
+        for requirement in self.requirements:
+            m.update(requirement.encode("utf-8"))
+        for constraint in self.interpreter_constraints:
+            m.update(str(constraint).encode("utf-8"))
+        return m.hexdigest()
 
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
