@@ -122,6 +122,11 @@ class PutativeTarget:
         build_file_name: str = "BUILD",
     ):
         explicit_sources = (kwargs or {}).get("sources")
+        if explicit_sources is not None and not isinstance(explicit_sources, tuple):
+            raise TypeError(
+                "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
+            )
+
         default_sources = default_sources_for_target_type(target_type)
         if (explicit_sources or triggering_sources) and not default_sources:
             raise ValueError(
@@ -135,7 +140,7 @@ class PutativeTarget:
             name,
             target_type.alias,
             triggering_sources,
-            owned_sources,  # type: ignore[arg-type]
+            owned_sources,
             kwargs=kwargs,
             comments=comments,
             build_file_name=build_file_name,
