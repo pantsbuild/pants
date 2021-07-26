@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
+from dataclasses import dataclass
 
 import pytest
 
@@ -31,9 +32,9 @@ from pants.core.goals.tailor import (
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
-from pants.engine.rules import QueryRule
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Sources, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
@@ -65,12 +66,32 @@ class FortranTests(Target):
     core_fields = (FortranTestsSources,)
 
 
+# This target intentionally has no `sources` field in order to test how `tailor` interacts with targets that
+# have no sources. An example of this type of target is `GoExternalModule`.
+class FortranModule(Target):
+    alias = "fortran_module"
+    core_fields = ()
+
+
+@dataclass(frozen=True)
+class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
+    pass
+
+
+@rule
+def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
+    return PutativeTargets([PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])])
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *tailor.rules(),
             *source_files.rules(),
+            infer_fortran_module_dependency,
+            UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
+            QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
@@ -83,6 +104,7 @@ def rule_runner() -> RuleRunner:
 def test_default_sources_for_target_type() -> None:
     assert default_sources_for_target_type(FortranLibrary) == FortranLibrarySources.default
     assert default_sources_for_target_type(FortranTests) == FortranTestsSources.default
+    assert default_sources_for_target_type(FortranModule) == tuple()
 
 
 def test_make_content_str() -> None:
@@ -433,3 +455,21 @@ def test_all_owned_sources(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(AllOwnedSources, []) == AllOwnedSources(
         ["dir/a.f90", "dir/b.f90", "dir/a_test.f90"]
     )
+
+
+def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
+    )
+    assert putative_targets == PutativeTargets(
+        [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
+    expected_msg = (
+        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
+        "but this target type does not have a `sources` field."
+    )
+    assert str(excinfo.value) == expected_msg

@@ -67,7 +67,7 @@ def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
     for field in tgt_type.core_fields:
         if issubclass(field, Sources):
             return field.default or tuple()
-    raise ValueError(f"Target type {tgt_type.__name__} does not have a sources field.")
+    return tuple()
 
 
 @frozen_after_init
@@ -82,11 +82,15 @@ class PutativeTarget:
 
     # The sources that triggered creating of this putative target.
     # The putative target will own these sources, but may also glob over other sources.
+    # If the putative target does not have a `sources` field, then this value must be the
+    # empty tuple.
     triggering_sources: Tuple[str, ...]
 
     # The globs of sources owned by this target.
     # If kwargs contains an explicit sources key, it should be identical to this value.
     # Otherwise, this field should contain the default globs that the target type will apply.
+    # If the putative target does not have a `sources` field, then this value must be the
+    # empty tuple.
     # TODO: If target_type is a regular target (and not a macro) we can derive the default
     #  source globs for that type from BuildConfiguration.  However that is fiddly and not
     #  a high priority.
@@ -117,15 +121,26 @@ class PutativeTarget:
         comments: Iterable[str] = tuple(),
         build_file_name: str = "BUILD",
     ):
-        owned_sources = (
-            (kwargs or {}).get("sources") or default_sources_for_target_type(target_type) or tuple()
-        )
+        explicit_sources = (kwargs or {}).get("sources")
+        if explicit_sources is not None and not isinstance(explicit_sources, tuple):
+            raise TypeError(
+                "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
+            )
+
+        default_sources = default_sources_for_target_type(target_type)
+        if (explicit_sources or triggering_sources) and not default_sources:
+            raise ValueError(
+                f"A target of type {target_type.__name__} was proposed at "
+                f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
+                "but this target type does not have a `sources` field."
+            )
+        owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
             name,
             target_type.alias,
             triggering_sources,
-            owned_sources,  # type: ignore[arg-type]
+            owned_sources,
             kwargs=kwargs,
             comments=comments,
             build_file_name=build_file_name,
