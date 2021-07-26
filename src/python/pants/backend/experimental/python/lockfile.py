@@ -287,5 +287,42 @@ async def generate_all_tool_lockfiles(
     return ToolLockGoal(exit_code=0)
 
 
+# Lockfile metadata for headers
+def lockfile_metadata(invalidation_digest: str) -> bytes:
+    """Produces a metadata bytes object for including at the top of a lockfile.
+
+    Currently, this only consists of an invalidation digest for the file, which is used when Pants
+    consumes the lockfile during builds.
+    """
+    return (
+        b"""
+# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+# invalidation digest: %(invalidation_digest)s
+# --- END LOCKFILE METADATA ---
+    """
+        % {b"invalidation_digest": invalidation_digest.encode("ascii")}
+    ).strip()
+
+
+def read_lockfile_metadata(contents: bytes) -> dict[str, str]:
+    """Reads through `contents`, and returns the contents of the lockfile metadata block as a
+    dictionary."""
+
+    metadata = {}
+    
+    in_metadata_block = False
+    for line in contents.splitlines():
+        line = line.strip()
+        if line == b"# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---":
+            in_metadata_block = True
+        elif line == b"# --- END LOCKFILE METADATA ---":
+            break
+        elif in_metadata_block:
+            key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
+            metadata[key] = value
+    
+    return metadata
+
+
 def rules():
     return collect_rules()
