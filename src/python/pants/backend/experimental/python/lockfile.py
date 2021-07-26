@@ -16,7 +16,14 @@ from pants.backend.python.target_types import ConsoleScript, PythonRequirementsF
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    MergeDigests,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -132,7 +139,9 @@ async def generate_lockfile(
         ),
     )
 
-    result = await Get(
+    tmp_lockfile = f"{req.dest}.tmp"
+
+    generated_lockfile = await Get(
         ProcessResult,
         # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share
         #  the cache between Pex and Pip. Next best is a dedicated named_cache.
@@ -143,16 +152,25 @@ async def generate_lockfile(
             argv=[
                 "reqs.txt",
                 "--generate-hashes",
-                f"--output-file={req.dest}",
+                f"--output-file={tmp_lockfile}",
                 # NB: This allows pinning setuptools et al, which we must do. This will become
                 # the default in a future version of pip-tools.
                 "--allow-unsafe",
             ],
             input_digest=input_requirements,
-            output_files=(req.dest,),
+            output_files=(tmp_lockfile,),
         ),
     )
-    return PythonLockfile(result.output_digest, req.dest)
+
+    lockfile_contents = next(
+        iter(await Get(DigestContents, Digest, generated_lockfile.output_digest))
+    )
+    content_with_header = b"%b\n%b" % (lockfile_metadata(req.hex_digest), lockfile_contents.content)
+    complete_lockfile = await Get(
+        Digest, CreateDigest([FileContent(req.dest, content_with_header)])
+    )
+
+    return PythonLockfile(complete_lockfile, req.dest)
 
 
 # --------------------------------------------------------------------------------------
@@ -309,7 +327,7 @@ def read_lockfile_metadata(contents: bytes) -> dict[str, str]:
     dictionary."""
 
     metadata = {}
-    
+
     in_metadata_block = False
     for line in contents.splitlines():
         line = line.strip()
@@ -320,7 +338,7 @@ def read_lockfile_metadata(contents: bytes) -> dict[str, str]:
         elif in_metadata_block:
             key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
             metadata[key] = value
-    
+
     return metadata
 
 
