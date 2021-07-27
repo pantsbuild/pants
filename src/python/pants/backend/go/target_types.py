@@ -10,6 +10,7 @@ from pants.engine.target import (
     InvalidFieldException,
     Sources,
     StringField,
+    StringSequenceField,
     Target,
 )
 
@@ -19,7 +20,7 @@ class GoSources(Sources):
 
 
 class GoPackageSources(GoSources):
-    default = ("*.go", "!*_test.go")
+    default = ("*.go",)
 
 
 class GoImportPath(StringField):
@@ -32,9 +33,21 @@ class GoPackageDependencies(Dependencies):
     pass
 
 
+class GoTestGlobs(StringSequenceField):
+    alias = "test_globs"
+    default = ("*_test.go",)
+    help = "Sequence of globs for which files in the package are test files."
+
+
 class GoPackage(Target):
     alias = "go_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependencies, GoPackageSources, GoImportPath)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoPackageDependencies,
+        GoPackageSources,
+        GoImportPath,
+        GoTestGlobs,
+    )
     help = "A single Go package."
 
 
