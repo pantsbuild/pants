@@ -15,12 +15,17 @@ use hashing::{Digest, Fingerprint};
 use store::Snapshot;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+  m.add_function(wrap_pyfunction!(check_fs_python_types_load, m)?)?;
   m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   m.add_class::<PyDigest>()?;
   m.add_class::<PySnapshot>()?;
   Ok(())
 }
+
+#[pyfunction]
+#[allow(unused_variables)]
+fn check_fs_python_types_load(path_globs: PyPathGlobs) {}
 
 // -----------------------------------------------------------------------------
 // PathGlobs

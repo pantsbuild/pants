@@ -38,6 +38,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals import native_engine_pyo3
 from pants.engine.internals.native_engine_pyo3 import PyDigest as DigestPyO3
 from pants.engine.internals.native_engine_pyo3 import PySnapshot as SnapshotPyO3
 from pants.engine.internals.scheduler import ExecutionError
@@ -1010,6 +1011,29 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 # Native types
 # -----------------------------------------------------------------------------------------------
+
+
+def test_fs_python_types_load() -> None:
+    """Check that types defined in Python can be correctly consumed by Rust."""
+
+    def assert_loads(*, path_globs: Optional[PathGlobs] = None) -> None:
+        native_engine_pyo3.check_fs_python_types_load(
+            path_globs=path_globs or PathGlobs(["glob/**"])
+        )
+
+    # Check when types are valid.
+    assert_loads()
+    assert_loads(
+        path_globs=PathGlobs(
+            [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="foo",
+        )
+    )
+
+    # Now check invalid types to check for false positives.
+    with pytest.raises(TypeError):
+        assert_loads(path_globs=PathGlobs([1, 2, 3]))
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])

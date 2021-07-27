@@ -22,6 +22,7 @@ class PyExecutor:
 # FS
 # ------------------------------------------------------------------------------
 
+def check_fs_python_types_load(*, path_globs: PathGlobs) -> None: ...
 def default_cache_path() -> str: ...
 
 # TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't
