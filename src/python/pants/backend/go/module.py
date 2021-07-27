@@ -80,6 +80,9 @@ def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
 
 # Parse the output of `go mod download` into a list of module descriptors.
 def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
+    if len(raw_json) == 0:
+        return []
+
     module_descriptors = []
     for raw_module_descriptor in ijson.items(raw_json, "", multiple_values=True):
         module_descriptor = ModuleDescriptor(
