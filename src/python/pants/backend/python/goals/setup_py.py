@@ -16,14 +16,11 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    PexEntryPointField,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
-    ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
-    ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     SetupPyCommandsField,
 )
@@ -563,72 +560,48 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
 
-    # Collect any `pex_binary` targets from `setup_py().with_binaries()`
-    key_to_binary_spec = exported_target.provides.binaries
-    binaries = await Get(
-        Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
-    )
-    entry_point_requests = []
-    for binary in binaries:
-        if not binary.has_field(PexEntryPointField):
-            raise InvalidEntryPoint(
-                "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
-                f"`provides` field for {exported_addr}, but found {binary.address} with target "
-                f"type {binary.alias}."
-            )
-        entry_point = binary[PexEntryPointField].value
-        url = "https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point"
-        if not entry_point.function:
-            raise InvalidEntryPoint(
-                "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
-                f"{exported_addr} must end in the format `:my_func` for the `entry_point` field, "
-                f"but {binary.address} set it to {entry_point.spec!r}. For example, set "
-                f"`entry_point='{entry_point.module}:main'. See {url}."
-            )
-        entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
-
-    binary_entry_points = await MultiGet(
-        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
-        for request in entry_point_requests
-    )
-
-    entry_points_from_with_binaries = {
-        key: binary_entry_point.val.spec
-        for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points)
-        if binary_entry_point.val is not None
-    }
-
-    # Collect entry points from `python_distribution(entry_points=...)`
-    entry_points_from_field = {}
-    if exported_target.target.has_field(PythonDistributionEntryPointsField):
-        entry_points_field = await Get(
+    # Resolve entry points from python_distribution(entry_points=...) and from
+    # python_distribution(provides=setup_py(entry_points=...).with_binaries(...)
+    resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
+        Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
-                exported_target.target[PythonDistributionEntryPointsField]
+                entry_points_field=exported_target.target.get(PythonDistributionEntryPointsField)
             ),
-        )
+        ),
+        Get(
+            ResolvedPythonDistributionEntryPoints,
+            ResolvePythonDistributionEntryPointsRequest(
+                provides_field=exported_target.target.get(PythonProvidesField)
+            ),
+        ),
+    )
 
-        entry_points_from_field = {
+    def _format_entry_points(
+        resolved: ResolvedPythonDistributionEntryPoints,
+    ) -> Dict[str, Dict[str, str]]:
+        return {
             category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
-            for category, entry_points in entry_points_field.val.items()
+            for category, entry_points in resolved.val.items()
         }
-
-    # Collect any entry points from the setup_py() object. Note that this was already normalized in
-    # `python_artifacts.py`.
-    entry_points_from_provides = setup_kwargs.get("entry_points", {})
 
     # Gather entry points with source description for any error messages when merging them.
     entry_point_sources = {
-        f"{exported_addr}'s field `provides=setup_py().with_binaries()`": {
-            "console_scripts": entry_points_from_with_binaries
-        },
-        f"{exported_addr}'s field `entry_points`": entry_points_from_field,
-        f"{exported_addr}'s field `provides=setup_py(..., entry_points={...})`": entry_points_from_provides,
+        f"{exported_addr}'s field `entry_points`": _format_entry_points(
+            resolved_from_entry_points_field
+        ),
+        f"{exported_addr}'s field `provides=setup_py()`": _format_entry_points(
+            resolved_from_provides_field
+        ),
     }
+
     # Merge all collected entry points and add them to the dist's entry points.
-    entry_points = merge_entry_points(*list(entry_point_sources.items()))
-    if entry_points:
-        setup_kwargs["entry_points"] = entry_points
+    all_entry_points = merge_entry_points(*list(entry_point_sources.items()))
+    if all_entry_points:
+        setup_kwargs["entry_points"] = {
+            category: [f"{name} = {entry_point}" for name, entry_point in entry_points.items()]
+            for category, entry_points in all_entry_points.items()
+        }
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
@@ -1011,7 +984,7 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 def merge_entry_points(
     *all_entry_points_with_descriptions_of_source: Tuple[str, Dict[str, Dict[str, str]]]
-) -> Dict[str, List[str]]:
+) -> Dict[str, Dict[str, str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
@@ -1024,22 +997,22 @@ def merge_entry_points(
             for ep_name, entry_point in entry_points.items():
                 merged[category][ep_name].append((description_of_source, entry_point))
 
-    def _merge_entry_point(
+    def _check_entry_point_single_source(
         category: str, name: str, entry_points_with_source: List[Tuple[str, str]]
-    ):
+    ) -> Tuple[str, str]:
         if len(entry_points_with_source) > 1:
             raise ValueError(
                 f"Multiple entry_points registered for {category} {name} in: "
                 f"{', '.join(ep_source for ep_source, _ in entry_points_with_source)}"
             )
-        for _, entry_point in entry_points_with_source:
-            return f"{name}={entry_point}"
+        _, entry_point = entry_points_with_source[0]
+        return name, entry_point
 
     return {
-        category: [
-            _merge_entry_point(category, name, entry_points_with_source)
+        category: dict(
+            _check_entry_point_single_source(category, name, entry_points_with_source)
             for name, entry_points_with_source in merged_entry_points.items()
-        ]
+        )
         for category, merged_entry_points in merged.items()
     }
 

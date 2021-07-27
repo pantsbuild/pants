@@ -123,10 +123,7 @@ class PythonArtifact:
         As before, Pants will infer a dependency on the `pex_binary`. You can confirm this by
         running
 
-            ./pants dependencies path/to:python_distribution.
-
-        For more on command line scripts and entry points, see:
-        https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point
+            ./pants dependencies path/to:python_distribution
 
         """,
     )
