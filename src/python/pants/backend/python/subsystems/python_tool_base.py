@@ -143,6 +143,33 @@ class PythonToolRequirementsBase(Subsystem):
             is_lockfile=True,
         )
 
+    def pex_requirements_with_digest(self, expected_lockfile_digest: str) -> PexRequirements:
+        """The requirements to be used when installing the tool.
+
+        If the tool supports lockfiles, the returned type will install from the lockfile rather than
+        `all_requirements`.
+        """
+        if not self.register_lockfile or self.lockfile == "<none>":
+            return PexRequirements(self.all_requirements)
+        if self.lockfile == "<default>":
+            assert self.default_lockfile_resource is not None
+            return PexRequirements(
+                file_content=FileContent(
+                    f"{self.options_scope}_default_lockfile.txt",
+                    importlib.resources.read_binary(*self.default_lockfile_resource),
+                ),
+                is_lockfile=True,
+                lockfile_hex_digest=expected_lockfile_digest,
+            )
+        return PexRequirements(
+            file_path=self.lockfile,
+            file_path_description_of_origin=(
+                f"the option `[{self.options_scope}].experimental_lockfile`"
+            ),
+            is_lockfile=True,
+            lockfile_hex_digest=expected_lockfile_digest,
+        )
+
     @property
     def lockfile(self) -> str:
         """The path to a lockfile or special strings '<none>' and '<default>'.

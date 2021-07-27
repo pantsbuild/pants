@@ -17,6 +17,7 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
+from pants.backend.experimental.python.lockfile_metadata import read_lockfile_metadata
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -57,6 +58,7 @@ from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
+from python.pants.engine.fs import DigestContents
 
 
 @frozen_after_init
@@ -67,6 +69,7 @@ class PexRequirements:
     file_path: str | None
     file_path_description_of_origin: str | None
     is_lockfile: bool
+    lockfile_hex_digest: str | None
 
     def __init__(
         self,
@@ -76,12 +79,14 @@ class PexRequirements:
         file_path: str | None = None,
         file_path_description_of_origin: str | None = None,
         is_lockfile: bool = False,
+        lockfile_hex_digest: str | None = None,
     ) -> None:
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.file_content = file_content
         self.file_path = file_path
         self.file_path_description_of_origin = file_path_description_of_origin
         self.is_lockfile = is_lockfile
+        self.lockfile_hex_digest = lockfile_hex_digest
 
         if self.file_path and not self.file_path_description_of_origin:
             raise ValueError(
@@ -421,19 +426,29 @@ async def build_pex(
     requirements_file_digest = EMPTY_DIGEST
     if request.requirements.file_path:
         argv.extend(["--requirement", request.requirements.file_path])
-        requirements_file_digest = await Get(
-            Digest,
-            PathGlobs(
+
+        globs = PathGlobs(
                 [request.requirements.file_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=request.requirements.file_path_description_of_origin,
             ),
-        )
+
+        # use contents to invalidate here
+        requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs,)
+        requirements_file_digest = await Get(Digest, PathGlobs, globs,)
+
     elif request.requirements.file_content:
-        argv.extend(["--requirement", request.requirements.file_content.path])
-        requirements_file_digest = await Get(
-            Digest, CreateDigest([request.requirements.file_content])
-        )
+        content = request.requirements.file_content
+        argv.extend(["--requirement", content.path])
+
+        metadata = read_lockfile_metadata(content.content)
+        # add option to Python setup to warn or error.
+        if "invalidation digest" in metadata:
+            invalidation = metadata["invalidation digest"]
+            if invalidation != request.requirements.lockfile_hex_digest:
+                raise Exception(f"lol {invalidation} {request.requirements.lockfile_hex_digest}")
+
+        requirements_file_digest = await Get(Digest, CreateDigest([content]))
     else:
         argv.extend(request.requirements.req_strings)
 

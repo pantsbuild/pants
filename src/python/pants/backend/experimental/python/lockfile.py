@@ -35,6 +35,7 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
+from pants.backend.experimental.python.lockfile_metadata import validated_lockfile_content
 
 logger = logging.getLogger(__name__)
 
