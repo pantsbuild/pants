@@ -128,7 +128,7 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel(PythonToolLockfileSentinel):
+class IsortLockfileSentinel:
     pass
 
 

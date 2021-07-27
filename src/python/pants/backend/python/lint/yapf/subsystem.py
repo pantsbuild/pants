@@ -119,7 +119,7 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel(PythonToolLockfileSentinel):
+class YapfLockfileSentinel:
     pass
 
 

@@ -219,7 +219,7 @@ class CoverageSubsystem(PythonToolBase):
         return cast(bool, self.options.global_report)
 
 
-class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
+class CoveragePyLockfileSentinel:
     pass
 
 
@@ -334,12 +334,16 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
+
+    # TODO: don't calculate if not needed
+    lockfile_request = await Get(PythonLockfileRequest, CoveragePyLockfileSentinel())
+
     pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="coverage.pex",
             internal_only=True,
-            requirements=coverage.pex_requirements,
+            requirements=coverage.pex_requirements_with_digest(lockfile_request.hex_digest),
             interpreter_constraints=coverage.interpreter_constraints,
             main=coverage.main,
         ),

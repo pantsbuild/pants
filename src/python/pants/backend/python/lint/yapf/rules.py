@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from os import lockf
 from typing import Tuple
 
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
-from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.lint.yapf.subsystem import Yapf, YapfLockfileSentinel
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -67,12 +69,15 @@ def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tu
 
 @rule(level=LogLevel.DEBUG)
 async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
+    # TODO: don't calculate if not needed
+    lockfile_request = await Get(PythonLockfileRequest, YapfLockfileSentinel())
+
     yapf_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="yapf.pex",
             internal_only=True,
-            requirements=yapf.pex_requirements,
+            requirements=yapf.pex_requirements_with_digest(lockfile_request.hex_digest),
             interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
         ),

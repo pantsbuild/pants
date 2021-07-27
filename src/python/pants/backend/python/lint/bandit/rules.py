@@ -4,7 +4,8 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet, BanditLockfileSentinel
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -41,12 +42,15 @@ def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
 
 @rule(level=LogLevel.DEBUG)
 async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> LintResult:
+    # TODO: don't calculate if not needed
+    lockfile_request = await Get(PythonLockfileRequest, BanditLockfileSentinel())
+
     bandit_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="bandit.pex",
             internal_only=True,
-            requirements=bandit.pex_requirements,
+            requirements=bandit.pex_requirements_with_digest(lockfile_request.hex_digest),
             interpreter_constraints=partition.interpreter_constraints,
             main=bandit.main,
         ),

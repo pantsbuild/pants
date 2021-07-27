@@ -37,6 +37,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.backend.awslambda.python.lambdex import LambdexLockfileSentinel
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +88,13 @@ async def package_python_awslambda(
         ],
     )
 
+    # TODO: don't calculate if not needed
+    lockfile_request = await Get(PythonLockfileRequest, LambdexLockfileSentinel())
+
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=lambdex.pex_requirements,
+        requirements=lambdex.pex_requirements(lockfile_request.hex_digest),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )

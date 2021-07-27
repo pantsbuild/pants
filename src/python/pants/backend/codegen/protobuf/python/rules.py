@@ -40,6 +40,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import MypyProtobufLockfileSentinel
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -95,13 +97,15 @@ async def generate_python_from_protobuf(
         target_stripped_sources_request,
     )
 
+    lockfile_request = await Get(PythonLockfileRequest, MypyProtobufLockfileSentinel())
+
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements,
+        requirements=python_protobuf_mypy_plugin.pex_requirements_with_digest(lockfile_request.hex_digest),
         interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
     )
 

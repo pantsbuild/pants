@@ -41,7 +41,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
+class SetuptoolsLockfileSentinel:
     pass
 
 
