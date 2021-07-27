@@ -24,7 +24,8 @@ class Lambdex(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.awslambda.python", "lambdex_lockfile.txt")
-    default_lockfile_url = git_url("src/python/pants/backend/awslambda/python/lambdex_lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/awslambda/python/lambdex_lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
 
 class LambdexLockfileSentinel(PythonToolLockfileSentinel):
