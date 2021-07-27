@@ -92,6 +92,7 @@ def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
 
 # Parse the output of `go mod download` into a list of module descriptors.
 def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
+    # `ijson` cannot handle empty input so short-circuit if there is no data.
     if len(raw_json) == 0:
         return []
 
