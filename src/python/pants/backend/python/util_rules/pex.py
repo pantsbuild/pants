@@ -58,7 +58,7 @@ from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
-from python.pants.engine.fs import DigestContents
+from pants.engine.fs import DigestContents
 
 
 @frozen_after_init
@@ -431,10 +431,16 @@ async def build_pex(
                 [request.requirements.file_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=request.requirements.file_path_description_of_origin,
-            ),
+            )
 
         # use contents to invalidate here
         requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs,)
+        metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
+        if "invalidation digest" in metadata:
+            invalidation = metadata["invalidation digest"]
+            if invalidation != request.requirements.lockfile_hex_digest:
+                raise Exception(f"lol {invalidation} {request.requirements.lockfile_hex_digest}")
+
         requirements_file_digest = await Get(Digest, PathGlobs, globs,)
 
     elif request.requirements.file_content:
@@ -443,6 +449,8 @@ async def build_pex(
 
         metadata = read_lockfile_metadata(content.content)
         # add option to Python setup to warn or error.
+        # Pex_from_targets.py (something about not using the rule :))
+        # test in pex_test.py
         if "invalidation digest" in metadata:
             invalidation = metadata["invalidation digest"]
             if invalidation != request.requirements.lockfile_hex_digest:
