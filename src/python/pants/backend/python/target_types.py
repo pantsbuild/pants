@@ -820,6 +820,10 @@ class ResolvePythonDistributionEntryPointsRequest:
     entry_points_field: Optional[PythonDistributionEntryPointsField] = None
     provides_field: Optional[PythonProvidesField] = None
 
+    def __post_init__(self):
+        # Must provide at least one of these fields.
+        assert self.entry_points_field or self.provides_field
+
 
 class SetupPyCommandsField(StringSequenceField):
     alias = "setup_py_commands"

@@ -562,7 +562,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Resolve entry points from python_distribution(entry_points=...) and from
     # python_distribution(provides=setup_py(entry_points=...).with_binaries(...)
-    entry_points_field, provides_field = await MultiGet(
+    resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
@@ -577,20 +577,22 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         ),
     )
 
-    entry_points_from_field = {
-        category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
-        for category, entry_points in entry_points_field.val.items()
-    }
-
-    entry_points_from_provides = {
-        category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
-        for category, entry_points in provides_field.val.items()
-    }
+    def _format_entry_points(
+        resolved: ResolvedPythonDistributionEntryPoints,
+    ) -> Dict[str, Dict[str, str]]:
+        return {
+            category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
+            for category, entry_points in resolved.val.items()
+        }
 
     # Gather entry points with source description for any error messages when merging them.
     entry_point_sources = {
-        f"{exported_addr}'s field `entry_points`": entry_points_from_field,
-        f"{exported_addr}'s field `provides=setup_py()`": entry_points_from_provides,
+        f"{exported_addr}'s field `entry_points`": _format_entry_points(
+            resolved_from_entry_points_field
+        ),
+        f"{exported_addr}'s field `provides=setup_py()`": _format_entry_points(
+            resolved_from_provides_field
+        ),
     }
 
     # Merge all collected entry points and add them to the dist's entry points.

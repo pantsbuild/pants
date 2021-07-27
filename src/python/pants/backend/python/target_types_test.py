@@ -32,6 +32,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    ResolvePythonDistributionEntryPointsRequest,
     TypeStubsModuleMappingField,
     parse_requirements_file,
 )
@@ -364,6 +365,12 @@ def test_parse_requirements_file() -> None:
         Requirement.parse("Un-Normalized-PROJECT"),
         Requirement.parse("pip@ git+https://github.com/pypa/pip.git"),
     }
+
+
+def test_resolve_python_distribution_entry_points() -> None:
+    with pytest.raises(AssertionError):
+        # either `entry_points_field` or `provides_field` is required
+        ResolvePythonDistributionEntryPointsRequest()
 
 
 def test_inject_python_distribution_dependencies() -> None:
