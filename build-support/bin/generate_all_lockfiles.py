@@ -61,8 +61,7 @@ def main() -> None:
         [
             "./pants",
             "--concurrent",
-            "tool-lock",
-            f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}"
+            f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
             # Bandit.
             "--backend-packages=+['pants.backend.python.lint.bandit']",
             f"--bandit-version={Bandit.default_version}",
@@ -94,26 +93,28 @@ def main() -> None:
             f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
             f"--yapf-experimental-lockfile={Yapf.default_lockfile_path}",
             # Setuptools.
-            f"--setuptools-version={Setuptools.version}",
-            f"--setuptools-extra-requirements={repr(Setuptools.extra_requirements)}",
+            f"--setuptools-version={Setuptools.default_version}",
+            f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
             f"--setuptools-experimental-lockfile={Setuptools.default_lockfile_path}",
             # Python Protobuf MyPy plugin.
             "--backend-packages=+['pants.backend.codegen.protobuf.python']",
-            f"--python-protobuf-mypy-plugin-version={PythonProtobufMypyPlugin.version}",
-            f"--python-protobuf-mypy-plugin-extra-requirements={repr(PythonProtobufMypyPlugin.extra_requirements)}",
-            f"--python-protobuf-mypy-plugin-interpreter-constraints={repr(PythonProtobufMypyPlugin.interpreter_constraints)}",
+            f"--python-protobuf-mypy-plugin-version={PythonProtobufMypyPlugin.default_version}",
+            f"--python-protobuf-mypy-plugin-extra-requirements={repr(PythonProtobufMypyPlugin.default_extra_requirements)}",
+            f"--python-protobuf-mypy-plugin-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
             f"--python-protobuf-mypy-plugin-experimental-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
             # Lambdex.
             "--backend-packages=+['pants.backend.awslambda.python']",
-            f"--lambdex-version={Lambdex.version}",
-            f"--lambdex-extra-requirements={repr(Lambdex.extra_requirements)}",
-            f"--lambdex-interpreter-constraints={repr(Lambdex.interpreter_constraints)}",
+            f"--lambdex-version={Lambdex.default_version}",
+            f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
+            f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",
             f"--lambdex-experimental-lockfile={Lambdex.default_lockfile_path}",
             # Coverage.py
-            f"--coverage-py-version={CoverageSubsystem.version}",
-            f"--coverage-py-extra-requirements={repr(CoverageSubsystem.extra_requirements)}",
-            f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.interpreter_constraints)}",
+            f"--coverage-py-version={CoverageSubsystem.default_version}",
+            f"--coverage-py-extra-requirements={repr(CoverageSubsystem.default_extra_requirements)}",
+            f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
             f"--coverage-py-experimental-lockfile={CoverageSubsystem.default_lockfile_path}",
+            # Run the goal.
+            "tool-lock",
         ],
         check=True
     )
