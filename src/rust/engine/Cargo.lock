@@ -719,6 +719,7 @@ dependencies = [
  "nailgun",
  "parking_lot",
  "pyo3",
+ "store",
  "task_executor",
  "workunit_store",
 ]

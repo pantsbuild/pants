@@ -116,6 +116,18 @@ py_class!(pub class PySnapshot |py| {
       Self::create_instance(py, Snapshot::empty())
     }
 
+    @classmethod def _create_for_testing(
+      _cls,
+      py_digest: PyDigest,
+      files: Vec<String>,
+      dirs: Vec<String>,
+    ) -> PyResult<Self> {
+      let snapshot = unsafe {
+        Snapshot::create_for_testing_ffi(*py_digest.digest(py), files, dirs)
+      };
+      Self::create_instance(py, snapshot)
+    }
+
     @property def digest(&self) -> PyResult<PyDigest> {
       to_py_digest(self.snapshot(py).digest)
     }

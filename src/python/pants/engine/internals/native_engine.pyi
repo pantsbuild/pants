@@ -148,6 +148,10 @@ class PyDigest:
 
 class PySnapshot:
     def __init__(self) -> None: ...
+    @classmethod
+    def _create_for_testing(
+        cls, digest: PyDigest, files: Sequence[str], dirs: Sequence[str]
+    ) -> PySnapshot: ...
     @property
     def digest(self) -> PyDigest: ...
     @property
