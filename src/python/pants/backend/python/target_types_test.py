@@ -367,7 +367,7 @@ def test_parse_requirements_file() -> None:
     }
 
 
-def test_resolve_python_distribution_entry_points() -> None:
+def test_resolve_python_distribution_entry_points_required_fields() -> None:
     with pytest.raises(AssertionError):
         # either `entry_points_field` or `provides_field` is required
         ResolvePythonDistributionEntryPointsRequest()
