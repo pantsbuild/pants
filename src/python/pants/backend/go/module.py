@@ -9,6 +9,7 @@ import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.target_types import GoModuleSources
+from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -117,6 +118,7 @@ async def resolve_go_module(
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
     # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
+    # TODO: Merge all duplicate versions of this script into a single script and invoke rule.
     analyze_script_digest = await Get(
         Digest,
         CreateDigest(
@@ -172,6 +174,44 @@ async def resolve_go_module(
         modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),
         digest=result.output_digest,
     )
+
+
+@dataclass(frozen=True)
+class FindOwningGoModuleRequest:
+    address: Address
+
+
+@dataclass(frozen=True)
+class ResolvedOwningGoModule:
+    module_address: Optional[Address]
+
+
+@rule
+async def find_nearest_go_module(request: FindOwningGoModuleRequest) -> ResolvedOwningGoModule:
+    # Obtain unexpanded targets and ensure file targets are filtered out. Unlike Python, file targets do not
+    # make sense semantically for Go source since Go builds entire packages at a time. The filtering is
+    # accomplished by requesting `UnexpandedTargets` and also filtering on `is_file_target`.
+    spec_path = request.address.spec_path
+    candidate_targets = await Get(
+        UnexpandedTargets,
+        AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),
+    )
+    go_module_targets = [
+        tgt
+        for tgt in candidate_targets
+        if tgt.has_field(GoModuleSources) and not tgt.address.is_file_target
+    ]
+
+    # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
+    sorted_go_module_targets = sorted(
+        go_module_targets, key=lambda tgt: tgt.address.spec_path, reverse=True
+    )
+    if sorted_go_module_targets:
+        nearest_go_module_target = sorted_go_module_targets[0]
+        return ResolvedOwningGoModule(module_address=nearest_go_module_target.address)
+    else:
+        # TODO: Consider eventually requiring all go_package's to associate with a go_module.
+        return ResolvedOwningGoModule(module_address=None)
 
 
 # TODO: Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
