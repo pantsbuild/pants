@@ -161,10 +161,10 @@ async def generate_lockfile(
         ),
     )
 
-    lockfile_contents = next(
-        iter(await Get(DigestContents, Digest, generated_lockfile.output_digest))
-    )
-    content_with_header = b"%b\n%b" % (lockfile_metadata(req.hex_digest), lockfile_contents.content)
+    _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
+    lockfile_contents = _lockfile_contents_iter[0]
+
+    content_with_header = validated_lockfile_content(req, lockfile_contents.content)
     complete_lockfile = await Get(
         Digest, CreateDigest([FileContent(req.dest, content_with_header)])
     )
@@ -309,6 +309,10 @@ END_LOCKFILE_HEADER = b"# --- END LOCKFILE METADATA ---"
 
 
 # Lockfile metadata for headers
+def validated_lockfile_content(req: PythonLockfileRequest, content: bytes) -> bytes:
+    return b"%b\n%b" % (lockfile_metadata(req.hex_digest), content)
+
+
 def lockfile_metadata(invalidation_digest: str) -> bytes:
     """Produces a metadata bytes object for including at the top of a lockfile.
 
