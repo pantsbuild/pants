@@ -435,22 +435,25 @@ async def build_pex(
 
     description = request.description
     if description is None:
-        if request.requirements.req_strings:
-            description = (
-                f"Building {request.output_filename} with "
-                f"{pluralize(len(request.requirements.req_strings), 'requirement')}: "
-                f"{', '.join(request.requirements.req_strings)}"
-            )
-        elif request.requirements.file_path:
-            description = (
-                f"Building {request.output_filename} from {request.requirements.file_path}"
-            )
-        elif request.requirements.file_content:
-            description = (
-                f"Building {request.output_filename} from {request.requirements.file_content.path}"
-            )
-        else:
+        if not request.requirements:
             description = f"Building {request.output_filename}"
+        else:
+            if request.requirements.file_path:
+                desc_suffix = f"from {request.requirements.file_path}"
+            elif request.requirements.file_content:
+                desc_suffix = f"from {request.requirements.file_content.path}"
+            else:
+                desc_suffix = (
+                    f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
+                    f"{', '.join(request.requirements.req_strings)}"
+                )
+            if request.repository_pex:
+                description = (
+                    f"Extracting from {request.repository_pex.name} to build "
+                    f"{request.output_filename} {desc_suffix}"
+                )
+            else:
+                description = f"Building {request.output_filename} {desc_suffix}"
 
     process = await Get(
         Process,
