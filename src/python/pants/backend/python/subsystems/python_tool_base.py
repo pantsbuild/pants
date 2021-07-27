@@ -79,15 +79,6 @@ class PythonToolRequirementsBase(Subsystem):
                 "The class property `default_lockfile_resource` and `default_lockfile_url` "
                 f"must be set if `register_lockfile` is set. See `{cls.options_scope}`."
             )
-        if cls.register_lockfile and not cls.register_interpreter_constraints:
-            # TODO(#12314): Figure out how to determine the interpreter constraints for tools that
-            #  get ICs from code, like FLake8 and Bandit. We could theoretically scan the repo to
-            #  see all constraints (`py-constraints` goal). What should the default lockfile we
-            #  bundle use?
-            raise ValueError(
-                "For now, you cannot set `register_lockfile` without also setting "
-                f"`register_interpreter_constraints`. See `{cls.options_scope}`."
-            )
         if cls.register_lockfile:
             register(
                 "--experimental-lockfile",

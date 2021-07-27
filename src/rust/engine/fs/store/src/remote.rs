@@ -12,11 +12,11 @@ use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
+use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tonic::{Code, Interceptor, Request, Status};
+use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
@@ -25,7 +25,6 @@ pub struct ByteStore {
   chunk_size_bytes: usize,
   upload_timeout: Duration,
   rpc_attempts: usize,
-  interceptor: Option<Interceptor>,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
 }
@@ -78,34 +77,22 @@ impl ByteStore {
 
     let endpoint =
       grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref(), &mut headers)?;
+    let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       rpc_concurrency_limit,
+      http_headers,
     );
-    let interceptor = if headers.is_empty() {
-      None
-    } else {
-      Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
-    };
 
-    let byte_stream_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => ByteStreamClient::with_interceptor(channel.clone(), interceptor.clone()),
-      None => ByteStreamClient::new(channel.clone()),
-    });
+    let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
 
-    let cas_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        ContentAddressableStorageClient::with_interceptor(channel, interceptor.clone())
-      }
-      None => ContentAddressableStorageClient::new(channel),
-    });
+    let cas_client = Arc::new(ContentAddressableStorageClient::new(channel));
 
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
       upload_timeout,
       rpc_attempts: rpc_retries + 1,
-      interceptor,
       byte_stream_client,
       cas_client,
     })

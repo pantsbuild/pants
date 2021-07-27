@@ -4,6 +4,8 @@
 import collections.abc
 from typing import Any, Dict, List, Union
 
+from pants.base.deprecated import deprecated
+
 
 def _normalize_entry_points(
     all_entry_points: Dict[str, Union[List[str], Dict[str, str]]]
@@ -78,6 +80,56 @@ class PythonArtifact:
     def __str__(self) -> str:
         return self.name
 
+    @deprecated(
+        "2.8.0.dev0",
+        """Use `python_distribution(entry_points={"console_scripts":{...}})` instead of
+        `python_distribution(provides=setup_py().with_binaries(...))`.
+
+        The entry points field was added as a more generic mechanism than
+        `.with_binaries()`. Whereas `.with_binaries()` would only add `console_scripts` to your
+        generated `setup.py`, you can now add other types of entry points like `gui_scripts`. You
+        can also now add a setuptools entry point like `path.to.module:func`, in addition to still
+        being able to sue a Pants target address to a `pex_binary` target.
+
+        Entry points are specified as a nested dictionary, with a dictionary for each type of entry
+        point like `console_scripts` and `gui_scripts`. Each dictionary maps the entry point name to
+        either a setuptools entry point or an address to a `pex_binary` target.
+
+        Any entry point that either starts with `:` or has `/` in it, is considered a target
+        address. Use `//` as prefix for target addresses if you need to disambiguate.
+
+        To migrate, add a dictionary for `console_scripts` with the same entry point name and
+        `pex_binary` address you were using before.
+
+        Example migration, before:
+
+            pex_binary(name="binary", entry_point="app.py:main")
+
+            python_distribution(
+                name="dist",
+                provides=setup_py(...).with_binaries({'my_command': ':binary'})
+            )
+
+        after:
+
+            pex_binary(name="binary", entry_point="app.py:main")
+
+            python_distribution(
+                name="dist",
+                entry_points={'console_scripts': {'my_command': ':binary'}},
+                provides=setup_py(...),
+            )
+
+        As before, Pants will infer a dependency on the `pex_binary`. You can confirm this by
+        running
+
+            ./pants dependencies path/to:python_distribution.
+
+        For more on command line scripts and entry points, see:
+        https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point
+
+        """,
+    )
     def with_binaries(self, *args, **kw):
         """Add binaries tagged to this artifact.
 

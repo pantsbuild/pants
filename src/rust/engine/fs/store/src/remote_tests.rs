@@ -235,7 +235,7 @@ async fn write_connection_error() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("dns error: failed to lookup address information"),
+    error.contains("Unknown: \"transport error\""),
     "Bad error message, got: {}",
     error
   );

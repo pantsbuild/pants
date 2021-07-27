@@ -19,8 +19,10 @@ use fs::{self, File, PathStat};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
+use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
-use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
+use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -32,7 +34,7 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
-use tonic::{Code, Interceptor, Request, Status};
+use tonic::{Code, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
@@ -43,7 +45,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::retry::{retry_call, status_is_retryable};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -119,7 +120,7 @@ impl CommandRunner {
     store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
-    mut headers: BTreeMap<String, String>,
+    headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
     overall_deadline: Duration,
@@ -136,49 +137,36 @@ impl CommandRunner {
       None
     };
 
-    let interceptor = if headers.is_empty() {
-      None
-    } else {
-      Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
-    };
-
+    let mut execution_headers = headers.clone();
     let execution_endpoint = grpc_util::create_endpoint(
       &execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut headers,
+      &mut execution_headers,
     )?;
+    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
     let execution_channel = layered_service(
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
       execution_concurrency_limit,
+      execution_http_headers,
     );
-    let execution_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
-      }
-      None => ExecutionClient::new(execution_channel.clone()),
-    });
+    let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
+    let mut store_headers = headers.clone();
     let store_endpoint = grpc_util::create_endpoint(
       &store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut headers,
+      &mut store_headers,
     )?;
+    let store_http_headers = headers_to_http_header_map(&store_headers)?;
     let store_channel = layered_service(
       tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter()),
       cache_concurrency_limit,
+      store_http_headers,
     );
 
-    let action_cache_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
-      None => ActionCacheClient::new(store_channel),
-    });
+    let action_cache_client = Arc::new(ActionCacheClient::new(store_channel));
 
-    let capabilities_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        CapabilitiesClient::with_interceptor(execution_channel, interceptor.clone())
-      }
-      None => CapabilitiesClient::new(execution_channel),
-    });
+    let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
       metadata,
