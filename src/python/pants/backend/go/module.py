@@ -45,11 +45,22 @@ class ModuleDescriptor:
 
 @dataclass(frozen=True)
 class ResolvedGoModule:
+    # Address of the resolved go_module target.
     address: Address
+
+    # The go_module target.
     target: Target
+
+    # Import path of the Go module. Inferred from the import path in the go.mod file.
     import_path: str
+
+    # Minimum Go version of the module from `go` statement in go.mod.
     minimum_go_version: Optional[str]
+
+    # Metadata of referenced modules.
     modules: FrozenOrderedSet[ModuleDescriptor]
+
+    # Digest containing go.mod and updated go.sum.
     digest: Digest
 
 
