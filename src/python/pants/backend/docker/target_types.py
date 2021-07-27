@@ -26,7 +26,7 @@ class DockerBuildRoot(StringField):
     help = (
         "Root directory for Docker build context. Default is to use the directory of the `BUILD` "
         "file. Use '/' to use the project root, thus putting any resource from the entire project "
-        "within scope."
+        "within scope (if the target also has a dependency on it)."
     )
 
 
