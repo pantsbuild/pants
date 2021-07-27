@@ -186,12 +186,10 @@ async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:
     if request.entry_points_field:
-        address = request.entry_points_field.address
-        dist_field_value = request.entry_points_field.value
-        if dist_field_value is not None:
-            all_entry_points = cast(_EntryPointsDictType, dist_field_value)
-        else:
+        if request.entry_points_field.value is None:
             return ResolvedPythonDistributionEntryPoints()
+        address = request.entry_points_field.address
+        all_entry_points = cast(_EntryPointsDictType, request.entry_points_field.value)
 
     elif request.provides_field:
         address = request.provides_field.address
