@@ -27,7 +27,6 @@ def test_validated_lockfile_content():
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
     """
 
-    line_by_line = lambda b: [ii for i in b.splitlines() if (ii := i.strip())]
     output = b"""
 # --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # invalidation digest: 000faaafcacacaca
@@ -35,6 +34,9 @@ def test_validated_lockfile_content():
 dave==3.1.4 \\
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
     """
+
+    # Helper function to make the test case more resilient to reformatting
+    line_by_line = lambda b: [ii for i in b.splitlines() if (ii := i.strip())]
     assert line_by_line(validated_lockfile_content(req, content)) == line_by_line(output)
 
 
