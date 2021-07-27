@@ -304,8 +304,8 @@ async def generate_all_tool_lockfiles(
     return ToolLockGoal(exit_code=0)
 
 
-BEGIN_LOCKFILE_HEADER = b"# --- BEGIN LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
-END_LOCKFILE_HEADER = b"# --- END LOCKFILE METADATA ---"
+BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
+END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 
 # Lockfile metadata for headers
