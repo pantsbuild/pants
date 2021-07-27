@@ -29,7 +29,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import Target, UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -46,6 +46,7 @@ class ModuleDescriptor:
 @dataclass(frozen=True)
 class ResolvedGoModule:
     address: Address
+    target: Target
     import_path: str
     minimum_go_version: Optional[str]
     modules: FrozenOrderedSet[ModuleDescriptor]
@@ -172,6 +173,7 @@ async def resolve_go_module(
 
     return ResolvedGoModule(
         address=request.address,
+        target=target,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
         modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),

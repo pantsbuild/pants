@@ -59,9 +59,31 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
                     fmt.Printf("%s\n", pkg.Grok())
                 }"""
             ),
+            "foo/cmd/bar_test.go": textwrap.dedent(
+                """\
+            package main
+            import "testing"
+            func TestBar(t *testing.T) {}
+            """
+            ),
         }
     )
     resolved_go_package = rule_runner.request(
         ResolvedGoPackage, [ResolveGoPackageRequest(Address("foo/cmd"))]
     )
+
+    # To avoid having to match on transitive dependencies in the `dependency_import_paths` metadata (some of
+    # which are internal to the Go standard library, match field-by-field instead of comparing to a full
+    # `ResolvedGoPackage` instance.
+    assert resolved_go_package.address == Address("foo/cmd")
     assert resolved_go_package.import_path == "go.example.com/foo/cmd"
+    assert resolved_go_package.module_address == Address("foo")
+    assert resolved_go_package.package_name == "main"
+    assert resolved_go_package.imports == ("fmt", "go.example.com/foo/pkg")
+    assert resolved_go_package.test_imports == ("testing",)
+    assert resolved_go_package.go_files == ("main.go",)
+    assert not resolved_go_package.cgo_files
+    assert not resolved_go_package.ignored_go_files
+    assert not resolved_go_package.ignored_other_files
+    assert resolved_go_package.test_go_files == ("bar_test.go",)
+    assert not resolved_go_package.xtest_go_files
