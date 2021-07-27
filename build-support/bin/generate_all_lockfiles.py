@@ -4,14 +4,17 @@
 """Ensure that we generate interpreter constraints using the correct values.
 
 This is necessary because the tool lockfiles we generate are used as the default for all Pants
-users. We need to decouple our own internal usage (e.g. using Flake8 plugins) from what the
-default should be.
+users. We need to decouple our own internal usage (e.g. using Flake8 plugins) from what the default
+should be.
 """
 
 import logging
 import shutil
 import subprocess
 
+from pants.backend.awslambda.python.lambdex import Lambdex
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
@@ -19,9 +22,6 @@ from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.setuptools import Setuptools
-from pants.backend.python.goals.coverage_py import CoverageSubsystem
-from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def main() -> None:
         [
             "./pants",
             "--concurrent",
-            "--tag='-lockfile_ignore',"
+            "--tag='-lockfile_ignore'",
             "lock",
             "tool-lock",
             "::",
@@ -116,10 +116,10 @@ def main() -> None:
             # Run the goal.
             "tool-lock",
         ],
-        check=True
+        check=True,
     )
     logger.warning(
-        "Please restore headers for how to generate each file. (This will be automated.)"
+        "\n\n\nPlease restore headers for how to generate each file. (This will be automated.)"
     )
     logger.warning(
         "Please fix Black to use environment markers like it was before. (This will be automated.)"
