@@ -194,8 +194,8 @@ async def resolve_go_module(
 
 
 @dataclass(frozen=True)
-class FindOwningGoModuleRequest:
-    address: Address
+class FindNearestGoModuleRequest:
+    spec_path: str
 
 
 @dataclass(frozen=True)
@@ -204,11 +204,11 @@ class ResolvedOwningGoModule:
 
 
 @rule
-async def find_nearest_go_module(request: FindOwningGoModuleRequest) -> ResolvedOwningGoModule:
+async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> ResolvedOwningGoModule:
     # Obtain unexpanded targets and ensure file targets are filtered out. Unlike Python, file targets do not
     # make sense semantically for Go source since Go builds entire packages at a time. The filtering is
     # accomplished by requesting `UnexpandedTargets` and also filtering on `is_file_target`.
-    spec_path = request.address.spec_path
+    spec_path = request.spec_path
     candidate_targets = await Get(
         UnexpandedTargets,
         AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),

@@ -9,7 +9,7 @@ from typing import Optional, Tuple
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.module import (
-    FindOwningGoModuleRequest,
+    FindNearestGoModuleRequest,
     ResolvedGoModule,
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
@@ -113,7 +113,7 @@ async def resolve_go_package(
     target = targets[0]
 
     owning_go_module_result = await Get(
-        ResolvedOwningGoModule, FindOwningGoModuleRequest(request.address)
+        ResolvedOwningGoModule, FindNearestGoModuleRequest(request.address.spec_path)
     )
 
     if not owning_go_module_result.module_address:

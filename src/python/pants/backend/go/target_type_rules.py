@@ -1,6 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.go.module import FindOwningGoModuleRequest, ResolvedOwningGoModule
+from pants.backend.go.module import FindNearestGoModuleRequest, ResolvedOwningGoModule
 from pants.backend.go.target_types import GoPackageDependencies
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -15,7 +15,8 @@ class InjectGoModuleDependency(InjectDependenciesRequest):
 @rule
 async def inject_go_module_dependency(request: InjectGoModuleDependency) -> InjectedDependencies:
     owning_go_module_result = await Get(
-        ResolvedOwningGoModule, FindOwningGoModuleRequest(request.dependencies_field.address)
+        ResolvedOwningGoModule,
+        FindNearestGoModuleRequest(request.dependencies_field.address.spec_path),
     )
     if owning_go_module_result.module_address:
         return InjectedDependencies([owning_go_module_result.module_address])
