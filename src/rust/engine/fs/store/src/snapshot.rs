@@ -27,8 +27,8 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-  pub fn empty() -> Snapshot {
-    Snapshot {
+  pub fn empty() -> Self {
+    Self {
       digest: EMPTY_DIGEST,
       path_stats: vec![],
     }
@@ -274,6 +274,36 @@ impl Snapshot {
         path_stats,
       )
       .await
+    }
+  }
+
+  /// # Safety
+  ///
+  /// This should only be used for testing, as this allows creating an invalid Snapshot.
+  pub unsafe fn create_for_testing_ffi(
+    digest: Digest,
+    files: Vec<String>,
+    dirs: Vec<String>,
+  ) -> Self {
+    let file_path_stats: Vec<PathStat> = files
+      .into_iter()
+      .map(|s| {
+        PathStat::file(
+          PathBuf::from(s.clone()),
+          File {
+            path: PathBuf::from(s),
+            is_executable: false,
+          },
+        )
+      })
+      .collect();
+    let dir_path_stats: Vec<PathStat> = dirs
+      .into_iter()
+      .map(|s| PathStat::dir(PathBuf::from(s.clone()), Dir(PathBuf::from(s))))
+      .collect();
+    Self {
+      digest,
+      path_stats: [file_path_stats, dir_path_stats].concat(),
     }
   }
 }

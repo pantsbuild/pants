@@ -11,12 +11,13 @@ import dataclasses
 import logging
 import os.path
 from collections import defaultdict
+from itertools import chain
 from textwrap import dedent
-from typing import DefaultDict, Dict, Generator, Optional, Tuple
+from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.goals.setup_py import InvalidEntryPoint
+from pants.backend.python.goals.setup_py import InvalidEntryPoint, merge_entry_points
 from pants.backend.python.target_types import (
     EntryPoint,
     PexBinaryDependencies,
@@ -160,8 +161,11 @@ async def inject_pex_binary_entry_point_dependency(
 # -----------------------------------------------------------------------------------------------
 
 
+_EntryPointsDictType = Dict[str, Dict[str, str]]
+
+
 def _classify_entry_points(
-    all_entry_points: FrozenDict[str, FrozenDict[str, str]]
+    all_entry_points: _EntryPointsDictType,
 ) -> Generator[Tuple[bool, str, str, str], None, None]:
     """Looks at each entry point to see if it is a target address or not.
 
@@ -181,12 +185,38 @@ def _classify_entry_points(
 async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:
-    field_value = request.entry_points_field.value
-    if field_value is None:
+    if request.entry_points_field:
+        if request.entry_points_field.value is None:
+            return ResolvedPythonDistributionEntryPoints()
+        address = request.entry_points_field.address
+        all_entry_points = cast(_EntryPointsDictType, request.entry_points_field.value)
+
+    elif request.provides_field:
+        address = request.provides_field.address
+        provides_field_value = cast(
+            _EntryPointsDictType, request.provides_field.value.kwargs.get("entry_points") or {}
+        )
+
+        with_binaries = request.provides_field.value.binaries
+        if with_binaries:
+            all_entry_points = merge_entry_points(
+                (
+                    f"{address}'s field `provides=setup_py(entry_points={...})`",
+                    provides_field_value,
+                ),
+                (
+                    f"{address}'s field `provides=setup_py().with_binaries(...)",
+                    {"console_scripts": with_binaries},
+                ),
+            )
+        elif provides_field_value:
+            all_entry_points = provides_field_value
+        else:
+            return ResolvedPythonDistributionEntryPoints()
+    else:
         return ResolvedPythonDistributionEntryPoints()
 
-    address = request.entry_points_field.address
-    classified_entry_points = list(_classify_entry_points(field_value))
+    classified_entry_points = list(_classify_entry_points(all_entry_points))
 
     # Pick out all target addresses up front, so we can use MultiGet later.
     #
@@ -209,7 +239,7 @@ async def resolve_python_distribution_entry_points(
     # Check that we only have targets with a pex entry_point field.
     for target in targets:
         if not target.has_field(PexEntryPointField):
-            raise InvalidFieldException(
+            raise InvalidEntryPoint(
                 "All target addresses in the entry_points field must be for pex_binary targets, "
                 f"but the target {address} includes the value {target.address}, which has the "
                 f"target type {target.alias}.\n\n"
@@ -281,12 +311,18 @@ async def inject_python_distribution_dependencies(
         return InjectedDependencies()
 
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    explicitly_provided_deps, all_entry_points = await MultiGet(
+    explicitly_provided_deps, distribution_entry_points, provides_entry_points = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
-                original_tgt.target[PythonDistributionEntryPointsField]
+                entry_points_field=original_tgt.target[PythonDistributionEntryPointsField]
+            ),
+        ),
+        Get(
+            ResolvedPythonDistributionEntryPoints,
+            ResolvePythonDistributionEntryPointsRequest(
+                provides_field=original_tgt.target[PythonProvidesField]
             ),
         ),
     )
@@ -294,7 +330,10 @@ async def inject_python_distribution_dependencies(
     address = original_tgt.target.address
     all_module_entry_points = [
         (category, name, entry_point)
-        for category, entry_points in all_entry_points.explicit_modules.items()
+        for category, entry_points in chain(
+            distribution_entry_points.explicit_modules.items(),
+            provides_entry_points.explicit_modules.items(),
+        )
         for name, entry_point in entry_points.items()
     ]
     all_module_owners = iter(
@@ -322,21 +361,10 @@ async def inject_python_distribution_dependencies(
         )
         module_owners.update(unambiguous_owners)
 
-    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
-    if not with_binaries:
-        with_binaries_addresses = Addresses()
-    else:
-        # Note that we don't validate that these are all `pex_binary` targets; we don't care about
-        # that here. `setup_py.py` will do that validation.
-        with_binaries_addresses = await Get(
-            Addresses,
-            UnparsedAddressInputs(
-                with_binaries.values(), owning_address=request.dependencies_field.address
-            ),
-        )
-
     return InjectedDependencies(
-        Addresses(module_owners) + with_binaries_addresses + all_entry_points.pex_binary_addresses
+        Addresses(module_owners)
+        + distribution_entry_points.pex_binary_addresses
+        + provides_entry_points.pex_binary_addresses
     )
 
 

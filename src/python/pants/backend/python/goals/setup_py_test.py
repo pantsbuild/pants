@@ -230,15 +230,15 @@ def test_merge_entry_points() -> None:
         },
     }
     expect = {
-        "console_scripts": [
-            "foo_tool=foo.bar.baz:Tool.main",
-            "foo_qux=foo.baz.qux",
-            "foo_main=foo.qux.bin:main",
-        ],
-        "foo_plugins": [
-            "qux=foo.qux",
-            "foo-bar=foo.bar:plugin",
-        ],
+        "console_scripts": {
+            "foo_tool": "foo.bar.baz:Tool.main",
+            "foo_qux": "foo.baz.qux",
+            "foo_main": "foo.qux.bin:main",
+        },
+        "foo_plugins": {
+            "qux": "foo.qux",
+            "foo-bar": "foo.bar:plugin",
+        },
     }
     assert merge_entry_points(*list(sources.items())) == expect
 
@@ -346,7 +346,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
             "install_requires": ("baz==1.1.1",),
-            "entry_points": {"console_scripts": ["foo_main=foo.qux.bin:main"]},
+            "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
     )
@@ -384,7 +384,8 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                     name='foo', version='1.2.3',
                     entry_points={
                         "console_scripts":{
-                            "foo_qux":"foo.baz.qux",
+                            "foo_qux":"foo.baz.qux:main",
+                            "foo_bin":":foo-bin",
                         },
                         "foo_plugins":[
                             "foo-bar=foo.bar:plugin",
@@ -422,16 +423,17 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "install_requires": tuple(),
             "entry_points": {
                 "console_scripts": [
-                    "foo_main=foo.qux.bin:main",
-                    "foo_tool=foo.bar.baz:Tool.main",
-                    "bin_tool=foo.qux.bin:main",
-                    "bin_tool2=foo.qux.bin:main",
-                    "hello=foo.bin:main",
-                    "foo_qux=foo.baz.qux",
+                    "foo_tool = foo.bar.baz:Tool.main",
+                    "bin_tool = foo.qux.bin:main",
+                    "bin_tool2 = foo.qux.bin:main",
+                    "hello = foo.bin:main",
+                    "foo_qux = foo.baz.qux:main",
+                    "foo_bin = foo.bin:main",
+                    "foo_main = foo.qux.bin:main",
                 ],
                 "foo_plugins": [
-                    "qux=foo.qux",
-                    "foo-bar=foo.bar:plugin",
+                    "qux = foo.qux",
+                    "foo-bar = foo.bar:plugin",
                 ],
             },
         },
@@ -516,7 +518,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": (),
             "install_requires": (),
             "package_data": {},
-            "entry_points": {"console_scripts": ["foo=project.app:func"]},
+            "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
         Address("src/python/project", target_name="dist"),
     )

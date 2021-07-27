@@ -32,6 +32,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    ResolvePythonDistributionEntryPointsRequest,
     TypeStubsModuleMappingField,
     parse_requirements_file,
 )
@@ -366,6 +367,12 @@ def test_parse_requirements_file() -> None:
     }
 
 
+def test_resolve_python_distribution_entry_points_required_fields() -> None:
+    with pytest.raises(AssertionError):
+        # either `entry_points_field` or `provides_field` is required
+        ResolvePythonDistributionEntryPointsRequest()
+
+
 def test_inject_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -429,6 +436,22 @@ def test_inject_python_distribution_dependencies() -> None:
                     }
                 }
             )
+
+            python_distribution(
+                name="third_dep2",
+                provides=setup_py(
+                    name="my-third",
+                    entry_points={
+                        "console_scripts":{
+                            "my-cmd": ":my_binary",
+                            "main": "project.app:main",
+                        },
+                        "color-plugins":{
+                            "my-ansi-colors": "colors",
+                        }
+                    }
+                )
+            )
             """
         ),
     )
@@ -467,6 +490,15 @@ def test_inject_python_distribution_dependencies() -> None:
         Address("project", target_name="third_dep"),
         [
             Address("", target_name="ansicolors"),
+        ],
+    )
+
+    assert_injected(
+        Address("project", target_name="third_dep2"),
+        [
+            Address("", target_name="ansicolors"),
+            Address("project", target_name="my_binary"),
+            Address("project", relative_file_path="app.py", target_name="my_library"),
         ],
     )
 
