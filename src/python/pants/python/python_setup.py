@@ -138,7 +138,7 @@ class PythonSetup(Subsystem):
                 "Causes a build failure if Pants encounters a lockfile that was generated with different "
                 "requirements or interpreter constraints than those currently specified. The default behavior "
                 "is to issue a warning if such a lockfile is encountered."
-            )
+            ),
         )
         register(
             "--interpreter-search-paths",

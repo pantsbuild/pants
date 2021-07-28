@@ -7,10 +7,12 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    MypyProtobufLockfileSentinel,
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
@@ -40,8 +42,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import MypyProtobufLockfileSentinel
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -105,7 +105,9 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements_with_digest(lockfile_request.hex_digest),
+        requirements=python_protobuf_mypy_plugin.pex_requirements_with_digest(
+            lockfile_request.hex_digest
+        ),
         interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
     )
 

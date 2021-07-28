@@ -4,13 +4,14 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.lambdex import Lambdex
+from pants.backend.awslambda.python.lambdex import Lambdex, LambdexLockfileSentinel
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
 )
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -37,8 +38,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.backend.awslambda.python.lambdex import LambdexLockfileSentinel
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 
 logger = logging.getLogger(__name__)
 
