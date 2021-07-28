@@ -33,7 +33,7 @@ dave==3.1.4 \\
     """
 
     # Helper function to make the test case more resilient to reformatting
-    line_by_line = lambda b: [ii for i in b.splitlines() if (ii := i.strip())]
+    line_by_line = lambda b: [i for i in (j.strip() for j in b.splitlines()) if i]
     assert line_by_line(lockfile_content_with_header("000faaafcacacaca", content)) == line_by_line(
         output
     )
