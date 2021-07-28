@@ -12,6 +12,7 @@ from typing import Iterable, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
+from pants.backend.experimental.python.lockfile_metadata import invalidation_digest
 from pants.backend.python.target_types import (
     MainSpecification,
     PythonRequirementsField,
@@ -304,6 +305,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         "the option `[python-setup].experimental_lockfile`"
                     ),
                     is_lockfile=True,
+                    lockfile_hex_digest=invalidation_digest(
+                        requirements.req_strings, interpreter_constraints
+                    ),
                 ),
                 interpreter_constraints=interpreter_constraints,
                 platforms=request.platforms,

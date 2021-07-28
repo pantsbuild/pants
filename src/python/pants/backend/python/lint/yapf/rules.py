@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from os import lockf
 from typing import Tuple
 
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest

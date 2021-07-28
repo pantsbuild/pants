@@ -458,9 +458,6 @@ async def build_pex(
         argv.extend(["--requirement", content.path])
 
         metadata = read_lockfile_metadata(content.content)
-        # add option to Python setup to warn or error.
-        # Pex_from_targets.py (something about not using the rule :))
-        # test in pex_test.py
         if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
             if python_setup.fail_on_invalid_lockfile:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
