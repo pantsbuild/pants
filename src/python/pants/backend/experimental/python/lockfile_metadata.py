@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pants.backend.experimental.python.lockfile import PythonLockfileRequest
@@ -21,7 +21,7 @@ class LockfileMetadata:
 
 # Lockfile metadata for headers
 def lockfile_content_with_header(req: PythonLockfileRequest, content: bytes) -> bytes:
-    """ Returns a version of the lockfile with a pants metadata header prepended. """
+    """Returns a version of the lockfile with a pants metadata header prepended."""
     return b"%b\n%b" % (lockfile_metadata_header(req.hex_digest), content)
 
 
@@ -62,7 +62,4 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
             key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
             metadata[key] = value
 
-    return LockfileMetadata(
-        invalidation_digest=metadata.get("invalidation digest")
-    )
-
+    return LockfileMetadata(invalidation_digest=metadata.get("invalidation digest"))

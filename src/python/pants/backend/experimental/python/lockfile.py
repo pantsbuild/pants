@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.experimental.python.lockfile_metadata import lockfile_content_with_header
 from pants.backend.python.subsystems.python_tool_base import (
     PythonToolBase,
     PythonToolRequirementsBase,
@@ -33,7 +34,6 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
-from pants.backend.experimental.python.lockfile_metadata import lockfile_content_with_header
 
 logger = logging.getLogger(__name__)
 
