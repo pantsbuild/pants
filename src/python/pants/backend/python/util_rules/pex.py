@@ -463,8 +463,11 @@ async def build_pex(
 
 
 def _build_pex_description(request: PexRequest) -> str:
+    if request.description:
+        return request.description
     if not request.requirements:
         return f"Building {request.output_filename}"
+
     if request.repository_pex:
         repo_pex = request.repository_pex.name
         if request.requirements.req_strings:

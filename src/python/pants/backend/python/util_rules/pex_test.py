@@ -473,16 +473,26 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_build_pex_description() -> None:
     def assert_description(
-        requirements: PexRequirements, *, use_repo_pex: bool = False, expected: str
+        requirements: PexRequirements,
+        *,
+        use_repo_pex: bool = False,
+        description: str | None = None,
+        expected: str,
     ) -> None:
         repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None) if use_repo_pex else None
         request = PexRequest(
             output_filename="new.pex",
             internal_only=True,
             requirements=requirements,
+            description=description,
             repository_pex=repo_pex,
         )
         assert _build_pex_description(request) == expected
+
+    assert_description(PexRequirements(), description="Custom!", expected="Custom!")
+    assert_description(
+        PexRequirements(), description="Custom!", use_repo_pex=True, expected="Custom!"
+    )
 
     assert_description(PexRequirements(), expected="Building new.pex")
     assert_description(PexRequirements(), use_repo_pex=True, expected="Building new.pex")
