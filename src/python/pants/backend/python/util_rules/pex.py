@@ -310,12 +310,7 @@ async def build_pex(
     pex_runtime_env: PexRuntimeEnvironment,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
-
-    argv = [
-        "--output-file",
-        request.output_filename,
-        *request.additional_args,
-    ]
+    argv = ["--output-file", request.output_filename, *request.additional_args]
 
     if request.repository_pex:
         argv.extend(["--pex-repository", request.repository_pex.name])
@@ -433,35 +428,13 @@ async def build_pex(
         ),
     )
 
-    description = request.description
-    if description is None:
-        if not request.requirements:
-            description = f"Building {request.output_filename}"
-        else:
-            if request.requirements.file_path:
-                desc_suffix = f"from {request.requirements.file_path}"
-            elif request.requirements.file_content:
-                desc_suffix = f"from {request.requirements.file_content.path}"
-            else:
-                desc_suffix = (
-                    f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-                    f"{', '.join(request.requirements.req_strings)}"
-                )
-            if request.repository_pex:
-                description = (
-                    f"Extracting from {request.repository_pex.name} to build "
-                    f"{request.output_filename} {desc_suffix}"
-                )
-            else:
-                description = f"Building {request.output_filename} {desc_suffix}"
-
     process = await Get(
         Process,
         PexCliProcess(
             python=python,
             argv=argv,
             additional_input_digest=merged_digest,
-            description=description,
+            description=_build_pex_description(request),
             output_files=[request.output_filename],
         ),
     )
@@ -487,6 +460,40 @@ async def build_pex(
     return BuildPexResult(
         result=result, pex_filename=request.output_filename, digest=digest, python=python
     )
+
+
+def _build_pex_description(request: PexRequest) -> str:
+    if not request.requirements:
+        return f"Building {request.output_filename}"
+    if request.repository_pex:
+        repo_pex = request.repository_pex.name
+        if request.requirements.req_strings:
+            return (
+                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
+                f"to build {request.output_filename} from {repo_pex}: "
+                f"{', '.join(request.requirements.req_strings)}"
+            )
+        reqs_file = (
+            request.requirements.file_content.path
+            if request.requirements.file_content
+            else request.requirements.file_path
+        )
+        assert reqs_file is not None
+        return (
+            f"Extracting all requirements in {reqs_file} from {repo_pex} to build "
+            f"{request.output_filename}"
+        )
+
+    if request.requirements.file_path:
+        desc_suffix = f"from {request.requirements.file_path}"
+    elif request.requirements.file_content:
+        desc_suffix = f"from {request.requirements.file_content.path}"
+    else:
+        desc_suffix = (
+            f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
+            f"{', '.join(request.requirements.req_strings)}"
+        )
+    return f"Building {request.output_filename} {desc_suffix}"
 
 
 @rule
