@@ -43,6 +43,7 @@ class ModuleDescriptor:
     module_version: str
 
 
+# TODO: Add class docstring with info on the fields.
 @dataclass(frozen=True)
 class ResolvedGoModule:
     # The go_module target.
