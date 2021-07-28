@@ -20,21 +20,14 @@ def test_find_putative_targets() -> None:
             *docker_tailor_rules(),
             QueryRule(PutativeTargets, [PutativeDockerTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[
-            DockerImage,
-        ],
+        target_types=[DockerImage],
     )
-    rule_runner.create_file("src/docker_ok/Dockerfile")
-    rule_runner.create_file("src/docker_orphan/Dockerfile")
+    rule_runner.write_files({"src/docker_ok/Dockerfile": "", "src/docker_orphan/Dockerfile": ""})
     pts = rule_runner.request(
         PutativeTargets,
         [
             PutativeDockerTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(
-                [
-                    "src/docker_ok/Dockerfile",
-                ]
-            ),
+            AllOwnedSources(["src/docker_ok/Dockerfile"]),
         ],
     )
     assert (
@@ -44,9 +37,7 @@ def test_find_putative_targets() -> None:
                     DockerImage,
                     "src/docker_orphan",
                     "docker",
-                    [
-                        "Dockerfile",
-                    ],
+                    ["Dockerfile"],
                     kwargs={"name": "docker"},
                 ),
             ]

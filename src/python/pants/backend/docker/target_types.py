@@ -17,14 +17,14 @@ class DockerImageVersion(StringField):
 
 
 class DockerDependencies(Dependencies):
-    pass
+    supports_transitive_excludes = True
 
 
 class DockerContextRoot(StringField):
     alias = "context_root"
     default = "."
     help = (
-        "Root directory for the Docker build context. Default is to use the directory of the "
+        "Root directory for the Docker build context.\n\nDefault is to use the directory of the "
         "`BUILD` file. Use '/' to use the project root, thus putting any resource from the entire "
         "project within scope (if the target also has a dependency on it)."
     )
