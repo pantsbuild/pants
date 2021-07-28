@@ -18,7 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ def parse_imports_for_golang_distribution(raw_json: bytes) -> Dict[str, str]:
             if "Target" in package_descriptor and "ImportPath" in package_descriptor:
                 import_paths[package_descriptor["ImportPath"]] = package_descriptor["Target"]
         except Exception as ex:
-            _logger.error(
+            logger.error(
                 f"error while parsing package descriptor: {ex}; package_descriptor: {json.dumps(package_descriptor)}"
             )
             raise

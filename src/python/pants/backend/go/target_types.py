@@ -19,7 +19,7 @@ class GoSources(Sources):
 
 
 class GoPackageSources(GoSources):
-    default = ("*.go", "!*_test.go")
+    default = ("*.go",)
 
 
 class GoImportPath(StringField):

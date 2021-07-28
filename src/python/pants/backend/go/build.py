@@ -36,7 +36,7 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class GoBuildSubsystem(GoalSubsystem):
@@ -139,7 +139,7 @@ async def build_target(
         input_root_digests.add(pkg_descriptor.digest)
         import_config.append(f"packagefile {pkg}={os.path.normpath(pkg_descriptor.path)}")
     import_config_content = "\n".join(import_config).encode("utf-8")
-    _logger.info(f"import_config_content={import_config_content!r}")
+    logger.info(f"import_config_content={import_config_content!r}")
     import_config_digest = await Get(
         Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
     )
@@ -196,7 +196,7 @@ async def package_go_binary(
         AddressInput,
         AddressInput.parse(main_address, relative_to=field_set.address.spec_path),
     )
-    _logger.info(f"main_go_package_address={main_go_package_address}")
+    logger.info(f"main_go_package_address={main_go_package_address}")
     main_go_package_target = await Get(WrappedTarget, Address, main_go_package_address)
     main_go_package_field_set = BuildGoPackageFieldSet.create(main_go_package_target.target)
     built_main_go_package = await Get(
@@ -248,7 +248,7 @@ async def package_go_binary(
     )
 
     input_snapshot = await Get(Snapshot, Digest, input_digest)
-    _logger.info(f"input_snapshot={input_snapshot.files}")
+    logger.info(f"input_snapshot={input_snapshot.files}")
 
     output_filename_str = field_set.output_path.value
     if output_filename_str:
@@ -258,8 +258,8 @@ async def package_go_binary(
         binary_name = field_set.binary_name.value or "name-not-set"
         output_filename = PurePath(field_set.address.spec_path.replace(os.sep, ".")) / binary_name
 
-    _logger.info(f"parent={output_filename.parent}")
-    _logger.info(f"name={output_filename.name}")
+    logger.info(f"parent={output_filename.parent}")
+    logger.info(f"name={output_filename.name}")
 
     argv = [
         "./go/bin/go",
@@ -286,7 +286,7 @@ async def package_go_binary(
         Digest, AddPrefix(result.output_digest, output_filename.parent.as_posix())
     )
     ss = await Get(Snapshot, Digest, renamed_output_digest)
-    _logger.info(f"ss={ss}")
+    logger.info(f"ss={ss}")
 
     artifact = BuiltPackageArtifact(relpath=output_filename.as_posix())
     return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
