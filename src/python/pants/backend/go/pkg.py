@@ -3,7 +3,6 @@
 import json
 import logging
 import textwrap
-import typing
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -225,31 +224,20 @@ async def resolve_go_package(
                 f"that were detected under the key '{key}': {', '.join(files)}."
             )
 
-    package_name: str = metadata["Name"]
-    imports = typing.cast(Tuple[str, ...], tuple(metadata.get("Imports", [])))
-    test_imports = typing.cast(Tuple[str, ...], tuple(metadata.get("TestImports", [])))
-    dependency_import_paths = typing.cast(Tuple[str, ...], tuple(metadata.get("Deps", [])))
-    go_files = typing.cast(Tuple[str, ...], tuple(metadata.get("GoFiles", [])))
-    cgo_files = typing.cast(Tuple[str, ...], tuple(metadata.get("CgoFiles", [])))
-    ignored_go_files = typing.cast(Tuple[str, ...], tuple(metadata.get("IgnoredGoFiles", [])))
-    ignored_other_files = typing.cast(Tuple[str, ...], tuple(metadata.get("IgnoredOtherFiles", [])))
-    test_go_files = typing.cast(Tuple[str, ...], tuple(metadata.get("TestGoFiles", [])))
-    xtest_go_files = typing.cast(Tuple[str, ...], tuple(metadata.get("XTestGoFiles", [])))
-
     return ResolvedGoPackage(
         address=request.address,
         import_path=import_path,
         module_address=owning_go_module_result.module_address,
-        package_name=package_name,
-        imports=imports,
-        test_imports=test_imports,
-        dependency_import_paths=dependency_import_paths,
-        go_files=go_files,
-        cgo_files=cgo_files,
-        ignored_go_files=ignored_go_files,
-        ignored_other_files=ignored_other_files,
-        test_go_files=test_go_files,
-        xtest_go_files=xtest_go_files,
+        package_name=metadata["Name"],
+        imports=tuple(metadata.get("Imports", [])),
+        test_imports=tuple(metadata.get("TestImports", [])),
+        dependency_import_paths=tuple(metadata.get("Deps", [])),
+        go_files=tuple(metadata.get("GoFiles", [])),
+        cgo_files=tuple(metadata.get("CgoFiles", [])),
+        ignored_go_files=tuple(metadata.get("IgnoredGoFiles", [])),
+        ignored_other_files=tuple(metadata.get("IgnoredOtherFiles", [])),
+        test_go_files=tuple(metadata.get("TestGoFiles", [])),
+        xtest_go_files=tuple(metadata.get("XTestGoFiles", [])),
     )
 
 
