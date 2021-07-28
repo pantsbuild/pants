@@ -33,6 +33,7 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
+from pants.backend.experimental.python.lockfile_metadata import lockfile_content_with_header
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ async def generate_lockfile(
     _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
     lockfile_contents = _lockfile_contents_iter[0]
 
-    content_with_header = validated_lockfile_content(req, lockfile_contents.content)
+    content_with_header = lockfile_content_with_header(req, lockfile_contents.content)
     complete_lockfile = await Get(
         Digest, CreateDigest([FileContent(req.dest, content_with_header)])
     )
@@ -302,55 +303,6 @@ async def generate_all_tool_lockfiles(
         logger.info(f"Wrote lockfile to {result.path}")
 
     return ToolLockGoal(exit_code=0)
-
-
-BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
-END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
-
-
-# Lockfile metadata for headers
-def validated_lockfile_content(req: PythonLockfileRequest, content: bytes) -> bytes:
-    return b"%b\n%b" % (lockfile_metadata(req.hex_digest), content)
-
-
-def lockfile_metadata(invalidation_digest: str) -> bytes:
-    """Produces a metadata bytes object for including at the top of a lockfile.
-
-    Currently, this only consists of an invalidation digest for the file, which is used when Pants
-    consumes the lockfile during builds.
-    """
-    return (
-        b"""
-%(BEGIN_LOCKFILE_HEADER)b
-# invalidation digest: %(invalidation_digest)s
-%(END_LOCKFILE_HEADER)b
-    """
-        % {
-            b"BEGIN_LOCKFILE_HEADER": BEGIN_LOCKFILE_HEADER,
-            b"invalidation_digest": invalidation_digest.encode("ascii"),
-            b"END_LOCKFILE_HEADER": END_LOCKFILE_HEADER,
-        }
-    ).strip()
-
-
-def read_lockfile_metadata(contents: bytes) -> dict[str, str]:
-    """Reads through `contents`, and returns the contents of the lockfile metadata block as a
-    dictionary."""
-
-    metadata = {}
-
-    in_metadata_block = False
-    for line in contents.splitlines():
-        line = line.strip()
-        if line == BEGIN_LOCKFILE_HEADER:
-            in_metadata_block = True
-        elif line == END_LOCKFILE_HEADER:
-            break
-        elif in_metadata_block:
-            key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
-            metadata[key] = value
-
-    return metadata
 
 
 def rules():

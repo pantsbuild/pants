@@ -5,18 +5,16 @@ from unittest.mock import MagicMock
 
 from pants.backend.experimental.python.lockfile import (
     PythonLockfileRequest,
-    lockfile_metadata,
-    read_lockfile_metadata,
-    validated_lockfile_content,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.backend.experimental.python.lockfile_metadata import lockfile_metadata_header, read_lockfile_metadata, validated_lockfile_content
 
 
 def test_metadata_round_trip() -> None:
     val = "help_im_trapped_inside_a_unit_test_string"
-    output = read_lockfile_metadata(lockfile_metadata(val))
-    assert val == output["invalidation digest"]
+    output = read_lockfile_metadata(lockfile_metadata_header(val))
+    assert val == output.invalidation_digest
 
 
 def test_validated_lockfile_content() -> None:
