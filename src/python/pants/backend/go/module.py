@@ -33,7 +33,7 @@ from pants.engine.target import Target, UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -248,9 +248,9 @@ async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> Go
             resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
             # TODO: Only update the files if they actually changed.
             workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
-            _logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
+            logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
         else:
-            _logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
+            logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
     return GoResolveGoal(exit_code=0)
 
 

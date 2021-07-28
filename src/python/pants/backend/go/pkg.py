@@ -26,7 +26,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.util.logging import LogLevel
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # A fully-resolved Go package. The metadata is obtained by invoking `go list` on the package.
@@ -200,7 +200,7 @@ async def resolve_go_package(
         error_dict = metadata.get("Error", {})
         if error_dict:
             error_str = error_to_string(error_dict)
-            _logger.warning(
+            logger.warning(
                 f"Error while resolving Go package at address {request.address}: {error_str}"
             )
         # TODO: Check DepsErrors key as well.
