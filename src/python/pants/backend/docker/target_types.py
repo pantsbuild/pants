@@ -7,7 +7,7 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Str
 class DockerImageSources(Sources):
     default = ("Dockerfile",)
     expected_num_files = 1
-    help = "Name of the Dockerfile to use when building the Docker image."
+    help = "The Dockerfile to use when building the Docker image."
 
 
 class DockerImageVersion(StringField):
