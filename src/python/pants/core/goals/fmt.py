@@ -8,15 +8,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Optional, Tuple, Type, TypeVar, cast
 
+from pants.base.dependence_analysis import DependenceAnalysisRequest, DependenceAnalysisResult
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import Field, Target, Targets
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -294,5 +295,19 @@ async def fmt(
     return Fmt(exit_code=0)
 
 
+class FmtDependenceAnalysisRequest(DependenceAnalysisRequest):
+    """Request data dependence analysis for the fmt goal."""
+
+
+@rule
+async def fmt_dependence_analysis(
+    request: FmtDependenceAnalysisRequest,
+) -> DependenceAnalysisResult:
+    return DependenceAnalysisResult(goal=Fmt, accesses=request.targets, mutates=request.targets)
+
+
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(DependenceAnalysisRequest, FmtDependenceAnalysisRequest),
+    ]

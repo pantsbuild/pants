@@ -10,6 +10,8 @@ from typing import Any, ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
+from pants.base.dependence_analysis import DependenceAnalysis
+from pants.base.dependence_analysis import rules as dependence_analysis_rules
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -117,8 +119,13 @@ class GraphSession:
 
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
+        # NB: Keep this in sync with the property `goal_param_types`.
+        params = Params(specs, self.console, workspace, interactive_runner)
 
-        for goal in goals:
+        # determine data dependence order for goals over targets
+        [data_dependence] = self.scheduler_session.product_request(DependenceAnalysis, [params])
+
+        for goal in data_dependence.sort(goals, self.goal_map):
             goal_product = self.goal_map[goal]
             # NB: We no-op for goals that have no implementation because no relevant backends are
             # registered. We might want to reconsider the behavior to instead warn or error when
@@ -128,8 +135,6 @@ class GraphSession:
             )
             if not is_implemented:
                 continue
-            # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, interactive_runner)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -257,6 +262,7 @@ class EngineInitializer:
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
+                *dependence_analysis_rules(),
                 *rules,
             )
         )
@@ -270,6 +276,7 @@ class EngineInitializer:
                     for goal_type in goal_map.values()
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
+                QueryRule(DependenceAnalysis, [Specs]),  # Used by GraphSession.run_goal_rules.
             )
         )
 

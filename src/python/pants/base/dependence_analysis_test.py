@@ -11,7 +11,8 @@ from pants.base.dependence_analysis import (
     DependenceAnalysisResult,
     run_dependence_analysis,
 )
-from pants.engine.addresses import Address, Addresses
+from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import rule
 from pants.engine.target import Sources, Target
@@ -131,7 +132,7 @@ def test_dependence_analysis():
             transform_fortran_union_rule,
             validate_fortran_code_analysis_rule,
             validate_fortran_union_rule,
-            QueryRule(DependenceAnalysis, [Addresses]),
+            QueryRule(DependenceAnalysis, [Specs]),
         ],
         target_types=[
             FortranLibrary,
@@ -154,13 +155,15 @@ def test_dependence_analysis():
         }
     )
 
+    parser = SpecsParser("/")
+
     def assert_analysis(addresses, goals):
-        result = rule_runner.request(DependenceAnalysis, [Addresses(addresses)])
+        result = rule_runner.request(DependenceAnalysis, [parser.parse_specs(addresses)])
 
         assert result.goal_dependence_order == FrozenOrderedSet(goals)
 
     assert_analysis(
-        [Address("src/py/demo", target_name="demo")],
+        ["src/py/demo"],
         [
             transform_py_goal,
             validate_py_goal,
@@ -168,14 +171,14 @@ def test_dependence_analysis():
     )
 
     assert_analysis(
-        [Address("src/fortran/demo", target_name="demo")],
+        ["src/fortran/demo"],
         [transform_fortran_goal, validate_fortran_goal],
     )
 
     assert_analysis(
         [
-            Address("src/py/demo", target_name="demo"),
-            Address("src/fortran/demo", target_name="demo"),
+            "src/py/demo",
+            "src/fortran/demo",
         ],
         [
             transform_py_goal,

@@ -7,6 +7,7 @@ from operator import itemgetter
 from typing import (
     ClassVar,
     DefaultDict,
+    Dict,
     Generic,
     Iterable,
     List,
@@ -17,6 +18,7 @@ from typing import (
     cast,
 )
 
+from pants.base.specs import Specs
 from pants.engine.goal import Goal
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Sources, Target, Targets
@@ -24,6 +26,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.ordered_set import FrozenOrderedSet
 
 _S = TypeVar("_S", bound=Sources)
+GoalType = Type[Goal]
 
 
 @union
@@ -37,18 +40,34 @@ class DependenceAnalysisRequest(Generic[_S]):
 
 @dataclass(frozen=True)
 class DependenceAnalysisResult:
-    goal: Goal
+    goal: GoalType
     accesses: Targets
     mutates: Optional[Targets] = None
 
 
 @dataclass(frozen=True)
 class DependenceAnalysis:
-    goal_dependence_order: FrozenOrderedSet[Goal]
+    goal_dependence_order: FrozenOrderedSet[GoalType]
+
+    def sort(self, goals: Iterable[str], goal_map: Dict[str, GoalType]) -> Iterable[str]:
+        return sorted(goals, key=self._sort_goals_key(goal_map))
+
+    def _sort_goals_key(self, goal_map: Dict[str, GoalType]):
+        last = len(self.goal_dependence_order)
+        goals_order = list(self.goal_dependence_order)
+
+        def _key(goal):
+            goal_product = goal_map[goal]
+            return last if goal_product not in goals_order else goals_order.index(goal_product)
+
+        return _key
 
 
 def update_goal(
-    goals_per_target: DefaultDict[Target, List[Goal]], goal: Goal, targets: Targets, append: bool
+    goals_per_target: DefaultDict[Target, List[GoalType]],
+    goal: GoalType,
+    targets: Targets,
+    append: bool,
 ) -> int:
     """Update goals_per_target for each target, adding goal to the front or back of the list of
     goals.
@@ -68,10 +87,12 @@ def update_goal(
 
 @rule
 async def run_dependence_analysis(
-    targets: Targets, union_membership: UnionMembership
+    specs: Specs, union_membership: UnionMembership
 ) -> DependenceAnalysis:
+
+    targets = await Get(Targets, Specs, specs)
     request_types = cast(
-        "Iterable[type[DependenceAnalysisRequest]]", union_membership[DependenceAnalysisRequest]
+        "Iterable[type[DependenceAnalysisRequest]]", union_membership.get(DependenceAnalysisRequest)
     )
     requests = [
         request_type(
@@ -90,7 +111,7 @@ async def run_dependence_analysis(
     )
 
     # Sort results based on target accesses/mutates data dependence.
-    goals_per_target: DefaultDict[Target, List[Goal]] = defaultdict(list)
+    goals_per_target: DefaultDict[Target, List[GoalType]] = defaultdict(list)
     goal_orders = sorted(
         [
             (update_goal(goals_per_target, result.goal, result.mutates, append=False), result.goal)
