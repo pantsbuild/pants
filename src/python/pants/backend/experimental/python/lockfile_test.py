@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
 from unittest.mock import MagicMock
 
 from pants.backend.experimental.python.lockfile import (
@@ -8,7 +9,7 @@ from pants.backend.experimental.python.lockfile import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.backend.experimental.python.lockfile_metadata import lockfile_metadata_header, read_lockfile_metadata, validated_lockfile_content
+from pants.backend.experimental.python.lockfile_metadata import lockfile_metadata_header, read_lockfile_metadata, lockfile_content_with_header
 
 
 def test_metadata_round_trip() -> None:
@@ -33,65 +34,27 @@ dave==3.1.4 \\
 
     # Helper function to make the test case more resilient to reformatting
     line_by_line = lambda b: [ii for i in b.splitlines() if (ii := i.strip())]
-    assert line_by_line(validated_lockfile_content(req, content)) == line_by_line(output)
+    assert line_by_line(lockfile_content_with_header(req, content)) == line_by_line(output)
 
 
-def test_hex_digest_empty() -> None:
+_interpreter_constraints = [">=3.7", "<3.10"]
+_requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
+
+@pytest.mark.parametrize(
+    "requirements,interpreter_constraints,expected",
+    [
+        ([], [], "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+        (_interpreter_constraints, [], "04a2a2691d10bde0a2320bf32e2d40c60d0db511613fabc71933137c87f61500"),
+        ([], _requirements, "4ffd0a2a29407ce3f6bf7bfca60fdfc6f7d6224adda3c62807eb86666edf93bf"),
+        (_interpreter_constraints, _requirements, "6c63e6595f2f6827b6c1b53b186a2fa2020942bbfe989e25059a493b32a8bf36"),
+    ],
+)
+def test_hex_digest(requirements, interpreter_constraints, expected) -> None:
     req = PythonLockfileRequest(
-        requirements=FrozenOrderedSet([]),
-        interpreter_constraints=InterpreterConstraints([]),
+        requirements=FrozenOrderedSet(requirements),
+        interpreter_constraints=InterpreterConstraints(interpreter_constraints),
         dest="lockfile.py",
         description="empty",
     )
 
-    assert req.hex_digest == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-
-def test_hex_digest_empty_interpreter_constraints() -> None:
-    req = PythonLockfileRequest(
-        requirements=FrozenOrderedSet(
-            [
-                "help",
-                "meim",
-                "trap",
-                "pedi",
-                "naun",
-                "itte",
-            ]
-        ),
-        interpreter_constraints=InterpreterConstraints([]),
-        dest="lockfile.py",
-        description="empty",
-    )
-
-    assert req.hex_digest == "9056af98e88b5f1ce893dcb7d7e189bd813ef4f5009f26594e1499be546fb3e1"
-
-
-def test_hex_digest_empty_requirements() -> None:
-    req = PythonLockfileRequest(
-        requirements=FrozenOrderedSet([]),
-        interpreter_constraints=InterpreterConstraints(
-            ["stda", "tase", "tand", "itsd", "arka", "ndsc"]
-        ),
-        dest="lockfile.py",
-        description="empty",
-    )
-
-    assert req.hex_digest == "312bd499be026b8ecedb95a3b3e234bdea28e82c2d40ae1b2a435fc20971e2c2"
-
-
-def test_hex_digest_both_specified() -> None:
-    req = PythonLockfileRequest(
-        requirements=FrozenOrderedSet(["aryi", "nher", "eple", "ases", "avem"]),
-        interpreter_constraints=InterpreterConstraints(
-            [
-                "efro",
-                "mitq",
-                "uick",
-            ]
-        ),
-        dest="lockfile.py",
-        description="empty",
-    )
-
-    assert req.hex_digest == "fc71e036ed72f43b9e0f2dcd37050a9e21773a619f0172ab8b657be9ee502fb6"
+    assert req.hex_digest == expected
