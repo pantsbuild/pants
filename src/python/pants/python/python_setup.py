@@ -130,6 +130,17 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--fail-on-invalid-lockfile",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                "Causes a build failure if Pants encounters a lockfile that was generated with different "
+                "requirements or interpreter constraints than those currently specified. The default behavior "
+                "is to issue a warning if such a lockfile is encountered."
+            )
+        )
+        register(
             "--interpreter-search-paths",
             advanced=True,
             type=list,
@@ -210,6 +221,10 @@ class PythonSetup(Subsystem):
     @property
     def lockfile(self) -> str | None:
         return cast("str | None", self.options.experimental_lockfile)
+
+    @property
+    def fail_on_invalid_lockfile(self) -> bool:
+        return cast(bool, self.options.fail_on_invalid_lockfile)
 
     @property
     def lockfile_custom_regeneration_command(self) -> str | None:
