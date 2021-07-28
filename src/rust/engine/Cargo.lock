@@ -713,6 +713,7 @@ dependencies = [
 name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
+ "bytes 1.0.1",
  "fs",
  "hashing",
  "mock",

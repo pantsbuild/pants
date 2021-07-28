@@ -1,15 +1,16 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use bytes::Bytes;
 use pyo3::basic::CompareOp;
 use pyo3::class::basic::PyObjectProtocol;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyTuple, PyType};
 
-use fs::PathStat;
+use fs::{FileContent, PathStat};
 use fs::{GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching};
 use hashing::{Digest, Fingerprint};
 use store::Snapshot;
@@ -25,7 +26,15 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 
 #[pyfunction]
 #[allow(unused_variables)]
-fn check_fs_python_types_load(path_globs: PyPathGlobs) {}
+fn check_fs_python_types_load(
+  path_globs: PyPathGlobs,
+  create_digest: PyCreateDigest,
+  merge_digests: PyMergeDigests,
+  digest_subset: PyDigestSubset,
+  add_prefix: PyAddPrefix,
+  remove_prefix: PyRemovePrefix,
+) {
+}
 
 // -----------------------------------------------------------------------------
 // PathGlobs
@@ -66,11 +75,7 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
     let conjunction =
       GlobExpansionConjunction::create(conjunction_str).map_err(PyValueError::new_err)?;
 
-    Ok(PyPathGlobs(PathGlobs::new(
-      globs,
-      match_behavior,
-      conjunction,
-    )))
+    Ok(Self(PathGlobs::new(globs, match_behavior, conjunction)))
   }
 }
 
@@ -213,6 +218,113 @@ impl PyObjectProtocol for PySnapshot {
 
   fn __hash__(&self) -> u64 {
     self.0.digest.hash.prefix_hash()
+  }
+}
+
+// -----------------------------------------------------------------------------
+// CreateDigest
+// -----------------------------------------------------------------------------
+
+#[allow(dead_code)]
+struct PyCreateDigest {
+  files: Vec<FileContent>,
+  dirs: Vec<PathBuf>,
+}
+
+impl<'source> FromPyObject<'source> for PyCreateDigest {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    for file_or_dir_res in obj.iter()? {
+      let file_or_dir = file_or_dir_res?;
+      let path: PathBuf = file_or_dir.getattr("path")?.extract()?;
+      if file_or_dir.hasattr("content")? {
+        let raw_content: Vec<u8> = file_or_dir.getattr("content")?.extract()?;
+        let content = Bytes::from(raw_content);
+        let is_executable: bool = file_or_dir.getattr("is_executable")?.extract()?;
+        files.push(FileContent {
+          path,
+          content,
+          is_executable,
+        });
+      } else {
+        dirs.push(path);
+      }
+    }
+    Ok(Self { files, dirs })
+  }
+}
+
+// -----------------------------------------------------------------------------
+// MergeDigests and DigestSubset
+// -----------------------------------------------------------------------------
+
+struct PyMergeDigests(Vec<Digest>);
+
+impl<'source> FromPyObject<'source> for PyMergeDigests {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py_digests: Vec<PyDigest> = obj.getattr("digests")?.extract()?;
+    Ok(Self(
+      py_digests
+        .into_iter()
+        .map(|py_digest| py_digest.0)
+        .collect(),
+    ))
+  }
+}
+
+#[allow(dead_code)]
+struct PyDigestSubset {
+  digest: Digest,
+  globs: PathGlobs,
+}
+
+impl<'source> FromPyObject<'source> for PyDigestSubset {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py_digest: PyDigest = obj.getattr("digest")?.extract()?;
+    let py_path_globs: PyPathGlobs = obj.getattr("globs")?.extract()?;
+    Ok(Self {
+      digest: py_digest.0,
+      globs: py_path_globs.0,
+    })
+  }
+}
+
+// -----------------------------------------------------------------------------
+// AddPrefix and RemovePrefix
+// -----------------------------------------------------------------------------
+
+#[allow(dead_code)]
+struct PyAddPrefix {
+  digest: Digest,
+  prefix: String,
+}
+
+impl<'source> FromPyObject<'source> for PyAddPrefix {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py_digest: PyDigest = obj.getattr("digest")?.extract()?;
+    let prefix: String = obj.getattr("prefix")?.extract()?;
+    Ok(Self {
+      digest: py_digest.0,
+      prefix,
+    })
+  }
+}
+
+#[allow(dead_code)]
+struct PyRemovePrefix {
+  digest: Digest,
+  prefix: String,
+}
+
+impl<'source> FromPyObject<'source> for PyRemovePrefix {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py_digest: PyDigest = obj.getattr("digest")?.extract()?;
+    let prefix: String = obj.getattr("prefix")?.extract()?;
+    Ok(Self {
+      digest: py_digest.0,
+      prefix,
+    })
   }
 }
 

@@ -5,7 +5,14 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    DigestSubset,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+)
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -22,7 +29,15 @@ class PyExecutor:
 # FS
 # ------------------------------------------------------------------------------
 
-def check_fs_python_types_load(*, path_globs: PathGlobs) -> None: ...
+def check_fs_python_types_load(
+    *,
+    path_globs: PathGlobs,
+    create_digest: CreateDigest,
+    merge_digests: MergeDigests,
+    digest_subset: DigestSubset,
+    add_prefix: AddPrefix,
+    remove_prefix: RemovePrefix,
+) -> None: ...
 def default_cache_path() -> str: ...
 
 # TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't

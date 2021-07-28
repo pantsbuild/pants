@@ -1015,10 +1015,26 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 
 def test_fs_python_types_load() -> None:
     """Check that types defined in Python can be correctly consumed by Rust."""
+    digest = DigestPyO3("a" * 64, 10)
 
-    def assert_loads(*, path_globs: Optional[PathGlobs] = None) -> None:
+    def assert_loads(
+        *,
+        path_globs: Optional[PathGlobs] = None,
+        create_digest: Optional[CreateDigest] = None,
+        merge_digests: Optional[MergeDigests] = None,
+        digest_subset: Optional[DigestSubset] = None,
+        add_prefix: Optional[AddPrefix] = None,
+        remove_prefix: Optional[RemovePrefix] = None,
+    ) -> None:
         native_engine_pyo3.check_fs_python_types_load(
-            path_globs=path_globs or PathGlobs(["glob/**"])
+            path_globs=path_globs or PathGlobs(["glob/**"]),
+            create_digest=(
+                create_digest or CreateDigest([FileContent("f.ext", b"foo"), Directory("dir")])
+            ),
+            merge_digests=merge_digests or MergeDigests([digest, digest]),  # type: ignore[list-item]
+            digest_subset=digest_subset or DigestSubset(digest, PathGlobs(["glob"])),  # type: ignore[arg-type]
+            add_prefix=add_prefix or AddPrefix(digest, "prefix"),  # type: ignore[arg-type]
+            remove_prefix=remove_prefix or RemovePrefix(digest, "prefix"),  # type: ignore[arg-type]
         )
 
     # Check when types are valid.
@@ -1033,7 +1049,30 @@ def test_fs_python_types_load() -> None:
 
     # Now check invalid types to check for false positives.
     with pytest.raises(TypeError):
-        assert_loads(path_globs=PathGlobs([1, 2, 3]))
+        assert_loads(path_globs=PathGlobs([1, 2, 3]))  # type: ignore[list-item]
+
+    with pytest.raises(AttributeError):
+        assert_loads(create_digest=CreateDigest([1, 2, 3]))  # type: ignore[list-item]
+    with pytest.raises(TypeError):
+        assert_loads(
+            create_digest=CreateDigest([FileContent("f.ext", "unicode")])  # type: ignore[arg-type]
+        )
+
+    with pytest.raises(TypeError):
+        assert_loads(merge_digests=MergeDigests([1, 2, 3]))  # type: ignore[list-item]
+    with pytest.raises(TypeError):
+        assert_loads(merge_digests=MergeDigests(digest))  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError):
+        assert_loads(
+            digest_subset=DigestSubset(digest, PathGlobs([1, 2, 3]))  # type: ignore[arg-type,list-item]
+        )
+
+    with pytest.raises(TypeError):
+        assert_loads(add_prefix=AddPrefix(digest, 123))  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError):
+        assert_loads(remove_prefix=RemovePrefix(digest, 123))  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("cls", [Digest, DigestPyO3])
