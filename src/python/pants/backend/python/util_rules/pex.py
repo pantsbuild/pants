@@ -440,14 +440,12 @@ async def build_pex(
             globs,
         )
         metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
-        if "invalidation digest" in metadata:
-            invalidation = metadata["invalidation digest"]
-            if invalidation != request.requirements.lockfile_hex_digest:
-                if python_setup.fail_on_invalid_lockfile:
-                    raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
-                else:
-                    # TODO: add warning
-                    pass
+        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+            if python_setup.fail_on_invalid_lockfile:
+                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+            else:
+                # TODO: add warning
+                pass
 
         requirements_file_digest = await Get(
             Digest,
@@ -463,14 +461,12 @@ async def build_pex(
         # add option to Python setup to warn or error.
         # Pex_from_targets.py (something about not using the rule :))
         # test in pex_test.py
-        if "invalidation digest" in metadata:
-            invalidation = metadata["invalidation digest"]
-            if invalidation != request.requirements.lockfile_hex_digest:
-                if python_setup.fail_on_invalid_lockfile:
-                    raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
-                else:
-                    # TODO: add warning
-                    pass
+        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+            if python_setup.fail_on_invalid_lockfile:
+                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+            else:
+                # TODO: add warning
+                pass
 
         requirements_file_digest = await Get(Digest, CreateDigest([content]))
     else:

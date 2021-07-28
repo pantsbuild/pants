@@ -84,4 +84,7 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
             key, value = (i.strip().decode("ascii") for i in line[1:].split(b":"))
             metadata[key] = value
 
-    return LockfileMetadata(invalidation_digest=metadata.get("invalidation digest"))
+    return LockfileMetadata(
+        invalidation_digest=metadata.get("invalidation digest")
+    )
+
