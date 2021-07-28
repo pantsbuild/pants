@@ -240,11 +240,10 @@ impl<'source> FromPyObject<'source> for PyCreateDigest {
       let path: PathBuf = file_or_dir.getattr("path")?.extract()?;
       if file_or_dir.hasattr("content")? {
         let raw_content: Vec<u8> = file_or_dir.getattr("content")?.extract()?;
-        let content = Bytes::from(raw_content);
         let is_executable: bool = file_or_dir.getattr("is_executable")?.extract()?;
         files.push(FileContent {
           path,
-          content,
+          content: Bytes::from(raw_content),
           is_executable,
         });
       } else {
