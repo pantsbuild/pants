@@ -676,7 +676,7 @@ dependencies = [
  "graph",
  "hashing",
  "indexmap",
- "itertools 0.8.2",
+ "itertools 0.10.1",
  "lazy_static",
  "libc",
  "log 0.4.11",
@@ -1396,24 +1396,6 @@ name = "ipnet"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
-
-[[package]]
-name = "itertools"
-version = "0.7.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -2221,7 +2203,7 @@ dependencies = [
  "futures",
  "grpc_util",
  "hashing",
- "itertools 0.8.2",
+ "itertools 0.10.1",
  "lazy_static",
  "libc",
  "log 0.4.11",
@@ -3078,7 +3060,7 @@ dependencies = [
  "http",
  "http-body",
  "indexmap",
- "itertools 0.7.11",
+ "itertools 0.10.1",
  "lmdb",
  "log 0.4.11",
  "madvise",
