@@ -640,6 +640,7 @@ def publish() -> None:
     upload_wheels_via_twine()
     tag_release()
     banner("Successfully released packages to PyPI and GitHub")
+    prompt_to_generate_docs()
 
 
 def publish_apple_silicon() -> None:
@@ -782,6 +783,29 @@ def upload_wheels_via_twine() -> None:
         ],
         check=True,
     )
+
+
+def prompt_to_generate_docs() -> None:
+    has_docs_access = input(
+        "\nThe docs now need to be regenerated. Do you already have editing access to "
+        "readme.com? [Y/n]: "
+    )
+    api_key_url = "https://dash.readme.com/project/pants/v2.5/api-key"
+    docs_cmd = "./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
+    if has_docs_access and has_docs_access.lower() != "y":
+        print(
+            "\nPlease ask in the #maintainers Slack channel to be added to Readme.com, then "
+            f"go to {api_key_url} to find your API key. "
+            f"Finally, run this command:\n\n\t{docs_cmd}\n\n"
+            f"(If you are not comfortable getting permissions, you can ask another maintainer to "
+            f"run this script in the #maintainers Slack.)"
+        )
+    else:
+        print(
+            f"\nPlease go to {api_key_url} to find your API key. "
+            "Then, run this command:\n\n"
+            "\t./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
+        )
 
 
 # -----------------------------------------------------------------------------------------------
