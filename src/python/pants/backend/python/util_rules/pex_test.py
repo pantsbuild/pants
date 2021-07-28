@@ -28,10 +28,11 @@ from pants.backend.python.util_rules.pex import (
     PexResolveInfo,
     VenvPex,
     VenvPexProcess,
+    _build_pex_description,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.engine.fs import CreateDigest, Digest, Directory, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -468,3 +469,69 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     assert dists[3].version == Version("2.23.0")
     assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
     assert dists[4].project_name == "urllib3"
+
+
+def test_build_pex_description() -> None:
+    def assert_description(
+        requirements: PexRequirements,
+        *,
+        use_repo_pex: bool = False,
+        description: str | None = None,
+        expected: str,
+    ) -> None:
+        repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None) if use_repo_pex else None
+        request = PexRequest(
+            output_filename="new.pex",
+            internal_only=True,
+            requirements=requirements,
+            description=description,
+            repository_pex=repo_pex,
+        )
+        assert _build_pex_description(request) == expected
+
+    assert_description(PexRequirements(), description="Custom!", expected="Custom!")
+    assert_description(
+        PexRequirements(), description="Custom!", use_repo_pex=True, expected="Custom!"
+    )
+
+    assert_description(PexRequirements(), expected="Building new.pex")
+    assert_description(PexRequirements(), use_repo_pex=True, expected="Building new.pex")
+
+    assert_description(
+        PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
+    )
+    assert_description(
+        PexRequirements(["req"]),
+        use_repo_pex=True,
+        expected="Extracting 1 requirement to build new.pex from repo.pex: req",
+    )
+
+    assert_description(
+        PexRequirements(["req1", "req2"]),
+        expected="Building new.pex with 2 requirements: req1, req2",
+    )
+    assert_description(
+        PexRequirements(["req1", "req2"]),
+        use_repo_pex=True,
+        expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
+    )
+
+    assert_description(
+        PexRequirements(file_content=FileContent("lock.txt", b"")),
+        expected="Building new.pex from lock.txt",
+    )
+    assert_description(
+        PexRequirements(file_content=FileContent("lock.txt", b"")),
+        use_repo_pex=True,
+        expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
+    )
+
+    assert_description(
+        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
+        expected="Building new.pex from lock.txt",
+    )
+    assert_description(
+        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
+        use_repo_pex=True,
+        expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
+    )

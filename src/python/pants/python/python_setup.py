@@ -27,6 +27,8 @@ class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
+    default_interpreter_constraints = ["CPython>=3.6"]
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -34,7 +36,7 @@ class PythonSetup(Subsystem):
             "--interpreter-constraints",
             advanced=True,
             type=list,
-            default=["CPython>=3.6"],
+            default=PythonSetup.default_interpreter_constraints,
             metavar="<requirement>",
             help=(
                 "The Python interpreters your codebase is compatible with.\n\nSpecify with "

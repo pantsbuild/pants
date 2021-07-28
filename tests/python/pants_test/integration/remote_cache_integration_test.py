@@ -39,7 +39,7 @@ def test_warns_on_remote_cache_errors():
 
     def write_err(i: int) -> str:
         return (
-            f'Failed to write to remote cache ({i} occurrences so far): Internal: "StubCAS is '
+            f'Failed to write to remote cache ({i} occurrences so far): InvalidArgument: "StubCAS is '
             f'configured to always fail"'
         )
 
@@ -63,7 +63,7 @@ def test_warns_on_remote_cache_errors():
 
     first_only_result = run(RemoteCacheWarningsBehavior.first_only)
     for err in [first_read_err, first_write_err]:
-        assert err in first_only_result
+        assert err in first_only_result, f"Not found in:\n{first_only_result}"
     for err in [third_read_err, third_write_err, fourth_read_err, fourth_write_err]:
         assert err not in first_only_result
 

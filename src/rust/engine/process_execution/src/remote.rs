@@ -733,7 +733,6 @@ impl crate::CommandRunner for CommandRunner {
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self.extract_compatible_request(&request).unwrap();
-    let store = self.store.clone();
     let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
@@ -774,16 +773,12 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    let input_files = request.input_files;
-    in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| ensure_action_uploaded(&store, command_digest, action_digest, input_files),
+    ensure_action_uploaded(
+      &context,
+      &self.store,
+      command_digest,
+      action_digest,
+      Some(request.input_files),
     )
     .await?;
 
@@ -1448,16 +1443,33 @@ pub async fn ensure_action_stored_locally(
   Ok((command_digest, action_digest))
 }
 
+///
+/// Ensure that the Action and Command (and optionally their input files, likely depending on
+/// whether we are in a remote execution context, or a pure cache-usage context) are uploaded.
+///
 pub async fn ensure_action_uploaded(
+  context: &Context,
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
-  input_files: Digest,
+  input_files: Option<Digest>,
 ) -> Result<(), String> {
-  let _ = store
-    .ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
-    .await?;
-  Ok(())
+  in_workunit!(
+    context.workunit_store.clone(),
+    "ensure_action_uploaded".to_owned(),
+    WorkunitMetadata {
+      level: Level::Trace,
+      desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
+      ..WorkunitMetadata::default()
+    },
+    |_workunit| async move {
+      let mut digests = vec![command_digest, action_digest];
+      digests.extend(input_files);
+      let _ = store.ensure_remote_has_recursive(digests).await?;
+      Ok(())
+    },
+  )
+  .await
 }
 
 pub fn format_error(error: &StatusProto) -> String {
