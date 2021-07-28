@@ -121,8 +121,9 @@ async def resolve_go_package(
     resolved_go_module = await Get(
         ResolvedGoModule, ResolveGoModuleRequest(owning_go_module_result.module_address)
     )
-    assert request.address.spec_path.startswith(resolved_go_module.address.spec_path)
-    spec_subpath = request.address.spec_path[len(resolved_go_module.address.spec_path) :]
+    go_module_spec_path = resolved_go_module.target.address.spec_path
+    assert request.address.spec_path.startswith(go_module_spec_path)
+    spec_subpath = request.address.spec_path[len(go_module_spec_path) :]
 
     # Compute the import_path for this go_package.
     import_path_field = target.get(GoImportPath)
@@ -135,7 +136,7 @@ async def resolve_go_package(
         if not resolved_go_module.import_path:
             raise ValueError(
                 f"Unable to infer import path for the `go_package` at address {request.address} "
-                f"because the owning go_module at address {resolved_go_module.address} "
+                f"because the owning go_module at address {resolved_go_module.target.address} "
                 "does not have an import path defined nor could one be inferred."
             )
         import_path = f"{resolved_go_module.import_path}{spec_subpath}"
@@ -166,7 +167,7 @@ async def resolve_go_package(
                 export GOPATH="$(/bin/pwd)/gopath"
                 export GOCACHE="$(/bin/pwd)/cache"
                 /bin/mkdir -p "$GOPATH" "$GOCACHE"
-                cd {resolved_go_module.address.spec_path}
+                cd {resolved_go_module.target.address.spec_path}
                 exec "${{GOROOT}}/bin/go" list -json ./{spec_subpath}
                 """
                     ).encode("utf-8"),

@@ -120,7 +120,7 @@ async def find_putative_go_external_module_targets(
             putative_targets.append(
                 PutativeTarget.for_target_type(
                     GoExternalModule,
-                    resolved_go_module.address.spec_path,
+                    resolved_go_module.target.address.spec_path,
                     compute_go_external_module_target_name(
                         module_descriptor.module_path, module_descriptor.module_version
                     ),

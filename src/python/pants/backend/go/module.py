@@ -45,9 +45,6 @@ class ModuleDescriptor:
 
 @dataclass(frozen=True)
 class ResolvedGoModule:
-    # Address of the resolved go_module target.
-    address: Address
-
     # The go_module target.
     target: Target
 
@@ -184,7 +181,6 @@ async def resolve_go_module(
         raise ValueError("No `module` directive found in go.mod.")
 
     return ResolvedGoModule(
-        address=request.address,
         target=target,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
