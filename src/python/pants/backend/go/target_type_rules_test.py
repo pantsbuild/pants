@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
 
-from pants.backend.go import target_type_rules
+from pants.backend.go import module, target_type_rules
 from pants.backend.go.target_types import GoModule, GoModuleSources, GoPackage
 from pants.build_graph.address import Address
+from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, DependenciesRequest, Target, UnexpandedTargets
@@ -15,6 +16,9 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *external_tool.rules(),
+            *source_files.rules(),
+            *module.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
             QueryRule(UnexpandedTargets, (Addresses,)),

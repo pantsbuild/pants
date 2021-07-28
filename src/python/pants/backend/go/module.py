@@ -9,6 +9,7 @@ import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.target_types import GoModuleSources
+from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -28,11 +29,11 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import Target, UnexpandedTargets
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -42,12 +43,22 @@ class ModuleDescriptor:
     module_version: str
 
 
+# TODO: Add class docstring with info on the fields.
 @dataclass(frozen=True)
 class ResolvedGoModule:
-    address: Address
+    # The go_module target.
+    target: Target
+
+    # Import path of the Go module. Inferred from the import path in the go.mod file.
     import_path: str
+
+    # Minimum Go version of the module from `go` statement in go.mod.
     minimum_go_version: Optional[str]
+
+    # Metadata of referenced modules.
     modules: FrozenOrderedSet[ModuleDescriptor]
+
+    # Digest containing go.mod and updated go.sum.
     digest: Digest
 
 
@@ -79,6 +90,10 @@ def basic_parse_go_mod(raw_text: bytes) -> Tuple[Optional[str], Optional[str]]:
 
 # Parse the output of `go mod download` into a list of module descriptors.
 def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
+    # `ijson` cannot handle empty input so short-circuit if there is no data.
+    if len(raw_json) == 0:
+        return []
+
     module_descriptors = []
     for raw_module_descriptor in ijson.items(raw_json, "", multiple_values=True):
         module_descriptor = ModuleDescriptor(
@@ -117,6 +132,7 @@ async def resolve_go_module(
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
     # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
+    # TODO: Merge all duplicate versions of this script into a single script and invoke rule.
     analyze_script_digest = await Get(
         Digest,
         CreateDigest(
@@ -166,12 +182,50 @@ async def resolve_go_module(
         raise ValueError("No `module` directive found in go.mod.")
 
     return ResolvedGoModule(
-        address=request.address,
+        target=target,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
         modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),
         digest=result.output_digest,
     )
+
+
+@dataclass(frozen=True)
+class FindNearestGoModuleRequest:
+    spec_path: str
+
+
+@dataclass(frozen=True)
+class ResolvedOwningGoModule:
+    module_address: Optional[Address]
+
+
+@rule
+async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> ResolvedOwningGoModule:
+    # Obtain unexpanded targets and ensure file targets are filtered out. Unlike Python, file targets do not
+    # make sense semantically for Go source since Go builds entire packages at a time. The filtering is
+    # accomplished by requesting `UnexpandedTargets` and also filtering on `is_file_target`.
+    spec_path = request.spec_path
+    candidate_targets = await Get(
+        UnexpandedTargets,
+        AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),
+    )
+    go_module_targets = [
+        tgt
+        for tgt in candidate_targets
+        if tgt.has_field(GoModuleSources) and not tgt.address.is_file_target
+    ]
+
+    # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
+    sorted_go_module_targets = sorted(
+        go_module_targets, key=lambda tgt: tgt.address.spec_path, reverse=True
+    )
+    if sorted_go_module_targets:
+        nearest_go_module_target = sorted_go_module_targets[0]
+        return ResolvedOwningGoModule(module_address=nearest_go_module_target.address)
+    else:
+        # TODO: Consider eventually requiring all go_package's to associate with a go_module.
+        return ResolvedOwningGoModule(module_address=None)
 
 
 # TODO: Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
@@ -194,9 +248,9 @@ async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> Go
             resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
             # TODO: Only update the files if they actually changed.
             workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
-            _logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
+            logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
         else:
-            _logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
+            logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
     return GoResolveGoal(exit_code=0)
 
 
