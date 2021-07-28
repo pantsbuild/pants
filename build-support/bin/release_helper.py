@@ -790,21 +790,22 @@ def prompt_to_generate_docs() -> None:
         "\nThe docs now need to be regenerated. Do you already have editing access to "
         "readme.com? [Y/n]: "
     )
+    # This URL will work regardless of the current version, so long as we don't delete 2.5 from
+    # the docs.
     api_key_url = "https://dash.readme.com/project/pants/v2.5/api-key"
     docs_cmd = "./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
     if has_docs_access and has_docs_access.lower() != "y":
         print(
-            "\nPlease ask in the #maintainers Slack channel to be added to Readme.com, then "
-            f"go to {api_key_url} to find your API key. "
-            f"Finally, run this command:\n\n\t{docs_cmd}\n\n"
-            f"(If you are not comfortable getting permissions, you can ask another maintainer to "
-            f"run this script in the #maintainers Slack.)"
+            "\nPlease ask in the #maintainers Slack channel to be added to Readme.com. Please "
+            "enable two-factor authentication!\n\n"
+            f"Then go to {api_key_url} to find your API key. Run this command:\n\n\t{docs_cmd}\n\n"
+            "(If you are not comfortable getting permissions, you can ask another maintainer to "
+            "run this script in the #maintainers Slack.)"
         )
     else:
         print(
-            f"\nPlease go to {api_key_url} to find your API key. "
-            "Then, run this command:\n\n"
-            "\t./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
+            f"\nPlease go to {api_key_url} to find your API key. Then, run this command:\n\n"
+            f"\t{docs_cmd}"
         )
 
 
