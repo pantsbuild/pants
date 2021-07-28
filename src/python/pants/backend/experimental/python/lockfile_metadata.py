@@ -4,11 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
@@ -20,9 +15,9 @@ class LockfileMetadata:
 
 
 # Lockfile metadata for headers
-def lockfile_content_with_header(req: PythonLockfileRequest, content: bytes) -> bytes:
+def lockfile_content_with_header(invalidation_digest: str, content: bytes) -> bytes:
     """Returns a version of the lockfile with a pants metadata header prepended."""
-    return b"%b\n%b" % (lockfile_metadata_header(req.hex_digest), content)
+    return b"%b\n%b" % (lockfile_metadata_header(invalidation_digest), content)
 
 
 def lockfile_metadata_header(invalidation_digest: str) -> bytes:
@@ -47,7 +42,7 @@ def lockfile_metadata_header(invalidation_digest: str) -> bytes:
 
 def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
     """Reads through `contents`, and returns the contents of the lockfile metadata block as a
-    dictionary."""
+    `LockfileMetadata` object."""
 
     metadata = {}
 

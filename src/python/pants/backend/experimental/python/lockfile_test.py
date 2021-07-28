@@ -1,8 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
@@ -22,7 +20,6 @@ def test_metadata_round_trip() -> None:
 
 
 def test_validated_lockfile_content() -> None:
-    req = MagicMock(hex_digest="000faaafcacacaca")
     content = b"""dave==3.1.4 \\
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
     """
@@ -37,7 +34,9 @@ dave==3.1.4 \\
 
     # Helper function to make the test case more resilient to reformatting
     line_by_line = lambda b: [ii for i in b.splitlines() if (ii := i.strip())]
-    assert line_by_line(lockfile_content_with_header(req, content)) == line_by_line(output)
+    assert line_by_line(lockfile_content_with_header("000faaafcacacaca", content)) == line_by_line(
+        output
+    )
 
 
 _interpreter_constraints = [">=3.7", "<3.10"]

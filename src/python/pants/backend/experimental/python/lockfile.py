@@ -165,7 +165,7 @@ async def generate_lockfile(
     _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
     lockfile_contents = _lockfile_contents_iter[0]
 
-    content_with_header = lockfile_content_with_header(req, lockfile_contents.content)
+    content_with_header = lockfile_content_with_header(req.hex_digest, lockfile_contents.content)
     complete_lockfile = await Get(
         Digest, CreateDigest([FileContent(req.dest, content_with_header)])
     )
