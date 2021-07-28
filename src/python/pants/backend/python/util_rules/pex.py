@@ -443,7 +443,11 @@ async def build_pex(
         if "invalidation digest" in metadata:
             invalidation = metadata["invalidation digest"]
             if invalidation != request.requirements.lockfile_hex_digest:
-                raise Exception(f"lol {invalidation} {request.requirements.lockfile_hex_digest}")
+                if python_setup.fail_on_invalid_lockfile:
+                    raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                else:
+                    # TODO: add warning
+                    pass
 
         requirements_file_digest = await Get(
             Digest,
@@ -462,7 +466,11 @@ async def build_pex(
         if "invalidation digest" in metadata:
             invalidation = metadata["invalidation digest"]
             if invalidation != request.requirements.lockfile_hex_digest:
-                raise Exception(f"lol {invalidation} {request.requirements.lockfile_hex_digest}")
+                if python_setup.fail_on_invalid_lockfile:
+                    raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                else:
+                    # TODO: add warning
+                    pass
 
         requirements_file_digest = await Get(Digest, CreateDigest([content]))
     else:
