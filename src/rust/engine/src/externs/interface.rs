@@ -1007,9 +1007,7 @@ async fn workunit_to_py_value(
   for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
-      ArtifactOutput::FileDigest(digest) => {
-        crate::nodes::Snapshot::store_file_digest(core, digest)
-      }
+      ArtifactOutput::FileDigest(digest) => crate::nodes::Snapshot::store_file_digest(core, digest),
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
