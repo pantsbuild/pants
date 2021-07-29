@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import os.path
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
@@ -70,7 +70,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
     # As hadolint uses a single config file, we need to partition our runs per config file
     # discovered.
     files_with_config = _group_files_with_config(
-        set(sources.snapshot.files),
+        sources.snapshot.files,
         config_files.snapshot.files,
         not hadolint.config,
     )
@@ -92,22 +92,24 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
 
 
 def _group_files_with_config(
-    source_files: set[str], config_files: tuple[str, ...], config_files_discovered: bool
+    source_files: tuple[str, ...], config_files: tuple[str, ...], config_files_discovered: bool
 ) -> list[tuple[tuple[str, ...], list[str]]]:
     """If config_files_discovered, group all source files that is in the same directory or below a
     config file, otherwise, all files will be kept in one group per config file that was provided as
     option."""
     groups = []
     consumed_files: set[str] = set()
+    source_paths = {PurePath(source_file) for source_file in source_files}
 
     for config_file in config_files:
         if not config_files_discovered:
-            files = source_files
+            files = set(source_files)
         else:
-            path = os.path.dirname(config_file)
-            files = {source_file for source_file in source_files if source_file.startswith(path)}
+            config_path = PurePath(config_file).parent
+            files = {str(source) for source in source_paths if config_path in source.parents}
         if files:
-            groups.append((tuple(files), ["--config", config_file]))
+            # Sort files, to make the order predictable for the tests.
+            groups.append((tuple(sorted(files)), ["--config", config_file]))
             consumed_files.update(files)
 
     if len(consumed_files) < len(source_files):
