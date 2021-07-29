@@ -204,7 +204,7 @@ dependencies = [
  "futures",
  "hashing",
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "protobuf",
  "store",
@@ -327,7 +327,7 @@ dependencies = [
  "env_logger",
  "futures",
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "nailgun",
  "nix",
  "peg",
@@ -366,7 +366,7 @@ dependencies = [
 name = "concrete_time"
 version = "0.0.1"
 dependencies = [
- "log 0.4.11",
+ "log 0.4.14",
  "prost",
  "prost-types",
  "serde",
@@ -679,7 +679,7 @@ dependencies = [
  "itertools 0.10.1",
  "lazy_static",
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "logging",
  "mock",
  "nailgun",
@@ -732,7 +732,7 @@ checksum = "15b0a4d2e39f8420210be8b27eeda28029729e2fd4291019455016c348240c38"
 dependencies = [
  "atty",
  "humantime",
- "log 0.4.11",
+ "log 0.4.14",
  "regex",
  "termcolor",
 ]
@@ -815,7 +815,7 @@ dependencies = [
  "glob",
  "ignore",
  "lazy_static",
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "rlimit",
  "task_executor",
@@ -1055,7 +1055,7 @@ dependencies = [
  "aho-corasick",
  "bstr",
  "fnv",
- "log 0.4.11",
+ "log 0.4.14",
  "regex",
 ]
 
@@ -1069,7 +1069,7 @@ dependencies = [
  "fixedbitset",
  "fnv",
  "futures",
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "petgraph",
  "rand 0.8.2",
@@ -1260,7 +1260,7 @@ checksum = "5f9f7a97316d44c0af9b0301e65010573a853a9fc97046d7331d7f6bc0fd5a64"
 dependencies = [
  "futures-util",
  "hyper",
- "log 0.4.11",
+ "log 0.4.14",
  "rustls",
  "tokio",
  "tokio-rustls",
@@ -1299,7 +1299,7 @@ dependencies = [
  "crossbeam-utils 0.8.1",
  "globset",
  "lazy_static",
- "log 0.4.11",
+ "log 0.4.14",
  "memchr",
  "regex",
  "same-file",
@@ -1524,16 +1524,16 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
 dependencies = [
- "log 0.4.11",
+ "log 0.4.14",
 ]
 
 [[package]]
 name = "log"
-version = "0.4.11"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
+checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -1544,7 +1544,7 @@ dependencies = [
  "chrono",
  "colored",
  "lazy_static",
- "log 0.4.11",
+ "log 0.4.14",
  "num_enum",
  "parking_lot",
  "regex",
@@ -1633,7 +1633,7 @@ dependencies = [
  "iovec",
  "kernel32-sys",
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "miow 0.2.2",
  "net2",
  "slab",
@@ -1647,7 +1647,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e50ae3f04d169fcc9bde0b547d1c205219b7157e07ded9c5aff03e0637cb3ed7"
 dependencies = [
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "miow 0.3.6",
  "ntapi",
  "winapi 0.3.9",
@@ -1660,7 +1660,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52403fe290012ce777c4626790c8951324a2b9e3316b3143779c72b029742f19"
 dependencies = [
  "lazycell",
- "log 0.4.11",
+ "log 0.4.14",
  "mio 0.6.23",
  "slab",
 ]
@@ -1698,7 +1698,7 @@ dependencies = [
  "grpc_util",
  "hashing",
  "hyper",
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "prost",
  "prost-types",
@@ -1720,7 +1720,7 @@ dependencies = [
  "async_latch",
  "bytes 1.0.1",
  "futures",
- "log 0.4.11",
+ "log 0.4.14",
  "nails",
  "os_pipe",
  "task_executor",
@@ -1736,7 +1736,7 @@ dependencies = [
  "byteorder",
  "bytes 1.0.1",
  "futures",
- "log 0.4.11",
+ "log 0.4.14",
  "tokio",
  "tokio-util",
 ]
@@ -2205,7 +2205,7 @@ dependencies = [
  "itertools 0.10.1",
  "lazy_static",
  "libc",
- "log 0.4.11",
+ "log 0.4.14",
  "maplit",
  "mock",
  "nails",
@@ -2247,7 +2247,7 @@ dependencies = [
  "fs",
  "futures",
  "hashing",
- "log 0.4.11",
+ "log 0.4.14",
  "process_execution",
  "prost",
  "shlex",
@@ -2277,7 +2277,7 @@ dependencies = [
  "bytes 1.0.1",
  "heck",
  "itertools 0.10.1",
- "log 0.4.11",
+ "log 0.4.14",
  "multimap",
  "petgraph",
  "prost",
@@ -2677,7 +2677,7 @@ dependencies = [
  "ipnet",
  "js-sys",
  "lazy_static",
- "log 0.4.11",
+ "log 0.4.14",
  "mime",
  "percent-encoding",
  "pin-project-lite",
@@ -2725,7 +2725,7 @@ version = "0.0.1"
 dependencies = [
  "env_logger",
  "indexmap",
- "log 0.4.11",
+ "log 0.4.14",
  "petgraph",
 ]
 
@@ -2751,7 +2751,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "064fd21ff87c6e87ed4506e68beb42459caa4a0e2eb144932e6776768556980b"
 dependencies = [
  "base64",
- "log 0.4.11",
+ "log 0.4.14",
  "ring",
  "sct",
  "webpki",
@@ -2933,7 +2933,7 @@ dependencies = [
  "futures",
  "hashing",
  "lmdb",
- "log 0.4.11",
+ "log 0.4.14",
  "task_executor",
  "tempfile",
  "tokio",
@@ -3036,7 +3036,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stdio"
 version = "0.0.1"
 dependencies = [
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "tokio",
 ]
@@ -3061,7 +3061,7 @@ dependencies = [
  "indexmap",
  "itertools 0.10.1",
  "lmdb",
- "log 0.4.11",
+ "log 0.4.14",
  "madvise",
  "maplit",
  "memmap",
@@ -3419,7 +3419,7 @@ dependencies = [
  "bytes 1.0.1",
  "futures-core",
  "futures-sink",
- "log 0.4.11",
+ "log 0.4.14",
  "pin-project-lite",
  "tokio",
 ]
@@ -3517,7 +3517,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
 dependencies = [
  "cfg-if 1.0.0",
- "log 0.4.11",
+ "log 0.4.14",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -3724,7 +3724,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ce8a968cb1cd110d136ff8b819a556d6fb6d919363c61534f6860c7eb172ba0"
 dependencies = [
- "log 0.4.11",
+ "log 0.4.14",
  "try-lock",
 ]
 
@@ -3760,7 +3760,7 @@ checksum = "1114f89ab1f4106e5b55e688b828c0ab0ea593a1ea7c094b141b14cbaaec2d62"
 dependencies = [
  "bumpalo",
  "lazy_static",
- "log 0.4.11",
+ "log 0.4.14",
  "proc-macro2 1.0.28",
  "quote 1.0.9",
  "syn 1.0.74",
@@ -3816,7 +3816,7 @@ dependencies = [
  "fs",
  "futures",
  "hashing",
- "log 0.4.11",
+ "log 0.4.14",
  "notify",
  "parking_lot",
  "task_executor",
@@ -3924,7 +3924,7 @@ dependencies = [
  "concrete_time",
  "hashing",
  "hdrhistogram",
- "log 0.4.11",
+ "log 0.4.14",
  "parking_lot",
  "petgraph",
  "rand 0.8.2",
