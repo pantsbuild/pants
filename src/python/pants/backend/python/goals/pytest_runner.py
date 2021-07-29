@@ -15,19 +15,12 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    ConsoleScript,
     PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -210,7 +203,7 @@ async def setup_pytest_for_target(
         Pex,
         PexRequest(
             output_filename="pytest.pex",
-            requirements=PexRequirements(pytest.get_requirement_strings()),
+            requirements=pytest.pex_requirements,
             interpreter_constraints=interpreter_constraints,
             internal_only=True,
         ),
@@ -246,7 +239,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            main=ConsoleScript("pytest"),
+            main=pytest.main,
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex],
         ),

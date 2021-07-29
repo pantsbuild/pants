@@ -6,14 +6,26 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
+from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import shell_str
-from pants.option.subsystem import Subsystem
 
 
-class PyTest(Subsystem):
+class PyTest(PythonToolBase):
     options_scope = "pytest"
     help = "The pytest Python test framework (https://docs.pytest.org/)."
+
+    # This should be kept in sync with `requirements.txt`.
+    # TODO: To fix this, we should allow using a `target_option` referring to a
+    #  `python_requirement_library` to override the version.
+    default_version = "pytest>=6.0.1,<6.3"
+    # TODO: When updating pytest-cov to 2.12+, update the help message for
+    #  `[coverage-py].config` to not mention installing TOML.
+    default_extra_requirements = ["pytest-cov>=2.10.1,<2.12"]
+
+    default_main = ConsoleScript("pytest")
 
     @classmethod
     def register_options(cls, register):
@@ -26,23 +38,17 @@ class PyTest(Subsystem):
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(
-            "--version",
-            # This should be kept in sync with `requirements.txt`.
-            # TODO: To fix this, we should allow using a `target_option` referring to a
-            #  `python_requirement_library` to override the version.
-            default="pytest>=6.0.1,<6.3",
-            advanced=True,
-            help="Requirement string for Pytest.",
-        )
-        register(
             "--pytest-plugins",
             type=list,
             advanced=True,
-            # TODO: When updating pytest-cov to 2.12+, update the help message for
-            #  `[coverage-py].config` to not mention installing TOML.
-            default=["pytest-cov>=2.10.1,<2.12"],
+            default=PyTest.default_extra_requirements,
             help=(
                 "Requirement strings for any plugins or additional requirements you'd like to use."
+            ),
+            removal_version="2.8.0.dev0",
+            removal_hint=(
+                "Use `[pytest].extra_requirements` instead, which behaves the same. (The option is "
+                "being renamed for uniformity with other Python tools.)"
             ),
         )
         register(
@@ -111,9 +117,17 @@ class PyTest(Subsystem):
             ),
         )
 
-    def get_requirement_strings(self) -> tuple[str, ...]:
-        """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
-        return (self.options.version, *self.options.pytest_plugins)
+    @property
+    def all_requirements(self) -> tuple[str, ...]:
+        extras = resolve_conflicting_options(
+            old_option="pytest_plugins",
+            new_option="extra_requirements",
+            old_scope=self.options_scope,
+            new_scope=self.options_scope,
+            old_container=self.options,
+            new_container=self.options,
+        )
+        return (self.version, *extras)
 
     @property
     def timeouts_enabled(self) -> bool:

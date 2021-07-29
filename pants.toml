@@ -150,7 +150,7 @@ release_notes = """
 
 [pytest]
 args = ["--no-header"]
-pytest_plugins.add = [
+extra_requirements.add = [
   "ipdb",
   "pytest-html",
   "pytest-icdiff",

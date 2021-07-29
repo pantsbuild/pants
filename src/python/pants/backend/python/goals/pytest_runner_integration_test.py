@@ -84,14 +84,14 @@ def run_pytest(
     # pytest-html==1.22.1 has an undeclared dep on setuptools. This, unfortunately,
     # is the most recent version of pytest-html that works with the low version of
     # pytest that we pin to.
-    plugins = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
-    plugins_str = "['" + "', '".join(plugins) + "']"
+    extra_reqs = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
+    extra_reqs_str = "['" + "', '".join(extra_reqs) + "']"
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
         # pin to lower versions so that we can run Python 2 tests
         "--pytest-version=pytest>=4.6.6,<4.7",
-        f"--pytest-pytest-plugins={plugins_str}",
+        f"--pytest-extra-requirements={extra_reqs_str}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
