@@ -74,7 +74,9 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
 // NB: We bundle these into a struct to ensure they share the same lifetime.
 struct StoreSetup {
   pub store: Store,
+  #[allow(dead_code)]
   pub store_temp_dir: TempDir,
+  #[allow(dead_code)]
   pub cas: StubCAS,
   pub executor: task_executor::Executor,
 }
