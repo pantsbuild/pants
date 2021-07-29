@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 
-import os
-from typing import Iterable, cast
+from typing import cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -85,16 +84,12 @@ class Hadolint(TemplatedExternalTool):
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
 
-    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+    def config_request(self) -> ConfigFilesRequest:
         # Refer to https://github.com/hadolint/hadolint#configure for how config files are
         # discovered.
-        candidates = []
-        for d in ("", *dirs):
-            candidates.append(os.path.join(d, ".hadolint.yaml"))
-            candidates.append(os.path.join(d, ".hadolint.yml"))
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=cast(bool, self.options.config_discovery),
-            check_existence=candidates,
+            check_existence=[".hadolint.yaml", ".hadolint.yml"],
         )

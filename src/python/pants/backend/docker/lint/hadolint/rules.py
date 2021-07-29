@@ -61,9 +61,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
             ),
         ),
     )
-    config_files = await Get(
-        ConfigFiles, ConfigFilesRequest, hadolint.config_request(sources.snapshot.dirs)
-    )
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request())
     input_digest = await Get(
         Digest,
         MergeDigests(
