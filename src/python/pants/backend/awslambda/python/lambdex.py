@@ -16,7 +16,7 @@ class Lambdex(PythonToolBase):
     options_scope = "lambdex"
     help = "A tool for turning .pex files into AWS Lambdas (https://github.com/wickman/lambdex)."
 
-    default_version = "lambdex==0.1.4"
+    default_version = "lambdex==0.1.5"
     default_main = ConsoleScript("lambdex")
 
     register_interpreter_constraints = True
