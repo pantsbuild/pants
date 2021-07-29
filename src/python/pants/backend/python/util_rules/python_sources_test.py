@@ -10,6 +10,9 @@ from typing import Iterable
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.target_types import PythonSources
@@ -42,6 +45,7 @@ def rule_runner() -> RuleRunner:
             *python_sources_rules(),
             *additional_fields.rules(),
             *protobuf_rules(),
+            *protobuf_subsystem_rules(),
             QueryRule(PythonSourceFiles, [PythonSourceFilesRequest]),
             QueryRule(StrippedPythonSourceFiles, [PythonSourceFilesRequest]),
         ],

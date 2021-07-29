@@ -80,7 +80,7 @@ async def create_ipython_repl_request(
         PexRequest(
             output_filename="ipython.pex",
             main=ipython.main,
-            requirements=ipython.pex_requirements,
+            requirements=ipython.pex_requirements(),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             internal_only=True,
         ),
