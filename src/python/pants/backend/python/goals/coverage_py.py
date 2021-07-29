@@ -334,16 +334,17 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
-
-    # TODO: don't calculate if not needed
-    lockfile_request = await Get(PythonLockfileRequest, CoveragePyLockfileSentinel())
+    lockfile_digest = None
+    if coverage.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, CoveragePyLockfileSentinel())
+        lockfile_digest = lockfile_request.hex_digest
 
     pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="coverage.pex",
             internal_only=True,
-            requirements=coverage.pex_requirements(lockfile_request.hex_digest),
+            requirements=coverage.pex_requirements(lockfile_digest),
             interpreter_constraints=coverage.interpreter_constraints,
             main=coverage.main,
         ),

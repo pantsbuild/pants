@@ -87,13 +87,15 @@ async def package_python_awslambda(
         ],
     )
 
-    # TODO: don't calculate if not needed
-    lockfile_request = await Get(PythonLockfileRequest, LambdexLockfileSentinel())
+    lockfile_digest = None
+    if lambdex.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, LambdexLockfileSentinel())
+        lockfile_digest = lockfile_request.hex_digest
 
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=lambdex.pex_requirements(lockfile_request.hex_digest),
+        requirements=lambdex.pex_requirements(lockfile_digest),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )

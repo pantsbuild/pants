@@ -97,7 +97,10 @@ async def generate_python_from_protobuf(
         target_stripped_sources_request,
     )
 
-    lockfile_request = await Get(PythonLockfileRequest, MypyProtobufLockfileSentinel())
+    lockfile_digest = None
+    if python_protobuf_mypy_plugin.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, MypyProtobufLockfileSentinel())
+        lockfile_digest = lockfile_request.hex_digest
 
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
@@ -105,7 +108,7 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements(lockfile_request.hex_digest),
+        requirements=python_protobuf_mypy_plugin.pex_requirements(lockfile_digest),
         interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
     )
 

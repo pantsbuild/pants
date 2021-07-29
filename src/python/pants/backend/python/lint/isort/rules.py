@@ -78,15 +78,17 @@ def generate_argv(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
-    # TODO: don't calculate if not needed
-    lockfile_request = await Get(PythonLockfileRequest, IsortLockfileSentinel())
+    lockfile_digest = None
+    if isort.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, IsortLockfileSentinel())
+        lockfile_digest = lockfile_request.hex_digest
 
     isort_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="isort.pex",
             internal_only=True,
-            requirements=isort.pex_requirements(lockfile_request.hex_digest),
+            requirements=isort.pex_requirements(lockfile_digest),
             interpreter_constraints=isort.interpreter_constraints,
             main=isort.main,
         ),

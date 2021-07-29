@@ -42,15 +42,17 @@ def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
 
 @rule(level=LogLevel.DEBUG)
 async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> LintResult:
-    # TODO: don't calculate if not needed
-    lockfile_request = await Get(PythonLockfileRequest, BanditLockfileSentinel())
+    lockfile_digest = None
+    if bandit.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, BanditLockfileSentinel())
+        lockfile_digest = lockfile_request.hex_digest
 
     bandit_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="bandit.pex",
             internal_only=True,
-            requirements=bandit.pex_requirements(lockfile_request.hex_digest),
+            requirements=bandit.pex_requirements(lockfile_digest),
             interpreter_constraints=partition.interpreter_constraints,
             main=bandit.main,
         ),
