@@ -3,8 +3,8 @@
 
 import pytest
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.experimental.python.lockfile_metadata import (
+    invalidation_digest,
     lockfile_content_with_header,
     lockfile_metadata_header,
     read_lockfile_metadata,
@@ -46,26 +46,36 @@ _requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
 @pytest.mark.parametrize(
     "requirements,interpreter_constraints,expected",
     [
-        ([], [], "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+        ([], [], "51f5289473089f1de64ab760af3f03ff55cd769f25cce7ea82dd1ac88aac5ff4"),
         (
             _interpreter_constraints,
             [],
-            "04a2a2691d10bde0a2320bf32e2d40c60d0db511613fabc71933137c87f61500",
+            "821e8eef80573c7d2460185da4d436b6a8c59e134f5f0758000be3c85e9819eb",
         ),
-        ([], _requirements, "4ffd0a2a29407ce3f6bf7bfca60fdfc6f7d6224adda3c62807eb86666edf93bf"),
+        ([], _requirements, "604fb99ed6d6d83ba2c4eb1230184dd7f279a446cda042e9e87099448f28dddb"),
         (
             _interpreter_constraints,
             _requirements,
-            "6c63e6595f2f6827b6c1b53b186a2fa2020942bbfe989e25059a493b32a8bf36",
+            "9264a3b59a592d7eeac9cb4bbb4f5b2200907694bfe92b48757c99b1f71485f0",
         ),
     ],
 )
 def test_hex_digest(requirements, interpreter_constraints, expected) -> None:
-    req = PythonLockfileRequest(
-        requirements=FrozenOrderedSet(requirements),
-        interpreter_constraints=InterpreterConstraints(interpreter_constraints),
-        dest="lockfile.py",
-        description="empty",
+    print(
+        invalidation_digest(
+            FrozenOrderedSet(requirements), InterpreterConstraints(interpreter_constraints)
+        )
+    )
+    assert (
+        invalidation_digest(
+            FrozenOrderedSet(requirements), InterpreterConstraints(interpreter_constraints)
+        )
+        == expected
     )
 
-    assert req.hex_digest == expected
+
+def test_hash_depends_on_requirement_source():
+    reqs = ["CPython"]
+    assert invalidation_digest(
+        FrozenOrderedSet(reqs), InterpreterConstraints([])
+    ) != invalidation_digest(FrozenOrderedSet([]), InterpreterConstraints(reqs))

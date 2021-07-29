@@ -3,7 +3,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
+
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.util.ordered_set import FrozenOrderedSet
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
@@ -14,7 +19,19 @@ class LockfileMetadata:
     invalidation_digest: str | None
 
 
-# Lockfile metadata for headers
+def invalidation_digest(
+    requirements: FrozenOrderedSet[str], interpreter_constraints: InterpreterConstraints
+) -> str:
+    """Returns an invalidation digest for the given requirements and interpreter constraints."""
+    m = hashlib.sha256()
+    pres = {
+        "requirements": [str(i) for i in requirements],
+        "interpreter_constraints": [str(i) for i in interpreter_constraints],
+    }
+    m.update(json.dumps(pres).encode("utf-8"))
+    return m.hexdigest()
+
+
 def lockfile_content_with_header(invalidation_digest: str, content: bytes) -> bytes:
     """Returns a version of the lockfile with a pants metadata header prepended."""
     return b"%b\n%b" % (lockfile_metadata_header(invalidation_digest), content)

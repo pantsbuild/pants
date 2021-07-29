@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.experimental.python.lockfile_metadata import lockfile_content_with_header
+from pants.backend.experimental.python.lockfile_metadata import (
+    invalidation_digest,
+    lockfile_content_with_header,
+)
 from pants.backend.python.subsystems.python_tool_base import (
     PythonToolBase,
     PythonToolRequirementsBase,
@@ -109,12 +111,7 @@ class PythonLockfileRequest:
 
         Inputs are definted as requirements and interpreter constraints.
         """
-        m = hashlib.sha256()
-        for requirement in self.requirements:
-            m.update(requirement.encode("utf-8"))
-        for constraint in self.interpreter_constraints:
-            m.update(str(constraint).encode("utf-8"))
-        return m.hexdigest()
+        return invalidation_digest(self.requirements, self.interpreter_constraints)
 
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
