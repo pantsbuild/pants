@@ -70,7 +70,9 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
     # As hadolint uses a single config file, we need to partition our runs per config file
     # discovered.
     files_with_config = _group_files_with_config(
-        sources.snapshot.files, config_files.snapshot.files
+        set(sources.snapshot.files),
+        config_files.snapshot.files,
+        not hadolint.config,
     )
     processes = [
         Process(
@@ -90,21 +92,26 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
 
 
 def _group_files_with_config(
-    source_files: tuple[str, ...], config_files: tuple[str, ...]
+    source_files: set[str], config_files: tuple[str, ...], config_files_discovered: bool
 ) -> list[tuple[tuple[str, ...], list[str]]]:
-    """Group all source files that is in the same directory or below a config file."""
+    """If config_files_discovered, group all source files that is in the same directory or below a
+    config file, otherwise, all files will be kept in one group per config file that was provided as
+    option."""
     groups = []
-    consumed_files: list[str] = []
+    consumed_files: set[str] = set()
 
     for config_file in config_files:
-        path = os.path.dirname(config_file)
-        files = {source_file for source_file in source_files if source_file.startswith(path)}
+        if not config_files_discovered:
+            files = source_files
+        else:
+            path = os.path.dirname(config_file)
+            files = {source_file for source_file in source_files if source_file.startswith(path)}
         if files:
             groups.append((tuple(files), ["--config", config_file]))
-            consumed_files.extend(files)
+            consumed_files.update(files)
 
     if len(consumed_files) < len(source_files):
-        files = set(source_files) - set(consumed_files)
+        files = set(source_files) - consumed_files
         groups.append((tuple(files), []))
 
     return groups

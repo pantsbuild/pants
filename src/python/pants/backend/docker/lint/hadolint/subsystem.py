@@ -8,7 +8,7 @@ from typing import Iterable, cast
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.custom_types import shell_str
+from pants.option.custom_types import file_option, shell_str
 
 
 class Hadolint(TemplatedExternalTool):
@@ -49,13 +49,27 @@ class Hadolint(TemplatedExternalTool):
             ),
         )
         register(
+            "--config",
+            type=file_option,
+            default=None,
+            advanced=True,
+            help=(
+                "Path to an YAML config file understood by Hadolint "
+                "(https://github.com/hadolint/hadolint#configure).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                "this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
             "--config-discovery",
             type=bool,
             default=True,
             advanced=True,
             help=(
-                "If true, Pants will include all relevant `.hadolint.yaml` and `.hadolint.yml` files "
-                "during runs."
+                "If true, Pants will include all relevant config files during runs "
+                "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
+                f"Use `[{cls.options_scope}].config` instead if your config is in a "
+                "non-standard location."
             ),
         )
 
@@ -67,6 +81,10 @@ class Hadolint(TemplatedExternalTool):
     def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
 
+    @property
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
+
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://github.com/hadolint/hadolint#configure for how config files are
         # discovered.
@@ -75,5 +93,8 @@ class Hadolint(TemplatedExternalTool):
             candidates.append(os.path.join(d, ".hadolint.yaml"))
             candidates.append(os.path.join(d, ".hadolint.yml"))
         return ConfigFilesRequest(
-            discovery=cast(bool, self.options.config_discovery), check_existence=candidates
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=cast(bool, self.options.config_discovery),
+            check_existence=candidates,
         )

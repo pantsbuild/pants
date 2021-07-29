@@ -133,6 +133,9 @@ def test_config_files(rule_runner: RuleRunner) -> None:
     assert "a/Dockerfile" not in result[1].stdout
     assert "b/Dockerfile:2 " in result[1].stdout
 
+    tgt = rule_runner.get_target(Address("b"))
+    assert_success(rule_runner, tgt, extra_args=["--hadolint-config=a/.hadolint.yaml"])
+
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t')"})
