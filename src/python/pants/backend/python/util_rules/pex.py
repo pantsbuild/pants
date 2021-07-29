@@ -68,7 +68,6 @@ class PexRequirements:
     file_content: FileContent | None
     file_path: str | None
     file_path_description_of_origin: str | None
-    is_lockfile: bool
     lockfile_hex_digest: str | None
 
     def __init__(
@@ -78,14 +77,12 @@ class PexRequirements:
         file_content: FileContent | None = None,
         file_path: str | None = None,
         file_path_description_of_origin: str | None = None,
-        is_lockfile: bool = False,
         lockfile_hex_digest: str | None = None,
     ) -> None:
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.file_content = file_content
         self.file_path = file_path
         self.file_path_description_of_origin = file_path_description_of_origin
-        self.is_lockfile = is_lockfile
         self.lockfile_hex_digest = lockfile_hex_digest
 
         if self.file_path and not self.file_path_description_of_origin:
@@ -124,6 +121,10 @@ class PexRequirements:
 
     def __bool__(self) -> bool:
         return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
+
+    @property
+    def is_lockfile(self) -> bool:
+        return self.lockfile_hex_digest is not None
 
 
 class PexPlatforms(DeduplicatedCollection[str]):

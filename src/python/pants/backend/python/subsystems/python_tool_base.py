@@ -133,14 +133,14 @@ class PythonToolRequirementsBase(Subsystem):
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                is_lockfile=True,
+                lockfile_hex_digest="TODO CHANGEME",
             )
         return PexRequirements(
             file_path=self.lockfile,
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"
             ),
-            is_lockfile=True,
+            lockfile_hex_digest="TODO CHANGEME",
         )
 
     def pex_requirements_with_digest(self, expected_lockfile_digest: str) -> PexRequirements:
@@ -158,7 +158,6 @@ class PythonToolRequirementsBase(Subsystem):
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                is_lockfile=True,
                 lockfile_hex_digest=expected_lockfile_digest,
             )
         return PexRequirements(
@@ -166,7 +165,6 @@ class PythonToolRequirementsBase(Subsystem):
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"
             ),
-            is_lockfile=True,
             lockfile_hex_digest=expected_lockfile_digest,
         )
 
