@@ -366,6 +366,7 @@ impl IntermediateGlobbedFilesAndDirectories {
         RestrictedPathGlob::DirWildcard { wildcard, .. } => wildcard,
       };
 
+      #[allow(clippy::needless_collect)]
       let matching_files: Vec<PathBuf> = cur_dir_files
         .keys()
         .filter(|path| {
@@ -382,6 +383,7 @@ impl IntermediateGlobbedFilesAndDirectories {
         globbed_files.insert(file_path, file_node);
       }
 
+      #[allow(clippy::needless_collect)]
       let matching_directories: Vec<PathBuf> = cur_dir_directories
         .keys()
         .filter(|path| {
