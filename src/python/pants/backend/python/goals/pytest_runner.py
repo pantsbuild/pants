@@ -210,7 +210,7 @@ async def setup_pytest_for_target(
         Pex,
         PexRequest(
             output_filename="pytest.pex",
-            requirements=PexRequirements(pytest.get_requirement_strings()),
+            requirements=pytest.pex_requirements,
             interpreter_constraints=interpreter_constraints,
             internal_only=True,
         ),
@@ -246,7 +246,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            main=ConsoleScript("pytest"),
+            main=pytest.main,
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex],
         ),
