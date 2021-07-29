@@ -117,9 +117,9 @@ packaging==20.9 \
     # via
     #   -r reqs.txt
     #   pytest
-pex==2.1.43 \
-    --hash=sha256:a2ac38d27730e00ffc9c51e8775cef2e3de9f7337eeaa4d84d0a2efdeb08e712 \
-    --hash=sha256:edc55cfae83d6cab51dde79a1b86f04d4227b5ec85dbed789090451ad9a798f2
+pex==2.1.44 \
+    --hash=sha256:2916e8f76e3e00b958572f42fb3ecf7fc0a19a378f73028067a4724be39193a6 \
+    --hash=sha256:371b3e52e568d3632fab09f66061541a3bf270c11db7eadb817f8974d01ea924
     # via -r reqs.txt
 pluggy==0.13.1 \
     --hash=sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0 \
