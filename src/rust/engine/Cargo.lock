@@ -687,6 +687,7 @@ dependencies = [
  "parking_lot",
  "petgraph",
  "process_execution",
+ "pyo3",
  "rand 0.8.2",
  "regex",
  "reqwest",

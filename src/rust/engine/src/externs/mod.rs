@@ -28,6 +28,7 @@ use cpython::{
   PyObject, PyResult as CPyResult, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 use lazy_static::lazy_static;
+use pyo3::FromPyPointer;
 
 use logging::PythonLogLevel;
 
@@ -419,4 +420,13 @@ pub enum GeneratorResponse {
   Break(Value),
   Get(Get),
   GetMulti(Vec<Get>),
+}
+
+pub(crate) fn from_rust_cpython_to_pyo3(value: &PyObject) -> &pyo3::PyAny {
+  let pyo3_val = pyo3::Python::with_gil(|py| unsafe {
+    pyo3::PyAny::from_owned_ptr(py, value.as_ptr() as *mut pyo3::ffi::PyObject)
+  });
+  // Forget the first instance, since the second instance has taken ownership.
+  std::mem::forget(value);
+  pyo3_val
 }
