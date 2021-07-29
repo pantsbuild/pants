@@ -15,19 +15,12 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    ConsoleScript,
     PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
