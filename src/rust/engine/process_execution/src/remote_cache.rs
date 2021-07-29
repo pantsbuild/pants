@@ -77,7 +77,7 @@ impl CommandRunner {
     };
 
     let endpoint = grpc_util::create_endpoint(
-      &action_cache_address,
+      action_cache_address,
       tls_client_config.as_ref(),
       &mut headers,
     )?;

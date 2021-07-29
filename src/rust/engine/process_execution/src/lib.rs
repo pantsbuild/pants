@@ -521,7 +521,7 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
   let mut hashes: Vec<String> = req
     .0
     .values()
-    .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
+    .map(|process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
     .map(|(_a, _b, er)| {
       er.action_digest
         .map(|d| d.hash)
@@ -533,7 +533,7 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
     hashes
       .iter()
       .fold(String::new(), |mut acc, hash| {
-        acc.push_str(&hash);
+        acc.push_str(hash);
         acc
       })
       .as_bytes(),
@@ -591,7 +591,7 @@ impl CommandRunner for BoundedCommandRunner {
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.inner.0.extract_compatible_request(&req)
+    self.inner.0.extract_compatible_request(req)
   }
 }
 

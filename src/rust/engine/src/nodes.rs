@@ -238,11 +238,11 @@ pub fn lift_directory_digest(digest: &PyObject) -> Result<hashing::Digest, Strin
 }
 
 pub fn lift_file_digest(types: &Types, digest: &PyObject) -> Result<hashing::Digest, String> {
-  if types.file_digest != externs::get_type_for(&digest) {
+  if types.file_digest != externs::get_type_for(digest) {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
-  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
-  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
+  let fingerprint = externs::getattr_as_string(digest, "fingerprint");
+  let digest_length: usize = externs::getattr(digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest::new(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
     digest_length,
@@ -259,10 +259,10 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
-    let env = externs::getattr_from_frozendict(&value, "env");
+    let env = externs::getattr_from_frozendict(value, "env");
 
     let working_directory = {
-      let val = externs::getattr_as_string(&value, "working_directory");
+      let val = externs::getattr_as_string(value, "working_directory");
       if val.is_empty() {
         None
       } else {
@@ -270,23 +270,23 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
+    let py_digest: Value = externs::getattr(value, "input_digest").unwrap();
     let digest =
       lift_directory_digest(&py_digest).map_err(|err| format!("Error parsing digest {}", err))?;
 
-    let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
+    let output_files = externs::getattr::<Vec<String>>(value, "output_files")
       .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::getattr::<Vec<String>>(&value, "output_directories")
+    let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")
       .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds: f64 = externs::getattr(&value, "timeout_seconds").unwrap();
+    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds").unwrap();
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -294,17 +294,17 @@ impl MultiPlatformExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description = externs::getattr_as_string(&value, "description");
-    let py_level: PyObject = externs::getattr(&value, "level").unwrap();
+    let description = externs::getattr_as_string(value, "description");
+    let py_level: PyObject = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(&py_level)?;
 
-    let append_only_caches = externs::getattr_from_frozendict(&value, "append_only_caches")
+    let append_only_caches = externs::getattr_from_frozendict(value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
     let jdk_home = {
-      let val = externs::getattr_as_string(&value, "jdk_home");
+      let val = externs::getattr_as_string(value, "jdk_home");
       if val.is_empty() {
         None
       } else {
@@ -312,10 +312,10 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let is_nailgunnable: bool = externs::getattr(&value, "is_nailgunnable").unwrap();
+    let is_nailgunnable: bool = externs::getattr(value, "is_nailgunnable").unwrap();
 
     let execution_slot_variable = {
-      let s = externs::getattr_as_string(&value, "execution_slot_variable");
+      let s = externs::getattr_as_string(value, "execution_slot_variable");
       if s.is_empty() {
         None
       } else {
@@ -324,11 +324,11 @@ impl MultiPlatformExecuteProcess {
     };
 
     let cache_scope =
-      externs::getattr_as_string(&externs::getattr(&value, "cache_scope").unwrap(), "name")
+      externs::getattr_as_string(&externs::getattr(value, "cache_scope").unwrap(), "name")
         .try_into()?;
 
     Ok(process_execution::Process {
-      argv: externs::getattr(&value, "argv").unwrap(),
+      argv: externs::getattr(value, "argv").unwrap(),
       env,
       working_directory,
       input_files: digest,
@@ -347,7 +347,7 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
+    let raw_constraints = externs::getattr::<Vec<Option<String>>>(value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
       .map(|maybe_plat| match maybe_plat {
@@ -355,7 +355,7 @@ impl MultiPlatformExecuteProcess {
         None => Ok(None),
       })
       .collect::<Result<Vec<_>, _>>()?;
-    let processes = externs::getattr::<Vec<Value>>(&value, "processes")?;
+    let processes = externs::getattr::<Vec<Value>>(value, "processes")?;
     if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -882,7 +882,7 @@ impl DownloadedFile {
     if url.scheme() == "file" {
       return Ok(Box::new(FileDownload::start(url.path(), file_name).await?));
     }
-    Ok(Box::new(NetDownload::start(&core, url, file_name).await?))
+    Ok(Box::new(NetDownload::start(core, url, file_name).await?))
   }
 
   async fn download(

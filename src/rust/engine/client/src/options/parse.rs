@@ -190,7 +190,7 @@ fn format_parse_error(
 }
 
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
-  option_value_parser::string_list_edits(&value)
+  option_value_parser::string_list_edits(value)
     .map_err(|e| format_parse_error("string list", value, e))
 }
 

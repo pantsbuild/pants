@@ -616,7 +616,7 @@ impl<R: Rule> Builder<R> {
             .collect::<Vec<_>>(),
           dependees_by_out_set
         .keys()
-        .map(|out_set| params_str(&out_set))
+        .map(|out_set| params_str(out_set))
         .collect::<Vec<_>>(),
         )
       } else {
@@ -1027,7 +1027,7 @@ impl<R: Rule> Builder<R> {
               );
             }
             errored.entry(node_id).or_insert_with(Vec::new).push(
-              self.render_no_source_of_dependency_error(&graph, &node, dependency_key, edge_refs),
+              self.render_no_source_of_dependency_error(&graph, node, dependency_key, edge_refs),
             );
           }
           _ => {
@@ -1263,7 +1263,7 @@ impl<R: Rule> Builder<R> {
 
       let dependency_key = &edge_ref.weight().0;
       edges_by_dependency_key
-        .get_mut(&dependency_key)
+        .get_mut(dependency_key)
         .unwrap_or_else(|| {
           panic!(
             "{} did not declare a dependency {}, but had an edge for it.",
@@ -1376,7 +1376,7 @@ impl<R: Rule> Builder<R> {
           .map(|(dependency_key, dependency_id)| {
             let dependency_in_set = Self::dependency_in_set(
               node_id,
-              &dependency_key,
+              dependency_key,
               *dependency_id,
               &graph[*dependency_id].0.in_set,
             )
@@ -1444,7 +1444,7 @@ impl<R: Rule> Builder<R> {
         .iter()
         .all(|(_, dependency_id, dependency_in_set)| {
           matches!(graph[*dependency_id].0.node, Node::Param(_))
-            || !minimal_in_set.contains(&dependency_id)
+            || !minimal_in_set.contains(dependency_id)
             || dependency_in_set.difference(&out_set).next().is_none()
         });
       if !out_set_satisfiable {

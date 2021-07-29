@@ -253,7 +253,7 @@ impl<N: Node> InnerGraph<N> {
           Some((i, Duration::from_nanos(-weight as u64)))
         }
       })
-      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(&right_duration))
+      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(right_duration))
     {
       let critical_path = {
         let mut next = paths[index];

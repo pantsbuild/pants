@@ -138,7 +138,7 @@ impl DirectoryMaterializeMetadata {
       }
 
       for (dir, meta) in current.child_directories.iter() {
-        recurse(outputs, path_so_far.join(RelativePath::new(dir)?), &meta)?
+        recurse(outputs, path_so_far.join(RelativePath::new(dir)?), meta)?
       }
       Ok(())
     }
@@ -1135,7 +1135,7 @@ impl Store {
                 e
               )
             })?;
-          f.write_all(&bytes)
+          f.write_all(bytes)
             .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
           Ok(())
         })

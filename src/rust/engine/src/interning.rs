@@ -78,7 +78,7 @@ impl Interns {
     self
       .reverse_keys
       .read()
-      .get(&k)
+      .get(k)
       .cloned()
       .unwrap_or_else(|| {
         // N.B.: This panic is effectively an assertion that `Key::new` is only ever called above in

@@ -226,7 +226,7 @@ pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
 }
 
 pub fn key_to_str(key: &Key) -> String {
-  val_to_str(&val_for(key).as_ref())
+  val_to_str(val_for(key).as_ref())
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {

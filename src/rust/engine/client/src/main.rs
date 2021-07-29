@@ -125,7 +125,7 @@ fn find_pantsd(
     value = option_value.value,
     source = option_value.source
   );
-  let port = pantsd::probe(&working_dir, &metadata_dir)?;
+  let port = pantsd::probe(working_dir, &metadata_dir)?;
   let mut pantsd_settings = client::ConnectionSettings::new(port);
   pantsd_settings.timeout_limit = options_parser
     .parse_float(

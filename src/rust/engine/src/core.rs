@@ -307,13 +307,13 @@ impl AsRef<PyObject> for Value {
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self.as_ref()))
+    write!(f, "{}", externs::val_to_str(self.as_ref()))
   }
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self.as_ref()))
+    write!(f, "{}", externs::val_to_str(self.as_ref()))
   }
 }
 

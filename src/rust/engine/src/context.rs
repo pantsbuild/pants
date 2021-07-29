@@ -217,7 +217,7 @@ impl Core {
       local_execution_root_dir,
       named_caches_dir,
       process_execution_metadata,
-      &exec_strategy_opts,
+      exec_strategy_opts,
     );
 
     // Possibly either add the remote execution runner or the remote cache runner.

@@ -80,7 +80,7 @@ fn match_path_globs(
     Ok(
       paths
         .into_iter()
-        .filter(|p| path_globs.matches(&Path::new(p)))
+        .filter(|p| path_globs.matches(Path::new(p)))
         .collect(),
     )
   })

@@ -76,7 +76,7 @@ impl ByteStore {
     };
 
     let endpoint =
-      grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref(), &mut headers)?;
+      grpc_util::create_endpoint(cas_address, tls_client_config.as_ref(), &mut headers)?;
     let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),

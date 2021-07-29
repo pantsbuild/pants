@@ -347,7 +347,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .expect("size_bytes must be a non-negative number");
           let digest = Digest::new(fingerprint, size_bytes);
           let write_result = store
-            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
+            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
             .await?;
           write_result
             .ok_or_else(|| {
