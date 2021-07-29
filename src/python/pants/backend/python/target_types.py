@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -20,7 +20,6 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address, Addresses
@@ -51,6 +50,10 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pants.backend.python.subsystems.pytest import PyTest
+
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
