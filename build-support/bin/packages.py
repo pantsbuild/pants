@@ -630,6 +630,8 @@ def publish_apple_silicon() -> None:
     banner("Building and publishing an Apple Silicon wheel")
     if os.environ.get("USE_PY39") != "true":
         die("Must set `USE_PY39=true` when building for Apple Silicon.")
+    if os.environ.get("MODE") == "debug":
+        die("Must build Rust in release mode, not debug. Please run `unset MODE`.")
     check_clean_git_branch()
     check_pgp()
     check_roles()
