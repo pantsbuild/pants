@@ -31,24 +31,15 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_FILE = dedent(
-    """
-    FROM python:3.8
-    """
-)
-
-BAD_FILE = dedent(
-    """
-    FROM python
-    """
-)
+GOOD_FILE = "FROM python:3.8"
+BAD_FILE = "FROM python"
 
 
 def run_hadolint(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.docker.lint.hadolint", *(extra_args or ())],
+        extra_args or (),
         env_inherit={"PATH"},
     )
     results = rule_runner.request(
@@ -80,7 +71,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     result = run_hadolint(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert "Dockerfile:2 " in result[0].stdout
+    assert "Dockerfile:1 " in result[0].stdout
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -106,17 +97,19 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Dockerfile.good" not in result[0].stdout
-    assert "Dockerfile.bad:2 " in result[0].stdout
+    assert "Dockerfile.bad:1 " in result[0].stdout
 
 
 def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
+            ".hadolint.yaml": "ignored: [DL3006, DL3011]",
             "a/Dockerfile": BAD_FILE,
             "a/BUILD": "docker_image()",
-            "a/.hadolint.yaml": "ignored: [DL3006]",
             "b/Dockerfile": BAD_FILE,
             "b/BUILD": "docker_image()",
+            "c/BUILD": "docker_image()",
+            "c/Dockerfile": "EXPOSE 123456",
         }
     )
     tgts = [
@@ -124,17 +117,13 @@ def test_config_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("b")),
     ]
     result = run_hadolint(rule_runner, tgts)
-    # We get two runs of hadolint, for the `a` and `b` directories respectively.
-    assert len(result) == 2
+    assert len(result) == 1
     assert result[0].exit_code == 0
     assert "a/Dockerfile" not in result[0].stdout
-    assert "b/Dockerfile:2 " not in result[0].stdout
-    assert result[1].exit_code == 1
-    assert "a/Dockerfile" not in result[1].stdout
-    assert "b/Dockerfile:2 " in result[1].stdout
+    assert "b/Dockerfile " not in result[0].stdout
 
-    tgt = rule_runner.get_target(Address("b"))
-    assert_success(rule_runner, tgt, extra_args=["--hadolint-config=a/.hadolint.yaml"])
+    tgt = rule_runner.get_target(Address("c"))
+    assert_success(rule_runner, tgt, extra_args=["--hadolint-config=.hadolint.yaml"])
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePath
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
@@ -37,6 +36,15 @@ class HadolintRequest(LintRequest):
     field_set_type = HadolintFieldSet
 
 
+def generate_argv(source_files: SourceFiles, hadolint: Hadolint) -> tuple[str, ...]:
+    args = []
+    if hadolint.config:
+        args.append(f"--config={hadolint.config}")
+    args.extend(hadolint.args)
+    args.extend(source_files.files)
+    return tuple(args)
+
+
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResults:
     if hadolint.skip:
@@ -66,57 +74,17 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
             )
         ),
     )
-
-    # As hadolint uses a single config file, we need to partition our runs per config file
-    # discovered.
-    files_with_config = _group_files_with_config(
-        sources.snapshot.files,
-        config_files.snapshot.files,
-        not hadolint.config,
-    )
-    processes = [
+    process_result = await Get(
+        FallibleProcessResult,
         Process(
-            argv=[downloaded_hadolint.exe, *config, *hadolint.args, *files],
+            argv=[downloaded_hadolint.exe, *generate_argv(sources, hadolint)],
             input_digest=input_digest,
-            description=f"Run `hadolint` on {pluralize(len(files), 'Dockerfile')}.",
+            description=f"Run `hadolint` on {pluralize(len(sources.files), 'Dockerfile')}.",
             level=LogLevel.DEBUG,
-        )
-        for files, config in files_with_config
-    ]
-    process_results = await MultiGet(Get(FallibleProcessResult, Process, p) for p in processes)
-    results = [
-        LintResult.from_fallible_process_result(process_result)
-        for process_result in process_results
-    ]
+        ),
+    )
+    results = [LintResult.from_fallible_process_result(process_result)]
     return LintResults(results, linter_name="hadolint")
-
-
-def _group_files_with_config(
-    source_files: tuple[str, ...], config_files: tuple[str, ...], config_files_discovered: bool
-) -> list[tuple[tuple[str, ...], list[str]]]:
-    """If config_files_discovered, group all source files that is in the same directory or below a
-    config file, otherwise, all files will be kept in one group per config file that was provided as
-    option."""
-    groups = []
-    consumed_files: set[str] = set()
-    source_paths = {PurePath(source_file) for source_file in source_files}
-
-    for config_file in config_files:
-        if not config_files_discovered:
-            files = set(source_files)
-        else:
-            config_path = PurePath(config_file).parent
-            files = {str(source) for source in source_paths if config_path in source.parents}
-        if files:
-            # Sort files, to make the order predictable for the tests.
-            groups.append((tuple(sorted(files)), ["--config", config_file]))
-            consumed_files.update(files)
-
-    if len(consumed_files) < len(source_files):
-        files = set(source_files) - consumed_files
-        groups.append((tuple(files), []))
-
-    return groups
 
 
 def rules():
