@@ -424,7 +424,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
-            requirements=setuptools.pex_requirements_with_digest(lockfile_request.hex_digest),
+            requirements=setuptools.pex_requirements(lockfile_request.hex_digest),
             interpreter_constraints=req.interpreter_constraints,
         ),
     )

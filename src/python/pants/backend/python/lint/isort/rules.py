@@ -86,7 +86,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         PexRequest(
             output_filename="isort.pex",
             internal_only=True,
-            requirements=isort.pex_requirements_with_digest(lockfile_request.hex_digest),
+            requirements=isort.pex_requirements(lockfile_request.hex_digest),
             interpreter_constraints=isort.interpreter_constraints,
             main=isort.main,
         ),

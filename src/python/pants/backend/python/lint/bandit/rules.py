@@ -50,7 +50,7 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
         PexRequest(
             output_filename="bandit.pex",
             internal_only=True,
-            requirements=bandit.pex_requirements_with_digest(lockfile_request.hex_digest),
+            requirements=bandit.pex_requirements(lockfile_request.hex_digest),
             interpreter_constraints=partition.interpreter_constraints,
             main=bandit.main,
         ),

@@ -93,7 +93,7 @@ async def package_python_awslambda(
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=lambdex.pex_requirements_with_digest(lockfile_request.hex_digest),
+        requirements=lambdex.pex_requirements(lockfile_request.hex_digest),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )

@@ -113,7 +113,7 @@ async def generate_lockfile(
         PexRequest(
             output_filename="pip_compile.pex",
             internal_only=True,
-            requirements=pip_tools_subsystem.pex_requirements,
+            requirements=pip_tools_subsystem.pex_requirements(),
             interpreter_constraints=req.interpreter_constraints,
             main=pip_tools_subsystem.main,
             description=(

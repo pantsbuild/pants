@@ -97,7 +97,7 @@ async def setup_black(
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
-            requirements=black.pex_requirements_with_digest(lockfile_request.hex_digest),
+            requirements=black.pex_requirements(lockfile_request.hex_digest),
             interpreter_constraints=tool_interpreter_constraints,
             main=black.main,
         ),

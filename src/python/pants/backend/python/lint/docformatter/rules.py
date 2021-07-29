@@ -69,7 +69,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=docformatter.pex_requirements_with_digest(lockfile_request.hex_digest),
+            requirements=docformatter.pex_requirements(lockfile_request.hex_digest),
             interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
         ),
