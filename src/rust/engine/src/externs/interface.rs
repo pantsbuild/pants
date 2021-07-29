@@ -73,7 +73,7 @@ use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{
-  ArtifactOutput, Metric, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
+  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
 };
 
 use crate::{
@@ -87,8 +87,6 @@ py_exception!(native_engine, PollTimeout);
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
     .unwrap();
-
-  m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
   m.add(
     py,
@@ -155,11 +153,6 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, maybe_set_panic_handler()),
   )?;
 
-  m.add(
-    py,
-    "match_path_globs",
-    py_fn!(py, match_path_globs(a: PyObject, b: Vec<String>)),
-  )?;
   m.add(
     py,
     "write_digest",
@@ -307,8 +300,6 @@ py_module_initializer!(native_engine, |py, m| {
     "session_isolated_shallow_clone",
     py_fn!(py, session_isolated_shallow_clone(a: PySession, b: String)),
   )?;
-
-  m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
 
   m.add(
     py,
@@ -1190,10 +1181,6 @@ fn scheduler_shutdown(py: Python, scheduler_ptr: PyScheduler, timeout_secs: u64)
   Ok(None)
 }
 
-fn all_counter_names(_: Python) -> CPyResult<Vec<String>> {
-  Ok(Metric::all_metrics())
-}
-
 fn scheduler_execute(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1597,35 +1584,6 @@ fn lease_files_in_graph(
   })
 }
 
-fn match_path_globs(
-  py: Python,
-  path_globs: PyObject,
-  paths: Vec<String>,
-) -> CPyResult<Vec<String>> {
-  let matches = py
-    .allow_threads(|| {
-      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&path_globs.into())?;
-
-      Ok(
-        paths
-          .into_iter()
-          .map(PathBuf::from)
-          .filter(|pb| path_globs.matches(pb.as_ref()))
-          .collect::<Vec<_>>(),
-      )
-    })
-    .map_err(|e: String| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
-  matches
-    .into_iter()
-    .map(|pb| {
-      pb.into_os_string().into_string().map_err(|s| {
-        PyErr::new::<exc::Exception, _>(py, (format!("Could not decode {:?} as a string.", s),))
-      })
-    })
-    .collect::<Result<Vec<_>, _>>()
-}
-
 fn capture_snapshots(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1832,21 +1790,6 @@ fn write_digest(
       Ok(None)
     })
   })
-}
-
-fn default_cache_path(py: Python) -> CPyResult<String> {
-  fs::default_cache_path()
-    .into_os_string()
-    .into_string()
-    .map_err(|s| {
-      PyErr::new::<exc::Exception, _>(
-        py,
-        (format!(
-          "Default cache path {:?} could not be converted to a string.",
-          s
-        ),),
-      )
-    })
 }
 
 fn stdio_initialize(

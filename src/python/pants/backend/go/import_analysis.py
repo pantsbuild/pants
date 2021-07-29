@@ -6,7 +6,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Dict
 
-import ijson  # type: ignore
+import ijson
 
 from pants.backend.go.distribution import GoLangDistribution
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -18,7 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ def parse_imports_for_golang_distribution(raw_json: bytes) -> Dict[str, str]:
             if "Target" in package_descriptor and "ImportPath" in package_descriptor:
                 import_paths[package_descriptor["ImportPath"]] = package_descriptor["Target"]
         except Exception as ex:
-            _logger.error(
+            logger.error(
                 f"error while parsing package descriptor: {ex}; package_descriptor: {json.dumps(package_descriptor)}"
             )
             raise
@@ -69,6 +69,8 @@ async def analyze_imports_for_golang_distribution(
         goroot.get_request(platform),
     )
 
+    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
+    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
     analyze_script_digest = await Get(
         Digest,
         CreateDigest(

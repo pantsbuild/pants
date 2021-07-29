@@ -23,7 +23,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -34,6 +34,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -705,7 +706,7 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonProvidesField(ScalarField, ProvidesField):
+class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
@@ -722,6 +723,106 @@ class PythonProvidesField(ScalarField, ProvidesField):
     @classmethod
     def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
         return cast(PythonArtifact, super().compute_value(raw_value, address))
+
+
+class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFieldMixin):
+    alias = "entry_points"
+    required = False
+    help = (
+        "Any entry points, such as `console_scripts` and `gui_scripts`.\n"
+        "\n"
+        "Specify as a nested dictionary, with a dictionary for each type of entry point, "
+        "e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to "
+        'either a setuptools entry point ("path.to.module:func") or a Pants target address to a '
+        "pex_binary target.\n\n"
+        + dedent(
+            """\
+            Example:
+
+                entry_points={
+                  "console_scripts": {
+                    "my-script": "project.app:main",
+                    "another-script": "project/subdir:pex_binary_tgt"
+                  }
+                }
+
+            """
+        )
+        + "Note that Pants will assume that any value that either starts with `:` or has `/` in it, "
+        "is a target address to a pex_binary target. Otherwise, it will assume it's a setuptools "
+        "entry point as defined by "
+        "https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use "
+        "`//` as a prefix for target addresses if you need to disambiguate.\n\n"
+        + dedent(
+            """\
+            Pants will attempt to infer dependencies, which you can confirm by running:
+
+                ./pants dependencies <python_distribution target address>
+
+            """
+        )
+    )
+
+
+@dataclass(frozen=True)
+class PythonDistributionEntryPoint:
+    """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
+
+    entry_point: EntryPoint
+    pex_binary_address: Optional[Address]
+
+
+# See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
+@dataclass(frozen=True)
+class ResolvedPythonDistributionEntryPoints:
+    # E.g. {"console_scripts": {"ep": PythonDistributionEntryPoint(...)}}.
+    val: FrozenDict[str, FrozenDict[str, PythonDistributionEntryPoint]] = FrozenDict()
+
+    @property
+    def explicit_modules(self) -> FrozenDict[str, FrozenDict[str, EntryPoint]]:
+        """Filters out all entry points from pex binary targets."""
+        return FrozenDict(
+            {
+                category: FrozenDict(
+                    {
+                        ep_name: ep_val.entry_point
+                        for ep_name, ep_val in entry_points.items()
+                        if not ep_val.pex_binary_address
+                    }
+                )
+                for category, entry_points in self.val.items()
+            }
+        )
+
+    @property
+    def pex_binary_addresses(self) -> Addresses:
+        """Returns the addresses to all pex binary targets owning entry points used."""
+        return Addresses(
+            ep_val.pex_binary_address
+            for category, entry_points in self.val.items()
+            for ep_val in entry_points.values()
+            if ep_val.pex_binary_address
+        )
+
+
+@dataclass(frozen=True)
+class ResolvePythonDistributionEntryPointsRequest:
+    """Looks at the entry points to see if it is a setuptools entry point, or a BUILD target address
+    that should be resolved into a setuptools entry point.
+
+    If the `entry_points_field` is present, inspect the specified entry points.
+    If the `provides_field` is present, inspect the `provides_field.kwargs["entry_points"]`.
+
+    This is to support inspecting one or the other depending on use case, using the same
+    logic for resolving pex_binary addresses etc.
+    """
+
+    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
+    provides_field: Optional[PythonProvidesField] = None
+
+    def __post_init__(self):
+        # Must provide at least one of these fields.
+        assert self.entry_points_field or self.provides_field
 
 
 class SetupPyCommandsField(StringSequenceField):
@@ -742,6 +843,7 @@ class PythonDistribution(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonDistributionDependencies,
+        PythonDistributionEntryPointsField,
         PythonProvidesField,
         SetupPyCommandsField,
     )

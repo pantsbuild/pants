@@ -59,13 +59,18 @@ class CoursierBinary(TemplatedExternalTool):
 
     default_version = "v2.0.13"
     default_known_versions = [
-        "v2.0.13|linux|1ae089789cc4b0a4d296d6852b760d7f8bf72805267a6b7571e99b681d5e13b4|59652208",
-        "v2.0.13|darwin|d74b8fe4ffc2f4e9011d7151722fc8b5ffca8a72b3bc4188c61df3326228c4ef|57625024",
+        "v2.0.13|linux_x86_64|1ae089789cc4b0a4d296d6852b760d7f8bf72805267a6b7571e99b681d5e13b4|59652208",
+        "v2.0.13|macos_arm64 |d74b8fe4ffc2f4e9011d7151722fc8b5ffca8a72b3bc4188c61df3326228c4ef|57625024",
+        "v2.0.13|macos_x86_64|d74b8fe4ffc2f4e9011d7151722fc8b5ffca8a72b3bc4188c61df3326228c4ef|57625024",
     ]
     default_url_template = (
         "https://github.com/coursier/coursier/releases/download/{version}/cs-{platform}"
     )
-    default_url_platform_mapping = {"darwin": "x86_64-apple-darwin", "linux": "x86_64-pc-linux"}
+    default_url_platform_mapping = {
+        "macos_arm64": "x86_64-apple-darwin",
+        "macos_x86_64": "x86_64-apple-darwin",
+        "linux_x86_64": "x86_64-pc-linux",
+    }
 
 
 @dataclass(frozen=True)

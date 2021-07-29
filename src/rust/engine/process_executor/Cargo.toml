@@ -15,7 +15,7 @@ futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
-prost = "0.7"
+prost = "0.8"
 shlex = "0.1.1"
 store = { path = "../fs/store" }
 structopt = "0.3.20"

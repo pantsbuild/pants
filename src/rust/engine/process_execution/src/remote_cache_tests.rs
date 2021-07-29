@@ -611,7 +611,7 @@ async fn make_action_result_basic() {
     stderr_digest: TestData::robin().digest(),
     output_directory: directory_digest,
     exit_code: 102,
-    platform: Platform::Linux,
+    platform: Platform::Linux_x86_64,
     metadata: ProcessResultMetadata::default(),
   };
 

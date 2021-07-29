@@ -30,15 +30,20 @@
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::iter::FromIterator;
 use std::str::FromStr;
 
-use http::header::USER_AGENT;
+use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
+use either::Either;
+use http::header::{HeaderName, USER_AGENT};
+use http::{HeaderMap, HeaderValue};
+use itertools::Itertools;
 use tokio_rustls::rustls::ClientConfig;
-use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
 use tower::ServiceBuilder;
 
+pub mod headers;
 pub mod hyper;
 pub mod prost;
 pub mod retry;
@@ -46,10 +51,15 @@ pub mod retry;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = ConcurrencyLimit<Channel>;
+pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<Channel>>;
 
-pub fn layered_service(channel: Channel, concurrency_limit: usize) -> LayeredService {
+pub fn layered_service(
+  channel: Channel,
+  concurrency_limit: usize,
+  http_headers: HeaderMap,
+) -> LayeredService {
   ServiceBuilder::new()
+    .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .service(channel)
 }
@@ -124,47 +134,32 @@ pub fn create_tls_config(root_ca_certs: Option<Vec<u8>>) -> Result<ClientConfig,
   Ok(tls_config)
 }
 
-pub fn headers_to_metadata_map(headers: &BTreeMap<String, String>) -> Result<MetadataMap, String> {
-  let mut metadata_map = MetadataMap::with_capacity(headers.len());
-  for (key, value) in headers {
-    let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
-      format!(
-        "Header key `{}` must be an ASCII value (as required by gRPC).",
-        key
-      )
-    })?;
-    let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
-      format!(
-        "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
-        value, key
-      )
-    })?;
-    metadata_map.insert(key_ascii, value_ascii);
-  }
-  Ok(metadata_map)
-}
+pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
+  let http_headers = headers
+    .iter()
+    .map(|(key, value)| {
+      let header_name = HeaderName::from_str(&key)
+        .map_err(|err| format!("Invalid header name {}: {}", key, err))?;
 
-pub fn headers_to_interceptor_fn(
-  headers: &BTreeMap<String, String>,
-) -> Result<
-  impl Fn(tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> + Send + Sync + 'static,
-  String,
-> {
-  let metadata_map = headers_to_metadata_map(headers)?;
-  Ok(move |mut req: tonic::Request<()>| {
-    let req_metadata = req.metadata_mut();
-    for kv_ref in metadata_map.iter() {
-      match kv_ref {
-        KeyAndValueRef::Ascii(key, value) => {
-          req_metadata.insert(key, value.clone());
-        }
-        KeyAndValueRef::Binary(key, value) => {
-          req_metadata.insert_bin(key, value.clone());
-        }
-      }
-    }
-    Ok(req)
-  })
+      let header_value = HeaderValue::from_str(&value)
+        .map_err(|err| format!("Invalid header value {}: {}", value, err))?;
+
+      Ok((header_name, header_value))
+    })
+    .collect::<Vec<Result<(HeaderName, HeaderValue), String>>>();
+
+  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = http_headers
+    .into_iter()
+    .partition_map(|result| match result {
+      Ok(v) => Either::Left(v),
+      Err(err) => Either::Right(err),
+    });
+
+  if !errors.is_empty() {
+    return Err(format!("header conversion errors: {}", errors.join("; ")));
+  }
+
+  Ok(HeaderMap::from_iter(http_headers))
 }
 
 pub fn status_to_str(status: tonic::Status) -> String {

@@ -10,7 +10,10 @@ import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import InterpreterConstraintsField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import (
+    InterpreterConstraints,
+    _not_in_contiguous_range,
+)
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
@@ -177,7 +180,11 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
 def test_interpreter_constraints_minimum_python_version(
     constraints: List[str], expected: str
 ) -> None:
-    assert InterpreterConstraints(constraints).minimum_python_version() == expected
+    universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ics = InterpreterConstraints(constraints)
+    assert ics.minimum_python_version(universe) == expected
+    assert ics.minimum_python_version(reversed(universe)) == expected
+    assert ics.minimum_python_version(sorted(universe)) == expected
 
 
 @pytest.mark.parametrize(
@@ -194,7 +201,11 @@ def test_interpreter_constraints_minimum_python_version(
     ],
 )
 def test_interpreter_constraints_require_python38(constraints) -> None:
-    assert InterpreterConstraints(constraints).requires_python38_or_newer() is True
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.requires_python38_or_newer(universe) is True
+    assert ics.requires_python38_or_newer(reversed(universe)) is True
+    assert ics.requires_python38_or_newer(sorted(universe)) is True
 
 
 @pytest.mark.parametrize(
@@ -211,7 +222,11 @@ def test_interpreter_constraints_require_python38(constraints) -> None:
     ],
 )
 def test_interpreter_constraints_do_not_require_python38(constraints):
-    assert InterpreterConstraints(constraints).requires_python38_or_newer() is False
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.requires_python38_or_newer(universe) is False
+    assert ics.requires_python38_or_newer(reversed(universe)) is False
+    assert ics.requires_python38_or_newer(sorted(universe)) is False
 
 
 def test_group_field_sets_by_constraints() -> None:
@@ -262,4 +277,58 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
         MockFieldSet.create_for_test(
             Address("src/python/c_dir/path.py", target_name="test"), "==3.6.*"
         ),
+    )
+
+
+@pytest.mark.parametrize(
+    "nums,expected",
+    (
+        ([0, 1, 2], []),
+        ([0, 2], [1]),
+        ([0, 1, 2, 4], [3]),
+        ([0, 1, 4], [2, 3]),
+        ([1, 4], [2, 3]),
+        ([1, 2, 3, 4], []),
+    ),
+)
+def test_not_in_contiguous_range(nums, expected) -> None:
+    assert _not_in_contiguous_range(nums) == expected
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        # Input constraints already are for a single interpreter version.
+        (["==3.7.5"], [["==3.7.5"]]),
+        (["==3.7.*"], [["==3.7.*"]]),
+        ([">=3.7,<3.8"], [["==3.7.*"]]),
+        ([">=3.7.5,<3.7.7"], [[">=3.7.5,<=3.7.6"]]),
+        ([">=3.7.5,<3.8"], [[">=3.7.5,<3.8"]]),
+        ([">=3.7.5,<3.8,!=3.7.7"], [[">=3.7.5,<3.8,!=3.7.7"]]),
+        ([">=3.7.5,<3.7.12,!=3.7.7,!=3.7.8"], [[">=3.7.5,<=3.7.11,!=3.7.7,!=3.7.8"]]),
+        # Input constraints are for multiple interpreters, but only a single constraint.
+        ([">=3.7,<3.9"], [["==3.7.*"], ["==3.8.*"]]),
+        ([">=3.7.5,<3.9.2,!=3.8.0"], [[">=3.7.5,<3.8"], [">=3.8.1,<3.9"], [">=3.9,<=3.9.1"]]),
+        # Input constraints have multiple elements, which get ORed, but each is for a single
+        # interpreter version.
+        (["==3.7.5", "==3.8.6"], [["==3.7.5"], ["==3.8.6"]]),
+        (["==3.7.*", "==3.8.*"], [["==3.7.*"], ["==3.8.*"]]),
+        ([">=3.7.5,<3.8", ">=3.9.5,<3.10"], [[">=3.7.5,<3.8"], [">=3.9.5,<3.10"]]),
+        (["==2.7.*", ">=3.6,<3.8"], [["==2.7.*"], ["==3.6.*"], ["==3.7.*"]]),
+        ([">=2.7.4,<2.7.7", "==2.7.5"], [[">=2.7.4,<=2.7.6"]]),
+    ),
+)
+def test_partition_by_major_minor_version(
+    constraints: list[str], expected: list[list[str]]
+) -> None:
+    ics = InterpreterConstraints(constraints)
+    universe = ("2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11")
+    assert ics.partition_by_major_minor_versions(universe) == tuple(
+        InterpreterConstraints(x) for x in expected
+    )
+    assert ics.partition_by_major_minor_versions(reversed(universe)) == tuple(
+        InterpreterConstraints(x) for x in expected
+    )
+    assert ics.partition_by_major_minor_versions(sorted(universe)) == tuple(
+        InterpreterConstraints(x) for x in expected
     )

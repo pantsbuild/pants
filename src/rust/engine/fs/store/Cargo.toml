@@ -15,22 +15,25 @@ fs = { path = ".." }
 futures = "0.3"
 glob = "0.2.11"
 hashing = { path = "../../hashing" }
+http = "0.2"
+http-body = "0.4"
 indexmap = "1.4"
-itertools = "0.7.2"
+itertools = "0.10"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
 madvise = "0.1"
 memmap = "0.7"
 parking_lot = "0.11"
-prost = "0.7"
-prost-types = "0.7"
+prost = "0.8"
+prost-types = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.22"
-tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }

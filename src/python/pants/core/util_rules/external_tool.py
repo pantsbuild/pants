@@ -66,8 +66,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         options_scope = "my-external-tool"
         default_version = "1.2.3"
         default_known_versions = [
-          "1.2.3|darwin|deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
-          "1.2.3|linux |1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
+          "1.2.3|linux_x86_64|cafebabacafebabacafebabacafebabacafebabacafebabacafebabacafebaba|878986",
+          "1.2.3|macos_arm64 |deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
+          "1.2.3|macos_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
         ]
 
         version_constraints = ">=1.2.3, <2.0"
@@ -139,7 +140,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
               - `length` is the expected length of the download file in bytes, as emmitted by
                 `wc -c`
 
-            E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+            E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
             Values are space-stripped, so pipes can be indented for readability if necessary.
             """
@@ -208,7 +209,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
                     f"Bad value for --known-versions (see {self.options.pants_bin_name} "
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
-            if plat_val == plat.value and ver == self.version:
+            if plat.matches(plat_val) and ver == self.version:
                 digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
                     url = self.generate_url(plat)
@@ -261,8 +262,9 @@ class TemplatedExternalTool(ExternalTool):
 
     default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
     default_url_platform_mapping = {
-        "darwin": "osx",
-        "linux": "linux",
+        "macos_x86_64": "osx_intel",
+        "macos_arm64": "osx_arm",
+        "linux_x86_64": "linux",
     }
 
     The platform mapping dict is optional.
@@ -301,8 +303,8 @@ class TemplatedExternalTool(ExternalTool):
                 "to download the tool.\n\nIn --url-template, anytime the `{platform}` string is "
                 "used, Pants will determine the current platform, and substitute `{platform}` with "
                 "the respective value from your dictionary.\n\nFor example, if you define "
-                '`{"darwin": "apple-darwin", "linux": "unknown-linux"}, and run Pants on '
-                "Linux, then `{platform}` will be substituted in the --url-template option with "
+                '`{"macos_x86_64": "apple-darwin", "linux_x86_64": "unknown-linux"}, and run Pants on '
+                "Linux with an intel architecture, then `{platform}` will be substituted in the --url-template option with "
                 "unknown-linux."
             ),
         )
@@ -313,7 +315,17 @@ class TemplatedExternalTool(ExternalTool):
 
     @property
     def url_platform_mapping(self) -> Optional[Dict[str, str]]:
-        return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
+        upm = self.options.url_platform_mapping
+        if "linux" in upm or "darwin" in upm:
+            Platform.deprecated_due_to_no_architecture()
+            if "linux" in upm:
+                upm["linux_x86_64"] = upm["linux"]
+                del upm["linux"]
+            if "darwin" in upm:
+                upm["macos_x86_64"] = upm["darwin"]
+                del upm["darwin"]
+
+        return cast(Optional[Dict[str, str]], upm)
 
     def generate_url(self, plat: Platform):
         platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""

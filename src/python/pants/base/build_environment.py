@@ -3,10 +3,11 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine_pyo3
 from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
@@ -28,12 +29,23 @@ def get_buildroot() -> str:
 
 def get_pants_cachedir() -> str:
     """Return the Pants global cache directory."""
-    return native_engine.default_cache_path()
+    return native_engine_pyo3.default_cache_path()
 
 
 def get_default_pants_config_file() -> str:
     """Return the default location of the Pants config file."""
     return os.path.join(get_buildroot(), "pants.toml")
+
+
+def is_in_container() -> bool:
+    """Return true if this process is likely running inside of a container."""
+    # https://stackoverflow.com/a/49944991/38265 and https://github.com/containers/podman/issues/3586
+    cgroup = Path("/proc/self/cgroup")
+    return (
+        Path("/.dockerenv").exists()
+        or Path("/run/.containerenv").exists()
+        or (cgroup.exists() and "docker" in cgroup.read_text("utf-8"))
+    )
 
 
 _Git: Optional[Git] = None

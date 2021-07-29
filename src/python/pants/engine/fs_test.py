@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Set
+from typing import Callable, Iterable, List, Optional, Set
 
 import pytest
 
@@ -38,6 +38,8 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine_pyo3 import PyDigest as DigestPyO3
+from pants.engine.internals.native_engine_pyo3 import PySnapshot as SnapshotPyO3
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -1006,18 +1008,98 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Comparison and representation of Digests
+# Native types
 # -----------------------------------------------------------------------------------------------
 
 
-def test_digest_repr() -> None:
-    assert (
-        str(Digest("f" * 64, 1))
-        == "Digest('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 1)"
+@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
+def test_digest_properties(cls) -> None:
+    digest = cls("a" * 64, 1000)
+    assert digest.fingerprint == "a" * 64
+    assert digest.serialized_bytes_length == 1000
+
+
+@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
+def test_digest_repr(cls) -> None:
+    assert str(cls("a" * 64, 1)) == f"Digest({repr('a' * 64)}, 1)"
+
+
+@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
+def test_digest_hash(cls) -> None:
+    assert hash(cls("a" * 64, 1)) == -6148914691236517206
+    assert hash(cls("b" * 64, 1)) == -4919131752989213765
+    # Note that the size bytes is not considered in the hash.
+    assert hash(cls("a" * 64, 1000)) == -6148914691236517206
+
+
+@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
+def test_digest_equality(cls) -> None:
+    digest = cls("a" * 64, 1)
+    assert digest == cls("a" * 64, 1)
+    assert digest != cls("a" * 64, 1000)
+    assert digest != cls("0" * 64, 1)
+    with pytest.raises(TypeError):
+        digest < digest
+
+
+@pytest.mark.parametrize(
+    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
+)
+def test_snapshot_properties(snapshot_cls, digest_cls) -> None:
+    digest = digest_cls("a" * 64, 1000)
+    snapshot = snapshot_cls._create_for_testing(digest, ["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot.digest == digest
+    assert snapshot.files == ("f.ext", "dir/f.ext")
+    assert snapshot.dirs == ("dir",)
+
+
+@pytest.mark.parametrize(
+    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
+)
+def test_snapshot_hash(snapshot_cls, digest_cls) -> None:
+    def assert_hash(
+        expected: int,
+        *,
+        digest_char: str = "a",
+        files: Optional[List[str]] = None,
+        dirs: Optional[List[str]] = None,
+    ) -> None:
+        digest = digest_cls(digest_char * 64, 1000)
+        snapshot = snapshot_cls._create_for_testing(
+            digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"]
+        )
+        assert hash(snapshot) == expected
+
+    # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
+    assert_hash(-6148914691236517206)
+    assert_hash(-6148914691236517206, files=["f.ext"])
+    assert_hash(-6148914691236517206, dirs=["foo"])
+    assert_hash(-6148914691236517206, dirs=["foo"])
+    assert_hash(-4919131752989213765, digest_char="b")
+
+
+@pytest.mark.parametrize(
+    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
+)
+def test_snapshot_equality(snapshot_cls, digest_cls) -> None:
+    # Only the digest is used for equality.
+    snapshot = snapshot_cls._create_for_testing(
+        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
-
-
-def test_digest_equality() -> None:
-    assert Digest("f" * 64, 1) == Digest("f" * 64, 1)
-    assert Digest("f" * 64, 1) != Digest("f" * 64, 1000)
-    assert Digest("f" * 64, 1) != Digest("0" * 64, 1)
+    assert snapshot == snapshot_cls._create_for_testing(
+        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    assert snapshot == snapshot_cls._create_for_testing(
+        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
+    )
+    assert snapshot == snapshot_cls._create_for_testing(
+        digest_cls("a" * 64, 1000), ["f.ext"], ["dir"]
+    )
+    assert snapshot != snapshot_cls._create_for_testing(
+        digest_cls("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    assert snapshot != snapshot_cls._create_for_testing(
+        digest_cls("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    with pytest.raises(TypeError):
+        snapshot < snapshot

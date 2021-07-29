@@ -36,7 +36,7 @@ use tonic::{Request, Response, Status};
 /// Represents an expected API call from the REv2 client. The data carried by each enum
 /// variant are the parameters to verify and the results to return to the client.
 ///
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[allow(clippy::large_enum_variant)] // GetActionResult variant is larger than others
 pub enum ExpectedAPICall {
   Execute {
@@ -64,7 +64,7 @@ pub enum ExpectedAPICall {
 /// client. If the duration is not None, it represents a delay before either responding or
 /// canceling for the operation.
 ///
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct MockOperation {
   pub op: Result<Option<Operation>, Status>,
   pub duration: Option<Duration>,
@@ -182,7 +182,7 @@ impl Drop for TestServer {
             .mock_execution
             .expected_api_calls
             .lock()
-            .clone(),
+            .deref(),
         )),
         MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
       );

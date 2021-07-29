@@ -28,7 +28,6 @@ from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
-
 # --------------------------------------------------------------------------------------
 # Generic lockfile generation
 # --------------------------------------------------------------------------------------
@@ -72,10 +71,24 @@ class PythonLockfileRequest:
     description: str
 
     @classmethod
-    def from_tool(cls, subsystem: PythonToolRequirementsBase) -> PythonLockfileRequest:
+    def from_tool(
+        cls,
+        subsystem: PythonToolRequirementsBase,
+        interpreter_constraints: InterpreterConstraints | None = None,
+    ) -> PythonLockfileRequest:
+        """Create a request for a dedicated lockfile for the tool.
+
+        If the tool determines its interpreter constraints by using the constraints of user code,
+        rather than the option `--interpreter-constraints`, you must pass the arg
+        `interpreter_constraints`.
+        """
         return cls(
             requirements=FrozenOrderedSet(subsystem.all_requirements),
-            interpreter_constraints=subsystem.interpreter_constraints,
+            interpreter_constraints=(
+                interpreter_constraints
+                if interpreter_constraints is not None
+                else subsystem.interpreter_constraints
+            ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
         )

@@ -307,8 +307,6 @@ class RuleRunner:
     ) -> str:
         """Writes to a file under the buildroot.
 
-        :API: public
-
         relpath: The relative path to the file from the build root.
         contents: A string containing the contents of the file - '' by default..
         mode: The mode to write to the file in - over-write by default.
@@ -322,10 +320,8 @@ class RuleRunner:
     def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
-        :API: public
-
-         path: The relative path to the file from the build root.
-         files: List of file names.
+        path: The relative path to the file from the build root.
+        files: List of file names.
         """
         for f in files:
             self.create_file(os.path.join(path, f), contents=f)
@@ -334,8 +330,6 @@ class RuleRunner:
         self, relpath: str | PurePath, target: str, *, overwrite: bool = False
     ) -> str:
         """Adds the given target specification to the BUILD file at relpath.
-
-        :API: public
 
         relpath: The relative path to the BUILD file from the build root.
         target:  A string containing the target definition as it would appear in a BUILD file.

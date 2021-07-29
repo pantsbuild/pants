@@ -80,8 +80,10 @@ async def setup_black(
     tool_interpreter_constraints = (
         all_interpreter_constraints
         if (
-            all_interpreter_constraints.requires_python38_or_newer()
-            and black.options.is_default("interpreter_constraints")
+            black.options.is_default("interpreter_constraints")
+            and all_interpreter_constraints.requires_python38_or_newer(
+                python_setup.interpreter_universe
+            )
         )
         else black.interpreter_constraints
     )

@@ -92,8 +92,9 @@ class PythonInferSubsystem(Subsystem):
             default=True,
             type=bool,
             help=(
-                "Infer dependencies on binary targets' entry points, e.g. `pex_binary`'s "
-                "`entry_point` field and `python_awslambda`'s `handler` field."
+                "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
+                "`entry_point` field, `python_awslambda`'s `handler` field and "
+                "`python_distribution`'s `entry_points` field."
             ),
         )
 

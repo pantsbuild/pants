@@ -16,6 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.memo import memoized_method
 from pants.util.osutil import CPU_COUNT
 
@@ -26,6 +27,8 @@ class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
+    default_interpreter_constraints = ["CPython>=3.6"]
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -33,7 +36,7 @@ class PythonSetup(Subsystem):
             "--interpreter-constraints",
             advanced=True,
             type=list,
-            default=["CPython>=3.6"],
+            default=PythonSetup.default_interpreter_constraints,
             metavar="<requirement>",
             help=(
                 "The Python interpreters your codebase is compatible with.\n\nSpecify with "
@@ -41,6 +44,26 @@ class PythonSetup(Subsystem):
                 ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
                 "constraint strings will be ORed together.\n\nThese constraints are used as the "
                 "default value for the `interpreter_constraints` field of Python targets."
+            ),
+        )
+        register(
+            "--interpreter-versions-universe",
+            advanced=True,
+            type=list,
+            default=["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            help=(
+                "All known Python major/minor interpreter versions that may be used by either "
+                "your code or tools used by your code.\n\n"
+                "This is used by Pants to robustly handle interpreter constraints, such as knowing "
+                "when generating lockfiles which Python versions to check if your code is "
+                "using.\n\n"
+                "This does not control which interpreter your code will use. Instead, to set your "
+                "interpreter constraints, update `[python-setup].interpreter_constraints`, the "
+                "`interpreter_constraints` field, and relevant tool options like "
+                "`[isort].interpreter_constraints` to tell Pants which interpreters your code "
+                f"actually uses. See {doc_url('python-interpreter-compatibility')}.\n\n"
+                "All elements must be the minor and major Python version, e.g. '2.7' or '3.10'. Do "
+                "not include the patch version.\n\n"
             ),
         )
         register(
@@ -148,6 +171,10 @@ class PythonSetup(Subsystem):
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
+
+    @property
+    def interpreter_universe(self) -> tuple[str, ...]:
+        return tuple(self.options.interpreter_versions_universe)
 
     @property
     def requirement_constraints(self) -> str | None:

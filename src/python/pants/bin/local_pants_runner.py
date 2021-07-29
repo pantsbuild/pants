@@ -253,7 +253,9 @@ class LocalPantsRunner:
                 options_bootstrapper=self.options_bootstrapper,
                 callbacks=self._get_workunits_callbacks(),
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
-                pantsd=global_options.pantsd,
+                allow_async_completion=(
+                    global_options.pantsd and global_options.streaming_workunits_complete_async
+                ),
             )
             with streaming_reporter:
                 engine_result = PANTS_FAILED_EXIT_CODE

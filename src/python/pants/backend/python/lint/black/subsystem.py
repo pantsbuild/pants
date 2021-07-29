@@ -10,13 +10,19 @@ from pants.backend.experimental.python.lockfile import (
     PythonLockfileRequest,
     PythonToolLockfileSentinel,
 )
+from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
+from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 
 
 class Black(PythonToolBase):
@@ -32,7 +38,8 @@ class Black(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
-    default_lockfile_url = git_url("src/python/pants/backend/python/lint/black/lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
@@ -107,9 +114,23 @@ class BlackLockfileSentinel(PythonToolLockfileSentinel):
     pass
 
 
-@rule
-def setup_black_lockfile(_: BlackLockfileSentinel, black: Black) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(black)
+@rule(
+    desc="Determine if Black should use Python 3.8+",
+    level=LogLevel.DEBUG,
+)
+async def setup_black_lockfile(
+    _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
+) -> PythonLockfileRequest:
+    constraints = black.interpreter_constraints
+    if black.options.is_default("interpreter_constraints"):
+        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        code_constraints = InterpreterConstraints.create_from_targets(
+            (tgt for tgt in all_build_targets if not tgt.get(SkipBlackField).value), python_setup
+        )
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+            constraints = code_constraints
+
+    return PythonLockfileRequest.from_tool(black, constraints)
 
 
 def rules():

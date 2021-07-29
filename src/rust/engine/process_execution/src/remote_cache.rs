@@ -11,7 +11,7 @@ use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::{
-  headers_to_interceptor_fn, layered_service, retry::retry_call, status_to_str, LayeredService,
+  headers_to_http_header_map, layered_service, retry::retry_call, status_to_str, LayeredService,
 };
 use hashing::Digest;
 use parking_lot::Mutex;
@@ -81,15 +81,13 @@ impl CommandRunner {
       tls_client_config.as_ref(),
       &mut headers,
     )?;
+    let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
+      http_headers,
     );
-    let action_cache_client = Arc::new(if headers.is_empty() {
-      ActionCacheClient::new(channel)
-    } else {
-      ActionCacheClient::with_interceptor(channel, headers_to_interceptor_fn(&headers)?)
-    });
+    let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
     Ok(CommandRunner {
       underlying,
@@ -440,29 +438,20 @@ impl CommandRunner {
   async fn update_action_cache(
     &self,
     context: &Context,
-    request: &Process,
     result: &FallibleProcessResultWithPlatform,
     metadata: &ProcessMetadata,
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
   ) -> Result<(), String> {
-    // Upload the action (and related data, i.e. the embedded command and input files).
-    // Assumption: The Action and related data has already been stored locally.
-    in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| crate::remote::ensure_action_uploaded(
-        &self.store,
-        command_digest,
-        action_digest,
-        request.input_files,
-      ),
+    // Upload the Action and Command, but not the input files. See #12432.
+    // Assumption: The Action and Command have already been stored locally.
+    crate::remote::ensure_action_uploaded(
+      context,
+      &self.store,
+      command_digest,
+      action_digest,
+      None,
     )
     .await?;
 
@@ -618,7 +607,6 @@ impl crate::CommandRunner for CommandRunner {
           let write_result = command_runner
             .update_action_cache(
               &context2,
-              &request,
               &result,
               &command_runner.metadata,
               &command,

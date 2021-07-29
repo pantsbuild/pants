@@ -80,8 +80,11 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
 
 
 @dataclass(frozen=True)
-class SiblingAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located directly within the given directory."""
+class MaybeEmptySiblingAddresses(AddressGlobSpec):
+    """An AddressSpec representing all addresses located directly within the given directory.
+
+    It is not an error if there are no such addresses.
+    """
 
     directory: str
 
@@ -95,12 +98,34 @@ class SiblingAddresses(AddressGlobSpec):
         self, address_families_dict: Mapping[str, "AddressFamily"]
     ) -> Tuple["AddressFamily", ...]:
         maybe_af = address_families_dict.get(self.directory)
-        if maybe_af is None:
+        return (maybe_af,) if maybe_af is not None else ()
+
+
+@dataclass(frozen=True)
+class SiblingAddresses(MaybeEmptySiblingAddresses):
+    """An AddressSpec representing all addresses located directly within the given directory.
+
+    At least one such address must exist.
+    """
+
+    def matching_address_families(
+        self, address_families_dict: Mapping[str, "AddressFamily"]
+    ) -> Tuple["AddressFamily", ...]:
+        address_families_tuple = super().matching_address_families(address_families_dict)
+        if not address_families_tuple:
             raise ResolveError(
                 f"Path '{self.directory}' does not contain any BUILD files, but '{self}' expected "
                 "matching targets there."
             )
-        return (maybe_af,)
+        return address_families_tuple
+
+    def matching_addresses(
+        self, address_families: Sequence["AddressFamily"]
+    ) -> Sequence[Tuple[Address, TargetAdaptor]]:
+        matching = super().matching_addresses(address_families)
+        if len(matching) == 0:
+            raise ResolveError(f"Address spec '{self}' does not match any targets.")
+        return matching
 
 
 @dataclass(frozen=True)

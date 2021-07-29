@@ -35,6 +35,7 @@ from pants.backend.python.goals.setup_py import (
     get_owned_dependencies,
     get_requirements,
     get_sources,
+    merge_entry_points,
     validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -214,6 +215,47 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
     )
 
 
+def test_merge_entry_points() -> None:
+    sources = {
+        "src/python/foo:foo-dist `entry_points`": {
+            "console_scripts": {"foo_tool": "foo.bar.baz:Tool.main"},
+            "foo_plugins": {"qux": "foo.qux"},
+        },
+        "src/python/foo:foo-dist `provides.entry_points`": {
+            "console_scripts": {"foo_qux": "foo.baz.qux"},
+            "foo_plugins": {"foo-bar": "foo.bar:plugin"},
+        },
+        "src/python/foo:foo-dist `provides.with_binaries()`": {
+            "console_scripts": {"foo_main": "foo.qux.bin:main"},
+        },
+    }
+    expect = {
+        "console_scripts": {
+            "foo_tool": "foo.bar.baz:Tool.main",
+            "foo_qux": "foo.baz.qux",
+            "foo_main": "foo.qux.bin:main",
+        },
+        "foo_plugins": {
+            "qux": "foo.qux",
+            "foo-bar": "foo.bar:plugin",
+        },
+    }
+    assert merge_entry_points(*list(sources.items())) == expect
+
+    conflicting_sources = {
+        "src/python/foo:foo-dist `entry_points`": {"console_scripts": {"my-tool": "ep1"}},
+        "src/python/foo:foo-dist `provides.entry_points`": {"console_scripts": {"my-tool": "ep2"}},
+    }
+
+    err_msg = (
+        "Multiple entry_points registered for console_scripts my-tool in: "
+        "src/python/foo:foo-dist `entry_points`, "
+        "src/python/foo:foo-dist `provides.entry_points`"
+    )
+    with pytest.raises(ValueError, match=err_msg):
+        merge_entry_points(*list(conflicting_sources.items()))
+
+
 def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     chroot_rule_runner.add_to_build_file(
         "src/python/foo/bar/baz",
@@ -304,7 +346,96 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
             "install_requires": ("baz==1.1.1",),
-            "entry_points": {"console_scripts": ["foo_main=foo.qux.bin:main"]},
+            "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
+        },
+        Address("src/python/foo", target_name="foo-dist"),
+    )
+
+
+def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo/qux",
+        textwrap.dedent(
+            """
+            python_library()
+
+            pex_binary(name="bin", entry_point="foo.qux.bin:main")
+            """
+        ),
+    )
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name='foo-dist',
+                entry_points={
+                    "console_scripts":{
+                        "foo_tool":"foo.bar.baz:Tool.main",
+                        "bin_tool":"//src/python/foo/qux:bin",
+                        "bin_tool2":"src/python/foo/qux:bin",
+                        "hello":":foo-bin",
+                    },
+                    "foo_plugins":{
+                        "qux":"foo.qux",
+                    },
+                },
+                provides=setup_py(
+                    name='foo', version='1.2.3',
+                    entry_points={
+                        "console_scripts":{
+                            "foo_qux":"foo.baz.qux:main",
+                            "foo_bin":":foo-bin",
+                        },
+                        "foo_plugins":[
+                            "foo-bar=foo.bar:plugin",
+                        ],
+                    },
+                ).with_binaries(
+                    foo_main='src/python/foo/qux:bin'
+                )
+            )
+
+            python_library(
+                dependencies=[
+                    'src/python/foo/qux',
+                ]
+            )
+
+            pex_binary(name="foo-bin", entry_point="foo.bin:main")
+            """
+        ),
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        [
+            "setup.py",
+            "MANIFEST.in",
+        ],
+        "setup.py",
+        {
+            "name": "foo",
+            "version": "1.2.3",
+            "plugin_demo": "hello world",
+            "packages": tuple(),
+            "namespace_packages": tuple(),
+            "package_data": {},
+            "install_requires": tuple(),
+            "entry_points": {
+                "console_scripts": [
+                    "foo_tool = foo.bar.baz:Tool.main",
+                    "bin_tool = foo.qux.bin:main",
+                    "bin_tool2 = foo.qux.bin:main",
+                    "hello = foo.bin:main",
+                    "foo_qux = foo.baz.qux:main",
+                    "foo_bin = foo.bin:main",
+                    "foo_main = foo.qux.bin:main",
+                ],
+                "foo_plugins": [
+                    "qux = foo.qux",
+                    "foo-bar = foo.bar:plugin",
+                ],
+            },
         },
         Address("src/python/foo", target_name="foo-dist"),
     )
@@ -387,7 +518,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": (),
             "install_requires": (),
             "package_data": {},
-            "entry_points": {"console_scripts": ["foo=project.app:func"]},
+            "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
         Address("src/python/project", target_name="dist"),
     )

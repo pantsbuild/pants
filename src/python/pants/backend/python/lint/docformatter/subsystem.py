@@ -27,7 +27,8 @@ class Docformatter(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.docformatter", "lockfile.txt")
-    default_lockfile_url = git_url("src/python/pants/backend/python/lint/docformatter/lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):

@@ -4,13 +4,17 @@
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
+mod fs;
 mod nailgun;
 mod testutil;
+mod workunits;
 
 #[pymodule]
 fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
+  self::fs::register(m)?;
   self::nailgun::register(py, m)?;
   self::testutil::register(m)?;
+  self::workunits::register(m)?;
 
   m.add_class::<PyExecutor>()?;
 
@@ -19,16 +23,14 @@ fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
 
 #[pyclass]
 #[derive(Debug, Clone)]
-struct PyExecutor {
-  executor: task_executor::Executor,
-}
+struct PyExecutor(task_executor::Executor);
 
 #[pymethods]
 impl PyExecutor {
   #[new]
   fn __new__(core_threads: usize, max_threads: usize) -> PyResult<Self> {
     task_executor::Executor::global(core_threads, max_threads)
-      .map(|executor| PyExecutor { executor })
+      .map(PyExecutor)
       .map_err(PyException::new_err)
   }
 }

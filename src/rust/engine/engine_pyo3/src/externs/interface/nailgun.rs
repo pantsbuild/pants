@@ -36,7 +36,7 @@ impl PyNailgunClient {
   fn __new__(port: u16, py_executor: PyExecutor) -> Self {
     Self {
       port,
-      executor: py_executor.executor,
+      executor: py_executor.0,
     }
   }
 

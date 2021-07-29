@@ -1,12 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import errno
 import logging
 import os
 import posix
 from functools import reduce
-from typing import Optional, Set
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +30,25 @@ CPU_COUNT = _compute_cpu_count()
 
 
 OS_ALIASES = {
-    "darwin": {"macos", "darwin", "macosx", "mac os x", "mac"},
+    "macos": {"macos", "darwin", "macosx", "mac os x", "mac"},
     "linux": {"linux", "linux2"},
 }
 
+ARCH_ALIASES = {
+    "x86_64": {"x86_64", "x86-64", "amd64"},
+    "arm64": {"arm64", "aarch64"},
+}
+
 Pid = int
+
+
+def get_arch_name(uname_result: Optional[posix.uname_result] = None) -> str:
+    """
+    :API: public
+    """
+    if uname_result is None:
+        uname_result = os.uname()
+    return uname_result.machine.lower()
 
 
 def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
@@ -41,31 +57,46 @@ def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
     """
     if uname_result is None:
         uname_result = os.uname()
-    return uname_result[0].lower()
+    return uname_result.sysname.lower()
+
+
+def normalize_arch_name(arch_name: str) -> str:
+    """
+    :API: public
+    """
+    return _normalize(arch_name, ARCH_ALIASES, "architecture")
 
 
 def normalize_os_name(os_name: str) -> str:
     """
     :API: public
     """
-    if os_name not in OS_ALIASES:
-        for proper_name, aliases in OS_ALIASES.items():
-            if os_name in aliases:
-                return proper_name
+    return _normalize(os_name, OS_ALIASES, "operating system")
+
+
+def _normalize(name: str, aliases: dict[str, set[str]], warning_hint: str) -> str:
+    for proper_name, alias_set in aliases.items():
+        if name in alias_set:
+            return proper_name
+    else:
         logger.warning(
-            "Unknown operating system name: {bad}, known names are: {known}".format(
-                bad=os_name, known=", ".join(sorted(known_os_names()))
+            "Unknown {hint} name: {bad}, known names are: {known}".format(
+                hint=warning_hint, bad=name, known=", ".join(sorted(_values(aliases)))
             )
         )
-    return os_name
+        return name
 
 
 def get_normalized_os_name() -> str:
     return normalize_os_name(get_os_name())
 
 
-def known_os_names() -> Set[str]:
-    return reduce(set.union, OS_ALIASES.values())
+def get_normalized_arch_name() -> str:
+    return normalize_arch_name(get_arch_name())
+
+
+def _values(aliases: dict[str, set[str]]) -> set[str]:
+    return reduce(set.union, aliases.values())
 
 
 # From kill(2) on OSX 10.13:

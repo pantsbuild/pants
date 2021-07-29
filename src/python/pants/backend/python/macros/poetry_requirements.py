@@ -8,15 +8,33 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Iterator, Mapping, Optional
+from typing import Any, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
 
 import toml
 from packaging.version import InvalidVersion, Version
 from pkg_resources import Requirement
+from typing_extensions import TypedDict
 
 from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
+
+PyprojectAttr = TypedDict(
+    "PyprojectAttr",
+    {
+        "extras": List[str],
+        "git": str,
+        "rev": str,
+        "branch": str,
+        "python": str,
+        "markers": str,
+        "tag": str,
+        "version": str,
+        "url": str,
+        "path": str,
+    },
+    total=False,
+)
 
 
 def get_max_caret(parsed_version: Version) -> str:
@@ -55,9 +73,12 @@ def get_max_tilde(parsed_version: Version) -> str:
     return f"{major}.{minor}.0"
 
 
-def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
+def parse_str_version(attributes: str, **kwargs: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
+    proj_name = kwargs["proj_name"]
+    fp = kwargs["file_path"]
+    extras_str = kwargs["extras_str"]
     comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
         is_caret = req[0] == "^"
@@ -79,15 +100,26 @@ def parse_str_version(proj_name: str, attributes: str, fp: str) -> str:
             pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
-    return f"{proj_name} {','.join(pep440_reqs)}"
+    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}"
 
 
 def parse_python_constraint(constr: str | None, fp: str) -> str:
     if constr is None:
         return ""
     valid_specifiers = "<>!~= "
+    # If the user passes multiple Python constraints, they're separated by
+    # either '||' signifying a logical 'or', or a comma signifying a logical
+    # 'and'. Hence, or_and_split is a 2D list where each inner list is a set of and-ed
+    # requirements; every list in the second layer is then or-ed together.
     or_and_split = [[j.strip() for j in i.split(",")] for i in constr.split("||")]
-    ver_parsed = [[parse_str_version("", j, fp) for j in i] for i in or_and_split]
+
+    # We only use parse_str_version to address the version parsing; we don't
+    # care about having an actual Requirement object so things like the project name
+    # and extras that would ordinarily exist for a project with a string version are left blank here.
+    ver_parsed = [
+        [parse_str_version(j, proj_name="", file_path=fp, extras_str="") for j in i]
+        for i in or_and_split
+    ]
 
     def conv_and(lst: list[str]) -> list:
         return list(itertools.chain(*[i.split(",") for i in lst]))
@@ -167,11 +199,44 @@ class PyProjectToml:
             )
 
 
+def produce_match(sep: str, feat: Any) -> str:
+    return f"{sep}{feat}" if feat else ""
+
+
+def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
+    markers_lookup = produce_match("", attributes.get("markers"))
+    python_lookup = parse_python_constraint(attributes.get("python"), fp)
+
+    # Python constraints are passed as a `python_version` environment marker; if we have multiple
+    # markers, we evaluate them as one whole, and then AND with the new marker for the Python constraint.
+    # E.g. (marker1 AND marker2 OR marker3...) AND (python_version)
+    # rather than (marker1 AND marker2 OR marker3 AND python_version)
+    if not markers_lookup and not python_lookup:
+        return base
+
+    result = f"{base};("
+
+    if markers_lookup:
+        result += f"{markers_lookup})"
+    if python_lookup and markers_lookup:
+        result += " and ("
+    if python_lookup:
+        result += f"{python_lookup})"
+
+    return result
+
+
 def handle_dict_attr(
-    proj_name: str, attributes: dict[str, str], pyproject_toml: PyProjectToml
+    proj_name: str, attributes: PyprojectAttr, pyproject_toml: PyProjectToml
 ) -> str | None:
-    def produce_match(sep: str, feat: Optional[str]) -> str:
-        return f"{sep}{feat}" if feat else ""
+    base = ""
+    fp = str(pyproject_toml.toml_relpath)
+
+    extras_lookup = attributes.get("extras")
+    if isinstance(extras_lookup, list):
+        extras_str = f"[{','.join(extras_lookup)}]"
+    else:
+        extras_str = ""
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
@@ -179,54 +244,57 @@ def handle_dict_attr(
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
 
-        return f"{proj_name} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
-
-    version_lookup = attributes.get("version")
+        base = f"{proj_name}{extras_str} @ git+{git_lookup}{tag_lookup}{branch_lookup}{rev_lookup}"
 
     path_lookup = attributes.get("path")
     if path_lookup is not None:
         non_pants_project_abs_path = pyproject_toml.non_pants_project_abs_path(path_lookup)
         if non_pants_project_abs_path:
-            return f"{proj_name} @ file://{non_pants_project_abs_path}"
-        # An internal path will be handled by normal Pants dependencies and dependency inference;
-        # i.e.: it never represents a third party requirement.
-        return None
+            base = f"{proj_name}{extras_str} @ file://{non_pants_project_abs_path}"
+        else:
+            # An internal path will be handled by normal Pants dependencies and dependency inference;
+            # i.e.: it never represents a third party requirement.
+            return None
 
     url_lookup = attributes.get("url")
     if url_lookup is not None:
-        return f"{proj_name} @ {url_lookup}"
+        base = f"{proj_name}{extras_str} @ {url_lookup}"
 
+    version_lookup = attributes.get("version")
     if version_lookup is not None:
-        markers_lookup = produce_match(";", attributes.get("markers"))
-        fp = str(pyproject_toml.toml_relpath)
-        python_lookup = parse_python_constraint(attributes.get("python"), fp)
-        version_parsed = parse_str_version(proj_name, version_lookup, fp)
-        return (
-            f"{version_parsed}"
-            f"{markers_lookup}"
-            f"{' and ' if python_lookup and markers_lookup else (';' if python_lookup else '')}"
-            f"{python_lookup}"
+        base = parse_str_version(
+            version_lookup, file_path=fp, extras_str=extras_str, proj_name=proj_name
         )
 
-    raise AssertionError(
-        f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
-        "or git location for your dependency. "
-    )
+    if len(base) == 0:
+        raise ValueError(
+            f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
+            "or git location for your dependency. "
+        )
+
+    return add_markers(base, attributes, fp)
 
 
 def parse_single_dependency(
     proj_name: str,
-    attributes: str | dict[str, Any] | list[dict[str, Any]],
+    attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[Requirement]:
+
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield Requirement.parse(
-            parse_str_version(proj_name, attributes, str(pyproject_toml.toml_relpath))
+            parse_str_version(
+                attributes,
+                proj_name=proj_name,
+                file_path=str(pyproject_toml.toml_relpath),
+                extras_str="",
+            )
         )
     elif isinstance(attributes, dict):
         # E.g. `foo = {version = "~1.1"}`.
-        req_str = handle_dict_attr(proj_name, attributes, pyproject_toml)
+        pyproject_attr = cast(PyprojectAttr, attributes)
+        req_str = handle_dict_attr(proj_name, pyproject_attr, pyproject_toml)
         if req_str:
             yield Requirement.parse(req_str)
     elif isinstance(attributes, list):
@@ -237,7 +305,7 @@ def parse_single_dependency(
                 yield Requirement.parse(req_str)
     else:
         raise AssertionError(
-            "Error: invalid poetry requirement format. Expected type of requirement attributes to "
+            "Error: invalid Poetry requirement format. Expected type of requirement attributes to "
             f"be string, dict, or list, but was of type {type(attributes).__name__}."
         )
 

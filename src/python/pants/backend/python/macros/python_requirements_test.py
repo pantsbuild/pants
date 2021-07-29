@@ -34,13 +34,11 @@ def assert_python_requirements(
     expected_targets: Iterable[PythonRequirementLibrary],
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
-    rule_runner.add_to_build_file("", f"{build_file_entry}\n")
-    rule_runner.create_file(requirements_txt_relpath, requirements_txt)
+    rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
     targets = rule_runner.request(
         Targets,
         [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
     )
-
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 

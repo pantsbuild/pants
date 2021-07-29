@@ -45,11 +45,15 @@ def test_set_invalid_log_location():
     with pytest.raises(ExceptionSink.ExceptionSinkError) as exc:
         sink.reset_log_location("/")
     err_str = {
-        Platform.darwin: (
+        Platform.macos_arm64: (
             "The provided log location path at '/' is not writable or could not be created: "
             "[Errno 21] Is a directory: '/'."
         ),
-        Platform.linux: (
+        Platform.macos_x86_64: (
+            "The provided log location path at '/' is not writable or could not be created: "
+            "[Errno 21] Is a directory: '/'."
+        ),
+        Platform.linux_x86_64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
             "denied: '/.pids'"
         ),

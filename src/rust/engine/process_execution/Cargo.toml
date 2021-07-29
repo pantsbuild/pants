@@ -35,16 +35,16 @@ workunit_store = { path = "../workunit_store" }
 regex = "1"
 lazy_static = "1"
 parking_lot = "0.11"
-itertools = "0.8.0"
+itertools = "0.10"
 serde = "1.0.104"
 bincode = "1.2.1"
 double-checked-cell-async = "2.0"
 rand = "0.8"
-prost = "0.7"
-prost-types = "0.7"
+prost = "0.8"
+prost-types = "0.8"
 strum = "0.20"
 strum_macros = "0.20"
-tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]

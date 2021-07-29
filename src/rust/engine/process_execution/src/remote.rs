@@ -19,8 +19,10 @@ use fs::{self, File, PathStat};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
+use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
-use grpc_util::{headers_to_interceptor_fn, layered_service, status_to_str, LayeredService};
+use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -32,7 +34,7 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
-use tonic::{Code, Interceptor, Request, Status};
+use tonic::{Code, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
@@ -43,7 +45,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::retry::{retry_call, status_is_retryable};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -119,7 +120,7 @@ impl CommandRunner {
     store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
-    mut headers: BTreeMap<String, String>,
+    headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
     overall_deadline: Duration,
@@ -136,49 +137,36 @@ impl CommandRunner {
       None
     };
 
-    let interceptor = if headers.is_empty() {
-      None
-    } else {
-      Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
-    };
-
+    let mut execution_headers = headers.clone();
     let execution_endpoint = grpc_util::create_endpoint(
       &execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut headers,
+      &mut execution_headers,
     )?;
+    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
     let execution_channel = layered_service(
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
       execution_concurrency_limit,
+      execution_http_headers,
     );
-    let execution_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
-      }
-      None => ExecutionClient::new(execution_channel.clone()),
-    });
+    let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
+    let mut store_headers = headers.clone();
     let store_endpoint = grpc_util::create_endpoint(
       &store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut headers,
+      &mut store_headers,
     )?;
+    let store_http_headers = headers_to_http_header_map(&store_headers)?;
     let store_channel = layered_service(
       tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter()),
       cache_concurrency_limit,
+      store_http_headers,
     );
 
-    let action_cache_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
-      None => ActionCacheClient::new(store_channel),
-    });
+    let action_cache_client = Arc::new(ActionCacheClient::new(store_channel));
 
-    let capabilities_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        CapabilitiesClient::with_interceptor(execution_channel, interceptor.clone())
-      }
-      None => CapabilitiesClient::new(execution_channel),
-    });
+    let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
       metadata,
@@ -745,7 +733,6 @@ impl crate::CommandRunner for CommandRunner {
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self.extract_compatible_request(&request).unwrap();
-    let store = self.store.clone();
     let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
@@ -786,16 +773,12 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    let input_files = request.input_files;
-    in_workunit!(
-      context.workunit_store.clone(),
-      "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| ensure_action_uploaded(&store, command_digest, action_digest, input_files),
+    ensure_action_uploaded(
+      &context,
+      &self.store,
+      command_digest,
+      action_digest,
+      Some(request.input_files),
     )
     .await?;
 
@@ -1460,16 +1443,33 @@ pub async fn ensure_action_stored_locally(
   Ok((command_digest, action_digest))
 }
 
+///
+/// Ensure that the Action and Command (and optionally their input files, likely depending on
+/// whether we are in a remote execution context, or a pure cache-usage context) are uploaded.
+///
 pub async fn ensure_action_uploaded(
+  context: &Context,
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
-  input_files: Digest,
+  input_files: Option<Digest>,
 ) -> Result<(), String> {
-  let _ = store
-    .ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
-    .await?;
-  Ok(())
+  in_workunit!(
+    context.workunit_store.clone(),
+    "ensure_action_uploaded".to_owned(),
+    WorkunitMetadata {
+      level: Level::Trace,
+      desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
+      ..WorkunitMetadata::default()
+    },
+    |_workunit| async move {
+      let mut digests = vec![command_digest, action_digest];
+      digests.extend(input_files);
+      let _ = store.ensure_remote_has_recursive(digests).await?;
+      Ok(())
+    },
+  )
+  .await
 }
 
 pub fn format_error(error: &StatusProto) -> String {

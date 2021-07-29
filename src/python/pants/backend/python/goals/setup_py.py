@@ -10,17 +10,18 @@ import pickle
 from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Set, Tuple, cast
+from functools import partial
+from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    PexEntryPointField,
+    PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
-    ResolvedPexEntryPoint,
-    ResolvePexEntryPointRequest,
+    ResolvedPythonDistributionEntryPoints,
+    ResolvePythonDistributionEntryPointsRequest,
     SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -559,45 +560,48 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
 
-    # Add any `pex_binary` targets from `setup_py().with_binaries()` to the dist's entry points.
-    key_to_binary_spec = exported_target.provides.binaries
-    binaries = await Get(
-        Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
+    # Resolve entry points from python_distribution(entry_points=...) and from
+    # python_distribution(provides=setup_py(entry_points=...).with_binaries(...)
+    resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
+        Get(
+            ResolvedPythonDistributionEntryPoints,
+            ResolvePythonDistributionEntryPointsRequest(
+                entry_points_field=exported_target.target.get(PythonDistributionEntryPointsField)
+            ),
+        ),
+        Get(
+            ResolvedPythonDistributionEntryPoints,
+            ResolvePythonDistributionEntryPointsRequest(
+                provides_field=exported_target.target.get(PythonProvidesField)
+            ),
+        ),
     )
-    entry_point_requests = []
-    for binary in binaries:
-        if not binary.has_field(PexEntryPointField):
-            raise InvalidEntryPoint(
-                "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
-                f"`provides` field for {exported_addr}, but found {binary.address} with target "
-                f"type {binary.alias}."
-            )
-        entry_point = binary[PexEntryPointField].value
-        url = "https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point"
-        if not entry_point:
-            raise InvalidEntryPoint(
-                "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
-                f"{exported_addr} must explicitly set the `entry_point` field, but "
-                f"{binary.address} left the field off. Set `entry_point` to either "
-                f"`app.py:func` or the longhand `path.to.app:func`. See {url}."
-            )
-        if not entry_point.function:
-            raise InvalidEntryPoint(
-                "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
-                f"{exported_addr} must end in the format `:my_func` for the `entry_point` field, "
-                f"but {binary.address} set it to {entry_point.spec!r}. For example, set "
-                f"`entry_point='{entry_point.module}:main'. See {url}."
-            )
-        entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
-    binary_entry_points = await MultiGet(
-        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
-        for request in entry_point_requests
-    )
-    for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
-        entry_points = setup_kwargs.setdefault("entry_points", {})
-        console_scripts = entry_points.setdefault("console_scripts", [])
-        if binary_entry_point.val is not None:
-            console_scripts.append(f"{key}={binary_entry_point.val.spec}")
+
+    def _format_entry_points(
+        resolved: ResolvedPythonDistributionEntryPoints,
+    ) -> Dict[str, Dict[str, str]]:
+        return {
+            category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
+            for category, entry_points in resolved.val.items()
+        }
+
+    # Gather entry points with source description for any error messages when merging them.
+    entry_point_sources = {
+        f"{exported_addr}'s field `entry_points`": _format_entry_points(
+            resolved_from_entry_points_field
+        ),
+        f"{exported_addr}'s field `provides=setup_py()`": _format_entry_points(
+            resolved_from_provides_field
+        ),
+    }
+
+    # Merge all collected entry points and add them to the dist's entry points.
+    all_entry_points = merge_entry_points(*list(entry_point_sources.items()))
+    if all_entry_points:
+        setup_kwargs["entry_points"] = {
+            category: [f"{name} = {entry_point}" for name, entry_point in entry_points.items()]
+            for category, entry_points in all_entry_points.items()
+        }
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
@@ -890,7 +894,7 @@ def find_packages(
     """
     # Find all packages implied by the sources.
     packages: Set[str] = set()
-    package_data: Dict[str, List[str]] = defaultdict(list)
+    package_data: DefaultDict[str, List[str]] = defaultdict(list)
     for python_file in python_files:
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
@@ -976,6 +980,41 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
         ):
             return True
     return False
+
+
+def merge_entry_points(
+    *all_entry_points_with_descriptions_of_source: Tuple[str, Dict[str, Dict[str, str]]]
+) -> Dict[str, Dict[str, str]]:
+    """Merge all entry points, throwing ValueError if there are any conflicts."""
+    merged = cast(
+        # this gives us a two level deep defaultdict with the inner values being of list type
+        DefaultDict[str, DefaultDict[str, List[Tuple[str, str]]]],
+        defaultdict(partial(defaultdict, list)),
+    )
+
+    for description_of_source, source_entry_points in all_entry_points_with_descriptions_of_source:
+        for category, entry_points in source_entry_points.items():
+            for ep_name, entry_point in entry_points.items():
+                merged[category][ep_name].append((description_of_source, entry_point))
+
+    def _check_entry_point_single_source(
+        category: str, name: str, entry_points_with_source: List[Tuple[str, str]]
+    ) -> Tuple[str, str]:
+        if len(entry_points_with_source) > 1:
+            raise ValueError(
+                f"Multiple entry_points registered for {category} {name} in: "
+                f"{', '.join(ep_source for ep_source, _ in entry_points_with_source)}"
+            )
+        _, entry_point = entry_points_with_source[0]
+        return name, entry_point
+
+    return {
+        category: dict(
+            _check_entry_point_single_source(category, name, entry_points_with_source)
+            for name, entry_points_with_source in merged_entry_points.items()
+        )
+        for category, merged_entry_points in merged.items()
+    }
 
 
 def rules():

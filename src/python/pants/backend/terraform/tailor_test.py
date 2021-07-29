@@ -4,7 +4,12 @@
 from pants.backend.terraform.tailor import PutativeTerraformTargetsRequest
 from pants.backend.terraform.tailor import rules as terraform_tailor_rules
 from pants.backend.terraform.target_types import TerraformModule
-from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import (
+    AllOwnedSources,
+    PutativeTarget,
+    PutativeTargets,
+    PutativeTargetsSearchPaths,
+)
 from pants.core.goals.tailor import rules as core_tailor_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -37,7 +42,7 @@ def test_find_putative_targets() -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeTerraformTargetsRequest(),
+            PutativeTerraformTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
             AllOwnedSources(
                 [
                     "src/terraform/root.tf",

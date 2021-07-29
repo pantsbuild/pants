@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.util.osutil import OS_ALIASES, known_os_names, normalize_os_name
+from pants.util.osutil import OS_ALIASES, _values, normalize_os_name
 
 
 def test_alias_normalization() -> None:
@@ -12,11 +12,11 @@ def test_alias_normalization() -> None:
 
 def test_keys_in_aliases() -> None:
     for key in OS_ALIASES.keys():
-        assert key in known_os_names()
+        assert key in _values(OS_ALIASES)
 
 
 def test_no_warnings_on_known_names(caplog) -> None:
-    for name in known_os_names():
+    for name in _values(OS_ALIASES):
         normalize_os_name(name)
         assert len(caplog.records) == 0
 
