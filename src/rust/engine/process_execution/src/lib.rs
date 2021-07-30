@@ -142,7 +142,7 @@ impl TryFrom<String> for Platform {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
   // Cached in all locations, regardless of success or failure.
   Always,
@@ -173,10 +173,14 @@ impl TryFrom<String> for ProcessCacheScope {
   }
 }
 
+fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::Ok, S::Error> {
+  s.serialize_str(&level.to_string())
+}
+
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
+#[derive(Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
   ///
@@ -216,6 +220,8 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
+  // NB: We serialize with a function to avoid adding a serde dep to the logging crate.
+  #[serde(serialize_with = "serialize_level")]
   pub level: log::Level,
 
   ///

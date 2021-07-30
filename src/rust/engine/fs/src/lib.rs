@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::{self, TryFutureExt};
 use lazy_static::lazy_static;
+use serde::Serialize;
 
 lazy_static! {
   static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
@@ -74,7 +75,7 @@ pub fn default_cache_path() -> PathBuf {
   cache_path.join("pants")
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
 pub struct RelativePath(PathBuf);
 
 impl RelativePath {

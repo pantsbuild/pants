@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use fs::default_cache_path;
+use serde::Serialize;
 
 use crate::RelativePath;
+use fs::default_cache_path;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
 
 impl CacheName {
@@ -24,7 +25,7 @@ impl CacheName {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize)]
 pub struct CacheDest(String);
 
 impl CacheDest {

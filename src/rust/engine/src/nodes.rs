@@ -399,11 +399,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    if context
+    if let Some(compatible_request) = context
       .core
       .command_runner
       .extract_compatible_request(&request)
-      .is_some()
     {
       let command_runner = &context.core.command_runner;
 
@@ -417,13 +416,21 @@ impl WrappedNode for MultiPlatformExecuteProcess {
         .await
         .map_err(|e| throw(&e))?;
 
+      let definition = serde_json::to_string(&compatible_request)
+        .map_err(|e| throw(&format!("Failed to serialize process: {}", e)))?;
       workunit.update_metadata(|initial| WorkunitMetadata {
         stdout: Some(res.stdout_digest),
         stderr: Some(res.stderr_digest),
-        user_metadata: vec![(
-          "exit_code".to_string(),
-          UserMetadataItem::ImmediateId(res.exit_code as i64),
-        )],
+        user_metadata: vec![
+          (
+            "definition".to_string(),
+            UserMetadataItem::ImmediateString(definition),
+          ),
+          (
+            "exit_code".to_string(),
+            UserMetadataItem::ImmediateInt(res.exit_code as i64),
+          ),
+        ],
         ..initial
       });
 
