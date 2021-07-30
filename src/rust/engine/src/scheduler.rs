@@ -283,11 +283,11 @@ impl Scheduler {
       let (result, last_observed) = context
         .core
         .graph
-        .poll(root.into(), last_observed, poll_delay, &context)
+        .poll(root.into(), last_observed, poll_delay, context)
         .await?;
       (result, Some(last_observed))
     } else {
-      let result = context.core.graph.create(root.into(), &context).await?;
+      let result = context.core.graph.create(root.into(), context).await?;
       (result, None)
     };
 
@@ -391,7 +391,7 @@ impl Scheduler {
           }
           res = &mut execution_task => {
             // Completed successfully.
-            break Ok(Self::execute_record_results(&request.roots, &session, res));
+            break Ok(Self::execute_record_results(&request.roots, session, res));
           }
         }
       };

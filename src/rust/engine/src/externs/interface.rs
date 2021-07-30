@@ -1007,9 +1007,7 @@ async fn workunit_to_py_value(
   for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
-      ArtifactOutput::FileDigest(digest) => {
-        crate::nodes::Snapshot::store_file_digest(&core, digest)
-      }
+      ArtifactOutput::FileDigest(digest) => crate::nodes::Snapshot::store_file_digest(core, digest),
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
@@ -1135,14 +1133,14 @@ fn session_poll_workunits(
             let started = core.executor.block_on(workunits_to_py_tuple_value(
               &mut started_iter,
               &scheduler.core,
-              &session,
+              session,
             ))?;
 
             let mut completed_iter = completed.iter();
             let completed = core.executor.block_on(workunits_to_py_tuple_value(
               &mut completed_iter,
               &scheduler.core,
-              &session,
+              session,
             ))?;
 
             Ok(externs::store_tuple(vec![started, completed]).into())
@@ -1600,12 +1598,12 @@ fn capture_snapshots(
       let path_globs_and_roots = values
         .iter()
         .map(|value| {
-          let root = PathBuf::from(externs::getattr_as_string(&value, "root"));
+          let root = PathBuf::from(externs::getattr_as_string(value, "root"));
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
-            &externs::getattr(&value, "path_globs").unwrap(),
+            &externs::getattr(value, "path_globs").unwrap(),
           );
           let digest_hint = {
-            let maybe_digest: PyObject = externs::getattr(&value, "digest_hint").unwrap();
+            let maybe_digest: PyObject = externs::getattr(value, "digest_hint").unwrap();
             if maybe_digest == externs::none() {
               None
             } else {
@@ -1964,7 +1962,7 @@ where
   F: FnOnce(&Executor) -> T,
 {
   let executor = executor_ptr.executor(py);
-  f(&executor)
+  f(executor)
 }
 
 ///
@@ -1975,7 +1973,7 @@ where
   F: FnOnce(&Session) -> T,
 {
   let session = session_ptr.session(py);
-  f(&session)
+  f(session)
 }
 
 ///
@@ -1987,7 +1985,7 @@ where
 {
   let nailgun_server = nailgun_server_ptr.server(py);
   let executor = nailgun_server_ptr.executor(py);
-  f(&nailgun_server, executor)
+  f(nailgun_server, executor)
 }
 
 ///

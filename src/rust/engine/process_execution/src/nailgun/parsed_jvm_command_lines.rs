@@ -86,7 +86,7 @@ impl ParsedJVMCommandLines {
   fn parse_classpath(args_to_consume: &mut Iter<String>) -> Result<(String, String), String> {
     let classpath_flag = args_to_consume
       .next()
-      .filter(|e| ParsedJVMCommandLines::is_classpath_flag(&e))
+      .filter(|e| ParsedJVMCommandLines::is_classpath_flag(e))
       .ok_or_else(|| "No classpath flag found.".to_string())
       .map(|e| e.clone())?;
 

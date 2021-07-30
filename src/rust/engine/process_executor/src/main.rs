@@ -242,7 +242,7 @@ async fn main() {
       }
 
       local_only_store.into_with_remote(
-        &cas_server,
+        cas_server,
         args.remote_instance_name.clone(),
         root_ca_certs,
         headers,

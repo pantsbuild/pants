@@ -36,7 +36,7 @@ impl EngineAwareInformation for Message {
   type MaybeOutput = String;
 
   fn retrieve(_types: &Types, value: &Value) -> Option<String> {
-    let msg_val = externs::call_method(&value, "message", &[]).ok()?;
+    let msg_val = externs::call_method(value, "message", &[]).ok()?;
     let msg_val = externs::check_for_python_none(msg_val)?;
     Some(externs::val_to_str(&msg_val))
   }
@@ -48,7 +48,7 @@ impl EngineAwareInformation for Metadata {
   type MaybeOutput = Vec<(String, Value)>;
 
   fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
-    let metadata_val = match externs::call_method(&value, "metadata", &[]) {
+    let metadata_val = match externs::call_method(value, "metadata", &[]) {
       Ok(value) => value,
       Err(py_err) => {
         let failure = Failure::from_py_err(py_err);
@@ -88,7 +88,7 @@ impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, ArtifactOutput)>;
 
   fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
-    let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
+    let artifacts_val = match externs::call_method(value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
         let failure = Failure::from_py_err(py_err);
@@ -115,7 +115,7 @@ impl EngineAwareInformation for Artifacts {
       };
 
       let artifact_output = if externs::get_type_for(&value) == types.file_digest {
-        match lift_file_digest(&types, &value) {
+        match lift_file_digest(types, &value) {
           Ok(digest) => ArtifactOutput::FileDigest(digest),
           Err(e) => {
             log::error!("Error in EngineAware.artifacts() implementation: {}", e);
@@ -149,7 +149,7 @@ impl EngineAwareInformation for DebugHint {
   type MaybeOutput = String;
 
   fn retrieve(_types: &Types, value: &Value) -> Option<String> {
-    externs::call_method(&value, "debug_hint", &[])
+    externs::call_method(value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
       .map(|val| externs::val_to_str(&val))

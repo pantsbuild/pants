@@ -158,7 +158,7 @@ impl Log for PantsLogger {
 
     let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
     if !should_log {
-      if let Some(ref module_path) = record.module_path() {
+      if let Some(module_path) = record.module_path() {
         for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
           if &module_path.split("::").next().unwrap() == pants_package {
             should_log = true;

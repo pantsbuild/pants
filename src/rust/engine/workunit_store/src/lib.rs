@@ -453,7 +453,7 @@ impl HeavyHittersData {
       ) {
         let workunit = inner.workunit_records.get(&span_id).unwrap();
         if let Some(effective_name) = workunit.metadata.desc.as_ref() {
-          let maybe_duration = Self::duration_for(now, &workunit);
+          let maybe_duration = Self::duration_for(now, workunit);
 
           res.insert(effective_name.to_string(), maybe_duration);
           if res.len() >= k {
@@ -534,7 +534,7 @@ fn first_matched_parent(
   while let Some(current_span_id) = span_id {
     let workunit = workunit_records.get(&current_span_id);
 
-    if let Some(ref workunit) = workunit {
+    if let Some(workunit) = workunit {
       // Should we continue visiting parents?
       if is_terminal(workunit) {
         break;
@@ -756,7 +756,7 @@ impl WorkunitStore {
       let mut writer = BytesMut::new().writer();
 
       serializer
-        .serialize(&histogram, &mut writer)
+        .serialize(histogram, &mut writer)
         .map_err(|err| {
           format!(
             "Failed to encode histogram for key `{}`: {}",

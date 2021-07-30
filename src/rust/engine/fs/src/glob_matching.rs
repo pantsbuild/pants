@@ -320,7 +320,7 @@ impl PreparedPathGlobs {
       })
       .collect();
 
-    let patterns = PreparedPathGlobs::parse_patterns_from_include(&include.as_slice())?;
+    let patterns = PreparedPathGlobs::parse_patterns_from_include(include.as_slice())?;
     Ok(PreparedPathGlobs {
       include,
       // An empty exclude becomes EMPTY_IGNORE.
@@ -425,7 +425,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           async move {
             // Canonicalize matched PathStats, and filter paths that are ignored by local excludes.
             // Context ("global") ignore patterns are applied during `scandir`.
-            if exclude.is_ignored(&stat) {
+            if exclude.is_ignored(stat) {
               Ok(None)
             } else {
               match stat {

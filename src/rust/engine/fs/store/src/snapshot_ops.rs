@@ -366,6 +366,8 @@ impl IntermediateGlobbedFilesAndDirectories {
         RestrictedPathGlob::DirWildcard { wildcard, .. } => wildcard,
       };
 
+      // TODO(#12462): Remove allow once upstream resolves https://github.com/rust-lang/rust-clippy/issues/6066.
+      #[allow(clippy::needless_collect)]
       let matching_files: Vec<PathBuf> = cur_dir_files
         .keys()
         .filter(|path| {
@@ -382,6 +384,8 @@ impl IntermediateGlobbedFilesAndDirectories {
         globbed_files.insert(file_path, file_node);
       }
 
+      // TODO(#12462): Remove allow once upstream resolves https://github.com/rust-lang/rust-clippy/issues/6066.
+      #[allow(clippy::needless_collect)]
       let matching_directories: Vec<PathBuf> = cur_dir_directories
         .keys()
         .filter(|path| {

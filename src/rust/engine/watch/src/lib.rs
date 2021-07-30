@@ -133,7 +133,7 @@ impl InvalidationWatcher {
       .expect("An InvalidationWatcher can only be started once.");
 
     InvalidationWatcher::start_background_thread(
-      Arc::downgrade(&invalidatable),
+      Arc::downgrade(invalidatable),
       ignorer,
       canonical_build_root,
       liveness_sender,

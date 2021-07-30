@@ -139,7 +139,7 @@ impl CommandRunner {
 
     let mut execution_headers = headers.clone();
     let execution_endpoint = grpc_util::create_endpoint(
-      &execution_address,
+      execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut execution_headers,
     )?;
@@ -153,7 +153,7 @@ impl CommandRunner {
 
     let mut store_headers = headers.clone();
     let store_endpoint = grpc_util::create_endpoint(
-      &store_address,
+      store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut store_headers,
     )?;
@@ -623,7 +623,7 @@ impl CommandRunner {
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, &context)
+            .wait_on_operation_stream(operation_stream, context)
             .await;
 
           match stream_outcome {
