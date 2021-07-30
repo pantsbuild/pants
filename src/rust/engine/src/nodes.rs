@@ -30,6 +30,7 @@ use fs::{
 };
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
+  ProcessResultSource,
 };
 
 use bytes::Bytes;
@@ -39,7 +40,8 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  in_workunit, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
+  UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -437,6 +439,26 @@ impl WrappedNode for MultiPlatformExecuteProcess {
         ],
         ..initial
       });
+      if let Some(total_elapsed) = res.metadata.total_elapsed {
+        let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
+        match res.metadata.source {
+          ProcessResultSource::RanLocally => {
+            workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
+            context
+              .session
+              .workunit_store()
+              .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
+          }
+          ProcessResultSource::RanRemotely => {
+            workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
+            context
+              .session
+              .workunit_store()
+              .record_observation(ObservationMetric::RemoteProcessTimeRunMs, total_elapsed);
+          }
+          _ => {}
+        }
+      }
 
       Ok(ProcessResult(res))
     } else {

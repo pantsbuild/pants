@@ -402,6 +402,8 @@ pub struct ProcessResultMetadata {
   /// The time from starting to completion, including preparing the chroot and cleanup.
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
   /// `ExecutedActionMetadata`.
+  ///
+  /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
