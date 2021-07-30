@@ -61,11 +61,6 @@ _requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
     ],
 )
 def test_hex_digest(requirements, interpreter_constraints, expected) -> None:
-    print(
-        invalidation_digest(
-            FrozenOrderedSet(requirements), InterpreterConstraints(interpreter_constraints)
-        )
-    )
     assert (
         invalidation_digest(
             FrozenOrderedSet(requirements), InterpreterConstraints(interpreter_constraints)
@@ -74,7 +69,7 @@ def test_hex_digest(requirements, interpreter_constraints, expected) -> None:
     )
 
 
-def test_hash_depends_on_requirement_source():
+def test_hash_depends_on_requirement_source() -> None:
     reqs = ["CPython"]
     assert invalidation_digest(
         FrozenOrderedSet(reqs), InterpreterConstraints([])

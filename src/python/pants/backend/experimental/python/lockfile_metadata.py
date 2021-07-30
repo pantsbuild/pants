@@ -25,7 +25,7 @@ def invalidation_digest(
     """Returns an invalidation digest for the given requirements and interpreter constraints."""
     m = hashlib.sha256()
     pres = {
-        "requirements": [str(i) for i in requirements],
+        "requirements": list(requirements),
         "interpreter_constraints": [str(i) for i in interpreter_constraints],
     }
     m.update(json.dumps(pres).encode("utf-8"))
