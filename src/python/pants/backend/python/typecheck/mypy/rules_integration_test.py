@@ -8,6 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import rules as protobuf_subsystem_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
@@ -624,7 +625,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     rule_runner = RuleRunner(
-        rules=[*rule_runner.rules, *protobuf_rules()],
+        rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
         target_types=[*rule_runner.target_types, ProtobufLibrary],
     )
     rule_runner.write_files(
