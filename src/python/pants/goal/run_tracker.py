@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import getpass
 import logging
-import os
 import platform
 import socket
 import time
@@ -13,7 +12,7 @@ import uuid
 from collections import OrderedDict
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -22,7 +21,6 @@ from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.util.dirutil import safe_mkdir_for
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -44,7 +42,33 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 class RunTracker:
     """Tracks and times the execution of a single Pants run."""
 
-    def __init__(self, args: Tuple[str, ...], options: Options):
+    # TODO: Find a way to know from a goal name whether it's a standard or a custom
+    #  goal whose name could, in theory, reveal something proprietary. That's more work than
+    #  we want to do at the moment, so we maintain this manual list for now.
+    STANDARD_GOALS = frozenset(
+        (
+            "count-loc",
+            "dependees",
+            "dependencies",
+            "export-codegen",
+            "filedeps",
+            "filter",
+            "fmt",
+            "lint",
+            "list",
+            "package",
+            "py-constraints",
+            "repl",
+            "roots",
+            "run",
+            "tailor",
+            "test",
+            "typecheck",
+            "validate",
+        )
+    )
+
+    def __init__(self, args: tuple[str, ...], options: Options):
         """
         :API: public
         """
@@ -60,25 +84,25 @@ class RunTracker:
 
         self._args = args
         self._all_options = options
-        info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
-        self._run_info: Dict[str, Any] = {}
+        info_dir = Path(self._all_options.for_global_scope().pants_workdir) / "run-tracker"
+        self._run_info: dict[str, Any] = {}
 
         # pantsd stats.
-        self._pantsd_metrics: Dict[str, int] = dict()
+        self._pantsd_metrics: dict[str, int] = dict()
 
-        self.run_logs_file = Path(info_dir, self.run_id, "logs")
-        safe_mkdir_for(str(self.run_logs_file))
+        self.run_logs_file = info_dir / self.run_id / "logs"
+        self.run_logs_file.parent.mkdir(exist_ok=True, parents=True)
         native_engine.set_per_run_log_path(str(self.run_logs_file))
 
         # Initialized in `start()`.
-        self._run_start_time: Optional[float] = None
-        self._run_total_duration: Optional[float] = None
+        self._run_start_time: float | None = None
+        self._run_total_duration: float | None = None
 
     @property
-    def goals(self) -> List[str]:
+    def goals(self) -> list[str]:
         return self._all_options.goals if self._all_options else []
 
-    def start(self, run_start_time: float, specs: List[str]) -> None:
+    def start(self, run_start_time: float, specs: list[str]) -> None:
         """Start tracking this pants run."""
         if self._has_started:
             raise AssertionError("RunTracker.start must not be called multiple times.")
@@ -106,30 +130,6 @@ class RunTracker:
         )
 
     def get_anonymous_telemetry_data(self, unhashed_repo_id: str) -> dict[str, str | list[str]]:
-        # TODO: Find a way to know from a goal name whether it's a standard or a custom
-        #  goal whose name could, in theory, reveal something proprietary. That's more work than
-        #  we want to do at the moment, so we maintain this manual list for now.
-        standard_goals = {
-            "count-loc",
-            "dependees",
-            "dependencies",
-            "export-codegen",
-            "filedeps",
-            "filter",
-            "fmt",
-            "lint",
-            "list",
-            "package",
-            "py-constraints",
-            "repl",
-            "roots",
-            "run",
-            "tailor",
-            "test",
-            "typecheck",
-            "validate",
-        }
-
         def maybe_hash_with_repo_id_prefix(s: str) -> str:
             qualified_str = f"{unhashed_repo_id}.{s}" if s else unhashed_repo_id
             # If the repo_id is the empty string we return a blank string.
@@ -151,19 +151,19 @@ class RunTracker:
             "machine_id": maybe_hash_with_repo_id_prefix(str(uuid.getnode())),
             "user_id": maybe_hash_with_repo_id_prefix(getpass.getuser()),
             # Note that we conserve the order in which the goals were specified on the cmd line.
-            "standard_goals": [goal for goal in self.goals if goal in standard_goals],
+            "standard_goals": [goal for goal in self.goals if goal in self.STANDARD_GOALS],
             # Lets us know of any custom goals were used, without knowing their names.
             "num_goals": str(len(self.goals)),
         }
 
-    def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
+    def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:
         self._pantsd_metrics = metrics
 
     @property
-    def pantsd_scheduler_metrics(self) -> Dict[str, int]:
+    def pantsd_scheduler_metrics(self) -> dict[str, int]:
         return dict(self._pantsd_metrics)  # defensive copy
 
-    def run_information(self) -> Dict[str, Any]:
+    def run_information(self) -> dict[str, Any]:
         """Basic information about this run."""
         return self._run_info
 
@@ -191,7 +191,7 @@ class RunTracker:
 
         native_engine.set_per_run_log_path(None)
 
-    def get_cumulative_timings(self) -> List[Dict[str, Any]]:
+    def get_cumulative_timings(self) -> list[dict[str, Any]]:
         return [{"label": "main", "timing": self._run_total_duration}]
 
     def get_options_to_record(self) -> dict:
@@ -227,7 +227,7 @@ class RunTracker:
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
             )
 
-    def retrieve_logs(self) -> List[str]:
+    def retrieve_logs(self) -> list[str]:
         """Get a list of every log entry recorded during this run."""
 
         if not self.run_logs_file:
