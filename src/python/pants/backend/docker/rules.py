@@ -12,19 +12,10 @@ from pants.backend.docker.target_types import (
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    DigestSubset,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import (
     BinaryNotFoundError,
     BinaryPath,
@@ -213,7 +204,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet, RunFieldSet):
+class DockerFieldSet(PackageFieldSet):
     required_fields = (DockerImageSources,)
 
     context_root_field: DockerContextRoot
@@ -291,28 +282,11 @@ async def build_docker_image(
                     f"Built docker image: {field_set.image_tag}",
                     "To try out the image interactively:",
                     f"    docker run -it --rm {field_set.image_tag} [entrypoint args...]",
-                    "or using pants:",
-                    f"    ./pants run {field_set.address} -- [entrypoint args...]",
                     "To push your image:",
                     f"    docker push {field_set.image_tag}",
                     "",
                 ),
             ),
-        ),
-    )
-
-
-@rule
-async def create_docker_image_run_request(field_set: DockerFieldSet) -> RunRequest:
-    docker = await Get(DockerBinary, DockerBinaryRequest(rationale="run docker images"))
-    return RunRequest(
-        digest=EMPTY_DIGEST,
-        args=(
-            docker.path,
-            "run",
-            "-it",
-            "--rm",
-            field_set.image_tag,
         ),
     )
 
@@ -326,5 +300,4 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(PackageFieldSet, DockerFieldSet),
-        UnionRule(RunFieldSet, DockerFieldSet),
     ]
