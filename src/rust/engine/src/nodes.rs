@@ -30,6 +30,7 @@ use fs::{
 };
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
+  ProcessResultSource,
 };
 
 use bytes::Bytes;
@@ -39,7 +40,8 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  in_workunit, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
+  UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -399,11 +401,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    if context
+    if let Some(compatible_request) = context
       .core
       .command_runner
       .extract_compatible_request(&request)
-      .is_some()
     {
       let command_runner = &context.core.command_runner;
 
@@ -417,15 +418,47 @@ impl WrappedNode for MultiPlatformExecuteProcess {
         .await
         .map_err(|e| throw(&e))?;
 
+      let definition = serde_json::to_string(&compatible_request)
+        .map_err(|e| throw(&format!("Failed to serialize process: {}", e)))?;
       workunit.update_metadata(|initial| WorkunitMetadata {
         stdout: Some(res.stdout_digest),
         stderr: Some(res.stderr_digest),
-        user_metadata: vec![(
-          "exit_code".to_string(),
-          UserMetadataItem::ImmediateId(res.exit_code as i64),
-        )],
+        user_metadata: vec![
+          (
+            "definition".to_string(),
+            UserMetadataItem::ImmediateString(definition),
+          ),
+          (
+            "source".to_string(),
+            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+          ),
+          (
+            "exit_code".to_string(),
+            UserMetadataItem::ImmediateInt(res.exit_code as i64),
+          ),
+        ],
         ..initial
       });
+      if let Some(total_elapsed) = res.metadata.total_elapsed {
+        let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
+        match res.metadata.source {
+          ProcessResultSource::RanLocally => {
+            workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
+            context
+              .session
+              .workunit_store()
+              .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
+          }
+          ProcessResultSource::RanRemotely => {
+            workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
+            context
+              .session
+              .workunit_store()
+              .record_observation(ObservationMetric::RemoteProcessTimeRunMs, total_elapsed);
+          }
+          _ => {}
+        }
+      }
 
       Ok(ProcessResult(res))
     } else {

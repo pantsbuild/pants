@@ -198,7 +198,8 @@ impl Default for WorkunitMetadata {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UserMetadataItem {
   PyValue(UserMetadataPyValue),
-  ImmediateId(i64),
+  ImmediateInt(i64),
+  ImmediateString(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

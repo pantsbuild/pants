@@ -1027,27 +1027,25 @@ async fn workunit_to_py_value(
     artifact_entries.push((externs::store_utf8(artifact_name.as_str()), py_val))
   }
 
-  let mut user_metadata_entries = Vec::new();
+  let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
-    match user_metadata_item {
-      UserMetadataItem::ImmediateId(n) => {
-        user_metadata_entries.push((
-          externs::store_utf8(user_metadata_key.as_str()),
-          externs::store_i64(*n),
-        ));
-      }
+    let value = match user_metadata_item {
+      UserMetadataItem::ImmediateString(v) => externs::store_utf8(v),
+      UserMetadataItem::ImmediateInt(n) => externs::store_i64(*n),
       UserMetadataItem::PyValue(py_val_handle) => {
         match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
-          None => log::warn!(
-            "Workunit metadata() value not found for key: {}",
-            user_metadata_key
-          ),
-          Some(v) => {
-            user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), v));
+          None => {
+            log::warn!(
+              "Workunit metadata() value not found for key: {}",
+              user_metadata_key
+            );
+            continue;
           }
+          Some(v) => v,
         }
       }
-    }
+    };
+    user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), value));
   }
 
   dict_entries.push((
