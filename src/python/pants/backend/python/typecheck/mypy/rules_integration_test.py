@@ -7,8 +7,10 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import rules as protobuf_subsystem_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
