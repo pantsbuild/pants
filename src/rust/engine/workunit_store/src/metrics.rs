@@ -73,6 +73,10 @@ pub enum Metric {
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
   RemoteStoreMissingDigest,
+  /// Total number of bytes of blobs downloaded from a remote CAS.
+  RemoteStoreBlobBytesDownloaded,
+  /// Total number of bytes of blobs uploaded to a remote CAS.
+  RemoteStoreBlobBytesUploaded,
 }
 
 impl Metric {
