@@ -27,20 +27,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use byteorder::ByteOrder;
-use digest::consts::U32;
-use generic_array::GenericArray;
-use serde::de::{MapAccess, Visitor};
-use serde::export::fmt::Error;
-use serde::export::Formatter;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
-use serde::{Deserialize, Deserializer};
-use sha2::{Digest as Sha256Digest, Sha256};
-
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;
+
+use byteorder::ByteOrder;
+use digest::consts::U32;
+use generic_array::GenericArray;
+use serde::de::{MapAccess, Visitor};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::{Deserialize, Deserializer};
+use sha2::{Digest as Sha256Digest, Sha256};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -139,7 +137,7 @@ impl<'de> Deserialize<'de> for Fingerprint {
     impl<'de> Visitor<'de> for FingerprintVisitor {
       type Value = Fingerprint;
 
-      fn expecting(&self, formatter: &mut Formatter) -> Result<(), Error> {
+      fn expecting(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter.write_str("struct Fingerprint")
       }
 
