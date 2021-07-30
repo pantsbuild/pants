@@ -202,6 +202,7 @@ dependencies = [
  "errno",
  "fuse",
  "futures",
+ "grpc_util",
  "hashing",
  "libc",
  "log 0.4.14",
@@ -670,6 +671,7 @@ dependencies = [
  "futures",
  "futures-core",
  "graph",
+ "grpc_util",
  "hashing",
  "indexmap",
  "itertools 0.10.1",
@@ -1090,7 +1092,9 @@ dependencies = [
  "prost-build",
  "prost-types",
  "rand 0.8.2",
+ "rustls",
  "rustls-native-certs",
+ "rustls-pemfile",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -1099,6 +1103,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
+ "webpki",
 ]
 
 [[package]]
@@ -2243,6 +2248,7 @@ dependencies = [
  "env_logger",
  "fs",
  "futures",
+ "grpc_util",
  "hashing",
  "log 0.4.14",
  "process_execution",
@@ -2763,6 +2769,15 @@ dependencies = [
  "rustls",
  "schannel",
  "security-framework",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
+dependencies = [
+ "base64",
 ]
 
 [[package]]

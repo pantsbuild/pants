@@ -133,7 +133,7 @@ impl CommandRunner {
     let store_use_tls = store_address.starts_with("https://");
 
     let tls_client_config = if execution_use_tls || store_use_tls {
-      Some(grpc_util::create_tls_config(root_ca_certs)?)
+      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
     } else {
       None
     };

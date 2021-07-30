@@ -43,6 +43,7 @@ use fs::{
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
 use grpc_util::prost::MessageExt;
+use grpc_util::tls::{CertificateCheck, MtlsConfig};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use serde_derive::Serialize;
@@ -224,6 +225,26 @@ to this directory.",
               .long("oauth-bearer-token-file")
               .required(false)
         )
+        .arg(
+          Arg::with_name("mtls-client-certificate-chain-path")
+              .help("Path to certificate chain to use when using MTLS.")
+              .takes_value(true)
+              .long("mtls-client-certificate-chain-path")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("mtls-client-key-path")
+              .help("Path to private key to use when using MTLS.")
+              .takes_value(true)
+              .long("mtls-client-key-path")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("dangerously-ignore-certificates")
+              .help("Ignore invalid certificates when using a remote CAS.")
+              .takes_value(false)
+              .long("dangerously-ignore-certificates")
+        )
         .arg(Arg::with_name("remote-instance-name")
             .takes_value(true)
                  .long("remote-instance-name")
@@ -298,6 +319,43 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           None
         };
 
+        let mtls = match (
+          top_match.value_of("mtls-client-certificate-chain-path"),
+          top_match.value_of("mtls-client-key-path"),
+        ) {
+          (Some(cert_chain_path), Some(key_path)) => {
+            let key = std::fs::read(key_path).map_err(|err| {
+              format!(
+                "Failed to read mtls-client-key-path from {:?}: {:?}",
+                key_path, err
+              )
+            })?;
+            let cert_chain = std::fs::read(cert_chain_path).map_err(|err| {
+              format!(
+                "Failed to read mtls-client-certificate-chain-path from {:?}: {:?}",
+                cert_chain_path, err
+              )
+            })?;
+            Some(MtlsConfig { key, cert_chain })
+          }
+          (None, None) => None,
+          _ => {
+            return Err("Must specify both or neither of mtls-client-certificate-chain-path and mtls-client-key-path".to_owned().into());
+          }
+        };
+
+        let certificate_check = if top_match.is_present("dangerously-ignore-certificates") {
+          CertificateCheck::DangerouslyDisabled
+        } else {
+          CertificateCheck::Enabled
+        };
+
+        let tls_config = grpc_util::tls::Config {
+          root_ca_certs,
+          mtls,
+          certificate_check,
+        };
+
         let mut headers = BTreeMap::new();
         if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
           let token = std::fs::read_to_string(oauth_path).map_err(|err| {
@@ -318,7 +376,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
-            root_ca_certs,
+            tls_config,
             headers,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
