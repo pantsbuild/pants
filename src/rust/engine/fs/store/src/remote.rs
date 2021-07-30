@@ -259,7 +259,9 @@ impl ByteStore {
         workunit_metadata,
         |workunit| async move {
           let result = result_future.await;
-          workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+          if result.is_ok() {
+            workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+          }
           result
         },
       )
@@ -372,7 +374,12 @@ impl ByteStore {
         workunit_metadata,
         |workunit| async move {
           let result = result_future.await;
-          workunit.increment_counter(Metric::RemoteStoreBlobBytesDownloaded, digest.size_bytes as u64);
+          if result.is_ok() {
+            workunit.increment_counter(
+              Metric::RemoteStoreBlobBytesDownloaded,
+              digest.size_bytes as u64,
+            );
+          }
           result
         },
       )
