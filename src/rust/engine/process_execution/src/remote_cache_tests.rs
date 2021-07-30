@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -75,7 +74,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
 // NB: We bundle these into a struct to ensure they share the same lifetime.
 struct StoreSetup {
   pub store: Store,
-  pub store_dir: PathBuf,
+  pub store_temp_dir: TempDir,
   pub cas: StubCAS,
   pub executor: task_executor::Executor,
 }
@@ -84,8 +83,9 @@ impl StoreSetup {
   pub fn new() -> StoreSetup {
     let executor = task_executor::Executor::new();
     let cas = StubCAS::builder().build();
-    let store_dir = TempDir::new().unwrap().path().join("store_dir");
-    let store = Store::local_only(executor.clone(), store_dir.clone())
+    let store_temp_dir = TempDir::new().unwrap();
+    let store_dir = store_temp_dir.path().join("store_dir");
+    let store = Store::local_only(executor.clone(), store_dir)
       .unwrap()
       .into_with_remote(
         &cas.address(),
@@ -100,7 +100,7 @@ impl StoreSetup {
       .unwrap();
     StoreSetup {
       store,
-      store_dir,
+      store_temp_dir,
       cas,
       executor,
     }
