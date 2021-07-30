@@ -427,6 +427,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
             UserMetadataItem::ImmediateString(definition),
           ),
           (
+            "source".to_string(),
+            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+          ),
+          (
             "exit_code".to_string(),
             UserMetadataItem::ImmediateInt(res.exit_code as i64),
           ),
