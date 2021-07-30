@@ -7,6 +7,10 @@ import logging
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.experimental.python.lockfile_metadata import (
+    invalidation_digest,
+    lockfile_content_with_header,
+)
 from pants.backend.python.subsystems.python_tool_base import (
     PythonToolBase,
     PythonToolRequirementsBase,
@@ -15,7 +19,14 @@ from pants.backend.python.target_types import ConsoleScript, PythonRequirementsF
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    MergeDigests,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -93,13 +104,23 @@ class PythonLockfileRequest:
             description=f"Generate lockfile for {subsystem.options_scope}",
         )
 
+    @property
+    def hex_digest(self) -> str:
+        """Produces a hex digest of this lockfile's inputs, which should uniquely specify the
+        resolution of this lockfile request.
+
+        Inputs are definted as requirements and interpreter constraints.
+        """
+        return invalidation_digest(self.requirements, self.interpreter_constraints)
+
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem
 ) -> PythonLockfile:
+    reqs_filename = "reqs.txt"
     input_requirements = await Get(
-        Digest, CreateDigest([FileContent("reqs.txt", "\n".join(req.requirements).encode())])
+        Digest, CreateDigest([FileContent(reqs_filename, "\n".join(req.requirements).encode())])
     )
 
     pip_compile_pex = await Get(
@@ -117,7 +138,7 @@ async def generate_lockfile(
         ),
     )
 
-    result = await Get(
+    generated_lockfile = await Get(
         ProcessResult,
         # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share
         #  the cache between Pex and Pip. Next best is a dedicated named_cache.
@@ -126,7 +147,7 @@ async def generate_lockfile(
             description=req.description,
             # TODO(#12314): Wire up all the pip options like indexes.
             argv=[
-                "reqs.txt",
+                reqs_filename,
                 "--generate-hashes",
                 f"--output-file={req.dest}",
                 # NB: This allows pinning setuptools et al, which we must do. This will become
@@ -137,7 +158,16 @@ async def generate_lockfile(
             output_files=(req.dest,),
         ),
     )
-    return PythonLockfile(result.output_digest, req.dest)
+
+    _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
+    lockfile_contents = _lockfile_contents_iter[0]
+
+    content_with_header = lockfile_content_with_header(req.hex_digest, lockfile_contents.content)
+    complete_lockfile = await Get(
+        Digest, CreateDigest([FileContent(req.dest, content_with_header)])
+    )
+
+    return PythonLockfile(complete_lockfile, req.dest)
 
 
 # --------------------------------------------------------------------------------------
