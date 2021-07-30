@@ -422,11 +422,9 @@ pub enum GeneratorResponse {
   GetMulti(Vec<Get>),
 }
 
-pub(crate) fn from_rust_cpython_to_pyo3(value: &PyObject) -> &pyo3::PyAny {
-  let pyo3_val = pyo3::Python::with_gil(|py| unsafe {
-    pyo3::PyAny::from_owned_ptr(py, value.as_ptr() as *mut pyo3::ffi::PyObject)
-  });
-  // Forget the first instance, since the second instance has taken ownership.
-  std::mem::forget(value);
-  pyo3_val
+pub(crate) fn from_rust_cpython_to_pyo3<'p>(
+  value: &PyObject,
+  py: pyo3::Python<'p>,
+) -> &'p pyo3::PyAny {
+  unsafe { pyo3::PyAny::from_owned_ptr(py, value.as_ptr() as *mut pyo3::ffi::PyObject) }
 }

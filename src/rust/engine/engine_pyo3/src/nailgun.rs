@@ -1,14 +1,15 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use super::PyExecutor;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyBrokenPipeError, PyException, PyKeyboardInterrupt};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+
+use crate::scheduler::PyExecutor;
 use task_executor::Executor;
 
-pub(crate) fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add(
     "PantsdConnectionException",
     py.get_type::<PantsdConnectionException>(),

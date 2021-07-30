@@ -14,7 +14,7 @@ use fs::{GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatch
 use hashing::{Digest, Fingerprint};
 use store::Snapshot;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &PyModule) -> PyResult<()> {
   m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   m.add_class::<PyDigest>()?;

@@ -726,6 +726,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine_pyo3_extension"
+version = "0.0.1"
+dependencies = [
+ "engine_pyo3",
+ "pyo3",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"

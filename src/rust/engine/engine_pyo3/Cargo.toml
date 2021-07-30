@@ -5,18 +5,6 @@ name = "engine_pyo3"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
-[lib]
-crate-type = ["cdylib"]
-
-[features]
-# NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
-# unfortunately, enabling `extension-module` causes tests linked against `pyo3` to fail. We
-# define a feature to enable that, but we do not enable it by default: someone building this module
-# in order to extract `libengine_pyo3.so` should pass `cargo build .. --features=engine_pyo3/extension-module`.
-#  see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["pyo3/extension-module"]
-default = []
-
 [dependencies]
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }

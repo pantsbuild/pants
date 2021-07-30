@@ -26,14 +26,15 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-// We only use unsafe pointer dereferences in our no_mangle exposed API, but it is nicer to list
-// just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
-// other unsafeness.
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
-#![type_length_limit = "43757804"]
 
-pub mod fs;
-pub mod nailgun;
-pub mod scheduler;
-pub mod testutil;
-pub mod workunits;
+use pyo3::prelude::*;
+
+#[pymodule]
+fn native_engine_pyo3(py: Python, m: &PyModule) -> PyResult<()> {
+  engine_pyo3::fs::register(m)?;
+  engine_pyo3::nailgun::register(py, m)?;
+  engine_pyo3::scheduler::register(m)?;
+  engine_pyo3::testutil::register(m)?;
+  engine_pyo3::workunits::register(m)?;
+  Ok(())
+}
