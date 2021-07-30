@@ -17,7 +17,7 @@ use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -257,7 +257,13 @@ impl ByteStore {
         workunit_store,
         workunit_name,
         workunit_metadata,
-        |_workunit| result_future,
+        |workunit| async move {
+          let result = result_future.await;
+          if result.is_ok() {
+            workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+          }
+          result
+        },
       )
       .await
     } else {
@@ -366,7 +372,16 @@ impl ByteStore {
         workunit_store_handle.store,
         workunit_name,
         workunit_metadata,
-        |_workunit| result_future,
+        |workunit| async move {
+          let result = result_future.await;
+          if result.is_ok() {
+            workunit.increment_counter(
+              Metric::RemoteStoreBlobBytesDownloaded,
+              digest.size_bytes as u64,
+            );
+          }
+          result
+        },
       )
       .await
     } else {
