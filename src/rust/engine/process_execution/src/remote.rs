@@ -42,7 +42,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
+  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
 };
 use grpc_util::retry::{retry_call, status_is_retryable};
 
@@ -499,6 +499,11 @@ impl CommandRunner {
             action_result,
             self.platform,
             false,
+            if execute_response.cached_result {
+              ProcessResultSource::HitRemotely
+            } else {
+              ProcessResultSource::RanRemotely
+            },
           )
           .await
           .map_err(ExecutionError::Fatal);
@@ -1073,7 +1078,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
     exit_code: -libc::SIGTERM,
     output_directory: hashing::EMPTY_DIGEST,
     platform,
-    metadata: ProcessResultMetadata::default(),
+    metadata: ProcessResultMetadata::new(Some(elapsed.into()), ProcessResultSource::RanRemotely),
   })
 }
 
@@ -1089,6 +1094,7 @@ pub fn populate_fallible_execution_result(
   action_result: &remexec::ActionResult,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
+  source: ProcessResultSource,
 ) -> BoxFuture<Result<FallibleProcessResultWithPlatform, String>> {
   future::try_join3(
     extract_stdout(&store, action_result),
@@ -1110,7 +1116,9 @@ pub fn populate_fallible_execution_result(
         metadata: action_result
           .execution_metadata
           .clone()
-          .map_or(ProcessResultMetadata::default(), |metadata| metadata.into()),
+          .map_or(ProcessResultMetadata::new(None, source), |metadata| {
+            ProcessResultMetadata::new_from_metadata(metadata, source)
+          }),
       })
     },
   )
@@ -1380,9 +1388,14 @@ pub async fn check_action_cache(
       match action_result_response {
         Ok(action_result) => {
           let action_result = action_result.into_inner();
-          let response =
-            populate_fallible_execution_result(store.clone(), &action_result, platform, false)
-              .await?;
+          let response = populate_fallible_execution_result(
+            store.clone(),
+            &action_result,
+            platform,
+            false,
+            ProcessResultSource::HitRemotely,
+          )
+          .await?;
           // TODO: This should move inside the retry_call above, both in order to be retried, and
           // to ensure that we increment a miss if we fail to eagerly fetch.
           if eager_fetch {

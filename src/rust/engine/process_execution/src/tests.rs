@@ -5,7 +5,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
-use crate::{Process, ProcessResultMetadata};
+use crate::{Process, ProcessResultMetadata, ProcessResultSource};
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use prost_types::Timestamp;
 use remexec::ExecutedActionMetadata;
@@ -59,10 +59,14 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
     ..ExecutedActionMetadata::default()
   };
 
-  let converted_process_result: ProcessResultMetadata = action_metadata.into();
+  let converted_process_result: ProcessResultMetadata =
+    ProcessResultMetadata::new_from_metadata(action_metadata, ProcessResultSource::RanLocally);
   assert_eq!(
     converted_process_result,
-    ProcessResultMetadata::new(Some(concrete_time::Duration::new(20, 30)))
+    ProcessResultMetadata::new(
+      Some(concrete_time::Duration::new(20, 30)),
+      ProcessResultSource::RanLocally
+    )
   );
 
   // The conversion from `ExecutedActionMetadata` to `ProcessResultMetadata` is lossy.
@@ -83,26 +87,37 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
   );
 
   // The relevant metadata may be missing from either type.
-  let action_metadata_missing: ProcessResultMetadata = ExecutedActionMetadata::default().into();
-  assert_eq!(action_metadata_missing, ProcessResultMetadata::default());
-  let process_result_missing: ExecutedActionMetadata = ProcessResultMetadata::default().into();
+  let empty = ProcessResultMetadata::new(None, ProcessResultSource::RanLocally);
+  let action_metadata_missing: ProcessResultMetadata = ProcessResultMetadata::new_from_metadata(
+    ExecutedActionMetadata::default(),
+    ProcessResultSource::RanLocally,
+  );
+  assert_eq!(action_metadata_missing, empty);
+  let process_result_missing: ExecutedActionMetadata = empty.into();
   assert_eq!(process_result_missing, ExecutedActionMetadata::default());
 }
 
 #[test]
 fn process_result_metadata_time_saved_from_cache() {
-  let metadata = ProcessResultMetadata::new(Some(concrete_time::Duration::new(5, 150)));
+  let metadata = ProcessResultMetadata::new(
+    Some(concrete_time::Duration::new(5, 150)),
+    ProcessResultSource::RanLocally,
+  );
   let time_saved = metadata.time_saved_from_cache(Duration::new(1, 100));
   assert_eq!(time_saved, Some(Duration::new(4, 50)));
 
   // If the cache lookup took more time than the process, we return 0.
-  let metadata = ProcessResultMetadata::new(Some(concrete_time::Duration::new(1, 0)));
+  let metadata = ProcessResultMetadata::new(
+    Some(concrete_time::Duration::new(1, 0)),
+    ProcessResultSource::RanLocally,
+  );
   let time_saved = metadata.time_saved_from_cache(Duration::new(5, 0));
   assert_eq!(time_saved, Some(Duration::new(0, 0)));
 
   // If the original process time wasn't recorded, we can't compute the time saved.
   assert_eq!(
-    ProcessResultMetadata::default().time_saved_from_cache(Duration::new(1, 100)),
+    ProcessResultMetadata::new(None, ProcessResultSource::RanLocally)
+      .time_saved_from_cache(Duration::new(1, 100)),
     None
   );
 }

@@ -110,7 +110,7 @@ impl TryFrom<String> for Platform {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
   // Cached in all locations, regardless of success or failure.
   Always,
@@ -141,10 +141,14 @@ impl TryFrom<String> for ProcessCacheScope {
   }
 }
 
+fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::Ok, S::Error> {
+  s.serialize_str(&level.to_string())
+}
+
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
+#[derive(Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
   ///
@@ -184,6 +188,8 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
+  // NB: We serialize with a function to avoid adding a serde dep to the logging crate.
+  #[serde(serialize_with = "serialize_level")]
   pub level: log::Level,
 
   ///
@@ -359,17 +365,40 @@ pub struct FallibleProcessResultWithPlatform {
 
 /// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
 /// conversion is lossy, but the interesting parts are preserved.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
   /// The time from starting to completion, including preparing the chroot and cleanup.
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
   /// `ExecutedActionMetadata`.
+  ///
+  /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
+  /// The source of the result.
+  pub source: ProcessResultSource,
 }
 
 impl ProcessResultMetadata {
-  pub fn new(total_elapsed: Option<Duration>) -> Self {
-    ProcessResultMetadata { total_elapsed }
+  pub fn new(total_elapsed: Option<Duration>, source: ProcessResultSource) -> Self {
+    ProcessResultMetadata {
+      total_elapsed,
+      source,
+    }
+  }
+
+  pub fn new_from_metadata(metadata: ExecutedActionMetadata, source: ProcessResultSource) -> Self {
+    let total_elapsed = match (
+      metadata.worker_start_timestamp,
+      metadata.worker_completed_timestamp,
+    ) {
+      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
+        .map(|span| span.duration)
+        .ok(),
+      _ => None,
+    };
+    Self {
+      total_elapsed,
+      source,
+    }
   }
 
   /// How much faster a cache hit was than running the process again.
@@ -397,21 +426,6 @@ impl ProcessResultMetadata {
   }
 }
 
-impl From<ExecutedActionMetadata> for ProcessResultMetadata {
-  fn from(metadata: ExecutedActionMetadata) -> Self {
-    let total_elapsed = match (
-      metadata.worker_start_timestamp,
-      metadata.worker_completed_timestamp,
-    ) {
-      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
-        .map(|span| span.duration)
-        .ok(),
-      _ => None,
-    };
-    Self { total_elapsed }
-  }
-}
-
 impl From<ProcessResultMetadata> for ExecutedActionMetadata {
   fn from(metadata: ProcessResultMetadata) -> ExecutedActionMetadata {
     let (total_start, total_end) = match metadata.total_elapsed {
@@ -436,6 +450,14 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
       ..ExecutedActionMetadata::default()
     }
   }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProcessResultSource {
+  RanLocally,
+  RanRemotely,
+  HitLocally,
+  HitRemotely,
 }
 
 #[derive(Clone)]

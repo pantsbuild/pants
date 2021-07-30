@@ -43,6 +43,7 @@ use strum::IntoEnumIterator;
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum Metric {
+  LocalProcessTotalTimeRunMs,
   LocalCacheRequests,
   LocalCacheRequestsCached,
   LocalCacheRequestsUncached,
@@ -52,6 +53,7 @@ pub enum Metric {
   /// processes directly.
   LocalCacheTotalTimeSavedMs,
   LocalExecutionRequests,
+  RemoteProcessTotalTimeRunMs,
   RemoteCacheRequests,
   RemoteCacheRequestsCached,
   RemoteCacheRequestsUncached,
@@ -85,7 +87,9 @@ impl Metric {
 #[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
+  LocalProcessTimeRunMs,
   LocalStoreReadBlobSize,
+  RemoteProcessTimeRunMs,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
   /// The time saved (in milliseconds) thanks to a local cache hit instead of running the process

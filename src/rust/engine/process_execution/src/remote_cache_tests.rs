@@ -22,7 +22,7 @@ use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, Process, ProcessMetadata, ProcessResultMetadata,
-  RemoteCacheWarningsBehavior,
+  ProcessResultSource, RemoteCacheWarningsBehavior,
 };
 
 /// A mock of the local runner used for better hermeticity of the tests.
@@ -46,7 +46,7 @@ impl MockLocalCommandRunner {
         exit_code,
         output_directory: EMPTY_DIGEST,
         platform: Platform::current().unwrap(),
-        metadata: ProcessResultMetadata::default(),
+        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
       }),
       call_counter,
       delay: Duration::from_millis(delay_ms),
@@ -609,7 +609,7 @@ async fn make_action_result_basic() {
     output_directory: directory_digest,
     exit_code: 102,
     platform: Platform::Linux,
-    metadata: ProcessResultMetadata::default(),
+    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
   };
 
   let (action_result, digests) = runner
