@@ -50,7 +50,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
     if hadolint.skip:
         return LintResults([], linter_name="Hadolint")
 
-    downloaded_hadolint, sources = await MultiGet(
+    downloaded_hadolint, sources, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
         Get(
             SourceFiles,
@@ -60,8 +60,8 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
                 enable_codegen=True,
             ),
         ),
+        Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
     )
-    config_files = await Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request())
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -81,8 +81,9 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
             level=LogLevel.DEBUG,
         ),
     )
-    results = [LintResult.from_fallible_process_result(process_result)]
-    return LintResults(results, linter_name="hadolint")
+    return LintResults(
+        [LintResult.from_fallible_process_result(process_result)], linter_name="hadolint"
+    )
 
 
 def rules():
