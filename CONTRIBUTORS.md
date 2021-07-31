@@ -112,6 +112,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Josh Reed
 + Josh Soref
 + Joshua Cohen
 + Joshua Humphries
