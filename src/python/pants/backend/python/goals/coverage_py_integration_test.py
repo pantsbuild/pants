@@ -140,13 +140,14 @@ def test_coverage() -> None:
             {tmpdir}/src/python/project/__init__.py                        0      0   100%
             {tmpdir}/src/python/project/lib.py                             6      0   100%
             {tmpdir}/src/python/project/lib_test.py                        3      0   100%
+            {tmpdir}/src/python/project/random.py                          2      2     0%
             {tmpdir}/tests/python/project_test/__init__.py                 0      0   100%
             {tmpdir}/tests/python/project_test/no_src/__init__.py          0      0   100%
             {tmpdir}/tests/python/project_test/no_src/test_no_src.py       2      0   100%
             {tmpdir}/tests/python/project_test/test_arithmetic.py          3      0   100%
             {tmpdir}/tests/python/project_test/test_multiply.py            3      0   100%
             ---------------------------------------------------------------------------------
-            TOTAL                                                            17      0   100%
+            TOTAL                                                            19      2    89%
             """
         )
         in result.stderr
@@ -239,3 +240,58 @@ def test_coverage_html_xml_json() -> None:
     assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr
     json_coverage = coverage_path / "coverage.json"
     assert json_coverage.exists() is True
+
+
+def test_default_coverage_issues_12390() -> None:
+    # N.B.: This ~replicates the repo used to reproduce this issue at
+    # https://github.com/alexey-tereshenkov-oxb/monorepo-coverage-pants.
+    files = {
+        "requirements.txt": "PySide2==5.15.2",
+        "BUILD": dedent(
+            """\
+            python_requirements(
+                module_mapping={{
+                    "PySide2": ["PySide2"],
+                }},
+            )
+            """
+        ),
+        "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
+        "minimalcov/minimalcov/src/BUILD": "python_library()",
+        "minimalcov/minimalcov/tests/test_foo.py": dedent(
+            """\
+            import minimalcov.src.foo
+
+            from PySide2.QtWidgets import QApplication
+
+            def test_1():
+                assert True
+            """
+        ),
+        "minimalcov/minimalcov/tests/BUILD": "python_tests()",
+    }
+    with setup_tmpdir(files) as tmpdir:
+        command = [
+            "--backend-packages=pants.backend.python",
+            "test",
+            "--use-coverage",
+            "::",
+            f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            "--coverage-py-report=raw",
+        ]
+        result = run_pants(command)
+        result.assert_success()
+
+    assert (
+        dedent(
+            f"""\
+            Name                                                  Stmts   Miss  Cover
+            -------------------------------------------------------------------------
+            {tmpdir}/minimalcov/minimalcov/src/foo.py              1      0   100%
+            {tmpdir}/minimalcov/minimalcov/tests/test_foo.py       4      0   100%
+            -------------------------------------------------------------------------
+            TOTAL                                                     5      0   100%
+            """
+        )
+        in result.stderr
+    ), result.stderr
