@@ -240,3 +240,59 @@ def test_coverage_html_xml_json() -> None:
     assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr
     json_coverage = coverage_path / "coverage.json"
     assert json_coverage.exists() is True
+
+
+def test_default_coverage_issues_12390() -> None:
+    # N.B.: This ~replicates the repo used to reproduce this issue at
+    # https://github.com/alexey-tereshenkov-oxb/monorepo-coverage-pants.
+    files = {
+        "requirements.txt": "PySide2==5.15.2",
+        "BUILD": dedent(
+            """\
+            python_requirements(
+                module_mapping={{
+                    "PySide2": ["PySide2"],
+                }},
+            )
+            """
+        ),
+        "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
+        "minimalcov/minimalcov/src/BUILD": "python_library()",
+        "minimalcov/minimalcov/tests/test_foo.py": dedent(
+            """\
+            import minimalcov.src.foo
+
+            from PySide2.QtWidgets import QApplication
+
+            def test_1():
+                assert True
+            """
+        ),
+        "minimalcov/minimalcov/tests/BUILD": "python_tests()",
+    }
+    with setup_tmpdir(files) as tmpdir:
+        command = [
+            "--backend-packages=pants.backend.python",
+            "test",
+            "--use-coverage",
+            "::",
+            f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            "--coverage-py-report=raw",
+        ]
+        result = run_pants(command)
+        result.assert_success()
+
+    print(result.stderr)
+    assert (
+        dedent(
+            f"""\
+            Name                                                  Stmts   Miss  Cover
+            -------------------------------------------------------------------------
+            {tmpdir}/minimalcov/minimalcov/src/foo.py              1      0   100%
+            {tmpdir}/minimalcov/minimalcov/tests/test_foo.py       4      0   100%
+            -------------------------------------------------------------------------
+            TOTAL                                                     5      0   100%
+            """
+        )
+        in result.stderr
+    ), result.stderr
