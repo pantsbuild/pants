@@ -282,7 +282,6 @@ def test_default_coverage_issues_12390() -> None:
         result = run_pants(command)
         result.assert_success()
 
-    print(result.stderr)
     assert (
         dedent(
             f"""\
