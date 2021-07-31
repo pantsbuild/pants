@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -278,11 +277,21 @@ async def setup_pytest_for_target(
     coverage_args = []
     if test_subsystem.use_coverage and not request.is_debug:
         output_files.append(".coverage")
-        cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
+
+        if coverage_subsystem.filter:
+            cov_args = [f"--cov={morf}" for morf in coverage_subsystem.filter]
+        else:
+            # N.B.: Passing `--cov=` or `--cov=.` to communicate "record coverage for all sources"
+            # fails in certain contexts as detailed in:
+            #   https://github.com/pantsbuild/pants/issues/12390
+            # Instead we focus coverage on just the directories containing python source files
+            # materialized to the Process chroot.
+            cov_args = [f"--cov={source_root}" for source_root in prepared_sources.source_roots]
+
         coverage_args = [
             "--cov-report=",  # Turn off output.
             f"--cov-config={coverage_config.path}",
-            *itertools.chain.from_iterable(["--cov", cov_path] for cov_path in cov_paths),
+            *cov_args,
         ]
 
     extra_env = {

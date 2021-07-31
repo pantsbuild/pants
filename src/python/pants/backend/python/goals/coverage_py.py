@@ -122,11 +122,12 @@ class CoverageSubsystem(PythonToolBase):
             member_type=str,
             default=None,
             help=(
-                "A list of Python modules to use in the coverage report, e.g. "
-                "`['helloworld_test', 'helloworld.util.dirutil'].\n\nThe modules are recursive: "
-                "any submodules will be included.\n\nIf you leave this off, the coverage report "
-                "will include every file in the transitive closure of the address/file arguments; "
-                "for example, `test ::` will include every Python file in your project, whereas "
+                "A list of Python modules or filesystem paths to use in the coverage report, e.g. "
+                "`['helloworld_test', 'helloworld/util/dirutil'].\n\nBoth modules and directory "
+                "paths are recursive: any submodules or child paths, respectively, will be "
+                "included.\n\nIf you leave this off, the coverage report will include every file "
+                "in the transitive closure of the address/file arguments; for example, `test ::` "
+                "will include every Python file in your project, whereas "
                 "`test project/app_test.py` will include `app_test.py` and any of its transitive "
                 "dependencies."
             ),
