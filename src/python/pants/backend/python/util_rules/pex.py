@@ -24,9 +24,10 @@ from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
+    CompletePexEnvironment,
+    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
-    SandboxPexEnvironment,
 )
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -522,36 +523,40 @@ class VenvScript:
 
 @dataclass(frozen=True)
 class VenvScriptWriter:
+    complete_pex_env: CompletePexEnvironment
     pex: Pex
     venv_dir: PurePath
+
+    @classmethod
+    def create(
+        cls, pex_environment: PexEnvironment, pex: Pex, venv_rel_dir: PurePath
+    ) -> VenvScriptWriter:
+        # N.B.: We don't know the working directory that will be used in any given
+        # invocation of the venv scripts; so we deal with working_directory inside the scripts
+        # themselves by absolutifying all relevant paths at runtime.
+        complete_pex_env = pex_environment.in_sandbox(working_directory=None)
+        venv_dir = complete_pex_env.pex_root / venv_rel_dir
+        return cls(complete_pex_env=complete_pex_env, pex=pex, venv_dir=venv_dir)
 
     def _create_venv_script(
         self,
         bash: BashBinary,
-        pex_environment: SandboxPexEnvironment,
         *,
         script_path: PurePath,
         venv_executable: PurePath,
     ) -> VenvScript:
-        # Ensure that the pex is executed from a path relative to the shim script, so
-        # that running from within a working directory works properly.
-        # NB: No method for determining the path of the current script is entirely foolproof,
-        #  but BASH_SOURCE works fine in our specific case (and has been available since bash-3.0,
-        #  released in 2004, so it seems safe to assume it's available).
-        sandbox_root = '"${BASH_SOURCE%/*}"'
-
         env_vars = (
-            f"{name}={os.path.join(sandbox_root, shlex.quote(value)) if name == 'PEX_ROOT' else shlex.quote(value)}"
-            for name, value in pex_environment.environment_dict(python_configured=True).items()
+            f"{name}={shlex.quote(value)}"
+            for name, value in self.complete_pex_env.environment_dict(
+                python_configured=True
+            ).items()
         )
 
-        local_pex_bin = os.path.join(sandbox_root, shlex.quote(self.pex.name))
-        target_venv_executable = os.path.join(sandbox_root, shlex.quote(str(venv_executable)))
-        venv_dir = os.path.join(os.path.join(sandbox_root, shlex.quote(str(self.venv_dir))))
+        target_venv_executable = shlex.quote(str(venv_executable))
+        venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            # Don't quote the BASH_SOURCE dereference in local_pex_bin.
-            arg if arg == local_pex_bin else shlex.quote(arg)
-            for arg in pex_environment.create_argv(local_pex_bin, python=self.pex.python)[1:]
+            shlex.quote(arg)
+            for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
         script = dedent(
@@ -559,22 +564,45 @@ class VenvScriptWriter:
             #!{bash.path}
             set -euo pipefail
 
+            # N.B.: We convert all sandbox root relative paths to absolute paths so this script
+            # works when run with a cwd set elsewhere.
+
+            # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
+            # 2004. In turn, our use of BASH_SOURCE relies on the fact that this script is executed
+            # by the engine via its absolute path.
+            ABS_SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
+
+            function ensure_absolute() {{
+                local value0="$1"
+                shift
+                if [ "${{value0:0:1}}" == "/" ]; then
+                    echo "${{value0}}" "$@"
+                else
+                    echo "${{ABS_SANDBOX_ROOT}}/${{value0}}" "$@"
+                fi
+            }}
+
             export {" ".join(env_vars)}
+            export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
+
+            execute_pex_args="$(ensure_absolute {execute_pex_args})"
+            target_venv_executable="$(ensure_absolute {target_venv_executable})"
+            venv_dir="$(ensure_absolute {venv_dir})"
 
             # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
             # with tools support.
             if [ -n "${{PEX_TOOLS:-}}" ]; then
-              exec {execute_pex_args} "$@"
+              exec ${{execute_pex_args}} "$@"
             fi
 
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
-            if [ ! -e {target_venv_executable} ]; then
-                rm -rf {venv_dir} || true
-                PEX_INTERPRETER=1 {execute_pex_args} -c ''
+            if [ ! -e "${{target_venv_executable}}" ]; then
+                rm -rf "${{venv_dir}}" || true
+                PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
             fi
 
-            exec {target_venv_executable} "$@"
+            exec "${{target_venv_executable}}" "$@"
             """
         )
         return VenvScript(
@@ -582,28 +610,25 @@ class VenvScriptWriter:
             content=FileContent(path=str(script_path), content=script.encode(), is_executable=True),
         )
 
-    def exe(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
+    def exe(self, bash: BashBinary) -> VenvScript:
         """Writes a safe shim for the venv's executable `pex` script."""
         script_path = PurePath(f"{self.pex.name}_pex_shim.sh")
         return self._create_venv_script(
-            bash, pex_environment, script_path=script_path, venv_executable=self.venv_dir / "pex"
+            bash, script_path=script_path, venv_executable=self.venv_dir / "pex"
         )
 
-    def bin(
-        self, bash: BashBinary, pex_environment: SandboxPexEnvironment, name: str
-    ) -> VenvScript:
+    def bin(self, bash: BashBinary, name: str) -> VenvScript:
         """Writes a safe shim for an executable or script in the venv's `bin` directory."""
         script_path = PurePath(f"{self.pex.name}_bin_{name}_shim.sh")
         return self._create_venv_script(
             bash,
-            pex_environment,
             script_path=script_path,
             venv_executable=self.venv_dir / "bin" / name,
         )
 
-    def python(self, bash: BashBinary, pex_environment: SandboxPexEnvironment) -> VenvScript:
+    def python(self, bash: BashBinary) -> VenvScript:
         """Writes a safe shim for the venv's python binary."""
-        return self.bin(bash, pex_environment, "python")
+        return self.bin(bash, "python")
 
 
 @dataclass(frozen=True)
@@ -639,7 +664,7 @@ def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
 
 @rule
 async def create_venv_pex(
-    request: VenvPexRequest, bash: BashBinary, pex_environment: SandboxPexEnvironment
+    request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
 ) -> VenvPex:
     # VenvPex is motivated by improving performance of Python tools by eliminating traditional PEX
     # file startup overhead.
@@ -679,15 +704,13 @@ async def create_venv_pex(
     abs_pex_root = PurePath(seed_info["pex_root"])
     abs_pex_path = PurePath(seed_info["pex"])
     venv_rel_dir = abs_pex_path.relative_to(abs_pex_root).parent
-    venv_dir = pex_environment.pex_root / venv_rel_dir
 
-    venv_script_writer = VenvScriptWriter(pex=venv_pex_result.create_pex(), venv_dir=venv_dir)
-    pex = venv_script_writer.exe(bash, pex_environment)
-    python = venv_script_writer.python(bash, pex_environment)
-    scripts = {
-        bin_name: venv_script_writer.bin(bash, pex_environment, bin_name)
-        for bin_name in request.bin_names
-    }
+    venv_script_writer = VenvScriptWriter.create(
+        pex_environment=pex_environment, pex=venv_pex_result.create_pex(), venv_rel_dir=venv_rel_dir
+    )
+    pex = venv_script_writer.exe(bash)
+    python = venv_script_writer.python(bash)
+    scripts = {bin_name: venv_script_writer.bin(bash, bin_name) for bin_name in request.bin_names}
     scripts_digest = await Get(
         Digest,
         CreateDigest(
@@ -756,16 +779,12 @@ class PexProcess:
 
 
 @rule
-async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvironment) -> Process:
+async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     pex = request.pex
-    pex_bin = (
-        os.path.relpath(pex.name, request.working_directory)
-        if request.working_directory
-        else pex.name
-    )
-    argv = pex_environment.create_argv(pex_bin, *request.argv, python=pex.python)
+    complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
+    argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
-        **pex_environment.environment_dict(python_configured=pex.python is not None),
+        **complete_pex_env.environment_dict(python_configured=pex.python is not None),
         **(request.extra_env or {}),
     }
     input_digest = (
@@ -782,7 +801,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: SandboxPexEnvi
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches,
+        append_only_caches=complete_pex_env.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -837,7 +856,7 @@ class VenvPexProcess:
 
 @rule
 async def setup_venv_pex_process(
-    request: VenvPexProcess, pex_environment: SandboxPexEnvironment
+    request: VenvPexProcess, pex_environment: PexEnvironment
 ) -> Process:
     venv_pex = request.venv_pex
     pex_bin = (
@@ -860,7 +879,9 @@ async def setup_venv_pex_process(
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.append_only_caches,
+        append_only_caches=pex_environment.in_sandbox(
+            working_directory=request.working_directory
+        ).append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
