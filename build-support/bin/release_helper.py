@@ -622,7 +622,7 @@ def build_pex(fetch: bool) -> None:
 
 
 def publish() -> None:
-    banner("Releasing packages to PyPI and GitHub")
+    banner("Releasing to PyPI and GitHub")
     # Check prereqs.
     check_clean_git_branch()
     check_pgp()
@@ -639,7 +639,8 @@ def publish() -> None:
     create_twine_venv()
     upload_wheels_via_twine()
     tag_release()
-    banner("Successfully released packages to PyPI and GitHub")
+    banner("Successfully released to PyPI and GitHub")
+    prompt_apple_silicon()
     prompt_to_generate_docs()
 
 
@@ -784,6 +785,16 @@ def upload_wheels_via_twine() -> None:
             str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],
         check=True,
+    )
+
+
+def prompt_apple_silicon() -> None:
+    input(
+        f"We need to release for Apple Silicon. Please message Eric on Slack asking to release "
+        f"for {CONSTANTS.pants_stable_version}.\n\n"
+        f"(You do not need to wait for Eric to finish his part. You can continue in the release "
+        f"process once you've messaged him.)"
+        f"\n\nHit enter when you've messaged Eric: "
     )
 
 
