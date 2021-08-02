@@ -4,12 +4,7 @@ import logging
 
 from pants.backend.go import import_analysis, pkg
 from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
-from pants.backend.go.module import (
-    FindNearestGoModuleRequest,
-    ResolvedGoModule,
-    ResolvedOwningGoModule,
-    ResolveGoModuleRequest,
-)
+from pants.backend.go.module import FindNearestGoModuleRequest, ResolvedOwningGoModule
 from pants.backend.go.pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.target_types import (
     GoExternalModule,
@@ -68,9 +63,9 @@ async def infer_go_dependencies(
     this_go_package = await Get(
         ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
     )
-    print(f"resolved_go_package={this_go_package}")
 
     # Obtain all go_package targets under this package's go_module.
+    assert this_go_package.module_address is not None
     spec_path = this_go_package.module_address.spec_path
     address_specs = [
         MaybeEmptySiblingAddresses(spec_path),
@@ -84,12 +79,6 @@ async def infer_go_dependencies(
         and not tgt.address.is_file_target
         and tgt.address != this_go_package.address
     ]
-    print(f"go_package_targets={go_package_targets}")
-
-    # TODO: Use MultiGet if possible to process modules concurrently.
-    resolved_go_module = await Get(
-        ResolvedGoModule, ResolveGoModuleRequest(this_go_package.module_address)
-    )
 
     # Find all go_external_modules in the repo and map their import paths to their address.
     candidate_go_external_module_targets = await Get(
@@ -101,27 +90,22 @@ async def infer_go_dependencies(
     third_party_import_path_to_address = {
         tgt[GoImportPath].value: tgt.address for tgt in go_external_module_targets
     }
-    print(f"third_party_import_path_to_address={third_party_import_path_to_address}")
 
     # Resolve all of the packages found.
     first_party_import_path_to_address = {}
-    resolved_go_packages = await MultiGet(
+    first_party_go_packages = await MultiGet(
         Get(ResolvedGoPackage, ResolveGoPackageRequest(tgt.address)) for tgt in go_package_targets
     )
-    print(f"resolved_go_packages={resolved_go_packages}")
-    for pkg in resolved_go_packages:
+    for first_party_go_package in first_party_go_packages:
         # Skip packages that are not part of this package's module.
         # TODO: This requires that all first-party code in the monorepo be part of the same go_module. Will need
         # figure out how multiple modules in a monorepo can interact.
-        if pkg.module_address != this_go_package.module_address:
-            print(
-                f"Skipping addr={pkg.address} (mod_addr={pkg.module_address}, this_mod_addr={this_go_package.module_address})"
-            )
+        if first_party_go_package.module_address != this_go_package.module_address:
             continue
 
-        first_party_import_path_to_address[pkg.import_path] = pkg.address
-
-    print(f"first_party_import_path_to_address={first_party_import_path_to_address}")
+        first_party_import_path_to_address[
+            first_party_go_package.import_path
+        ] = first_party_go_package.address
 
     # Loop through all of the imports of this package and add dependencies on other packages and
     # external modules.
@@ -139,12 +123,12 @@ async def infer_go_dependencies(
         # Infer third-party dependencies on go_external_module targets.
         found_module_import = False
         for module_import_path, address in third_party_import_path_to_address.items():
-            # TODO: This check naively assumes that the import path for the external module is a prefix of any package
+            # TODO: This check assumes that the import path for the external module is a prefix of any package
             # from the external module and that the import path will never overlap with another external module's
-            # import path. This may be the case, but bears investigation. One problem could be how to handle multiple
-            # major versions which have separate import paths.
-            print(f"module_import_path='{module_import_path}'\nimport_path='{import_path}'")
-            if import_path.startswith(module_import_path):
+            # import path. This may be the case, but bears confirmation.
+            #
+            # TODO: Also cleanup mandatory go_module ownership, so module_import_path is not Optional[str].
+            if module_import_path and import_path.startswith(module_import_path):
                 inferred_dependencies.append(address)
                 found_module_import = True
 
