@@ -621,6 +621,10 @@ class SchedulerSession:
     def record_test_observation(self, value: int) -> None:
         native_engine.session_record_test_observation(self.py_scheduler, self.py_session, value)
 
+    @property
+    def is_cancelled(self) -> bool:
+        return self.py_session.is_cancelled()
+
     def cancel(self) -> None:
         self.py_session.cancel()
 

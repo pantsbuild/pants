@@ -7,6 +7,7 @@ import os
 import signal
 from typing import Mapping
 
+import pytest
 from workunit_logger.register import FINISHED_SUCCESSFULLY
 
 from pants.testutil.pants_integration_test import (
@@ -19,9 +20,10 @@ from pants.util.dirutil import maybe_read_file
 from pants_test.pantsd.pantsd_integration_test_base import attempts, launch_waiter
 
 
-def workunit_logger_config(log_dest: str) -> Mapping:
+def workunit_logger_config(log_dest: str, *, pantsd: bool = True) -> Mapping:
     return {
         "GLOBAL": {
+            "pantsd": pantsd,
             "backend_packages.add": ["workunit_logger", "pants.backend.python"],
         },
         "workunit-logger": {"dest": log_dest},
@@ -59,12 +61,15 @@ def test_help() -> None:
     run(["--version"])
 
 
-def test_ctrl_c() -> None:
+@pytest.mark.parametrize("pantsd", [True, False])
+def test_ctrl_c(pantsd: bool) -> None:
     with temporary_workdir() as workdir:
         dest = os.path.join(workdir, "dest.log")
 
         # Start a pantsd run that will wait forever, then kill the pantsd client.
-        client_handle, _, _ = launch_waiter(workdir=workdir, config=workunit_logger_config(dest))
+        client_handle, _, _ = launch_waiter(
+            workdir=workdir, config=workunit_logger_config(dest, pantsd=pantsd)
+        )
         client_pid = client_handle.process.pid
         os.kill(client_pid, signal.SIGINT)
 
