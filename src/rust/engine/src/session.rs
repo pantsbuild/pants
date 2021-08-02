@@ -101,6 +101,9 @@ struct SessionHandle {
   // Whether or not this Session has been cancelled. If a Session has been cancelled, all work that
   // it started should attempt to exit in an orderly fashion.
   cancelled: AsyncLatch,
+  // True if this Session should be shielded from keyboard interrupts (which cancel all
+  // non-isolated Sessions).
+  isolated: bool,
   // The display mechanism to use in this Session.
   display: Mutex<SessionDisplay>,
 }
@@ -155,6 +158,7 @@ impl Session {
     let handle = Arc::new(SessionHandle {
       build_id,
       cancelled,
+      isolated: false,
       display,
     });
     scheduler.core.sessions.add(&handle)?;
@@ -177,7 +181,7 @@ impl Session {
   /// metrics, identity, and state with the original.
   ///
   /// Useful when executing background work "on behalf of a Session" which should not be torn down
-  /// when a client disconnects.
+  /// when a client disconnects, or killed by Ctrl+C.
   ///
   pub fn isolated_shallow_clone(&self, build_id: String) -> Result<Session, String> {
     let display = Mutex::new(SessionDisplay::new(
@@ -187,6 +191,7 @@ impl Session {
     ));
     let handle = Arc::new(SessionHandle {
       build_id,
+      isolated: true,
       cancelled: AsyncLatch::new(),
       display,
     });
@@ -206,6 +211,13 @@ impl Session {
   ///
   pub fn cancel(&self) {
     self.handle.cancel();
+  }
+
+  ///
+  /// Returns true if this Session has been cancelled.
+  ///
+  pub fn is_cancelled(&self) -> bool {
+    self.handle.cancelled.poll_triggered()
   }
 
   ///
@@ -361,6 +373,8 @@ impl Sessions {
   pub fn new(executor: &Executor) -> Result<Sessions, String> {
     let sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>> =
       Arc::new(Mutex::new(Some(Vec::new())));
+    // A task that watches for keyboard interrupts arriving at this process, and cancels all
+    // non-isolated Sessions.
     let signal_task_abort_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
@@ -370,13 +384,20 @@ impl Sessions {
         async move {
           loop {
             let _ = signal_stream.recv().await;
-            let sessions = sessions.lock();
-            if let Some(ref sessions) = *sessions {
-              for session in sessions {
-                if let Some(session) = session.upgrade() {
-                  session.cancel();
-                }
+            let cancellable_sessions = {
+              let sessions = sessions.lock();
+              if let Some(ref sessions) = *sessions {
+                sessions
+                  .iter()
+                  .flat_map(|session| session.upgrade())
+                  .filter(|session| !session.isolated)
+                  .collect::<Vec<_>>()
+              } else {
+                vec![]
               }
+            };
+            for session in cancellable_sessions {
+              session.cancel();
             }
           }
         },
