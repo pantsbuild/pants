@@ -168,6 +168,14 @@ class PythonSetup(Subsystem):
             "__init__.py and there are no other .py files in the package.",
         )
 
+        register(
+            "--tailor-pex-binary-targets",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Tailor pex_binary() targets for Python entry point files.",
+        )
+
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
@@ -210,6 +218,10 @@ class PythonSetup(Subsystem):
     @property
     def tailor_ignore_solitary_init_files(self) -> bool:
         return cast(bool, self.options.tailor_ignore_solitary_init_files)
+
+    @property
+    def tailor_pex_binary_targets(self) -> bool:
+        return cast(bool, self.options.tailor_pex_binary_targets)
 
     @property
     def scratch_dir(self):

@@ -1,11 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import textwrap
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals import tailor
-from pants.backend.python.goals.tailor import PutativePythonTargetsRequest, classify_source_files
-from pants.backend.python.target_types import PythonLibrary, PythonTests
+from pants.backend.python.goals.tailor import (
+    PutativePythonTargetsRequest,
+    classify_source_files,
+    is_entry_point,
+)
+from pants.backend.python.target_types import PexBinary, PythonLibrary, PythonTests
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -38,9 +44,10 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *tailor.rules(),
+            *target_types_rules.rules(),
             QueryRule(PutativeTargets, (PutativePythonTargetsRequest, AllOwnedSources)),
         ],
-        target_types=[],
+        target_types=[PexBinary],
     )
 
 
@@ -132,6 +139,47 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None:
+    mains = ("main1.py", "main2.py", "main3.py")
+    rule_runner.write_files(
+        {
+            f"src/python/foo/{name}": textwrap.dedent(
+                """
+            if __name__ == "__main__":
+                main()
+            """
+            )
+            for name in mains
+        }
+    )
+    rule_runner.add_to_build_file(
+        "src/python/foo",
+        "pex_binary(name='main1', entry_point='main1.py')\n"
+        "pex_binary(name='main2', entry_point='foo.main2')\n",
+    )
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources([f"src/python/foo/{name}" for name in mains]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    PexBinary,
+                    "src/python/foo",
+                    "main3",
+                    [],
+                    kwargs={"name": "main3", "entry_point": "main3.py"},
+                ),
+            ]
+        )
+        == pts
+    )
+
+
 def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -164,4 +212,97 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
             ]
         )
         == pts
+    )
+
+
+def test_is_entry_point_true() -> None:
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note single quotes.
+    if __name__ == '__main__':
+        main()
+    """
+        ).encode()
+    )
+
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note double quotes.
+    if __name__ == "__main__":
+        main()
+    """
+        ).encode()
+    )
+
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note weird extra spaces.
+    if __name__  ==    "__main__":
+        main()
+    """
+        ).encode()
+    )
+
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note trailing comment.
+    if __name__ == "__main__": # Trailing comment.
+        main()
+    """
+        ).encode()
+    )
+
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note trailing comment.
+    if __name__ == "__main__":# Trailing comment.
+        main()
+    """
+        ).encode()
+    )
+
+    assert is_entry_point(
+        textwrap.dedent(
+            """
+    # Note trailing comment.
+    if __name__ == "__main__":        # Trailing comment.
+        main()
+    """
+        ).encode()
+    )
+
+
+def test_is_entry_point_false() -> None:
+    assert not is_entry_point(
+        textwrap.dedent(
+            """
+    # Note commented out.
+    # if __name__ == "__main__":
+    #    main()
+    """
+        ).encode()
+    )
+
+    assert not is_entry_point(
+        textwrap.dedent(
+            """
+    # Note weird indent.
+     if __name__ == "__main__":
+         main()
+    """
+        ).encode()
+    )
+
+    assert not is_entry_point(
+        textwrap.dedent(
+            """
+    # Note some nonsense, as a soundness check.
+     print(__name__)
+    """
+        ).encode()
     )
