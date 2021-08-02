@@ -52,15 +52,11 @@ class GoModuleSources(Sources):
             raise InvalidFieldException(f"""No go.mod file was found for target {self.address}.""")
 
 
-class GoModuleDependencies(Dependencies):
-    pass
-
-
 class GoModule(Target):
     alias = "go_module"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoModuleDependencies,
+        Dependencies,
         GoModuleSources,
     )
     help = "First-party Go module."

@@ -9,7 +9,6 @@ from pants.backend.go.pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.target_types import (
     GoExternalModule,
     GoImportPath,
-    GoModuleDependencies,
     GoPackageDependencies,
     GoPackageSources,
 )
@@ -47,18 +46,14 @@ async def inject_go_package_dependencies(
         return InjectedDependencies()
 
 
-# Inject dependencies from a go_module to any referenced go_external_module targets.
-class InjectGoModuleDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoModuleDependencies
-
-
-class InferGoDependenciesRequest(InferDependenciesRequest):
+class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoPackageSources
 
 
 @rule
 async def infer_go_dependencies(
-    request: InferGoDependenciesRequest, goroot_imports: ResolvedImportPathsForGoLangDistribution
+    request: InferGoPackageDependenciesRequest,
+    goroot_imports: ResolvedImportPathsForGoLangDistribution,
 ) -> InferredDependencies:
     this_go_package = await Get(
         ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
@@ -149,5 +144,5 @@ def rules():
         *pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
-        UnionRule(InferDependenciesRequest, InferGoDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
     )
