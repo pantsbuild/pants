@@ -58,9 +58,9 @@ def attempts(
 def launch_waiter(
     *, workdir: str, config: Mapping | None = None
 ) -> Tuple[PantsJoinHandle, int, str]:
-    """Launch a process via pantsd that will wait forever for a file to be created.
+    """Launch a process that will wait forever for a file to be created.
 
-    Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
+    Returns the pid of the pants client, the pid of the waiting child process, and the file to
     create to cause the waiting child to exit.
     """
     file_to_make = os.path.join(workdir, "some_magic_file")
