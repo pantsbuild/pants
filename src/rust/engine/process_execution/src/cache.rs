@@ -17,7 +17,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata,
+  ProcessCacheScope, ProcessMetadata, ProcessResultSource,
 };
 
 #[allow(dead_code)]
@@ -189,6 +189,7 @@ impl CommandRunner {
           action_result,
           platform,
           true,
+          ProcessResultSource::HitLocally,
         )
         .await?
       } else {

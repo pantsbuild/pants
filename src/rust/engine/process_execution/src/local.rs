@@ -33,7 +33,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessResultMetadata,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -590,7 +590,8 @@ pub trait CapturedWorkdir {
     }
 
     let elapsed = start_time.elapsed();
-    let result_metadata = ProcessResultMetadata::new(Some(elapsed.into()));
+    let result_metadata =
+      ProcessResultMetadata::new(Some(elapsed.into()), ProcessResultSource::RanLocally);
 
     match child_results_result {
       Ok(child_results) => {
