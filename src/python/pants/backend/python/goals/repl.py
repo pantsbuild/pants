@@ -3,7 +3,7 @@
 
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.util_rules.pex import Pex, PexRequest
-from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -21,9 +21,7 @@ class PythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_repl_request(
-    repl: PythonRepl, pex_env: WorkspacePexEnvironment
-) -> ReplRequest:
+async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
     requirements_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -39,13 +37,14 @@ async def create_python_repl_request(
         Digest, MergeDigests((requirements_pex.digest, sources.source_files.snapshot.digest))
     )
 
-    args = pex_env.create_argv(
+    complete_pex_env = pex_env.in_workspace()
+    args = complete_pex_env.create_argv(
         repl.in_chroot(requirements_pex.name), python=requirements_pex.python
     )
 
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **pex_env.environment_dict(python_configured=requirements_pex.python is not None),
+        **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
@@ -58,7 +57,7 @@ class IPythonRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_ipython_repl_request(
-    repl: IPythonRepl, ipython: IPython, pex_env: WorkspacePexEnvironment
+    repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
 ) -> ReplRequest:
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in ipython_request.
@@ -97,13 +96,16 @@ async def create_ipython_repl_request(
         ),
     )
 
-    args = list(pex_env.create_argv(repl.in_chroot(ipython_pex.name), python=ipython_pex.python))
+    complete_pex_env = pex_env.in_workspace()
+    args = list(
+        complete_pex_env.create_argv(repl.in_chroot(ipython_pex.name), python=ipython_pex.python)
+    )
     if ipython.options.ignore_cwd:
         args.append("--ignore-cwd")
 
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **pex_env.environment_dict(python_configured=ipython_pex.python is not None),
+        **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
         "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }

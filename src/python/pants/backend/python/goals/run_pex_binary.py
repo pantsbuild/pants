@@ -10,7 +10,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.util_rules.pex import Pex, PexRequest
-from pants.backend.python.util_rules.pex_environment import WorkspacePexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -28,7 +28,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
-    pex_env: WorkspacePexEnvironment,
+    pex_env: PexEnvironment,
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
@@ -88,11 +88,12 @@ async def create_pex_binary_run_request(
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
 
-    args = pex_env.create_argv(in_chroot(runner_pex.name), python=runner_pex.python)
+    complete_pex_env = pex_env.in_workspace()
+    args = complete_pex_env.create_argv(in_chroot(runner_pex.name), python=runner_pex.python)
 
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **pex_env.environment_dict(python_configured=runner_pex.python is not None),
+        **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
         "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }

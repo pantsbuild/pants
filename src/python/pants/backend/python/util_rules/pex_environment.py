@@ -134,14 +134,14 @@ class PexEnvironment(EngineAwareReturnType):
             append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
         )
 
-    def in_workspace(self) -> WorkspacePexEnvironment:
+    def in_workspace(self) -> CompletePexEnvironment:
         # N.B.: When running in the workspace the engine doesn't offer an append_only_caches
         # service to setup a symlink to our named cache for us. As such, we point the PEX_ROOT
         # directly at the underlying append only cache in that case to re-use results there and
         # to keep the workspace from being dirtied by the creation of a new Pex cache rooted
         # there.
         pex_root = self.named_caches_dir / self._PEX_ROOT_DIRNAME
-        return WorkspacePexEnvironment(
+        return CompletePexEnvironment(
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=None,
@@ -283,11 +283,6 @@ class CompletePexEnvironment:
 
 class WorkspacePexEnvironment(CompletePexEnvironment):
     pass
-
-
-@rule
-def workspace_pex_environment(pex_environment: PexEnvironment) -> WorkspacePexEnvironment:
-    return pex_environment.in_workspace()
 
 
 def rules():
