@@ -10,9 +10,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import (
+    PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
-    SandboxPexEnvironment,
 )
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
@@ -114,7 +114,7 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_binary: PexPEX,
-    pex_env: SandboxPexEnvironment,
+    pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -165,10 +165,11 @@ async def setup_pex_cli_process(
 
     # NB: This comes at the end of the argv because the request may use `--` passthrough args,
     # which must come at the end.
+    complete_pex_env = pex_env.in_sandbox(working_directory=None)
     argv.extend(request.argv)
-    normalized_argv = pex_env.create_argv(*argv, python=request.python)
+    normalized_argv = complete_pex_env.create_argv(*argv, python=request.python)
     env = {
-        **pex_env.environment_dict(python_configured=request.python is not None),
+        **complete_pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
     }
@@ -180,7 +181,7 @@ async def setup_pex_cli_process(
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_env.append_only_caches,
+        append_only_caches=complete_pex_env.append_only_caches,
         level=request.level,
         cache_scope=request.cache_scope,
     )

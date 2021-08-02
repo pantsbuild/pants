@@ -111,6 +111,8 @@ class PexEnvironment(EngineAwareReturnType):
     named_caches_dir: PurePath
     bootstrap_python: Optional[PythonExecutable] = None
 
+    _PEX_ROOT_DIRNAME = "pex_root"
+
     def level(self) -> LogLevel:
         return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
 
@@ -122,6 +124,29 @@ class PexEnvironment(EngineAwareReturnType):
                 "PEXes directly."
             )
         return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
+
+    def in_sandbox(self, *, working_directory: Optional[str]) -> CompletePexEnvironment:
+        pex_root = PurePath(".cache") / self._PEX_ROOT_DIRNAME
+        return CompletePexEnvironment(
+            _pex_environment=self,
+            pex_root=pex_root,
+            _working_directory=PurePath(working_directory) if working_directory else None,
+            append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
+        )
+
+    def in_workspace(self) -> CompletePexEnvironment:
+        # N.B.: When running in the workspace the engine doesn't offer an append_only_caches
+        # service to setup a symlink to our named cache for us. As such, we point the PEX_ROOT
+        # directly at the underlying append only cache in that case to re-use results there and
+        # to keep the workspace from being dirtied by the creation of a new Pex cache rooted
+        # there.
+        pex_root = self.named_caches_dir / self._PEX_ROOT_DIRNAME
+        return CompletePexEnvironment(
+            _pex_environment=self,
+            pex_root=pex_root,
+            _working_directory=None,
+            append_only_caches=FrozenDict(),
+        )
 
 
 @rule(desc="Find Python interpreter to bootstrap PEX", level=LogLevel.DEBUG)
@@ -210,6 +235,8 @@ async def find_pex_python(
 class CompletePexEnvironment:
     _pex_environment: PexEnvironment
     pex_root: PurePath
+    _working_directory: Optional[PurePath]
+    append_only_caches: FrozenDict[str, str]
 
     _PEX_ROOT_DIRNAME = "pex_root"
 
@@ -220,12 +247,17 @@ class CompletePexEnvironment:
     def create_argv(
         self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Tuple[str, ...]:
+        pex_relpath = (
+            os.path.relpath(pex_filepath, self._working_directory)
+            if self._working_directory
+            else pex_filepath
+        )
         python = python or self._pex_environment.bootstrap_python
         if python:
-            return (python.path, pex_filepath, *args)
-        if os.path.basename(pex_filepath) == pex_filepath:
-            return (f"./{pex_filepath}", *args)
-        return (pex_filepath, *args)
+            return (python.path, pex_relpath, *args)
+        if os.path.basename(pex_relpath) == pex_relpath:
+            return (f"./{pex_relpath}", *args)
+        return (pex_relpath, *args)
 
     def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
@@ -236,7 +268,9 @@ class CompletePexEnvironment:
         d = dict(
             PATH=create_path_env_var(self._pex_environment.path),
             PEX_IGNORE_RCFILES="true",
-            PEX_ROOT=str(self.pex_root),
+            PEX_ROOT=os.path.relpath(self.pex_root, self._working_directory)
+            if self._working_directory
+            else str(self.pex_root),
             **self._pex_environment.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
@@ -247,40 +281,8 @@ class CompletePexEnvironment:
         return d
 
 
-@dataclass(frozen=True)
-class SandboxPexEnvironment(CompletePexEnvironment):
-    append_only_caches: FrozenDict[str, str]
-
-    @classmethod
-    def create(cls, pex_environment) -> SandboxPexEnvironment:
-        pex_root = PurePath(".cache") / cls._PEX_ROOT_DIRNAME
-        return cls(
-            _pex_environment=pex_environment,
-            pex_root=pex_root,
-            append_only_caches=FrozenDict({cls._PEX_ROOT_DIRNAME: str(pex_root)}),
-        )
-
-
 class WorkspacePexEnvironment(CompletePexEnvironment):
-    @classmethod
-    def create(cls, pex_environment: PexEnvironment) -> WorkspacePexEnvironment:
-        # N.B.: When running in the workspace the engine doesn't offer an append_only_caches
-        # service to setup a symlink to our named cache for us. As such, we point the PEX_ROOT
-        # directly at the underlying append only cache in that case to re-use results there and
-        # to keep the workspace from being dirtied by the creation of a new Pex cache rooted
-        # there.
-        pex_root = pex_environment.named_caches_dir / cls._PEX_ROOT_DIRNAME
-        return cls(_pex_environment=pex_environment, pex_root=pex_root)
-
-
-@rule
-def sandbox_pex_environment(pex_environment: PexEnvironment) -> SandboxPexEnvironment:
-    return SandboxPexEnvironment.create(pex_environment)
-
-
-@rule
-def workspace_pex_environment(pex_environment: PexEnvironment) -> WorkspacePexEnvironment:
-    return WorkspacePexEnvironment.create(pex_environment)
+    pass
 
 
 def rules():
