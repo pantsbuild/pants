@@ -54,10 +54,14 @@ class WorkunitsLogger(WorkunitsCallback):
     ) -> None:
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)
-            if finished and context.run_tracker.has_ended():
-                # Sleep a little while to ensure that we're finishing asynchronously.
-                time.sleep(2)
-                print(FINISHED_SUCCESSFULLY, file=dest)
+            if not finished:
+                return
+
+            assert context.run_tracker.has_ended()
+            # Sleep a little while to ensure that we're finishing asynchronously.
+            time.sleep(4)
+            assert not context._scheduler.is_cancelled
+            print(FINISHED_SUCCESSFULLY, file=dest)
 
 
 @rule

@@ -632,6 +632,10 @@ py_class!(class PySession |py| {
         self.session(py).cancel();
         Ok(None)
     }
+
+    def is_cancelled(&self) -> CPyResult<bool> {
+        Ok(self.session(py).is_cancelled())
+    }
 });
 
 py_class!(class PySessionCancellationLatch |py| {
