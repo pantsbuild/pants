@@ -50,6 +50,8 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoPackageSources
 
 
+# TODO: Refactor this rule so as much as possible is memoized by invoking other rules. Consider
+# for example `FirstPartyPythonModuleMapping` and `ThirdPartyPythonModuleMapping`.
 @rule
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
