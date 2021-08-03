@@ -206,7 +206,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     repository_pex: Pex | None = None
     description = request.description
 
-    if python_setup.requirement_constraints:
+    if python_setup.requirement_constraints and requirements:
         constraints_file_contents = await Get(
             DigestContents,
             PathGlobs(
@@ -288,7 +288,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].resolve_all_constraints` is enabled, so "
             "`[python-setup].requirement_constraints` must also be set."
         )
-    elif python_setup.lockfile:
+    elif python_setup.lockfile and requirements:
         # TODO(#12314): This does not handle the case where requirements are disjoint to the
         #  lockfile. We should likely regenerate the lockfile (or warn/error), as the inputs have
         #  changed.
