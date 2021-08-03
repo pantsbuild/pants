@@ -132,7 +132,7 @@ async def infer_go_dependencies(
         if found_module_import:
             continue
 
-        raise ValueError(
+        logger.debug(
             f"Unable to infer dependency for import path '{import_path}' "
             f"in go_package at address '{this_go_package.address}'."
         )
