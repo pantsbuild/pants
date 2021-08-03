@@ -330,10 +330,16 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     # See: https://python-poetry.org/docs/pyproject/#dependencies-and-dev-dependencies
     dependencies.pop("python", None)
 
+    groups = poetry_vals.get("group", {})
+    group_deps = {}
+
+    for group in groups.values():
+        group_deps.update(**group.get("dependencies", {}))
+
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
-    if not dependencies and not dev_dependencies:
+    if not dependencies and not dev_dependencies and not group_deps:
         logger.warning(
-            "No requirements defined in poetry.tools.dependencies and "
+            "No requirements defined in any Poetry dependency groups, poetry.tools.dependencies and "
             f"poetry.tools.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
             "by Pants from a poetry_requirements macro. Did you mean to populate these "
             "with requirements?"
@@ -342,7 +348,7 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     return set(
         itertools.chain.from_iterable(
             parse_single_dependency(proj, attr, pyproject_toml)
-            for proj, attr in {**dependencies, **dev_dependencies}.items()
+            for proj, attr in {**dependencies, **dev_dependencies, **group_deps}.items()
         )
     )
 
