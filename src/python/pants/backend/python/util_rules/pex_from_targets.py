@@ -206,7 +206,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     repository_pex: Pex | None = None
     description = request.description
 
-    if python_setup.requirement_constraints:
+    if python_setup.requirement_constraints and requirements:
         constraints_file_contents = await Get(
             DigestContents,
             PathGlobs(
