@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
 
 import toml
 from packaging.version import InvalidVersion, Version
@@ -331,16 +331,16 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     dependencies.pop("python", None)
 
     groups = poetry_vals.get("group", {})
-    group_deps = {}
+    group_deps: Dict[str, PyprojectAttr] = {}
 
     for group in groups.values():
-        group_deps.update(**group.get("dependencies", {}))
+        group_deps.update(group.get("dependencies", {}))
 
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies and not group_deps:
         logger.warning(
-            "No requirements defined in any Poetry dependency groups, poetry.tools.dependencies and "
-            f"poetry.tools.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
+            "No requirements defined in any Poetry dependency groups, tool.poetry.dependencies and "
+            f"tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
             "by Pants from a poetry_requirements macro. Did you mean to populate these "
             "with requirements?"
         )
