@@ -349,6 +349,12 @@ def test_parse_multi_reqs() -> None:
     python = "3.6"
     markers = "platform_python_implementation == 'CPython'"
 
+    [tool.poetry.group.mygroup.dependencies]
+    myrequirement = "1.2.3"
+
+    [tool.poetry.group.mygroup2.dependencies]
+    myrequirement2 = "1.2.3"
+
     [tool.poetry.dev-dependencies]
     isort = ">=5.5.1,<5.6"
 
@@ -360,6 +366,8 @@ def test_parse_multi_reqs() -> None:
     retval = parse_pyproject_toml(pyproject_toml)
     actual_reqs = {
         Requirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
+        Requirement.parse("myrequirement==1.2.3"),
+        Requirement.parse("myrequirement2==1.2.3"),
         Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
         Requirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
         Requirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
