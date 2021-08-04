@@ -142,7 +142,7 @@ async def resolve_go_package(
 
     invoke_request = InvokeGoSdkRequest(
         digest=sources.snapshot.digest,
-        command=("${GOROOT}/bin/go", "list", "-json", f"./{spec_subpath}"),
+        command=("list", "-json", f"./{spec_subpath}"),
         description="Resolve go_package metadata.",
         working_dir=resolved_go_module.target.address.spec_path,
     )

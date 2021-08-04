@@ -1,16 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import shlex
 import textwrap
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.go import distribution
 from pants.backend.go.distribution import GoLangDistribution
-from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine import process
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals import build_files
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -62,7 +59,7 @@ async def invoke_go_sdk_command(
                 export GOCACHE="$(/bin/pwd)/cache"
                 /bin/mkdir -p "$GOPATH" "$GOCACHE"
                 {working_dir_cmd}
-                exec {' '.join(request.command)}
+                exec "${{GOROOT}}/bin/go" {' '.join(shlex.quote(arg) for arg in request.command)}
                 """
                     ).encode("utf-8"),
                 )
