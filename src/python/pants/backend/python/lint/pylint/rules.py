@@ -266,7 +266,7 @@ async def pylint_lint(
             PylintPartition(
                 target_setups,
                 InterpreterConstraints(python_setup.interpreter_constraints),
-                Targets(plugin_targets),
+                Targets(plugin_targets.closure),
             ),
         )
         return LintResults([result], linter_name="Pylint")

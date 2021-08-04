@@ -240,7 +240,9 @@ def test_group_field_sets_by_constraints() -> None:
     )
     assert InterpreterConstraints.group_field_sets_by_constraints(
         [py2_fs, *py3_fs, no_constraints_fs],
-        python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
+        python_setup=create_subsystem(
+            PythonSetup, interpreter_constraints=[], disable_mixed_interpreter_constraints=False
+        ),
     ) == FrozenDict(
         {
             InterpreterConstraints(): (no_constraints_fs,),
@@ -267,7 +269,9 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
 
     output = InterpreterConstraints.group_field_sets_by_constraints(
         py3_fs,
-        python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
+        python_setup=create_subsystem(
+            PythonSetup, interpreter_constraints=[], disable_mixed_interpreter_constraints=False
+        ),
     )
 
     assert output[ic_36] == (

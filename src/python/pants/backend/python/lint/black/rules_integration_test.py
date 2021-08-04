@@ -215,7 +215,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=["--python-setup-disable-mixed-interpreter-constraints"],
-        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": "['==3.9*']"},
+        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": "['==3.8.*']"},
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
