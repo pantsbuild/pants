@@ -335,7 +335,7 @@ async def mypy_typecheck(
         result = await Get(
             TypecheckResult,
             MyPyPartition(
-                transitive_targets.roots,
+                FrozenOrderedSet(transitive_targets.roots),
                 transitive_targets.closure,
                 InterpreterConstraints(python_setup.interpreter_constraints),
                 python_version_configured,
