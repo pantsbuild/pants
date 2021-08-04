@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
 
-from pants.backend.go import module
+from pants.backend.go import module, sdk
 from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.target_types import GoExternalModule, GoModule, GoPackage
 from pants.build_graph.address import Address
@@ -17,6 +17,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
+            *sdk.rules(),
             *module.rules(),
             QueryRule(ResolvedGoModule, [ResolveGoModuleRequest]),
         ],

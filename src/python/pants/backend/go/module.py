@@ -1,36 +1,22 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
-import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import ijson
 
-from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.sdk import InvokeGoSdkRequest, InvokeGoSdkResult
 from pants.backend.go.target_types import GoModuleSources
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    MergeDigests,
-    RemovePrefix,
-    Snapshot,
-    Workspace,
-)
+from pants.engine.fs import Digest, DigestContents, RemovePrefix, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -108,16 +94,7 @@ def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
 @rule
 async def resolve_go_module(
     request: ResolveGoModuleRequest,
-    goroot: GoLangDistribution,
-    platform: Platform,
-    bash: BashBinary,
 ) -> ResolvedGoModule:
-    downloaded_goroot = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(platform),
-    )
-
     targets = await Get(UnexpandedTargets, Addresses([request.address]))
     if not targets:
         raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
@@ -130,45 +107,14 @@ async def resolve_go_module(
         Snapshot, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
     )
 
-    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
-    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
-    # TODO: Merge all duplicate versions of this script into a single script and invoke rule.
-    analyze_script_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    "analyze.sh",
-                    textwrap.dedent(
-                        """\
-                export GOROOT="./go"
-                export GOPATH="$(/bin/pwd)/gopath"
-                export GOCACHE="$(/bin/pwd)/cache"
-                mkdir -p "$GOPATH" "$GOCACHE"
-                exec ./go/bin/go mod download -json all
-                """
-                    ).encode("utf-8"),
-                )
-            ]
-        ),
-    )
-
-    input_root_digest = await Get(
-        Digest,
-        MergeDigests(
-            [flattened_sources_snapshot.digest, downloaded_goroot.digest, analyze_script_digest]
-        ),
-    )
-
-    process = Process(
-        argv=[bash.path, "./analyze.sh"],
-        input_digest=input_root_digest,
+    invoke_request = InvokeGoSdkRequest(
+        digest=flattened_sources_snapshot.digest,
+        command=("mod", "download", "-json", "all"),
         description="Resolve go_module metadata.",
-        output_files=["go.mod", "go.sum"],
-        level=LogLevel.DEBUG,
+        output_files=("go.mod", "go.sum"),
     )
 
-    result = await Get(ProcessResult, Process, process)
+    invoke_result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
 
     # Parse the go.mod for the module path and minimum Go version.
     module_path = None
@@ -185,8 +131,8 @@ async def resolve_go_module(
         target=target,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
-        modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),
-        digest=result.output_digest,
+        modules=FrozenOrderedSet(parse_module_descriptors(invoke_result.result.stdout)),
+        digest=invoke_result.result.output_digest,
     )
 
 
