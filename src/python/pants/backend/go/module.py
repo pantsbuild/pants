@@ -111,7 +111,7 @@ async def resolve_go_module(
     result = await Get(
         ProcessResult,
         GoSdkProcess(
-            digest=flattened_sources_snapshot.digest,
+            input_digest=flattened_sources_snapshot.digest,
             command=("mod", "download", "-json", "all"),
             description="Resolve go_module metadata.",
             output_files=("go.mod", "go.sum"),

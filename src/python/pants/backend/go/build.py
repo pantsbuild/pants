@@ -148,7 +148,7 @@ async def build_target(
     result = await Get(
         ProcessResult,
         GoSdkProcess(
-            digest=input_digest,
+            input_digest=input_digest,
             command=(
                 "tool",
                 "compile",
@@ -248,7 +248,7 @@ async def package_go_binary(
     result = await Get(
         ProcessResult,
         GoSdkProcess(
-            digest=input_digest,
+            input_digest=input_digest,
             command=(
                 "tool",
                 "link",

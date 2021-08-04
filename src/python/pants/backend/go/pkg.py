@@ -143,7 +143,7 @@ async def resolve_go_package(
     result = await Get(
         ProcessResult,
         GoSdkProcess(
-            digest=sources.snapshot.digest,
+            input_digest=sources.snapshot.digest,
             command=("list", "-json", f"./{spec_subpath}"),
             description="Resolve go_package metadata.",
             working_dir=resolved_go_module.target.address.spec_path,

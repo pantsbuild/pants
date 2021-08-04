@@ -17,7 +17,7 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class GoSdkProcess:
-    digest: Digest
+    input_digest: Digest
     command: Tuple[str, ...]
     description: str
     working_dir: Optional[str] = None
@@ -64,7 +64,7 @@ async def setup_go_sdk_command(
 
     input_root_digest = await Get(
         Digest,
-        MergeDigests([downloaded_goroot.digest, script_digest, request.digest]),
+        MergeDigests([downloaded_goroot.digest, script_digest, request.input_digest]),
     )
 
     return Process(
