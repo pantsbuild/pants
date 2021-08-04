@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Dict, List, Tuple
 
 from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
-from pants.backend.go.sdk import InvokeGoSdkRequest, InvokeGoSdkResult
+from pants.backend.go.sdk import InvokeGoSdkRequest
 from pants.backend.go.target_types import GoBinaryMainAddress, GoBinaryName, GoImportPath, GoSources
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -20,6 +20,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -144,26 +145,28 @@ async def build_target(
     if request.is_main:
         import_path = "main"
 
-    invoke_request = InvokeGoSdkRequest(
-        digest=input_digest,
-        command=(
-            "tool",
-            "compile",
-            "-p",
-            import_path,
-            "-importcfg",
-            "./importcfg",
-            "-pack",
-            "-o",
-            "__pkg__.a",
-            *source_files.files,
+    result = await Get(
+        ProcessResult,
+        InvokeGoSdkRequest(
+            digest=input_digest,
+            command=(
+                "tool",
+                "compile",
+                "-p",
+                import_path,
+                "-importcfg",
+                "./importcfg",
+                "-pack",
+                "-o",
+                "__pkg__.a",
+                *source_files.files,
+            ),
+            description=f"Compile Go package with {pluralize(len(source_files.files), 'file')}.",
+            output_files=("__pkg__.a",),
         ),
-        description=f"Compile Go package with {pluralize(len(source_files.files), 'file')}.",
-        output_files=("__pkg__.a",),
     )
 
-    invoke_result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
-    return BuiltGoPackage(import_path=import_path, object_digest=invoke_result.result.output_digest)
+    return BuiltGoPackage(import_path=import_path, object_digest=result.output_digest)
 
 
 @rule
@@ -242,25 +245,26 @@ async def package_go_binary(
     logger.info(f"parent={output_filename.parent}")
     logger.info(f"name={output_filename.name}")
 
-    invoke_request = InvokeGoSdkRequest(
-        digest=input_digest,
-        command=(
-            "tool",
-            "link",
-            "-importcfg",
-            "./importcfg",
-            "-o",
-            f"./{output_filename.name}",
-            "./__pkg__.a",
+    result = await Get(
+        ProcessResult,
+        InvokeGoSdkRequest(
+            digest=input_digest,
+            command=(
+                "tool",
+                "link",
+                "-importcfg",
+                "./importcfg",
+                "-o",
+                f"./{output_filename.name}",
+                "./__pkg__.a",
+            ),
+            description="Link Go binary.",
+            output_files=(f"./{output_filename.name}",),
         ),
-        description="Link Go binary.",
-        output_files=(f"./{output_filename.name}",),
     )
 
-    invoke_result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
-
     renamed_output_digest = await Get(
-        Digest, AddPrefix(invoke_result.result.output_digest, output_filename.parent.as_posix())
+        Digest, AddPrefix(result.output_digest, output_filename.parent.as_posix())
     )
     ss = await Get(Snapshot, Digest, renamed_output_digest)
     logger.info(f"ss={ss}")

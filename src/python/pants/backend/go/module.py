@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 import ijson
 
-from pants.backend.go.sdk import InvokeGoSdkRequest, InvokeGoSdkResult
+from pants.backend.go.sdk import InvokeGoSdkRequest
 from pants.backend.go.target_types import GoModuleSources
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
@@ -15,6 +15,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, RemovePrefix, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.util.ordered_set import FrozenOrderedSet
@@ -107,14 +108,15 @@ async def resolve_go_module(
         Snapshot, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
     )
 
-    invoke_request = InvokeGoSdkRequest(
-        digest=flattened_sources_snapshot.digest,
-        command=("mod", "download", "-json", "all"),
-        description="Resolve go_module metadata.",
-        output_files=("go.mod", "go.sum"),
+    result = await Get(
+        ProcessResult,
+        InvokeGoSdkRequest(
+            digest=flattened_sources_snapshot.digest,
+            command=("mod", "download", "-json", "all"),
+            description="Resolve go_module metadata.",
+            output_files=("go.mod", "go.sum"),
+        ),
     )
-
-    invoke_result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
 
     # Parse the go.mod for the module path and minimum Go version.
     module_path = None
@@ -131,8 +133,8 @@ async def resolve_go_module(
         target=target,
         import_path=module_path,
         minimum_go_version=minimum_go_version,
-        modules=FrozenOrderedSet(parse_module_descriptors(invoke_result.result.stdout)),
-        digest=invoke_result.result.output_digest,
+        modules=FrozenOrderedSet(parse_module_descriptors(result.stdout)),
+        digest=result.output_digest,
     )
 
 

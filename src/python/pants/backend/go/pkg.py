@@ -11,14 +11,14 @@ from pants.backend.go.module import (
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
 )
-from pants.backend.go.sdk import InvokeGoSdkRequest, InvokeGoSdkResult
+from pants.backend.go.sdk import InvokeGoSdkRequest
 from pants.backend.go.target_types import GoImportPath, GoModuleSources, GoPackageSources
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary
+from pants.engine.process import BashBinary, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 
@@ -140,16 +140,17 @@ async def resolve_go_package(
         ),
     )
 
-    invoke_request = InvokeGoSdkRequest(
-        digest=sources.snapshot.digest,
-        command=("list", "-json", f"./{spec_subpath}"),
-        description="Resolve go_package metadata.",
-        working_dir=resolved_go_module.target.address.spec_path,
+    result = await Get(
+        ProcessResult,
+        InvokeGoSdkRequest(
+            digest=sources.snapshot.digest,
+            command=("list", "-json", f"./{spec_subpath}"),
+            description="Resolve go_package metadata.",
+            working_dir=resolved_go_module.target.address.spec_path,
+        ),
     )
 
-    result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
-
-    metadata = json.loads(result.result.stdout)
+    metadata = json.loads(result.stdout)
 
     # TODO: Raise an exception on errors. They are only emitted as warnings for now because the `go` tool is
     # flagging missing first-party code as a dependency error. But we want dependency inference and won't know

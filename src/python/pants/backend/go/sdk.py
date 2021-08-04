@@ -10,7 +10,7 @@ from pants.core.util_rules.external_tool import DownloadedExternalTool, External
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -25,17 +25,12 @@ class InvokeGoSdkRequest:
     output_directories: Tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
-class InvokeGoSdkResult:
-    result: ProcessResult
-
-
 @rule
-async def invoke_go_sdk_command(
+async def setup_go_sdk_command(
     request: InvokeGoSdkRequest,
     goroot: GoLangDistribution,
     bash: BashBinary,
-) -> InvokeGoSdkResult:
+) -> Process:
     downloaded_goroot = await Get(
         DownloadedExternalTool,
         ExternalToolRequest,
@@ -72,7 +67,7 @@ async def invoke_go_sdk_command(
         MergeDigests([downloaded_goroot.digest, script_digest, request.digest]),
     )
 
-    process = Process(
+    return Process(
         argv=[bash.path, "__pants__.sh"],
         input_digest=input_root_digest,
         description=request.description,
@@ -80,10 +75,6 @@ async def invoke_go_sdk_command(
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
     )
-
-    result = await Get(ProcessResult, Process, process)
-
-    return InvokeGoSdkResult(result=result)
 
 
 def rules():
