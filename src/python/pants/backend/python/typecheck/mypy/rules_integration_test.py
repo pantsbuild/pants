@@ -485,61 +485,71 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     This batching must consider transitive dependencies, so we use a more complex setup where the
     dependencies are what have specific constraints that influence the batching.
     """
-    rule_runner.create_file(f"{PACKAGE}/py2/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/py2/lib.py",
-        dedent(
-            """\
-            def add(x, y):
-                # type: (int, int) -> int
-                print "old school"
-                return x + y
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        f"{PACKAGE}/py2", "python_library(interpreter_constraints=['==2.7.*'])"
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/lib/__init__.py": dedent(
+                """\
+                def add(x: int, y: int) -> int:
+                    return x + y
+                """
+            ),
+            f"{PACKAGE}/lib/BUILD": dedent(
+                """\
+                # This is an incorrect interpreter constraint: the code really is only
+                # compatible with Python 3. But this will force it to run with Python 2 so that
+                # we can check there is a syntax error.
+                python_library(name='py2', interpreter_constraints=['==2.7.*'])
+                python_library(name='py3', interpreter_constraints=['>=3.6'])
+                """
+            ),
+            f"{PACKAGE}/app.py": "from project.lib import add\nassert add(2, 2) == 4\n",
+            f"{PACKAGE}/BUILD": dedent(
+                f"""\
+                python_library(
+                    name='uses_py2',
+                    interpreter_constraints=['==2.7.*', '>=3.6'],
+                    dependencies=['{PACKAGE}/lib:py2'],
+                )
+                python_library(
+                    name='uses_py3',
+                    interpreter_constraints=['==2.7.*', '>=3.6'],
+                    dependencies=['{PACKAGE}/lib:py3'],
+                )
+                """
+            ),
+        }
     )
 
-    rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/py3/lib.py",
-        dedent(
-            """\
-            def add(x: int, y: int) -> int:
-                return x + y
-            """
-        ),
+    py2_target = rule_runner.get_target(
+        Address(PACKAGE, target_name="uses_py2", relative_file_path="app.py")
     )
-    rule_runner.add_to_build_file(
-        f"{PACKAGE}/py3", "python_library(interpreter_constraints=['>=3.6'])"
+    py3_target = rule_runner.get_target(
+        Address(PACKAGE, target_name="uses_py3", relative_file_path="app.py")
     )
-
-    # Our input files belong to the same target, which is compatible with both Py2 and Py3.
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/uses_py2.py", "from project.py2.lib import add\nassert add(2, 2) == 4\n"
-    )
-    rule_runner.create_file(
-        f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
-    )
-    rule_runner.add_to_build_file(
-        PACKAGE, "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])"
-    )
-    py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
-    py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 
     result = run_mypy(rule_runner, [py2_target, py3_target])
     assert len(result) == 2
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
-    assert py2_result.exit_code == 0
+    assert py2_result.exit_code == 1
     assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
-    assert "Success: no issues found" in py3_result.stdout
+    assert f"{PACKAGE}/app.py:4" in py2_result.stdout
+    assert result[0].exit_code == 1
 
     assert py3_result.exit_code == 0
     assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
     assert "Success: no issues found" in py3_result.stdout.strip()
+
+    # Finally, disable mixed interpreter constraints, meaning we should only disable batching and
+    # use the global constraints.
+    no_mixed_ics_result = run_mypy(
+        rule_runner,
+        [py2_target, py3_target],
+        extra_args=["--python-setup-disable-mixed-interpreter-constraints"],
+    )
+    assert len(no_mixed_ics_result) == 1
+    assert no_mixed_ics_result[0].exit_code == 0
+    assert "Success: no issues found" in no_mixed_ics_result[0].stdout.strip()
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:

@@ -327,6 +327,22 @@ async def mypy_typecheck(
         config=next(iter(config_content), None), args=mypy.args
     )
 
+    if python_setup.disable_mixed_interpreter_constraints:
+        transitive_targets = await Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest(field_set.address for field_set in request.field_sets),
+        )
+        result = await Get(
+            TypecheckResult,
+            MyPyPartition(
+                transitive_targets.roots,
+                transitive_targets.closure,
+                InterpreterConstraints(python_setup.interpreter_constraints),
+                python_version_configured,
+            ),
+        )
+        return TypecheckResults([result], typechecker_name="MyPy")
+
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
     # TODO(#10863): Improve the performance of this.
