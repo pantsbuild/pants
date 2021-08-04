@@ -2,29 +2,25 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 import logging
-import textwrap
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.module import (
     FindNearestGoModuleRequest,
     ResolvedGoModule,
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
 )
+from pants.backend.go.sdk import InvokeGoSdkRequest, InvokeGoSdkResult
 from pants.backend.go.target_types import GoImportPath, GoModuleSources, GoPackageSources
 from pants.build_graph.address import Address
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import UnexpandedTargets
-from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -93,17 +89,10 @@ def error_to_string(d: dict) -> str:
 @rule
 async def resolve_go_package(
     request: ResolveGoPackageRequest,
-    goroot: GoLangDistribution,
     platform: Platform,
     bash: BashBinary,
 ) -> ResolvedGoPackage:
     # TODO: Use MultiGet where applicable.
-
-    downloaded_goroot = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(platform),
-    )
 
     targets = await Get(UnexpandedTargets, Addresses([request.address]))
     if not targets:
@@ -151,46 +140,16 @@ async def resolve_go_package(
         ),
     )
 
-    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
-    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
-    # TODO: Merge all duplicate versions of this script into a single script and add an invoke rule that will
-    # insert the desired `go` command into the boilerplate portions.
-    analyze_script_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    "analyze.sh",
-                    textwrap.dedent(
-                        f"""\
-                export GOROOT="$(/bin/pwd)/go"
-                export GOPATH="$(/bin/pwd)/gopath"
-                export GOCACHE="$(/bin/pwd)/cache"
-                /bin/mkdir -p "$GOPATH" "$GOCACHE"
-                cd {resolved_go_module.target.address.spec_path}
-                exec "${{GOROOT}}/bin/go" list -json ./{spec_subpath}
-                """
-                    ).encode("utf-8"),
-                )
-            ]
-        ),
-    )
-
-    input_root_digest = await Get(
-        Digest,
-        MergeDigests([sources.snapshot.digest, downloaded_goroot.digest, analyze_script_digest]),
-    )
-
-    process = Process(
-        argv=[bash.path, "./analyze.sh"],
-        input_digest=input_root_digest,
+    invoke_request = InvokeGoSdkRequest(
+        digest=sources.snapshot.digest,
+        command=("${GOROOT}/bin/go", "list", "-json", f"./{spec_subpath}"),
         description="Resolve go_package metadata.",
-        level=LogLevel.DEBUG,
+        working_dir=resolved_go_module.target.address.spec_path,
     )
 
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(InvokeGoSdkResult, InvokeGoSdkRequest, invoke_request)
 
-    metadata = json.loads(result.stdout)
+    metadata = json.loads(result.result.stdout)
 
     # TODO: Raise an exception on errors. They are only emitted as warnings for now because the `go` tool is
     # flagging missing first-party code as a dependency error. But we want dependency inference and won't know

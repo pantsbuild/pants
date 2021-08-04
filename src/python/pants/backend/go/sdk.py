@@ -4,9 +4,13 @@ import textwrap
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.go import distribution
 from pants.backend.go.distribution import GoLangDistribution
+from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.engine import process
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.internals import build_files
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -30,7 +34,7 @@ class InvokeGoSdkResult:
 
 
 @rule
-async def invoke_go_sdk(
+async def invoke_go_sdk_command(
     request: InvokeGoSdkRequest,
     goroot: GoLangDistribution,
     bash: BashBinary,
@@ -43,6 +47,8 @@ async def invoke_go_sdk(
 
     working_dir_cmd = f"cd '{request.working_dir}'" if request.working_dir else ""
 
+    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
+    # execution sandbox. Thus, this code uses a bash script to be able to resolve absolute paths inside the sandbox.
     script_digest = await Get(
         Digest,
         CreateDigest(
