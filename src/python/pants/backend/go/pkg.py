@@ -11,7 +11,7 @@ from pants.backend.go.module import (
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
 )
-from pants.backend.go.sdk import InvokeGoSdkRequest
+from pants.backend.go.sdk import SetupGoSdkProcess
 from pants.backend.go.target_types import GoImportPath, GoModuleSources, GoPackageSources
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -142,7 +142,7 @@ async def resolve_go_package(
 
     result = await Get(
         ProcessResult,
-        InvokeGoSdkRequest(
+        SetupGoSdkProcess(
             digest=sources.snapshot.digest,
             command=("list", "-json", f"./{spec_subpath}"),
             description="Resolve go_package metadata.",

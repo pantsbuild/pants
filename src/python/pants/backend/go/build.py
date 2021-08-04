@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Dict, List, Tuple
 
 from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
-from pants.backend.go.sdk import InvokeGoSdkRequest
+from pants.backend.go.sdk import SetupGoSdkProcess
 from pants.backend.go.target_types import GoBinaryMainAddress, GoBinaryName, GoImportPath, GoSources
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -147,7 +147,7 @@ async def build_target(
 
     result = await Get(
         ProcessResult,
-        InvokeGoSdkRequest(
+        SetupGoSdkProcess(
             digest=input_digest,
             command=(
                 "tool",
@@ -247,7 +247,7 @@ async def package_go_binary(
 
     result = await Get(
         ProcessResult,
-        InvokeGoSdkRequest(
+        SetupGoSdkProcess(
             digest=input_digest,
             command=(
                 "tool",
