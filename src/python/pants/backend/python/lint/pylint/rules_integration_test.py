@@ -123,12 +123,13 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
     ]
     py2_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py2", relative_file_path="f.py"))
+    py3_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py3", relative_file_path="f.py"))
+
     py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=py2_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 2
     assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
 
-    py3_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py3", relative_file_path="f.py"))
     py3_result = run_pylint(rule_runner, [py3_tgt])
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
@@ -147,6 +148,17 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert batched_py3_result.exit_code == 0
     assert batched_py3_result.partition_description == "['CPython<3.8,>=3.6']"
     assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
+
+    # Finally, disable mixed interpreter constraints, meaning we should only disable batching and
+    # use the global constraints.
+    no_mixed_ics_result = run_pylint(
+        rule_runner,
+        [py2_tgt, py3_tgt],
+        extra_args=["--python-setup-disable-mixed-interpreter-constraints"],
+    )
+    assert len(no_mixed_ics_result) == 1
+    assert no_mixed_ics_result[0].exit_code == 0
+    assert "Your code has been rated at 10.00/10" in no_mixed_ics_result[0].stdout.strip()
 
 
 @pytest.mark.parametrize(

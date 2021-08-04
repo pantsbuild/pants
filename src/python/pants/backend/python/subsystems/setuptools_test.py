@@ -25,11 +25,14 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     )
 
     global_constraint = "==3.9.*"
-    rule_runner.set_options(
-        [], env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"}
-    )
 
-    def assert_ics(build_file: str, expected: list[str]) -> None:
+    def assert_ics(
+        build_file: str, expected: list[str], *, disable_mixed_ics: bool = False
+    ) -> None:
+        rule_runner.set_options(
+            [f"--python-setup-disable-mixed-interpreter-constraints={disable_mixed_ics}"],
+            env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+        )
         rule_runner.write_files({"project/BUILD": build_file})
         lockfile_request = rule_runner.request(
             PythonLockfileRequest, [SetuptoolsLockfileSentinel()]
@@ -150,4 +153,20 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             """
         ),
         ["==2.7.*", global_constraint, ">=3.6"],
+    )
+
+    # If mixed interpreter constraints are disabled, simply look at the global ICs.
+    assert_ics(
+        dedent(
+            """\
+            python_library(name="lib", interpreter_constraints=["==2.7.*"])
+            python_distribution(
+                name="dist",
+                dependencies=[":lib"],
+                provides=setup_py(name="dist"),
+            )
+            """
+        ),
+        [global_constraint],
+        disable_mixed_ics=True,
     )

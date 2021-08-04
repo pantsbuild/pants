@@ -8,7 +8,7 @@ import os
 import re
 from collections import OrderedDict
 from pathlib import Path, PurePath
-from typing import Iterable, List, Optional, Tuple, cast
+from typing import List, Optional, cast
 
 from pex.variables import Variables
 
@@ -45,6 +45,13 @@ class PythonSetup(Subsystem):
                 "constraint strings will be ORed together.\n\nThese constraints are used as the "
                 "default value for the `interpreter_constraints` field of Python targets."
             ),
+        )
+        register(
+            "--disable-mixed-interpreter-constraints",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(""),
         )
         register(
             "--interpreter-versions-universe",
@@ -177,8 +184,12 @@ class PythonSetup(Subsystem):
         )
 
     @property
-    def interpreter_constraints(self) -> Tuple[str, ...]:
+    def interpreter_constraints(self) -> tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
+
+    @property
+    def disable_mixed_interpreter_constraints(self) -> bool:
+        return cast(bool, self.options.disable_mixed_interpreter_constraints)
 
     @property
     def interpreter_universe(self) -> tuple[str, ...]:
@@ -226,26 +237,6 @@ class PythonSetup(Subsystem):
     @property
     def scratch_dir(self):
         return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
-
-    def compatibility_or_constraints(
-        self, compatibility: Optional[Iterable[str]]
-    ) -> Tuple[str, ...]:
-        """Return either the given `compatibility` field or the global interpreter constraints.
-
-        If interpreter constraints are supplied by the CLI flag, return those only.
-        """
-        if self.options.is_flagged("interpreter_constraints"):
-            return self.interpreter_constraints
-        return tuple(compatibility or self.interpreter_constraints)
-
-    def compatibilities_or_constraints(
-        self, compatibilities: Iterable[Optional[Iterable[str]]]
-    ) -> Tuple[str, ...]:
-        return tuple(
-            constraint
-            for compatibility in compatibilities
-            for constraint in self.compatibility_or_constraints(compatibility)
-        )
 
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):

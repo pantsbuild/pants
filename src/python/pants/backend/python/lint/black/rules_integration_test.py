@@ -46,7 +46,11 @@ NEEDS_CONFIG_FILE = "animal = 'Koala'\n"  # Note the single quotes.
 
 
 def run_black(
-    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
 ) -> tuple[tuple[LintResult, ...], FmtResult]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.lint.black", *(extra_args or ())],
@@ -63,6 +67,7 @@ def run_black(
         #     export LC_ALL=C.UTF-8
         #     export LANG=C.UTF-8
         #
+        env=env,
         env_inherit={"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"},
     )
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
@@ -197,6 +202,21 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(rule_runner, [tgt])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0
+    assert "1 file would be left unchanged" in lint_results[0].stderr
+    assert "1 file left unchanged" in fmt_result.stderr
+    assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
+    assert fmt_result.did_change is False
+
+    # Also ensure the code path works when mixed interpreter constraints are disabled, which
+    # allows simply looking at the global constraints.
+    lint_results, fmt_result = run_black(
+        rule_runner,
+        [tgt],
+        extra_args=["--python-setup-disable-mixed-interpreter-constraints"],
+        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": "['==3.9*']"},
+    )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr

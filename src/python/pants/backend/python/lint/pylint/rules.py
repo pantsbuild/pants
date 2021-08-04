@@ -254,6 +254,23 @@ async def pylint_lint(
         for field_set in request.field_sets
     )
 
+    if python_setup.disable_mixed_interpreter_constraints:
+        target_setups = tuple(
+            PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
+            for field_set, tgt, dependencies in zip(
+                request.field_sets, linted_targets, per_target_dependencies
+            )
+        )
+        result = await Get(
+            LintResult,
+            PylintPartition(
+                target_setups,
+                InterpreterConstraints(python_setup.interpreter_constraints),
+                Targets(plugin_targets),
+            ),
+        )
+        return LintResults([result], linter_name="Pylint")
+
     # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
     # targets run together and all Python 3 targets run together.
     # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
@@ -277,14 +294,8 @@ async def pylint_lint(
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 
     partitions = (
-        PylintPartition(
-            tuple(sorted(target_setups, key=lambda tgt_setup: tgt_setup.field_set.address)),
-            interpreter_constraints,
-            Targets(plugin_targets.closure),
-        )
-        for interpreter_constraints, target_setups in sorted(
-            interpreter_constraints_to_target_setup.items()
-        )
+        PylintPartition(target_setups, interpreter_constraints, Targets(plugin_targets.closure))
+        for interpreter_constraints, target_setups in interpreter_constraints_to_target_setup.items()
     )
     partitioned_results = await MultiGet(
         Get(LintResult, PylintPartition, partition) for partition in partitions

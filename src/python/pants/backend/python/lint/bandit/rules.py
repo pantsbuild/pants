@@ -111,6 +111,15 @@ async def bandit_lint(
     if bandit.skip:
         return LintResults([], linter_name="Bandit")
 
+    if python_setup.disable_mixed_interpreter_constraints:
+        result = await Get(
+            LintResult,
+            BanditPartition(
+                request.field_sets, InterpreterConstraints(python_setup.interpreter_constraints)
+            ),
+        )
+        return LintResults([result], linter_name="Bandit")
+
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
     # batch targets by their constraints to ensure, for example, that all Python 2 targets run

@@ -120,15 +120,19 @@ class Flake8LockfileSentinel(PythonToolLockfileSentinel):
 async def setup_flake8_lockfile(
     _: Flake8LockfileSentinel, flake8: Flake8, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
-    unique_constraints = {
-        InterpreterConstraints.create_from_compatibility_fields(
-            [tgt[InterpreterConstraintsField]], python_setup
-        )
-        for tgt in all_build_targets
-        if tgt.has_field(InterpreterConstraintsField) and not tgt.get(SkipFlake8Field).value
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    if python_setup.disable_mixed_interpreter_constraints:
+        constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    else:
+        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        unique_constraints = {
+            InterpreterConstraints.create_from_compatibility_fields(
+                [tgt[InterpreterConstraintsField]], python_setup
+            )
+            for tgt in all_build_targets
+            if tgt.has_field(InterpreterConstraintsField) and not tgt.get(SkipFlake8Field).value
+        }
+        constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
     return PythonLockfileRequest.from_tool(
         flake8, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )

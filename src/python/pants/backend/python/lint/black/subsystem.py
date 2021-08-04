@@ -123,10 +123,16 @@ async def setup_black_lockfile(
 ) -> PythonLockfileRequest:
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
-        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
-        code_constraints = InterpreterConstraints.create_from_targets(
-            (tgt for tgt in all_build_targets if not tgt.get(SkipBlackField).value), python_setup
-        )
+        if python_setup.disable_mixed_interpreter_constraints:
+            code_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+        else:
+            all_build_targets = await Get(
+                UnexpandedTargets, AddressSpecs([DescendantAddresses("")])
+            )
+            code_constraints = InterpreterConstraints.create_from_targets(
+                (tgt for tgt in all_build_targets if not tgt.get(SkipBlackField).value),
+                python_setup,
+            )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
 

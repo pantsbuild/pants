@@ -73,10 +73,13 @@ async def setup_black(
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
     # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
     # the machine.
-    all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
-        python_setup,
-    )
+    if python_setup.disable_mixed_interpreter_constraints:
+        all_interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    else:
+        all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+            (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
+            python_setup,
+        )
     tool_interpreter_constraints = (
         all_interpreter_constraints
         if (

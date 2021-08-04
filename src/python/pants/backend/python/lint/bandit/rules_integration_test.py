@@ -109,16 +109,15 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    py2_args = [
-        "--bandit-version=bandit>=1.6.2,<1.7",
-    ]
+    py2_args = ["--bandit-version=bandit>=1.6.2,<1.7"]
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
+    py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
+
     py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=py2_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 0
     assert "f.py (syntax error while parsing AST from file)" in py2_result[0].stdout
 
-    py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
     py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=py2_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
@@ -139,6 +138,17 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert batched_py3_result.exit_code == 0
     assert batched_py3_result.partition_description == "['CPython>=3.6']"
     assert "No issues identified." in batched_py3_result.stdout
+
+    # Finally, disable mixed interpreter constraints, meaning we should only disable batching and
+    # use the global constraints.
+    no_mixed_ics_result = run_bandit(
+        rule_runner,
+        [py2_tgt, py3_tgt],
+        extra_args=["--python-setup-disable-mixed-interpreter-constraints"],
+    )
+    assert len(no_mixed_ics_result) == 1
+    assert no_mixed_ics_result[0].exit_code == 0
+    assert "No issues identified." in py3_result[0].stdout
 
 
 def test_respects_config_file(rule_runner: RuleRunner) -> None:

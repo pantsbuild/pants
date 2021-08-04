@@ -109,6 +109,15 @@ async def flake8_lint(
     if flake8.skip:
         return LintResults([], linter_name="Flake8")
 
+    if python_setup.disable_mixed_interpreter_constraints:
+        result = await Get(
+            LintResult,
+            Flake8Partition(
+                request.field_sets, InterpreterConstraints(python_setup.interpreter_constraints)
+            ),
+        )
+        return LintResults([result], linter_name="flake8")
+
     # NB: Flake8 output depends upon which Python interpreter version it's run with
     # (http://flake8.pycqa.org/en/latest/user/invocation.html). We batch targets by their
     # constraints to ensure, for example, that all Python 2 targets run together and all Python 3

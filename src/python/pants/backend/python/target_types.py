@@ -65,7 +65,7 @@ class PythonSources(Sources):
     expected_file_extensions = ("", ".py", ".pyi")
 
 
-class InterpreterConstraintsField(StringSequenceField):
+class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
     alias = "interpreter_constraints"
     help = (
         "The Python interpreters this code is compatible with.\n\nEach element should be written "
@@ -83,7 +83,21 @@ class InterpreterConstraintsField(StringSequenceField):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
-        return python_setup.compatibility_or_constraints(self.value)
+        if python_setup.disable_mixed_interpreter_constraints:
+            if self.value:
+                raise InvalidFieldException(
+                    f"The `{self.alias}` field in target at {self.address} was set, but "
+                    "`[python-setup].disable_mixed_interpreter_constraints` is set so the field "
+                    "is disabled.\n\n"
+                    "Please either remove the field so that it uses the value from "
+                    "`[python-setup].interpreter_constraints`, or set "
+                    "`disable_mixed_interpreter_constraints = false` in your `pants.toml` "
+                    "(the default)."
+                )
+            return python_setup.interpreter_constraints
+        if python_setup.options.is_flagged("interpreter_constraints"):
+            return python_setup.interpreter_constraints
+        return tuple(self.value or python_setup.interpreter_constraints)
 
 
 # -----------------------------------------------------------------------------------------------

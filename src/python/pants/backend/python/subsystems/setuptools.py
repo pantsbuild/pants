@@ -43,18 +43,22 @@ class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
-    transitive_targets_per_python_dist = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_build_targets
-        if tgt.has_field(PythonProvidesField)
-    )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-        or InterpreterConstraints(python_setup.interpreter_constraints)
-        for transitive_targets in transitive_targets_per_python_dist
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    if python_setup.disable_mixed_interpreter_constraints:
+        constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    else:
+        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        transitive_targets_per_python_dist = await MultiGet(
+            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+            for tgt in all_build_targets
+            if tgt.has_field(PythonProvidesField)
+        )
+        unique_constraints = {
+            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+            or InterpreterConstraints(python_setup.interpreter_constraints)
+            for transitive_targets in transitive_targets_per_python_dist
+        }
+        constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
     return PythonLockfileRequest.from_tool(
         setuptools, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )
