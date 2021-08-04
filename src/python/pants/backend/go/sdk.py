@@ -16,7 +16,7 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class SetupGoSdkProcess:
+class GoSdkProcess:
     digest: Digest
     command: Tuple[str, ...]
     description: str
@@ -27,7 +27,7 @@ class SetupGoSdkProcess:
 
 @rule
 async def setup_go_sdk_command(
-    request: SetupGoSdkProcess,
+    request: GoSdkProcess,
     goroot: GoLangDistribution,
     bash: BashBinary,
 ) -> Process:

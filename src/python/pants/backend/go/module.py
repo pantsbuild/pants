@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 import ijson
 
-from pants.backend.go.sdk import SetupGoSdkProcess
+from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import GoModuleSources
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
@@ -110,7 +110,7 @@ async def resolve_go_module(
 
     result = await Get(
         ProcessResult,
-        SetupGoSdkProcess(
+        GoSdkProcess(
             digest=flattened_sources_snapshot.digest,
             command=("mod", "download", "-json", "all"),
             description="Resolve go_module metadata.",
