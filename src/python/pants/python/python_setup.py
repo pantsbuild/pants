@@ -39,11 +39,13 @@ class PythonSetup(Subsystem):
             default=PythonSetup.default_interpreter_constraints,
             metavar="<requirement>",
             help=(
-                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
-                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
-                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
-                "constraint strings will be ORed together.\n\nThese constraints are used as the "
-                "default value for the `interpreter_constraints` field of Python targets."
+                "The Python interpreters your codebase is compatible with.\n\n"
+                "Specify with requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter "
+                "with version >=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). "
+                "Multiple constraint strings will be ORed together.\n\n"
+                "If `[python-setup].disable_mixed_interpreter_constraints` is set, this will set "
+                "the constraints for your entire project. Otherwise, these constraints are used as "
+                "the default value for the `interpreter_constraints` field of Python targets."
             ),
         )
         register(
@@ -51,7 +53,19 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=bool,
             default=False,
-            help=(""),
+            help=(
+                "If true, the `interpreter_constraints` field will be banned for Python targets "
+                "and you will only be able to set interpreter constraints via the option "
+                "`[python-setup].interpreter_constraints`.\n\n"
+                "You should set this option if your repository can use uniform interpreter "
+                "constraints, unlike, for example, projects with some Python 2-only code and some "
+                "Python 3-only code. Disabling this feature can improve performance."
+                "\n\n"
+                "This option is temporary: in Pants 2.8+, the `interpreter_constraints` field will "
+                "only be registered on Python targets if the backend "
+                "`pants.backend.python.mixed_interpreter_constraints` is activated. In the "
+                "meantime, this option allows you to opt-out of the feature."
+            ),
         )
         register(
             "--interpreter-versions-universe",
@@ -83,7 +97,6 @@ class PythonSetup(Subsystem):
                 "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
-                "\n\nMutually exclusive with `--requirement-constraints-target`."
             ),
         )
         register(

@@ -75,7 +75,11 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\n"
         f"See {doc_url('python-interpreter-compatibility')} for how these interpreter "
-        "constraints are merged with the constraints of dependencies."
+        "constraints are merged with the constraints of dependencies.\n\n"
+        "Requires that you do not set the option "
+        "`[python-setup].disable_mixed_interpreter_constraints`. In Pants 2.8+, you will also need "
+        "to activate the backend `pants.backend.python.mixed_interpreter_constraints` for this "
+        "field to be registered on your Python targets."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
