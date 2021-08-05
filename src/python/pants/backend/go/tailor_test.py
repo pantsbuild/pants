@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.go import module, target_type_rules
+from pants.backend.go import module, sdk, target_type_rules
 from pants.backend.go.tailor import (
     PutativeGoExternalModuleTargetsRequest,
     PutativeGoModuleTargetsRequest,
@@ -33,6 +33,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *module.rules(),
+            *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(PutativeTargets, [PutativeGoPackageTargetsRequest, AllOwnedSources]),
             QueryRule(PutativeTargets, [PutativeGoModuleTargetsRequest, AllOwnedSources]),

@@ -7,6 +7,7 @@ from pants.backend.go import (
     import_analysis,
     module,
     pkg,
+    sdk,
     tailor,
     target_type_rules,
 )
@@ -26,6 +27,7 @@ def rules():
         *import_analysis.rules(),
         *module.rules(),
         *pkg.rules(),
+        *sdk.rules(),
         *tailor.rules(),
         *target_type_rules.rules(),
     ]

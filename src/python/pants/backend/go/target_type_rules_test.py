@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.go import module, pkg, target_type_rules
+from pants.backend.go import module, pkg, sdk, target_type_rules
 from pants.backend.go.target_type_rules import InferGoPackageDependenciesRequest
 from pants.backend.go.target_types import (
     GoExternalModule,
@@ -36,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *module.rules(),
             *pkg.rules(),
+            *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
             QueryRule(UnexpandedTargets, (Addresses,)),
