@@ -4,6 +4,7 @@
 import logging
 import site
 import sys
+from dataclasses import dataclass
 from typing import Optional, TypeVar, cast
 
 from pkg_resources import WorkingSet
@@ -16,6 +17,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
@@ -33,13 +35,20 @@ logger = logging.getLogger(__name__)
 S = TypeVar("S", bound=Subsystem)
 
 
+@dataclass(frozen=True)
+class PluginsRequest:
+    # Interpreter constraints to resolve for, or None to resolve for the interpreter that Pants is
+    # running under.
+    interpreter_constraints: Optional[PexInterpreterConstraints] = None
+
+
 class ResolvedPluginDistributions(DeduplicatedCollection[str]):
     sort_input = True
 
 
 @rule
 async def resolve_plugins(
-    interpreter_constraints: PexInterpreterConstraints, global_options: GlobalOptions
+    request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     """This rule resolves plugins using a VenvPex, and exposes the absolute paths of their dists.
 
@@ -51,13 +60,23 @@ async def resolve_plugins(
     if not requirements:
         return ResolvedPluginDistributions()
 
+    python: PythonExecutable | None = None
+    if not request.interpreter_constraints:
+        python = cast(
+            PythonExecutable,
+            PythonExecutable.fingerprinted(
+                sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
+            ),
+        )
+
     plugins_pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="pants_plugins.pex",
             internal_only=True,
+            python=python,
             requirements=requirements,
-            interpreter_constraints=interpreter_constraints,
+            interpreter_constraints=request.interpreter_constraints,
             # The repository's constraints are not relevant here, because this resolve is mixed
             # into the Pants' process' path, and never into user code.
             apply_requirement_constraints=False,
@@ -93,11 +112,7 @@ class PluginResolver:
         interpreter_constraints: Optional[PexInterpreterConstraints] = None,
     ) -> None:
         self._scheduler = scheduler
-        self._interpreter_constraints = (
-            interpreter_constraints
-            if interpreter_constraints is not None
-            else PexInterpreterConstraints([f"=={'.'.join(map(str, sys.version_info[:3]))}"])
-        )
+        self._request = PluginsRequest(interpreter_constraints)
 
     def resolve(
         self,
@@ -134,14 +149,12 @@ class PluginResolver:
         )
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [self._interpreter_constraints])[
-                0
-            ],
+            session.product_request(ResolvedPluginDistributions, [self._request])[0],
         )
 
 
 def rules():
     return [
-        QueryRule(ResolvedPluginDistributions, [PexInterpreterConstraints]),
+        QueryRule(ResolvedPluginDistributions, [PluginsRequest]),
         *collect_rules(),
     ]

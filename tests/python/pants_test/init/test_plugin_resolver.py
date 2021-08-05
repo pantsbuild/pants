@@ -3,6 +3,7 @@
 
 import os
 import shutil
+import sys
 from contextlib import contextmanager
 from pathlib import Path, PurePath
 from textwrap import dedent
@@ -127,10 +128,14 @@ def plugin_resolution(
             with temporary_dir() as new_chroot:
                 yield new_chroot, True
 
+    # Default to resolving with whatever we're currently running with.
     interpreter_constraints = (
         PexInterpreterConstraints([f"=={interpreter.identity.version_str}"])
         if interpreter
-        else PexInterpreterConstraints([">=3.7"])
+        else None
+    )
+    artifact_interpreter_constraints = interpreter_constraints or PexInterpreterConstraints(
+        [f"=={'.'.join(map(str, sys.version_info[:3]))}"]
     )
 
     with provide_chroot(chroot) as (root_dir, create_artifacts):
@@ -154,7 +159,7 @@ def plugin_resolution(
                     _run_setup_py(
                         rule_runner,
                         plugin,
-                        interpreter_constraints,
+                        artifact_interpreter_constraints,
                         version,
                         setup_py_args,
                         repo_dir,

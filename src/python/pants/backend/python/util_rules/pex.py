@@ -319,6 +319,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
+    python: PythonExecutable | None
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
     platforms: PexPlatforms
@@ -336,6 +337,7 @@ class PexRequest(EngineAwareParameter):
         *,
         output_filename: str,
         internal_only: bool,
+        python: PythonExecutable | None = None,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
         platforms=PexPlatforms(),
@@ -356,6 +358,8 @@ class PexRequest(EngineAwareParameter):
             to end users, such as with the `binary` goal. Typically, instead, the user never
             directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
+        :param python: A particular PythonExecutable to use, which must match any relevant
+            interpreter_constraints.
         :param requirements: The requirements to install.
         :param interpreter_constraints: Any constraints on which Python versions may be used.
         :param platforms: Which platforms should be supported. Setting this value will cause
@@ -377,6 +381,7 @@ class PexRequest(EngineAwareParameter):
         """
         self.output_filename = output_filename
         self.internal_only = internal_only
+        self.python = python
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
@@ -396,6 +401,16 @@ class PexRequest(EngineAwareParameter):
                 "Internal only PEXes can only constrain interpreters with interpreter_constraints."
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
+            )
+        if self.python and self.platforms:
+            raise ValueError(
+                "Only one of platforms or a specific interpreter may be set. Got "
+                f"both {self.platforms} and {self.python}."
+            )
+        if self.python and self.interpreter_constraints:
+            raise ValueError(
+                "Only one of interpreter_constraints or a specific interpreter may be set. Got "
+                f"both {self.interpreter_constraints} and {self.python}."
             )
 
     def debug_hint(self) -> str:
@@ -595,15 +610,22 @@ async def build_pex(
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
-    else:
-        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
+    elif request.python:
+        python = request.python
+    elif request.internal_only:
         # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
         # interpreter constraints, and then will run the PEX with that specific interpreter. We
         # will have already validated that there were no platforms.
-        if request.internal_only:
-            python = await Get(
-                PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
-            )
+        python = await Get(
+            PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
+        )
+    else:
+        # `--interpreter-constraint` options are mutually exclusive with the `--python` option,
+        # so we only specify them if we have not already located a concrete Python.
+        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
+
+    if python:
+        argv.extend(["--python", python.path])
 
     argv.append("--no-emit-warnings")
 
