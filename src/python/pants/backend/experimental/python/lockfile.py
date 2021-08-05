@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.experimental.python.lockfile_metadata import (
-    invalidation_digest,
+    calculate_invalidation_digest,
     lockfile_content_with_header,
 )
 from pants.backend.python.subsystems.python_tool_base import (
@@ -80,6 +80,7 @@ class PythonLockfileRequest:
     interpreter_constraints: InterpreterConstraints
     dest: str
     description: str
+    regenerate_command: str
 
     @classmethod
     def from_tool(
@@ -102,6 +103,7 @@ class PythonLockfileRequest:
             ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
+            regenerate_command="./pants tool-lock",
         )
 
     @property
@@ -111,12 +113,12 @@ class PythonLockfileRequest:
 
         Inputs are definted as requirements and interpreter constraints.
         """
-        return invalidation_digest(self.requirements, self.interpreter_constraints)
+        return calculate_invalidation_digest(self.requirements, self.interpreter_constraints)
 
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem
+    req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem, python_setup: PythonSetup
 ) -> PythonLockfile:
     reqs_filename = "reqs.txt"
     input_requirements = await Get(
@@ -162,7 +164,11 @@ async def generate_lockfile(
     _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
     lockfile_contents = _lockfile_contents_iter[0]
 
-    content_with_header = lockfile_content_with_header(req.hex_digest, lockfile_contents.content)
+    content_with_header = lockfile_content_with_header(
+        python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
+        req.hex_digest,
+        lockfile_contents.content,
+    )
     complete_lockfile = await Get(
         Digest, CreateDigest([FileContent(req.dest, content_with_header)])
     )
@@ -242,9 +248,12 @@ async def lockfile_goal(
             InterpreterConstraints(python_setup.interpreter_constraints),
             dest=pip_tools_subsystem.lockfile_dest,
             description=(
-                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirements')}: "
+                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirement')}: "
                 f"{', '.join(reqs.req_strings)}"
             ),
+            # TODO(12382): Make this command actually accurate once we figure out the semantics
+            #  for user lockfiles. This is currently misleading.
+            regenerate_command="./pants lock ::",
         ),
     )
     workspace.write_digest(result.digest)
