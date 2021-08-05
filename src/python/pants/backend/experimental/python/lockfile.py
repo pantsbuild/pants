@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
@@ -50,22 +49,6 @@ class PipToolsSubsystem(PythonToolBase):
 
     default_version = "pip-tools==6.2.0"
     default_main = ConsoleScript("pip-compile")
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        # TODO(#12314): How should users indicate where to save the lockfile to when we have
-        #  per-tool lockfiles and multiple user lockfiles?
-        register(
-            "--lockfile-dest",
-            type=str,
-            default="3rdparty/python/lockfile.txt",
-            help="The file path to be created.\n\nThis will overwrite any previous files.",
-        )
-
-    @property
-    def lockfile_dest(self) -> str:
-        return cast(str, self.options.lockfile_dest)
 
 
 @dataclass(frozen=True)
@@ -193,10 +176,17 @@ class LockGoal(Goal):
 @goal_rule
 async def lockfile_goal(
     addresses: Addresses,
-    pip_tools_subsystem: PipToolsSubsystem,
     python_setup: PythonSetup,
     workspace: Workspace,
 ) -> LockGoal:
+    if python_setup.lockfile is None:
+        logger.warning(
+            "You ran `./pants lock`, but `[python-setup].experimental_lockfile` is not set. Please "
+            "set this option to the path where you'd like the lockfile for your code's "
+            "dependencies to live."
+        )
+        return LockGoal(exit_code=1)
+
     # TODO(#12314): Looking at the transitive closure to generate a single lockfile will not work
     #  when we have multiple lockfiles supported, via per-tool lockfiles and multiple user lockfiles.
     #  Ideally, `./pants lock ::` would mean "regenerate all unique lockfiles", whereas now it
@@ -246,7 +236,7 @@ async def lockfile_goal(
             #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
             #  but we need to figure out how this will work with multiple resolves.
             InterpreterConstraints(python_setup.interpreter_constraints),
-            dest=pip_tools_subsystem.lockfile_dest,
+            dest=python_setup.lockfile,
             description=(
                 f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirement')}: "
                 f"{', '.join(reqs.req_strings)}"
