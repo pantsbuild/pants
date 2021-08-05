@@ -46,7 +46,7 @@ def main() -> None:
         [
             "./pants",
             "--concurrent",
-            "--tag='-lockfile_ignore'",
+            "--tag=-lockfile_ignore",
             "lock",
             "tool-lock",
             "::",
