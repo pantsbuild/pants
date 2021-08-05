@@ -46,7 +46,7 @@ def main() -> None:
         [
             "./pants",
             "--concurrent",
-            "--tag='-lockfile_ignore'",
+            "--tag=-lockfile_ignore",
             "lock",
             "tool-lock",
             "::",
@@ -118,11 +118,10 @@ def main() -> None:
         ],
         check=True,
     )
+
     logger.warning(
-        "\n\n\nPlease restore headers for how to generate each file. (This will be automated.)"
-    )
-    logger.warning(
-        "Please fix Black to use environment markers like it was before. (This will be automated.)"
+        "Please fix Black and Flake8 to use environment markers like it was before. (This will "
+        "be automated.)"
     )
 
 

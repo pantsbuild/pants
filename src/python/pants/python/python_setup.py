@@ -111,6 +111,22 @@ class PythonSetup(Subsystem):
                 "and run `./pants lock ::`."
             ),
         )
+        # TODO(#12293): It's plausible this option might not exist once we figure out the semantics
+        #  for lockfile generation. One tricky edge is that the command to regenerate stale
+        #  lockfiles might need to consume this. In the meantime to figuring this all out, this is
+        #  helpful for internal pantsbuild/pants use.
+        register(
+            "--experimental-lockfile-custom-regeneration-command",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "If set, Pants will instruct your users to run a custom command to regenerate "
+                "lockfiles, rather than running `./pants lock` and `./pants tool-lock` like normal."
+                "\n\nThis option is experimental and it may change at any time without the normal "
+                "deprecation cycle."
+            ),
+        )
         register(
             "--interpreter-search-paths",
             advanced=True,
@@ -192,6 +208,10 @@ class PythonSetup(Subsystem):
     @property
     def lockfile(self) -> str | None:
         return cast("str | None", self.options.experimental_lockfile)
+
+    @property
+    def lockfile_custom_regeneration_command(self) -> str | None:
+        return cast("str | None", self.options.experimental_lockfile_custom_regeneration_command)
 
     @property
     def resolve_all_constraints(self) -> bool:
