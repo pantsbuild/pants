@@ -3,7 +3,7 @@
 
 python_tests(
   name='tests',
-  timeout = 270,
+  timeout = 360,
   dependencies=[
     # Used by `test_options_initializer`.
     '//:build_root',
