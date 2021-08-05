@@ -62,7 +62,7 @@ BAD_FILE = dedent(
     def add(x: int, y: int) -> int:
         return x + y
 
-    result = add(3, 3)
+    result = add(2.0, 3.0)
     """
 )
 # This will fail if `--disallow-any-expr` is configured.
@@ -152,7 +152,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     result = run_mypy(rule_runner, [tgt], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/f.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
@@ -163,7 +163,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--disallow-any-expr'"])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/f.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
@@ -182,7 +182,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
-    assert "4       4      1      1 good" in report_files[0].content.decode()
+    assert "4       4      1      1 f" in report_files[0].content.decode()
 
 
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
@@ -202,6 +202,7 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
                 assert flatten(42) == [4, 2]
                 """
             ),
+            f"{PACKAGE}/BUILD": "python_library()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -246,7 +247,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    tgt = rule_runner.get_target(Address(PACKAGE))
     result = run_mypy(
         rule_runner,
         [tgt],
@@ -342,7 +343,7 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
     result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
+    assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
     # Confirm original issues not showing up.
     assert "Failed to execute PEX file" not in result[0].stderr
     assert (
@@ -503,7 +504,7 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
         {
             "BUILD": "python_requirement_library(name='ta', requirements=['typed-ast==1.4.1'])",
             f"{PACKAGE}/f.py": "import typed_ast",
-            f"{PACKAGE}/BUILD": "python_library",
+            f"{PACKAGE}/BUILD": "python_library()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -546,7 +547,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 f"""\
                 python_requirement_library(name='mypy', requirements=['{MyPy.default_version}'])
                 python_requirement_library(
-                    name="more-itertools", requirements=["more-itertools==8.4.0"])
+                    name="more-itertools", requirements=["more-itertools==8.4.0"]
                 )
                 """
             ),
@@ -608,7 +609,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy_with_plugin(tgt)
     assert result.exit_code == 1
-    assert f"{PACKAGE}/f.py:10" in result.stdout
+    assert f"{PACKAGE}/f.py:8" in result.stdout
     # Ensure we don't accidentally check the source plugin itself.
     assert "(checked 1 source file)" in result.stdout
 
@@ -618,7 +619,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     )
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
-    assert "Success: no issues found in 2 source files" in result.stdout
+    assert "Success: no issues found in 1 source file" in result.stdout
 
 
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
