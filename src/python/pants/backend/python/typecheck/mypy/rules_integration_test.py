@@ -336,23 +336,38 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
                 print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['==2.7.*'])",
+            f"{PACKAGE}/BUILD": "python_library()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    result = run_mypy(rule_runner, [tgt])
-    assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
-    # Confirm original issues not showing up.
-    assert "Failed to execute PEX file" not in result[0].stderr
-    assert (
-        "Cannot find implementation or library stub for module named 'x690'" not in result[0].stdout
-    )
-    assert (
-        "Cannot find implementation or library stub for module named 'libumi'"
-        not in result[0].stdout
-    )
+
+    def assert_succeeds(*, disable_mixed_ics: bool) -> None:
+        result = run_mypy(
+            rule_runner,
+            [tgt],
+            extra_args=[
+                "--python-setup-interpreter-constraints=['==2.7.*']",
+                f"--python-setup-disable-mixed-interpreter-constraints={disable_mixed_ics}",
+            ],
+        )
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
+        # Confirm original issues not showing up.
+        assert "Failed to execute PEX file" not in result[0].stderr
+        assert (
+            "Cannot find implementation or library stub for module named 'x690'"
+            not in result[0].stdout
+        )
+        assert (
+            "Cannot find implementation or library stub for module named 'libumi'"
+            not in result[0].stdout
+        )
+
+    # Ensure the code path works when mixed interpreter constraints are disabled, which allows us
+    # to skip partitioning by constraints.
+    assert_succeeds(disable_mixed_ics=False)
+    assert_succeeds(disable_mixed_ics=True)
 
 
 @skip_unless_python38_present
