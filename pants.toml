@@ -72,7 +72,7 @@ root_patterns = [
 
 [python-setup]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
-experimental_lockfile_custom_regeneration_command = "./pants run build-support/bin/generate_all_lockfiles.py"
+experimental_lockfile_custom_regeneration_command = "build-support/bin/generate_all_lockfiles.sh"
 interpreter_constraints = [">=3.7,<3.10"]
 
 [black]
