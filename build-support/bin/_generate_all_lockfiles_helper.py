@@ -57,7 +57,6 @@ def main() -> None:
         ],
         check=True,
     )
-    return
 
     logger.info("Now, generating default tool lockfiles for users")
     # Now, generate default tool lockfiles. We must be careful that our own internal settings
