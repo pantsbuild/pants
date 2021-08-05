@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Sequence
 
 import pytest
 
@@ -50,101 +48,40 @@ def rule_runner() -> RuleRunner:
     )
 
 
-PACKAGE = "src/python/project"
-GOOD_SOURCE = FileContent(
-    f"{PACKAGE}/good.py",
-    dedent(
-        """\
-        def add(x: int, y: int) -> int:
-            return x + y
+PACKAGE = "src/py/project"
+GOOD_FILE = dedent(
+    """\
+    def add(x: int, y: int) -> int:
+        return x + y
 
-        result = add(3, 3)
-        """
-    ).encode(),
+    result = add(3, 3)
+    """
 )
-BAD_SOURCE = FileContent(
-    f"{PACKAGE}/bad.py",
-    dedent(
-        """\
-        def add(x: int, y: int) -> int:
-            return x + y
+BAD_FILE = dedent(
+    """\
+    def add(x: int, y: int) -> int:
+        return x + y
 
-        result = add(2.0, 3.0)
-        """
-    ).encode(),
+    result = add(2.0, 3.0)
+    """
 )
-NEEDS_CONFIG_SOURCE = FileContent(
-    f"{PACKAGE}/needs_config.py",
-    dedent(
-        """\
-        from typing import Any, cast
+# This will fail if `--disallow-any-expr` is configured.
+NEEDS_CONFIG_FILE = dedent(
+    """\
+    from typing import Any, cast
 
-        # This will fail if `--disallow-any-expr` is configured.
-        x = cast(Any, "hello")
-        """
-    ).encode(),
+    x = cast(Any, "hello")
+    """
 )
-
-GLOBAL_ARGS = (
-    "--backend-packages=pants.backend.python",
-    "--backend-packages=pants.backend.python.typecheck.mypy",
-    "--source-root-patterns=['/', 'src/python', 'tests/python']",
-)
-
-
-def make_target(
-    rule_runner: RuleRunner,
-    source_files: List[FileContent],
-    *,
-    package: Optional[str] = None,
-    name: str = "target",
-    interpreter_constraints: Optional[str] = None,
-    dependencies: Optional[List[str]] = None,
-) -> Target:
-    if not package:
-        package = PACKAGE
-    for source_file in source_files:
-        rule_runner.create_file(source_file.path, source_file.content.decode())
-    source_globs = [PurePath(source_file.path).name for source_file in source_files]
-    if not dependencies:
-        dependencies = []
-    rule_runner.add_to_build_file(
-        f"{package}",
-        dedent(
-            f"""\
-            python_library(
-                name={repr(name)},
-                sources={source_globs},
-                dependencies={dependencies},
-                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
-            )
-            """
-        ),
-    )
-    rule_runner.set_options(GLOBAL_ARGS)
-    return rule_runner.get_target(Address(package, target_name=name))
 
 
 def run_mypy(
-    rule_runner: RuleRunner,
-    targets: List[Target],
-    *,
-    config: Optional[str] = None,
-    passthrough_args: Optional[str] = None,
-    skip: bool = False,
-    extra_args: Optional[List[str]] = None,
-) -> Sequence[TypecheckResult]:
-    args = list(GLOBAL_ARGS)
-    if config:
-        rule_runner.create_file(relpath="mypy.ini", contents=config)
-        args.append("--mypy-config=mypy.ini")
-    if passthrough_args:
-        args.append(f"--mypy-args='{passthrough_args}'")
-    if skip:
-        args.append("--mypy-skip")
-    if extra_args:
-        args.extend(extra_args)
-    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+) -> tuple[TypecheckResult, ...]:
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python.typecheck.mypy", *(extra_args or ())],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     result = rule_runner.request(
         TypecheckResults,
         [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
@@ -152,41 +89,45 @@ def run_mypy(
     return result.results
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_mypy(rule_runner, [target])
+def assert_success(
+    rule_runner: RuleRunner, target: Target, *, extra_args: list[str] | None = None
+) -> None:
+    result = run_mypy(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_failing_source(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_mypy(rule_runner, [target])
-    assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert f"{PACKAGE}/bad.py:4" in result[0].stdout
-    assert result[0].report == EMPTY_DIGEST
+def test_passing(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    assert_success(rule_runner, tgt)
 
 
-def test_mixed_sources(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
-    result = run_mypy(rule_runner, [target])
+def test_failing(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/good.py" not in result[0].stdout
-    assert f"{PACKAGE}/bad.py:4" in result[0].stdout
-    assert "checked 2 source files" in result[0].stdout
+    assert f"{PACKAGE}/f.py:4" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
-    targets = [
-        make_target(rule_runner, [GOOD_SOURCE], name="t1"),
-        make_target(rule_runner, [BAD_SOURCE], name="t2"),
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/good.py": GOOD_FILE,
+            f"{PACKAGE}/bad.py": BAD_FILE,
+            f"{PACKAGE}/BUILD": "python_library()",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address(PACKAGE, relative_file_path="good.py")),
+        rule_runner.get_target(Address(PACKAGE, relative_file_path="bad.py")),
     ]
-    result = run_mypy(rule_runner, targets)
+    result = run_mypy(rule_runner, tgts)
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/good.py" not in result[0].stdout
@@ -202,7 +143,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/f.py": NEEDS_CONFIG_SOURCE.content.decode(),
+            f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE,
             f"{PACKAGE}/BUILD": "python_library()",
             config_path: "[mypy]\ndisallow_any_expr = True\n",
         }
@@ -211,169 +152,147 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     result = run_mypy(rule_runner, [tgt], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/f.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
-    result = run_mypy(rule_runner, [target], passthrough_args="--disallow-any-expr")
+    rule_runner.write_files(
+        {f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE, f"{PACKAGE}/BUILD": "python_library()"}
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--disallow-any-expr'"])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/needs_config.py:4" in result[0].stdout
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_mypy(rule_runner, [target], skip=True)
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-skip"])
     assert not result
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_mypy(rule_runner, [target], passthrough_args="--linecount-report=reports")
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--linecount-report=reports'"])
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
-    assert "4       4      1      1 good" in report_files[0].content.decode()
+    assert "4       4      1      1 f" in report_files[0].content.decode()
 
 
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name="more-itertools",
-                requirements=["more-itertools==8.4.0"],
-            )
-            """
-        ),
-    )
-    source_file = FileContent(
-        f"{PACKAGE}/itertools.py",
-        dedent(
-            """\
-            from more_itertools import flatten
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement_library(
+                    name="more-itertools", requirements=["more-itertools==8.4.0"],
+                )
+                """
+            ),
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                from more_itertools import flatten
 
-            assert flatten(42) == [4, 2]
-            """
-        ).encode(),
+                assert flatten(42) == [4, 2]
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library()",
+        }
     )
-    target = make_target(rule_runner, [source_file])
-    result = run_mypy(rule_runner, [target])
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/itertools.py:3" in result[0].stdout
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name='django',
-                requirements=['Django==2.2.5'],
-            )
-            """
-        ),
-    )
-    rule_runner.create_file(
-        f"{PACKAGE}/settings.py",
-        dedent(
-            """\
-            from django.urls import URLPattern
+    rule_runner.write_files(
+        {
+            "BUILD": "python_requirement_library(name='django', requirements=['Django==2.2.5'])",
+            f"{PACKAGE}/settings.py": dedent(
+                """\
+                from django.urls import URLPattern
 
-            DEBUG = True
-            DEFAULT_FROM_EMAIL = "webmaster@example.com"
-            SECRET_KEY = "not so secret"
-            MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
-            """
-        ),
-    )
-    rule_runner.create_file(
-        f"{PACKAGE}/app.py",
-        dedent(
-            """\
-            from django.utils import text
+                DEBUG = True
+                DEFAULT_FROM_EMAIL = "webmaster@example.com"
+                SECRET_KEY = "not so secret"
+                MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
+                """
+            ),
+            f"{PACKAGE}/app.py": dedent(
+                """\
+                from django.utils import text
 
-            assert "forty-two" == text.slugify("forty two")
-            assert "42" == text.slugify(42)
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(PACKAGE, "python_library()")
-    package_tgt = rule_runner.get_target(Address(PACKAGE))
+                assert "forty-two" == text.slugify("forty two")
+                assert "42" == text.slugify(42)
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library()",
+            "mypy.ini": dedent(
+                """\
+                [mypy]
+                plugins =
+                    mypy_django_plugin.main
 
-    config_content = dedent(
-        """\
-        [mypy]
-        plugins =
-            mypy_django_plugin.main
-
-        [mypy.plugins.django-stubs]
-        django_settings_module = project.settings
-        """
+                [mypy.plugins.django-stubs]
+                django_settings_module = project.settings
+                """
+            ),
+        }
     )
+    tgt = rule_runner.get_target(Address(PACKAGE))
     result = run_mypy(
         rule_runner,
-        [package_tgt],
-        config=config_content,
+        [tgt],
         extra_args=["--mypy-extra-requirements=django-stubs==1.5.0", "--mypy-version=mypy==0.770"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert "src/python/project/app.py:4" in result[0].stdout
+    assert f"{PACKAGE}/app.py:4" in result[0].stdout
 
 
 def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/util/lib.py",
-        dedent(
-            """\
-            def capitalize(v: str) -> str:
-                return v.capitalize()
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(f"{PACKAGE}/util", "python_library()")
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/util/__init__.py": "",
+            f"{PACKAGE}/util/lib.py": dedent(
+                """\
+                def capitalize(v: str) -> str:
+                    return v.capitalize()
+                """
+            ),
+            f"{PACKAGE}/util/BUILD": "python_library()",
+            f"{PACKAGE}/math/__init__.py": "",
+            f"{PACKAGE}/math/add.py": dedent(
+                """\
+                from project.util.lib import capitalize
 
-    rule_runner.create_file(f"{PACKAGE}/math/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/math/add.py",
-        dedent(
-            """\
-            from project.util.lib import capitalize
-
-            def add(x: int, y: int) -> str:
-                sum = x + y
-                return capitalize(sum)  # This is the wrong type.
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        f"{PACKAGE}/math",
-        "python_library()",
-    )
-
-    sources_content = [
-        FileContent(
-            f"{PACKAGE}/app.py",
-            dedent(
+                def add(x: int, y: int) -> str:
+                    sum = x + y
+                    return capitalize(sum)  # This is the wrong type.
+                """
+            ),
+            f"{PACKAGE}/math/BUILD": "python_library()",
+            f"{PACKAGE}/__init__.py": "",
+            f"{PACKAGE}/app.py": dedent(
                 """\
                 from project.math.add import add
 
                 print(add(2, 4))
                 """
-            ).encode(),
-        ),
-        FileContent(f"{PACKAGE}/__init__.py", b""),
-    ]
-    target = make_target(rule_runner, sources_content)
-    result = run_mypy(rule_runner, [target])
+            ),
+            f"{PACKAGE}/BUILD": "python_library()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
@@ -385,43 +304,47 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
 
     There was a bug that this would cause the runner PEX to fail to execute because it did not have
     Python 3 distributions of the requirements.
+
+    Also note that this Python 2 support should be automatic: Pants will tell MyPy to run with
+    `--py2` by detecting its use in interpreter constraints.
     """
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
-            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
-            # both to be usable, even though libumi is not compatible with Py3.
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
+                # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
+                # both to be usable, even though libumi is not compatible with Py3.
 
-            python_requirement_library(
-                name="libumi",
-                requirements=["libumi==0.0.2"],
-            )
+                python_requirement_library(
+                    name="libumi",
+                    requirements=["libumi==0.0.2"],
+                )
 
-            python_requirement_library(
-                name="x690",
-                requirements=["x690==0.2.0"],
-            )
-            """
-        ),
+                python_requirement_library(
+                    name="x690",
+                    requirements=["x690==0.2.0"],
+                )
+                """
+            ),
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                from libumi import hello_world
+                from x690 import types
+
+                print "Blast from the past!"
+                print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['==2.7.*'])",
+        }
     )
-    source_file = FileContent(
-        f"{PACKAGE}/py2.py",
-        dedent(
-            """\
-            from libumi import hello_world
-            from x690 import types
-
-            print "Blast from the past!"
-            print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
-            """
-        ).encode(),
-    )
-    target = make_target(rule_runner, [source_file], interpreter_constraints="==2.7.*")
-    result = run_mypy(rule_runner, [target], passthrough_args="--py2")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
+    assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
+    # Confirm original issues not showing up.
     assert "Failed to execute PEX file" not in result[0].stderr
     assert (
         "Cannot find implementation or library stub for module named 'x690'" not in result[0].stdout
@@ -430,51 +353,46 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
         "Cannot find implementation or library stub for module named 'libumi'"
         not in result[0].stdout
     )
-    assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
 
 
 @skip_unless_python38_present
 def test_works_with_python38(rule_runner: RuleRunner) -> None:
     """MyPy's typed-ast dependency does not understand Python 3.8, so we must instead run MyPy with
     Python 3.8 when relevant."""
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    py38_sources = FileContent(
-        f"{PACKAGE}/py38.py",
-        dedent(
-            """\
-            x = 0
-            if y := x:
-                print("x is truthy and now assigned to y")
-            """
-        ).encode(),
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                x = 0
+                if y := x:
+                    print("x is truthy and now assigned to y")
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['>=3.8'])",
+        }
     )
-    target = make_target(rule_runner, [py38_sources], interpreter_constraints=">=3.8")
-    result = run_mypy(rule_runner, [target])
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    assert_success(rule_runner, tgt)
 
 
 @skip_unless_python39_present
 def test_works_with_python39(rule_runner: RuleRunner) -> None:
     """MyPy's typed-ast dependency does not understand Python 3.9, so we must instead run MyPy with
     Python 3.9 when relevant."""
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    py39_sources = FileContent(
-        f"{PACKAGE}/py39.py",
-        dedent(
-            """\
-            @lambda _: int
-            def replaced(x: bool) -> str:
-                return "42" if x is True else "1/137"
-            """
-        ).encode(),
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                @lambda _: int
+                def replaced(x: bool) -> str:
+                    return "42" if x is True else "1/137"
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['>=3.9'])",
+        }
     )
-    target = make_target(rule_runner, [py39_sources], interpreter_constraints=">=3.9")
-    result = run_mypy(rule_runner, [target])
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    assert_success(rule_runner, tgt)
 
 
 @skip_unless_python27_and_python3_present
@@ -485,128 +403,90 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     This batching must consider transitive dependencies, so we use a more complex setup where the
     dependencies are what have specific constraints that influence the batching.
     """
-    rule_runner.create_file(f"{PACKAGE}/py2/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/py2/lib.py",
-        dedent(
-            """\
-            def add(x, y):
-                # type: (int, int) -> int
-                print "old school"
-                return x + y
-            """
-        ),
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/py2/__init__.py": dedent(
+                """\
+                def add(x, y):
+                    # type: (int, int) -> int
+                    return x + y
+                """
+            ),
+            f"{PACKAGE}/py2/BUILD": "python_library(interpreter_constraints=['==2.7.*'])",
+            f"{PACKAGE}/py3/__init__.py": dedent(
+                """\
+                def add(x: int, y: int) -> int:
+                    return x + y
+                """
+            ),
+            f"{PACKAGE}/py3/BUILD": "python_library(interpreter_constraints=['>=3.6'])",
+            f"{PACKAGE}/__init__.py": "",
+            f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
+            f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
+            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])",
+        }
     )
-    rule_runner.add_to_build_file(
-        f"{PACKAGE}/py2", "python_library(interpreter_constraints=['==2.7.*'])"
-    )
+    py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
+    py3_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 
-    rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/py3/lib.py",
-        dedent(
-            """\
-            def add(x: int, y: int) -> int:
-                return x + y
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        f"{PACKAGE}/py3", "python_library(interpreter_constraints=['>=3.6'])"
-    )
-
-    # Our input files belong to the same target, which is compatible with both Py2 and Py3.
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/uses_py2.py", "from project.py2.lib import add\nassert add(2, 2) == 4\n"
-    )
-    rule_runner.create_file(
-        f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
-    )
-    rule_runner.add_to_build_file(
-        PACKAGE, "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])"
-    )
-    py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
-    py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
-
-    result = run_mypy(rule_runner, [py2_target, py3_target])
+    result = run_mypy(rule_runner, [py2_tgt, py3_tgt])
     assert len(result) == 2
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
     assert py2_result.exit_code == 0
     assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
-    assert "Success: no issues found" in py3_result.stdout
+    assert "Success: no issues found" in py2_result.stdout
 
     assert py3_result.exit_code == 0
     assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
-    assert "Success: no issues found" in py3_result.stdout.strip()
+    assert "Success: no issues found" in py3_result.stdout
+
+
+def test_run_only_on_specified_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/good.py": GOOD_FILE,
+            f"{PACKAGE}/bad.py": BAD_FILE,
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_library(name='good', sources=['good.py'], dependencies=[':bad'])
+                python_library(name='bad', sources=['bad.py'])
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, target_name="good", relative_file_path="good.py"))
+    assert_success(rule_runner, tgt)
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
-    """Test that type stubs work for both first-party and third-party code."""
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name="ansicolors",
-                requirements=["ansicolors"],
-                module_mapping={'ansicolors': ['colors']},
-            )
-            """
-        ),
-    )
+    """Test that first-party type stubs work for both first-party and third-party code."""
+    rule_runner.write_files(
+        {
+            "BUILD": "python_requirement_library(name='colors', requirements=['ansicolors'])",
+            "mypy_stubs/__init__.py": "",
+            "mypy_stubs/colors.pyi": "def red(s: str) -> str: ...",
+            "mypy_stubs/BUILD": "python_library()",
+            f"{PACKAGE}/util/__init__.py": "",
+            f"{PACKAGE}/util/untyped.py": "def add(x, y):\n    return x + y",
+            f"{PACKAGE}/util/untyped.pyi": "def add(x: int, y: int) -> int: ...",
+            f"{PACKAGE}/util/BUILD": "python_library()",
+            f"{PACKAGE}/__init__.py": "",
+            f"{PACKAGE}/app.py": dedent(
+                """\
+                from colors import red
+                from project.util.untyped import add
 
-    rule_runner.create_file("mypy_stubs/__init__.py")
-    rule_runner.create_file(
-        "mypy_stubs/colors.pyi",
-        dedent(
-            """\
-            def red(s: str) -> str:
-                ...
-            """
-        ),
+                z = add(2, 2.0)
+                print(red(z))
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library()",
+        }
     )
-    rule_runner.add_to_build_file("mypy_stubs", "python_library()")
-
-    rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/util/untyped.py",
-        dedent(
-            """\
-            def add(x, y):
-                return x + y
-            """
-        ),
-    )
-    rule_runner.create_file(
-        f"{PACKAGE}/util/untyped.pyi",
-        dedent(
-            """\
-            def add(x: int, y: int) -> int:
-                ...
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(f"{PACKAGE}/util", "python_library()")
-
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/app.py",
-        dedent(
-            """\
-            from colors import red
-            from project.util.untyped import add
-
-            z = add(2, 2.0)
-            print(red(z))
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(PACKAGE, "python_library()")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
     result = run_mypy(
-        rule_runner, [tgt], extra_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+        rule_runner, [tgt], extra_args=["--source-root-patterns=['mypy_stubs', 'src/py']"]
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -620,25 +500,15 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
     The way we load requirements is complex. We want to ensure that things still work properly in
     this edge case.
     """
-    rule_runner.create_file("app.py", "import typed_ast\n")
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name='typed-ast',
-                requirements=['typed-ast==1.4.1'],
-            )
-
-            python_library(name="lib")
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "BUILD": "python_requirement_library(name='ta', requirements=['typed-ast==1.4.1'])",
+            f"{PACKAGE}/f.py": "import typed_ast",
+            f"{PACKAGE}/BUILD": "python_library()",
+        }
     )
-    tgt = rule_runner.get_target(Address("", target_name="lib"))
-    result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-version=mypy==0.782"])
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    assert_success(rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782"])
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
@@ -646,99 +516,83 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     # This is to ensure that we can correctly support plugins with dependencies.
     # The plugin changes the return type of functions ending in `__overridden_by_plugin` to have a
     # return type of `None`.
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            f"""\
-            python_requirement_library(
-                name='mypy',
-                requirements=['{MyPy.default_version}'],
-            )
-
-            python_requirement_library(
-                name="more-itertools",
-                requirements=["more-itertools==8.4.0"],
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("pants-plugins/plugins/subdir/__init__.py")
-    rule_runner.create_file(
-        "pants-plugins/plugins/subdir/dep.py",
-        dedent(
-            """\
-            from more_itertools import flatten
-
-            def is_overridable_function(name: str) -> bool:
-                assert list(flatten([[1, 2], [3, 4]])) == [1, 2, 3, 4]
-                return name.endswith("__overridden_by_plugin")
-            """
-        ),
-    )
-    rule_runner.add_to_build_file("pants-plugins/plugins/subdir", "python_library()")
-
-    # The plugin can depend on code located anywhere in the project; its dependencies need not be in
-    # the same directory.
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    rule_runner.create_file(f"{PACKAGE}/subdir/__init__.py")
-    rule_runner.create_file(f"{PACKAGE}/subdir/util.py", "def noop() -> None:\n    pass\n")
-    rule_runner.add_to_build_file(f"{PACKAGE}/subdir", "python_library()")
-
-    rule_runner.create_file("pants-plugins/plugins/__init__.py")
-    rule_runner.create_file(
-        "pants-plugins/plugins/change_return_type.py",
-        dedent(
-            """\
-            from typing import Callable, Optional, Type
-
-            from mypy.plugin import FunctionContext, Plugin
-            from mypy.types import NoneType, Type as MyPyType
-
-            from plugins.subdir.dep import is_overridable_function
-            from project.subdir.util import noop
-
-            noop()
-
-            class ChangeReturnTypePlugin(Plugin):
-                def get_function_hook(
-                    self, fullname: str
-                ) -> Optional[Callable[[FunctionContext], MyPyType]]:
-                    return hook if is_overridable_function(fullname) else None
-
-
-            def hook(ctx: FunctionContext) -> MyPyType:
-                return NoneType()
-
-
-            def plugin(_version: str) -> Type[Plugin]:
-                return ChangeReturnTypePlugin
-            """
-        ),
-    )
-    rule_runner.add_to_build_file("pants-plugins/plugins", "python_library()")
-
-    config_content = dedent(
+    plugin_file = dedent(
         """\
-        [mypy]
-        plugins =
-            plugins.change_return_type
+        from typing import Callable, Optional, Type
+
+        from mypy.plugin import FunctionContext, Plugin
+        from mypy.types import NoneType, Type as MyPyType
+
+        from plugins.subdir.dep import is_overridable_function
+        from project.subdir.util import noop
+
+        noop()
+
+        class ChangeReturnTypePlugin(Plugin):
+            def get_function_hook(
+                self, fullname: str
+            ) -> Optional[Callable[[FunctionContext], MyPyType]]:
+                return hook if is_overridable_function(fullname) else None
+
+        def hook(ctx: FunctionContext) -> MyPyType:
+            return NoneType()
+
+        def plugin(_version: str) -> Type[Plugin]:
+            return ChangeReturnTypePlugin
         """
     )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                f"""\
+                python_requirement_library(name='mypy', requirements=['{MyPy.default_version}'])
+                python_requirement_library(
+                    name="more-itertools", requirements=["more-itertools==8.4.0"]
+                )
+                """
+            ),
+            "pants-plugins/plugins/subdir/__init__.py": "",
+            "pants-plugins/plugins/subdir/dep.py": dedent(
+                """\
+                from more_itertools import flatten
 
-    test_file_content = dedent(
-        """\
-        def add(x: int, y: int) -> int:
-            return x + y
+                def is_overridable_function(name: str) -> bool:
+                    assert list(flatten([[1, 2], [3, 4]])) == [1, 2, 3, 4]
+                    return name.endswith("__overridden_by_plugin")
+                """
+            ),
+            "pants-plugins/plugins/subdir/BUILD": "python_library()",
+            # The plugin can depend on code located anywhere in the project; its dependencies need
+            # not be in the same directory.
+            f"{PACKAGE}/subdir/__init__.py": "",
+            f"{PACKAGE}/subdir/util.py": "def noop() -> None:\n    pass\n",
+            f"{PACKAGE}/subdir/BUILD": "python_library()",
+            "pants-plugins/plugins/__init__.py": "",
+            "pants-plugins/plugins/change_return_type.py": plugin_file,
+            "pants-plugins/plugins/BUILD": "python_library()",
+            f"{PACKAGE}/__init__.py": "",
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                def add(x: int, y: int) -> int:
+                    return x + y
 
+                def add__overridden_by_plugin(x: int, y: int) -> int:
+                    return x  + y
 
-        def add__overridden_by_plugin(x: int, y: int) -> int:
-            return x  + y
-
-
-        result = add__overridden_by_plugin(1, 1)
-        assert add(result, 2) == 4
-        """
-    ).encode()
+                result = add__overridden_by_plugin(1, 1)
+                assert add(result, 2) == 4
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_library()",
+            "mypy.ini": dedent(
+                """\
+                [mypy]
+                plugins =
+                    plugins.change_return_type
+                """
+            ),
+        }
+    )
 
     def run_mypy_with_plugin(tgt: Target) -> TypecheckResult:
         result = run_mypy(
@@ -746,27 +600,26 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             [tgt],
             extra_args=[
                 "--mypy-source-plugins=['pants-plugins/plugins']",
-                "--source-root-patterns=['pants-plugins', 'src/python']",
+                "--source-root-patterns=['pants-plugins', 'src/py']",
             ],
-            config=config_content,
         )
         assert len(result) == 1
         return result[0]
 
-    target = make_target(
-        rule_runner, [FileContent(f"{PACKAGE}/test_source_plugin.py", test_file_content)]
-    )
-    result = run_mypy_with_plugin(target)
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy_with_plugin(tgt)
     assert result.exit_code == 1
-    assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
-    # We want to ensure we don't accidentally check the source plugin itself.
+    assert f"{PACKAGE}/f.py:8" in result.stdout
+    # Ensure we don't accidentally check the source plugin itself.
     assert "(checked 1 source file)" in result.stdout
 
-    # We also want to ensure that running MyPy on the plugin itself still works.
-    plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
+    # Ensure that running MyPy on the plugin itself still works.
+    plugin_tgt = rule_runner.get_target(
+        Address("pants-plugins/plugins", relative_file_path="change_return_type.py")
+    )
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
-    assert "Success: no issues found in 2 source files" in result.stdout
+    assert "Success: no issues found in 1 source file" in result.stdout
 
 
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
@@ -774,55 +627,40 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
         rules=[*rule_runner.rules, *protobuf_rules()],
         target_types=[*rule_runner.target_types, ProtobufLibrary],
     )
+    rule_runner.write_files(
+        {
+            "BUILD": (
+                "python_requirement_library(name='protobuf', requirements=['protobuf==3.13.0'])"
+            ),
+            f"{PACKAGE}/__init__.py": "",
+            f"{PACKAGE}/proto.proto": dedent(
+                """\
+                syntax = "proto3";
+                package project;
 
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name="protobuf",
-                requirements=["protobuf==3.13.0"],
-            )
-            """
-        ),
-    )
+                message Person {
+                    string name = 1;
+                    int32 id = 2;
+                    string email = 3;
+                }
+                """
+            ),
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                from project.proto_pb2 import Person
 
-    rule_runner.create_file(f"{PACKAGE}/__init__.py")
-    rule_runner.create_file(
-        f"{PACKAGE}/proto.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-            package project;
-
-            message Person {
-                string name = 1;
-                int32 id = 2;
-                string email = 3;
-            }
-            """
-        ),
+                x = Person(name=123, id="abc", email=None)
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_library(dependencies=[':proto'])
+                protobuf_library(name='proto')
+                """
+            ),
+        }
     )
-    rule_runner.create_file(
-        f"{PACKAGE}/app.py",
-        dedent(
-            """\
-            from project.proto_pb2 import Person
-
-            x = Person(name=123, id="abc", email=None)
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        PACKAGE,
-        dedent(
-            """\
-            python_library(dependencies=[':proto'])
-            protobuf_library(name='proto')
-            """
-        ),
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE))
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy(
         rule_runner,
         [tgt],
@@ -839,15 +677,15 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
 
 def test_determine_python_files() -> None:
     assert determine_python_files([]) == ()
-    assert determine_python_files(["foo.py"]) == ("foo.py",)
-    assert determine_python_files(["foo.pyi"]) == ("foo.pyi",)
-    assert determine_python_files(["foo.py", "foo.pyi"]) == ("foo.pyi",)
-    assert determine_python_files(["foo.pyi", "foo.py"]) == ("foo.pyi",)
-    assert determine_python_files(["foo.json"]) == ()
+    assert determine_python_files(["f.py"]) == ("f.py",)
+    assert determine_python_files(["f.pyi"]) == ("f.pyi",)
+    assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
+    assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
+    assert determine_python_files(["f.json"]) == ()
 
 
 def test_warn_if_python_version_configured(caplog) -> None:
-    def assert_is_configured(*, has_config: bool, args: List[str], warning: str) -> None:
+    def assert_is_configured(*, has_config: bool, args: list[str], warning: str) -> None:
         config = FileContent("mypy.ini", b"[mypy]\npython_version = 3.6") if has_config else None
         is_configured = check_and_warn_if_python_version_configured(config=config, args=tuple(args))
         assert is_configured
@@ -873,26 +711,3 @@ def test_warn_if_python_version_configured(caplog) -> None:
             "option and you set `--python-version` in the `--mypy-args` option."
         ),
     )
-
-
-def test_run_mypy_only_on_specified_files(rule_runner: RuleRunner) -> None:
-    # create a library that passes all mypy checks
-    good_target = make_target(
-        rule_runner=rule_runner,
-        source_files=[GOOD_SOURCE],
-        name="good",
-        dependencies=[":bad"],
-    )
-
-    # create a library that does NOT pass mypy checks
-    make_target(
-        rule_runner=rule_runner,
-        source_files=[BAD_SOURCE],
-        name="bad",
-    )
-
-    result = run_mypy(rule_runner, [good_target])
-
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
