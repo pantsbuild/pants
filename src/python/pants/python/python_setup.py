@@ -99,7 +99,9 @@ class PythonSetup(Subsystem):
         register(
             "--experimental-lockfile",
             advanced=True,
-            type=file_option,
+            # TODO(#11719): Switch this to a file_option once env vars can unset a value.
+            type=str,
+            metavar="<file>",
             mutually_exclusive_group="constraints",
             help=(
                 "The lockfile to use when resolving requirements for your own code (vs. tools you "

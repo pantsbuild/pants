@@ -47,12 +47,17 @@ def main() -> None:
             "./pants",
             "--concurrent",
             "--tag=-lockfile_ignore",
+            # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
+            # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
+            # restore it here so that the lockfile gets generated properly.
+            "--python-setup-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
             "lock",
             "tool-lock",
             "::",
         ],
         check=True,
     )
+    return
 
     logger.info("Now, generating default tool lockfiles for users")
     # Now, generate default tool lockfiles. We must be careful that our own internal settings
