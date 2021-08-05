@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.experimental.python.lockfile import (
@@ -12,17 +13,33 @@ from pants.backend.experimental.python.lockfile import (
 )
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    InterpreterConstraintsField,
+    PythonSources,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import FieldSet, Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class BanditFieldSet(FieldSet):
+    required_fields = (PythonSources,)
+
+    sources: PythonSources
+    interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipBanditField).value
 
 
 class Bandit(PythonToolBase):
@@ -97,19 +114,26 @@ class BanditLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine all Python interpreter versions used by Bandit in your project",
+    desc=(
+        "Determine all Python interpreter versions used by Bandit in your project (for lockfile "
+        "usage)"
+    ),
     level=LogLevel.DEBUG,
 )
 async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    # While Bandit will run in partitions, we need a single lockfile that works with every
+    # partition.
+    #
+    # This ORs all unique interpreter constraints. When paired with
+    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that every
+    # possible Python interpreter used will be covered.
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     unique_constraints = {
-        InterpreterConstraints.create_from_compatibility_fields(
-            [tgt[InterpreterConstraintsField]], python_setup
-        )
+        InterpreterConstraints.create_from_targets([tgt], python_setup)
         for tgt in all_build_targets
-        if tgt.has_field(InterpreterConstraintsField) and not tgt.get(SkipBanditField).value
+        if BanditFieldSet.is_applicable(tgt)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return PythonLockfileRequest.from_tool(

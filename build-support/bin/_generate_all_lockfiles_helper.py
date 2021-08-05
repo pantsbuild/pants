@@ -20,7 +20,10 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.python.python_setup import PythonSetup
 
@@ -90,12 +93,21 @@ def main() -> None:
             f"--isort-extra-requirements={repr(Isort.default_extra_requirements)}",
             f"--isort-interpreter-constraints={repr(Isort.default_interpreter_constraints)}",
             f"--isort-experimental-lockfile={Isort.default_lockfile_path}",
+            # Pylint.
+            "--backend-packages=+['pants.backend.python.lint.pylint']",
+            f"--pylint-version={Pylint.default_version}",
+            f"--pylint-extra-requirements={repr(Pylint.default_extra_requirements)}",
+            f"--pylint-experimental-lockfile={Pylint.default_lockfile_path}",
             # Yapf.
             "--backend-packages=+['pants.backend.python.lint.yapf']",
             f"--yapf-version={Yapf.default_version}",
             f"--yapf-extra-requirements={repr(Yapf.default_extra_requirements)}",
             f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
             f"--yapf-experimental-lockfile={Yapf.default_lockfile_path}",
+            # IPython.
+            f"--ipython-version={IPython.default_version}",
+            f"--ipython-extra-requirements={repr(IPython.default_extra_requirements)}",
+            f"--ipython-experimental-lockfile={IPython.default_lockfile_path}",
             # Setuptools.
             f"--setuptools-version={Setuptools.default_version}",
             f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
@@ -112,6 +124,10 @@ def main() -> None:
             f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
             f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",
             f"--lambdex-experimental-lockfile={Lambdex.default_lockfile_path}",
+            # Pytest
+            f"--pytest-version={PyTest.default_version}",
+            f"--pytest-extra-requirements={repr(PyTest.default_extra_requirements)}",
+            f"--pytest-experimental-lockfile={PyTest.default_lockfile_path}",
             # Coverage.py
             f"--coverage-py-version={CoverageSubsystem.default_version}",
             f"--coverage-py-extra-requirements={repr(CoverageSubsystem.default_extra_requirements)}",

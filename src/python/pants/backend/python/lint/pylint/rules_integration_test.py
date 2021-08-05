@@ -7,8 +7,9 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
+from pants.backend.python.lint.pylint.rules import PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
+from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files

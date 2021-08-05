@@ -75,6 +75,9 @@ experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 experimental_lockfile_custom_regeneration_command = "build-support/bin/generate_all_lockfiles.sh"
 interpreter_constraints = [">=3.7,<3.10"]
 
+[ipython]
+experimental_lockfile = "<default>"
+
 [black]
 experimental_lockfile = "<default>"
 
@@ -157,6 +160,7 @@ extra_requirements.add = [
   "pytest-icdiff",
   "pygments",
 ]
+experimental_lockfile = "3rdparty/python/lockfiles/pytest.txt"
 timeout_default = 60
 
 [test]

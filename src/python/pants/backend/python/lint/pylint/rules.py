@@ -5,13 +5,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
-from pants.backend.python.lint.pylint.skip_field import SkipPylintField
-from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.target_types import (
-    InterpreterConstraintsField,
-    PythonRequirementsField,
-    PythonSources,
-)
+from pants.backend.python.lint.pylint.subsystem import Pylint, PylintFieldSet
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonRequirementsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -35,9 +30,7 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
-    FieldSet,
     Target,
     Targets,
     TransitiveTargets,
@@ -48,18 +41,6 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
-
-
-@dataclass(frozen=True)
-class PylintFieldSet(FieldSet):
-    required_fields = (PythonSources,)
-
-    sources: PythonSources
-    dependencies: Dependencies
-
-    @classmethod
-    def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipPylintField).value
 
 
 @dataclass(frozen=True)

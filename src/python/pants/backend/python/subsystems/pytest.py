@@ -3,14 +3,27 @@
 
 from __future__ import annotations
 
+import itertools
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.target_types import ConsoleScript, PythonTestsSources
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.deprecated import resolve_conflicting_options
+from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
+from pants.python.python_setup import PythonSetup
+from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 
 
 class PyTest(PythonToolBase):
@@ -26,6 +39,11 @@ class PyTest(PythonToolBase):
     default_extra_requirements = ["pytest-cov>=2.10.1,<2.12"]
 
     default_main = ConsoleScript("pytest")
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.subsystems", "pytest_lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest_lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
@@ -157,3 +175,45 @@ class PyTest(PythonToolBase):
             check_existence=check_existence,
             check_content=check_content,
         )
+
+
+class PytestLockfileSentinel(PythonToolLockfileSentinel):
+    pass
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pytest in your project (for "
+        "lockfile usage)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_pytest_lockfile(
+    _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
+) -> PythonLockfileRequest:
+    # Even though we run each python_tests target in isolation, we need a single lockfile that
+    # works with them all (and their transitive deps).
+    #
+    # This first computes the constraints for each individual `python_tests` target
+    # (which will AND across each target in the closure). Then, it ORs all unique resulting
+    # interpreter constraints. When paired with
+    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that
+    # every possible Python interpreter used will be covered.
+    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    transitive_targets_per_test = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+        for tgt in all_build_targets
+        if tgt.has_field(PythonTestsSources)
+    )
+    unique_constraints = {
+        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+        for transitive_targets in transitive_targets_per_test
+    }
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return PythonLockfileRequest.from_tool(
+        pytest, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+    )
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, PytestLockfileSentinel))

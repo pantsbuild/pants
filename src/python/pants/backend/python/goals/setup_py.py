@@ -14,7 +14,7 @@ from functools import partial
 from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setuptools import Setuptools
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
 from pants.backend.python.target_types import (
     PythonDistributionEntryPointsField,
     PythonProvidesField,
@@ -161,13 +161,6 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """
 
     sort_input = True
-
-
-@dataclass(frozen=True)
-class PythonDistributionFieldSet(PackageFieldSet):
-    required_fields = (PythonProvidesField,)
-
-    provides: PythonProvidesField
 
 
 @dataclass(frozen=True)

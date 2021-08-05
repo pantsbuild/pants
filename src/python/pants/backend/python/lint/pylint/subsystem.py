@@ -3,15 +3,47 @@
 
 from __future__ import annotations
 
+import itertools
 import os.path
+from dataclasses import dataclass
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonLockfileRequest,
+    PythonToolLockfileSentinel,
+)
+from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.target_types import ConsoleScript, PythonSources
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    FieldSet,
+    Target,
+    UnexpandedTargets,
+)
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url
+from pants.python.python_setup import PythonSetup
+from pants.util.docutil import doc_url, git_url
+from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class PylintFieldSet(FieldSet):
+    required_fields = (PythonSources,)
+
+    sources: PythonSources
+    dependencies: Dependencies
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPylintField).value
 
 
 class Pylint(PythonToolBase):
@@ -20,6 +52,11 @@ class Pylint(PythonToolBase):
 
     default_version = "pylint>=2.6.2,<2.7"
     default_main = ConsoleScript("pylint")
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.lint.pylint", "lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
@@ -110,3 +147,45 @@ class Pylint(PythonToolBase):
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+
+
+class PylintLockfileSentinel:
+    pass
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pylint in your project (for "
+        "lockfile usage)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_pylint_lockfile(
+    _: PylintLockfileSentinel, pylint: Pylint, python_setup: PythonSetup
+) -> PythonLockfileRequest:
+    # While Pylint will run in partitions, we need a single lockfile that works with every
+    # partition.
+    #
+    # This first computes the constraints for each individual target, including its direct
+    # dependencies (which will AND across each target in the closure). Then, it ORs all unique
+    # resulting interpreter constraints. When paired with
+    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that
+    # every possible Python interpreter used will be covered.
+    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    relevant_targets = tuple(tgt for tgt in all_build_targets if PylintFieldSet.is_applicable(tgt))
+    direct_deps_per_target = await MultiGet(
+        Get(UnexpandedTargets, DependenciesRequest(tgt.get(Dependencies)))
+        for tgt in relevant_targets
+    )
+    unique_constraints = {
+        InterpreterConstraints.create_from_targets([tgt, *direct_deps], python_setup)
+        for tgt, direct_deps in zip(relevant_targets, direct_deps_per_target)
+    }
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return PythonLockfileRequest.from_tool(
+        pylint, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+    )
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, PylintLockfileSentinel))

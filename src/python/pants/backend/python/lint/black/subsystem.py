@@ -115,7 +115,7 @@ class BlackLockfileSentinel(PythonToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine if Black should use Python 3.8+",
+    desc="Determine if Black should use Python 3.8+ (for lockfile usage)",
     level=LogLevel.DEBUG,
 )
 async def setup_black_lockfile(
