@@ -509,3 +509,15 @@ def test_skip_type_stubs(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code is None
+
+
+def test_skip_tests_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_foo.pyi": "def test_foo() -> None:\n    ...\n",
+            f"{PACKAGE}/BUILD": "python_tests(skip_tests=True)",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code is None
