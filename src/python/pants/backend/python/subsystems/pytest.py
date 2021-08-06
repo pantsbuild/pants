@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable, cast
 
 from pants.backend.experimental.python.lockfile import (
@@ -12,18 +14,49 @@ from pants.backend.experimental.python.lockfile import (
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, PythonTestsSources
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    PythonTestsExtraEnvVars,
+    PythonTestsSources,
+    PythonTestsTimeout,
+    SkipPythonTestsField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    UnexpandedTargets,
+)
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class PythonTestFieldSet(TestFieldSet):
+    required_fields = (PythonTestsSources,)
+
+    sources: PythonTestsSources
+    timeout: PythonTestsTimeout
+    runtime_package_dependencies: RuntimePackageDependenciesField
+    extra_env_vars: PythonTestsExtraEnvVars
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        if tgt.get(SkipPythonTestsField).value:
+            return True
+        if not tgt.address.is_file_target:
+            return False
+        file_name = PurePath(tgt.address.filename)
+        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
 
 class PyTest(PythonToolBase):
@@ -203,7 +236,7 @@ async def setup_pytest_lockfile(
     transitive_targets_per_test = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in all_build_targets
-        if tgt.has_field(PythonTestsSources)
+        if PythonTestFieldSet.is_applicable(tgt)
     )
     unique_constraints = {
         InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)

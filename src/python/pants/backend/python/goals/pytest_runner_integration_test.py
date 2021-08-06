@@ -13,11 +13,8 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import (
-    PytestPluginSetup,
-    PytestPluginSetupRequest,
-    PythonTestFieldSet,
-)
+from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PythonLibrary,
@@ -499,25 +496,27 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
     assert result.exit_code == 0
 
 
-def test_skip_type_stubs(rule_runner: RuleRunner) -> None:
+def test_skip_tests(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/test_foo.pyi": "def test_foo() -> None:\n    ...\n",
-            f"{PACKAGE}/BUILD": "python_tests()",
+            f"{PACKAGE}/test_skip_me.py": "",
+            f"{PACKAGE}/test_foo.py": "",
+            f"{PACKAGE}/test_foo.pyi": "",
+            f"{PACKAGE}/conftest.py": "",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(name='t1', sources=['test_skip_me.py'], skip_tests=True)
+                python_tests(name='t2', sources=['test_foo*', 'conftest.py'])
+                """
+            ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
-    result = run_pytest(rule_runner, tgt)
-    assert result.exit_code is None
 
+    def is_applicable(tgt_name: str, fp: str) -> bool:
+        tgt = rule_runner.get_target(Address(PACKAGE, target_name=tgt_name, relative_file_path=fp))
+        return PythonTestFieldSet.is_applicable(tgt)
 
-def test_skip_tests_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            f"{PACKAGE}/test_foo.pyi": "def test_foo() -> None:\n    ...\n",
-            f"{PACKAGE}/BUILD": "python_tests(skip_tests=True)",
-        }
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
-    result = run_pytest(rule_runner, tgt)
-    assert result.exit_code is None
+    assert not is_applicable("t1", "test_skip_me.py")
+    assert is_applicable("t2", "test_foo.py")
+    assert not is_applicable("t2", "test_foo.pyi")
+    assert not is_applicable("t2", "conftest.py")
