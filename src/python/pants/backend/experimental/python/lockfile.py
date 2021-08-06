@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from textwrap import dedent
 from dataclasses import dataclass
 
 from pants.backend.experimental.python.lockfile_metadata import (
@@ -43,12 +44,18 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------------
 
 
-class PipToolsSubsystem(PythonToolBase):
-    options_scope = "pip-tools"
+class PoetrySubsystem(PythonToolBase):
+    options_scope = "poetry"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
-    default_version = "pip-tools==6.2.0"
-    default_main = ConsoleScript("pip-compile")
+    default_version = "poetry==1.1.7"
+    default_main = ConsoleScript("poetry")
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+    # TODO: add lockfile support? Would that suffer from chicken and egg? Note that I tried using
+    #  ExternalTool with their GitHub releases, but they are deprecating that release process.
 
 
 @dataclass(frozen=True)
@@ -101,62 +108,74 @@ class PythonLockfileRequest:
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem, python_setup: PythonSetup
+    req: PythonLockfileRequest, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
 ) -> PythonLockfile:
-    reqs_filename = "reqs.txt"
+    # TODO: code to generate a pyproject.toml
+    pyproject_toml = dedent(
+        """\
+        [tool.poetry]
+        name = "pants-lockfile-generation"
+        version = "0.1.0"
+        description = ""
+        authors = ["pantsbuild"]
+
+        [tool.poetry.dependencies]
+        python = ">=3.6,<3.10"
+        flake8 = "*"
+        """
+    )
     input_requirements = await Get(
-        Digest, CreateDigest([FileContent(reqs_filename, "\n".join(req.requirements).encode())])
+        Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml.encode())])
     )
 
-    pip_compile_pex = await Get(
+    poetry_pex = await Get(
         VenvPex,
         PexRequest(
-            output_filename="pip_compile.pex",
+            output_filename="poetry.pex",
             internal_only=True,
-            requirements=pip_tools_subsystem.pex_requirements,
-            interpreter_constraints=req.interpreter_constraints,
-            main=pip_tools_subsystem.main,
-            description=(
-                "Building pip_compile.pex with interpreter constraints: "
-                f"{req.interpreter_constraints}"
-            ),
+            requirements=poetry_subsystem.pex_requirements,
+            interpreter_constraints=poetry_subsystem.interpreter_constraints,
+            main=poetry_subsystem.main,
         ),
     )
 
-    generated_lockfile = await Get(
+    # TODO(#12314): Wire up Poetry to named_caches.
+    # TODO(#12314): Wire up all the pip options like indexes.
+    poetry_lock_result = await Get(
         ProcessResult,
-        # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share
-        #  the cache between Pex and Pip. Next best is a dedicated named_cache.
         VenvPexProcess(
-            pip_compile_pex,
-            description=req.description,
-            # TODO(#12314): Wire up all the pip options like indexes.
-            argv=[
-                reqs_filename,
-                "--generate-hashes",
-                f"--output-file={req.dest}",
-                # NB: This allows pinning setuptools et al, which we must do. This will become
-                # the default in a future version of pip-tools.
-                "--allow-unsafe",
-            ],
+            poetry_pex,
+            argv=("lock",),
             input_digest=input_requirements,
-            output_files=(req.dest,),
+            output_files=("poetry.lock", "pyproject.toml"),
+            description=req.description,
         ),
     )
+    poetry_export_result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            poetry_pex,
+            argv=("export", "-o", req.dest),
+            input_digest=poetry_lock_result.output_digest,
+            output_files=(req.dest,),
+            description=(
+                f"Exporting Poetry lockfile to requirements.txt format for {req.dest}"
+            ),
+            level=LogLevel.DEBUG,
+        )
+    )
 
-    _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
-    lockfile_contents = _lockfile_contents_iter[0]
-
-    content_with_header = lockfile_content_with_header(
+    lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
+    lockfile_with_header = lockfile_content_with_header(
         python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
         req.hex_digest,
-        lockfile_contents.content,
+        lockfile_digest_contents[0].content,
     )
-    complete_lockfile = await Get(
-        Digest, CreateDigest([FileContent(req.dest, content_with_header)])
+    final_lockfile = await Get(
+        Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)])
     )
 
-    return PythonLockfile(complete_lockfile, req.dest)
+    return PythonLockfile(final_lockfile, req.dest)
 
 
 # --------------------------------------------------------------------------------------
