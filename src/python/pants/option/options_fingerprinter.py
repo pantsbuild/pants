@@ -28,21 +28,18 @@ class OptionsFingerprinter:
     """
 
     @classmethod
-    def combined_options_fingerprint_for_scope(cls, scope, options, **kwargs) -> str:
+    def combined_options_fingerprint_for_scope(cls, scope, options, daemon_only=False) -> str:
         """Given options and a scope, compute a combined fingerprint for the scope.
 
         :param string scope: The scope to fingerprint.
         :param Options options: The `Options` object to fingerprint.
-        :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
-                                       target options.
-        :param dict **kwargs: Keyword parameters passed on to
-                              `Options#get_fingerprintable_for_scope`.
+        :param daemon_only: Whether to fingerprint only daemon=True options.
         :return: Hexadecimal string representing the fingerprint for all `options`
                  values in `scope`.
         """
         fingerprinter = cls()
         hasher = sha1()
-        pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
+        pairs = options.get_fingerprintable_for_scope(scope, daemon_only)
         for (option_type, option_value) in pairs:
             fingerprint = fingerprinter.fingerprint(option_type, option_value)
             if fingerprint is None:
