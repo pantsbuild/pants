@@ -152,7 +152,6 @@ class PantsDaemonCore:
         options_fingerprint = OptionsFingerprinter.combined_options_fingerprint_for_scope(
             GLOBAL_SCOPE,
             options_bootstrapper.bootstrap_options,
-            invert=True,
         )
         bootstrap_options_changed = (
             self._fingerprint is not None and options_fingerprint != self._fingerprint

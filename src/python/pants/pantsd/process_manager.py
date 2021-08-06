@@ -525,7 +525,7 @@ class PantsDaemonProcessManager(ProcessManager, metaclass=ABCMeta):
         Scheduler needs need to be re-initialized.
         """
         return OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon"
+            GLOBAL_SCOPE, self._bootstrap_options, daemon_only=True
         )
 
     def needs_restart(self, option_fingerprint):
