@@ -176,6 +176,7 @@ class Scheduler:
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
             store_rpc_concurrency=execution_options.remote_store_rpc_concurrency,
+            store_batch_api_size_limit=execution_options.remote_store_batch_api_size_limit,
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,

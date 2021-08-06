@@ -252,6 +252,12 @@ to this directory.",
               .required(false)
               .default_value("128")
         )
+        .arg(    Arg::with_name("batch-api-size-limit")
+                .help("Total size of blobs allowed to be sent in a single batch API call")
+               .takes_value(true)
+               .long("batch-api-size-limit")
+               .required(false)
+               .default_value("4194304"))
       .get_matches(),
   ).await {
     Ok(_) => {}
@@ -327,6 +333,8 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             value_t!(top_match.value_of("rpc-concurrency-limit"), usize)
               .expect("Bad rpc-concurrency-limit flag"),
             None,
+            value_t!(top_match.value_of("batch-api-size-limit"), usize)
+              .expect("Bad batch-api-size-limit flag"),
           ),
           true,
         )

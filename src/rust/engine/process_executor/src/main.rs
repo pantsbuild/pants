@@ -176,6 +176,10 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   store_rpc_concurrency: usize,
 
+  /// Total size of blobs allowed to be sent in a single API call.
+  #[structopt(long, default_value = "4194304")]
+  store_batch_api_size_limit: usize,
+
   /// Number of concurrent requests to the execution service.
   #[structopt(long, default_value = "128")]
   execution_rpc_concurrency: usize,
@@ -251,6 +255,7 @@ async fn main() {
         args.store_rpc_retries,
         args.store_rpc_concurrency,
         None,
+        args.store_batch_api_size_limit,
       )
     }
     (None, None) => Ok(local_only_store),
