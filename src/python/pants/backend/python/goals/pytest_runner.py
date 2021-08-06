@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
     PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
+    SkipPythonTestsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -84,10 +85,13 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars
+    skip_tests: SkipPythonTestsField
 
-    def is_conftest_or_type_stub(self) -> bool:
-        """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
-        `python_tests` target, because neither contain any tests to run on."""
+    def should_skip(self) -> bool:
+        """Check if the target was set to be skipped, or it's `conftest.py` or a type stub."""
+        if self.skip_tests.value:
+            return True
+        # Defend against it being a BUILD target, which should never happen in production.
         if not self.address.is_file_target:
             return False
         file_name = PurePath(self.address.filename)
@@ -328,7 +332,7 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
 ) -> TestResult:
-    if field_set.is_conftest_or_type_stub():
+    if field_set.should_skip():
         return TestResult.skip(field_set.address)
 
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
@@ -374,7 +378,7 @@ async def run_python_test(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    if field_set.is_conftest_or_type_stub():
+    if field_set.should_skip():
         return TestDebugRequest(None)
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(

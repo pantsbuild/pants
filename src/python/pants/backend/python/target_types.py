@@ -457,6 +457,12 @@ class PythonTestsExtraEnvVars(StringSequenceField):
     )
 
 
+class SkipPythonTestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this target's tests."
+
+
 class PythonTests(Target):
     alias = "python_tests"
     core_fields = (
@@ -467,6 +473,7 @@ class PythonTests(Target):
         PythonTestsTimeout,
         RuntimePackageDependenciesField,
         PythonTestsExtraEnvVars,
+        SkipPythonTestsField,
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
