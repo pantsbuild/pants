@@ -159,7 +159,7 @@ async fn write_file_multiple_chunks() {
     1,
     256,
     None,
-    super::tests::STORE_BATCH_API_SIZE_LIMIT,
+    0, // disable batch API, force streaming API
   )
   .unwrap();
 
