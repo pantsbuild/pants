@@ -2,7 +2,7 @@
 #
 #    build-support/bin/generate_all_lockfiles.sh
 #
-# You MUST manually add back the `python_version` environment markers. (This will be automated.)
+# You MUST manually add back the `python_version` and `sys_platform` environment markers.
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # invalidation digest: 1ee11fe335a8425c80f54cb5879e7feb0e81c4de710883ed698e88f368f54427
 # --- END PANTS LOCKFILE METADATA ---
@@ -13,6 +13,10 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=3rdparty/python/lockfiles/pytest.txt reqs.txt
 #
+appnope==0.1.2 ; sys_platform == "darwin" \
+     --hash=sha256:93aa393e9d6c54c5cd570ccadd8edad61ea0c4b9ea7a01409020c9aa019eb442 \
+     --hash=sha256:dd83cd4b5b460958838f6eb3000c660b1f9caf2a5b1de4264e941512f603258a
+     # via ipython
 attrs==21.2.0 \
     --hash=sha256:149e90d6d8ac20db7a955ad60cf0e6881a3f20d37096140088356da6c716b0b1 \
     --hash=sha256:ef6aaac3ca6cd92904cdd0d83f629a15f18053ec84e6432106f7a4d04ae4f5fb

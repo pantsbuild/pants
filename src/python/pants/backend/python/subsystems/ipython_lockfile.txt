@@ -2,6 +2,7 @@
 #
 #    build-support/bin/generate_all_lockfiles.sh
 #
+# You MUST manually add back the `sys_platform` environment markers. (This will be automated.)
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # invalidation digest: 066d10fe955dba4f9c6f2171aa5e55210f4bc154a1ad4ca12170e5c8c063d6cf
 # --- END PANTS LOCKFILE METADATA ---
@@ -12,6 +13,10 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=src/python/pants/backend/python/subsystems/ipython_lockfile.txt reqs.txt
 #
+appnope==0.1.2 ; sys_platform == "darwin" \
+     --hash=sha256:93aa393e9d6c54c5cd570ccadd8edad61ea0c4b9ea7a01409020c9aa019eb442 \
+     --hash=sha256:dd83cd4b5b460958838f6eb3000c660b1f9caf2a5b1de4264e941512f603258a
+     # via ipython
 backcall==0.2.0 \
     --hash=sha256:5cbdbf27be5e7cfadb448baf0aa95508f91f2bbc6c6437cd9cd06e2a4c215e1e \
     --hash=sha256:fbbce6a29f263178a1f7915c1940bde0ec2b2a967566fe1c65c1dfb7422bd255

@@ -140,8 +140,8 @@ def main() -> None:
     )
 
     logger.warning(
-        "Please fix Black, Pytest, Flake8 to use environment markers like it was before. (This "
-        "will be automated.)"
+        "Please fix Black, Pytest, Flake8, and iPython to use environment markers like it was "
+        "before. (This will be automated.)"
     )
 
 
