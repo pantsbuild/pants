@@ -69,9 +69,8 @@ async def setup_ipython_lockfile(
     # `./pants repl py2::` and then `./pants repl py3::`. Still, even with those subsets possible,
     # we need a single lockfile that works with all possible Python interpreters in use.
     #
-    # This ORs all unique interpreter constraints. When paired with
-    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that
-    # every possible Python interpreter used will be covered.
+    # This ORs all unique interpreter constraints. The net effect is that every possible Python
+    # interpreter used will be covered.
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(

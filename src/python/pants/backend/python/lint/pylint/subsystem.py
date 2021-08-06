@@ -168,9 +168,8 @@ async def setup_pylint_lockfile(
     #
     # This first computes the constraints for each individual target, including its direct
     # dependencies (which will AND across each target in the closure). Then, it ORs all unique
-    # resulting interpreter constraints. When paired with
-    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that
-    # every possible Python interpreter used will be covered.
+    # resulting interpreter constraints. The net effect is that every possible Python interpreter
+    # used will be covered.
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     relevant_targets = tuple(tgt for tgt in all_build_targets if PylintFieldSet.is_applicable(tgt))
     direct_deps_per_target = await MultiGet(
