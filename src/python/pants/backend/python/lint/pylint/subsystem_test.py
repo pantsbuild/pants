@@ -6,9 +6,9 @@ from __future__ import annotations
 from textwrap import dedent
 
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.lint.pylint.subsystem import PylintLockfileSentinel
 from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
-from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
