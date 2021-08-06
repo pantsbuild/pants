@@ -221,8 +221,6 @@ def test_grouping():
     do_test({}, expected_basic=True)
     do_test({"advanced": False}, expected_basic=True)
     do_test({"advanced": True}, expected_advanced=True)
-    do_test({"recursive_root": True}, expected_basic=True)
-    do_test({"advanced": True, "recursive_root": True}, expected_advanced=True)
 
 
 def test_get_all_help_info():

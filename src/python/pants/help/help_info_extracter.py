@@ -360,12 +360,7 @@ class HelpInfoExtracter:
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:
                 deprecated_options.append(ohi)
-            elif kwargs.get("advanced") or (
-                kwargs.get("recursive") and not kwargs.get("recursive_root")
-            ):
-                # In order to keep the regular help output uncluttered, we treat recursive
-                # options as advanced.  The concept of recursive options is not widely used
-                # and not clear to the end user, so it's best not to expose it as a concept.
+            elif kwargs.get("advanced"):
                 advanced_options.append(ohi)
             else:
                 basic_options.append(ohi)
