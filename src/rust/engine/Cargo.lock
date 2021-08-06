@@ -3034,6 +3034,7 @@ dependencies = [
  "bytes",
  "concrete_time",
  "criterion",
+ "double-checked-cell-async",
  "fs",
  "futures",
  "glob",
