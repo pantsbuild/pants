@@ -22,7 +22,7 @@ from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
 from pants.backend.python.macros.poetry_requirements import PoetryRequirements
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirements
-from pants.backend.python.subsystems import python_native_code, setuptools
+from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
@@ -73,6 +73,8 @@ def rules():
         *target_types_rules.rules(),
         *setup_py.rules(),
         *setuptools.rules(),
+        *ipython.rules(),
+        *pytest.rules(),
     )
 
 

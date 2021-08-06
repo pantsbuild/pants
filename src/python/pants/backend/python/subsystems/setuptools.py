@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from dataclasses import dataclass
 
 from pants.backend.experimental.python.lockfile import (
     PythonLockfileRequest,
@@ -11,12 +12,20 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class PythonDistributionFieldSet(PackageFieldSet):
+    required_fields = (PythonProvidesField,)
+
+    provides: PythonProvidesField
 
 
 class Setuptools(PythonToolRequirementsBase):
@@ -47,7 +56,7 @@ async def setup_setuptools_lockfile(
     transitive_targets_per_python_dist = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in all_build_targets
-        if tgt.has_field(PythonProvidesField)
+        if PythonDistributionFieldSet.is_applicable(tgt)
     )
     unique_constraints = {
         InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
