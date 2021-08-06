@@ -2,6 +2,7 @@
 #
 #    build-support/bin/generate_all_lockfiles.sh
 #
+# You MUST manually add back the `python_version` environment markers. (This will be automated.)
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # invalidation digest: 1ee11fe335a8425c80f54cb5879e7feb0e81c4de710883ed698e88f368f54427
 # --- END PANTS LOCKFILE METADATA ---
@@ -83,7 +84,7 @@ decorator==5.0.9 \
 icdiff==2.0.4 \
     --hash=sha256:c72572e5ce087bc7a7748af2664764d4a805897caeefb665bdc12677fefb2212
     # via pytest-icdiff
-importlib-metadata==4.6.3 \
+importlib-metadata==4.6.3 ; python_version == '3.7' \
     --hash=sha256:0645585859e9a6689c523927a5032f2ba5919f1f7d0e84bd4533312320de1ff9 \
     --hash=sha256:51c6635429c77cf1ae634c997ff9e53ca3438b495f10a55ba28594dd69764a8b
     # via
@@ -194,7 +195,7 @@ traitlets==5.0.5 \
     # via
     #   ipython
     #   matplotlib-inline
-typing-extensions==3.10.0.0 \
+typing-extensions==3.10.0.0 ; python_version == '3.7' \
     --hash=sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497 \
     --hash=sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342 \
     --hash=sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84
@@ -203,7 +204,7 @@ wcwidth==0.2.5 \
     --hash=sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784 \
     --hash=sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83
     # via prompt-toolkit
-zipp==3.5.0 \
+zipp==3.5.0 ; python_version == '3.7' \
     --hash=sha256:957cfda87797e389580cb8b9e3870841ca991e2125350677b2ca83a0e99390a3 \
     --hash=sha256:f5812b1e007e48cff63449a5e9f4e7ebea716b4111f9c4f9a645f91d579bf0c4
     # via importlib-metadata
