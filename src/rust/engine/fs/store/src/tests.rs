@@ -20,6 +20,8 @@ use crate::{
   MEGABYTES,
 };
 
+pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
+
 impl LoadMetadata {
   fn is_remote(&self) -> bool {
     match self {
@@ -105,6 +107,7 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
       1,
       256,
       None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap()
 }
@@ -847,6 +850,7 @@ async fn instance_name_upload() {
       1,
       256,
       None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -876,6 +880,7 @@ async fn instance_name_download() {
       1,
       256,
       None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -927,6 +932,7 @@ async fn auth_upload() {
       1,
       256,
       None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -958,6 +964,7 @@ async fn auth_download() {
       1,
       256,
       None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 

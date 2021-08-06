@@ -97,6 +97,7 @@ impl StoreSetup {
         1,
         256,
         None,
+        4 * 1024 * 1024,
       )
       .unwrap();
     StoreSetup {
