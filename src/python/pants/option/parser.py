@@ -47,9 +47,7 @@ from pants.option.errors import (
     OptionNameDoubleDash,
     ParseError,
     PassthroughType,
-    RecursiveSubsystemOption,
     RegistrationError,
-    Shadowing,
     UnknownFlagsError,
 )
 from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
@@ -71,13 +69,9 @@ class OptionValueHistory:
 class Parser:
     """An argument parser in a hierarchy.
 
-    Each node in the hierarchy is a 'scope': the root is the global scope, and the parent of
-    a node is the scope it's immediately contained in. E.g., the 'compile.java' scope is
-    a child of the 'compile' scope, which is a child of the global scope.
-
-    Options registered on a parser are also registered transitively on all the scopes it encloses.
-    We forbid registering options that shadow other options, and registration walks up and down the
-    hierarchy to enforce that.
+    Each node in the hierarchy is a 'scope': the root is the global scope, and the parent of a node
+    is the scope it's immediately contained in. E.g., the 'compile.java' scope is a child of the
+    'compile' scope, which is a child of the global scope.
     """
 
     @staticmethod
@@ -116,11 +110,6 @@ class Parser:
     def scope_str(cls, scope: str) -> str:
         return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-    @classmethod
-    def _check_shadowing(cls, parent_scope, parent_known_args, child_scope, child_known_args):
-        for arg in parent_known_args & child_known_args:
-            raise Shadowing(child_scope, arg, outer_scope=cls.scope_str(parent_scope))
-
     def __init__(
         self,
         env: Mapping[str, str],
@@ -141,7 +130,7 @@ class Parser:
         self._scope_info = scope_info
         self._scope = self._scope_info.scope
 
-        # All option args registered with this parser.  Used to prevent shadowing args in inner scopes.
+        # All option args registered with this parser.  Used to prevent conflicts.
         self._known_args: Set[str] = set()
 
         # List of (args, kwargs) registration pairs, exactly as captured at registration time.
@@ -163,10 +152,6 @@ class Parser:
     @property
     def scope(self) -> str:
         return self._scope
-
-    @property
-    def known_args(self) -> Set[str]:
-        return self._known_args
 
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
@@ -235,7 +220,7 @@ class Parser:
         namespace = parse_args_request.namespace
 
         mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
-        for args, kwargs in self._unnormalized_option_registrations_iter():
+        for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
 
@@ -326,10 +311,6 @@ class Parser:
         will be normalized in the following ways:
           - It will always have 'dest' explicitly set.
           - It will always have 'default' explicitly set, and the value will be a RankedValue.
-          - For recursive options, the original registrar will also have 'recursive_root' set.
-
-        Note that recursive options we inherit from a parent will also be yielded here, with
-        the correctly-scoped default value.
         """
 
         def normalize_kwargs(orig_args, orig_kwargs):
@@ -347,52 +328,10 @@ class Parser:
                 nkwargs["default"] = RankedValue(Rank.HARDCODED, default_val)
             return nkwargs
 
-        # First yield any recursive options we inherit from our parent.
-        if self._parent_parser:
-            for args, kwargs in self._parent_parser._recursive_option_registration_args():
-                yield args, normalize_kwargs(args, kwargs)
-
-        # Then yield our directly-registered options.
-        # This must come after yielding inherited recursive options, so we can detect shadowing.
+        # Yield our directly-registered options.
         for args, kwargs in self._option_registrations:
             normalized_kwargs = normalize_kwargs(args, kwargs)
-            if "recursive" in normalized_kwargs:
-                # If we're the original registrar, make sure we can distinguish that.
-                normalized_kwargs["recursive_root"] = True
             yield args, normalized_kwargs
-
-    def _unnormalized_option_registrations_iter(self):
-        """Returns an iterator over the raw registration arguments of each option in this parser.
-
-        Each yielded item is an (args, kwargs) pair, exactly as passed to register(), except for
-        substituting list and dict types with list_option/dict_option.
-
-        Note that recursive options we inherit from a parent will also be yielded here.
-        """
-        # First yield any recursive options we inherit from our parent.
-        if self._parent_parser:
-            for args, kwargs in self._parent_parser._recursive_option_registration_args():
-                yield args, kwargs
-        # Then yield our directly-registered options.
-        for args, kwargs in self._option_registrations:
-            if "recursive" in kwargs and self._scope_info.scope != GLOBAL_SCOPE:
-                raise RecursiveSubsystemOption(self.scope, args[0])
-            yield args, kwargs
-
-    def _recursive_option_registration_args(self):
-        """Yield args, kwargs pairs for just our recursive options.
-
-        Includes all the options we inherit recursively from our ancestors.
-        """
-        if self._parent_parser:
-            for args, kwargs in self._parent_parser._recursive_option_registration_args():
-                yield args, kwargs
-        for args, kwargs in self._option_registrations:
-            # Note that all subsystem options are implicitly recursive: a subscope of a subsystem
-            # scope is another (optionable-specific) instance of the same subsystem, so it needs
-            # all the same options.
-            if self._scope_info.scope != GLOBAL_SCOPE or "recursive" in kwargs:
-                yield args, kwargs
 
     def register(self, *args, **kwargs) -> None:
         """Register an option."""
@@ -413,14 +352,7 @@ class Parser:
         # Record the args. We'll do the underlying parsing on-demand.
         self._option_registrations.append((args, kwargs))
 
-        # Look for shadowing options up and down the hierarchy.
-        args_set = set(args)
-        for parent in self._parents_transitive():
-            self._check_shadowing(parent.scope, parent._known_args, self.scope, args_set)
-        for child in self._children_transitive():
-            self._check_shadowing(self.scope, args_set, child.scope, child._known_args)
-
-        # And look for direct conflicts
+        # Look for direct conflicts.
         for arg in args:
             if arg in self._known_args:
                 raise OptionAlreadyRegistered(self.scope, arg)
@@ -449,8 +381,6 @@ class Parser:
         "metavar",
         "help",
         "advanced",
-        "recursive",
-        "recursive_root",
         "fingerprint",
         "removal_version",
         "removal_hint",
@@ -550,12 +480,8 @@ class Parser:
             if kwarg not in self._allowed_registration_kwargs:
                 error(InvalidKwarg, kwarg=kwarg)
 
-            # Ensure `daemon=True` can't be passed on non-global scopes (except for `recursive=True`).
-            if (
-                kwarg == "daemon"
-                and self._scope != GLOBAL_SCOPE
-                and kwargs.get("recursive") is False
-            ):
+            # Ensure `daemon=True` can't be passed on non-global scopes.
+            if kwarg == "daemon" and self._scope != GLOBAL_SCOPE:
                 error(InvalidKwargNonGlobalScope, kwarg=kwarg)
 
         removal_version = kwargs.get("removal_version")

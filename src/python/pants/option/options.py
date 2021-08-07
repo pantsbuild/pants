@@ -14,7 +14,7 @@ from pants.option.config import Config
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
-from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
+from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -86,7 +86,7 @@ class Options:
         """
         ret: OrderedSet[ScopeInfo] = OrderedSet()
         original_scopes: Dict[str, ScopeInfo] = {}
-        for si in sorted(scope_infos, key=lambda si: si.scope):
+        for si in sorted(scope_infos, key=lambda _si: _si.scope):
             ret.add(si)
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
@@ -126,6 +126,7 @@ class Options:
         :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
         :param bootstrap_option_values: An optional namespace containing the values of bootstrap
                options. We can use these values when registering other options.
+        :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
         """
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
@@ -242,12 +243,7 @@ class Options:
             for section in config.sections():
                 scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
                 try:
-                    # TODO(#10834): this is broken for subscopes. Once we fix global options to no
-                    #  longer be included in self.for_scope(), we should set
-                    #  inherit_from_enclosing_scope=True.
-                    valid_options_under_scope = set(
-                        self.for_scope(scope, inherit_from_enclosing_scope=False)
-                    )
+                    valid_options_under_scope = set(self.for_scope(scope, check_deprecations=False))
                 # Only catch ConfigValidationError. Other exceptions will be raised directly.
                 except Config.ConfigValidationError:
                     error_log.append(f"Invalid scope [{section}] in {config.config_path}")
@@ -269,26 +265,6 @@ class Options:
                 "Invalid config entries detected. See log for details on which entries to update or "
                 "remove.\n(Specify --no-verify-config to disable this check.)"
             )
-
-    def drop_flag_values(self) -> Options:
-        """Returns a copy of these options that ignores values specified via flags.
-
-        Any pre-cached option values are cleared and only option values that come from option
-        defaults, the config or the environment are used.
-        """
-        # An empty scope_to_flags to force all values to come via the config -> env hierarchy alone
-        # and empty values in case we already cached some from flags.
-        no_flags: Dict[str, List[str]] = {}
-        return Options(
-            goals=self._goals,
-            scope_to_flags=no_flags,
-            specs=self._specs,
-            passthru=self._passthru,
-            help_request=self._help_request,
-            parser_hierarchy=self._parser_hierarchy,
-            bootstrap_option_values=self._bootstrap_option_values,
-            known_scope_to_info=self._known_scope_to_info,
-        )
 
     def is_known_scope(self, scope: str) -> bool:
         """Whether the given scope is known by this instance.
@@ -349,9 +325,7 @@ class Options:
 
         # If this Scope is itself deprecated, report that.
         if si.removal_version:
-            explicit_keys = self.for_scope(
-                scope, inherit_from_enclosing_scope=False
-            ).get_explicit_keys()
+            explicit_keys = self.for_scope(scope, check_deprecations=False).get_explicit_keys()
             if explicit_keys:
                 warn_or_error(
                     removal_version=si.removal_version,
@@ -365,14 +339,13 @@ class Options:
         # check that scope != deprecated_scope to prevent infinite recursion.
         deprecated_scope = si.deprecated_scope
         if deprecated_scope is not None and scope != deprecated_scope:
-            # Do the deprecation check only on keys that were explicitly set on the deprecated scope
-            # (and not on its enclosing scopes).
+            # Do the deprecation check only on keys that were explicitly set
+            # on the deprecated scope.
             explicit_keys = self.for_scope(
-                deprecated_scope, inherit_from_enclosing_scope=False
+                deprecated_scope, check_deprecations=False
             ).get_explicit_keys()
             if explicit_keys:
-                # Update our values with those of the deprecated scope (now including values inherited
-                # from its enclosing scope).
+                # Update our values with those of the deprecated scope.
                 # Note that a deprecated val will take precedence over a val of equal rank.
                 # This makes the code a bit neater.
                 values.update(self.for_scope(deprecated_scope))
@@ -397,11 +370,7 @@ class Options:
 
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
-    def for_scope(
-        self,
-        scope: str,
-        inherit_from_enclosing_scope: bool = True,
-    ) -> OptionValueContainer:
+    def for_scope(self, scope: str, check_deprecations: bool = True) -> OptionValueContainer:
         """Return the option values for the given scope.
 
         Values are attributes of the returned object, e.g., options.foo.
@@ -410,19 +379,13 @@ class Options:
         :API: public
         """
 
-        # First get enclosing scope's option values, if any.
-        if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
-            values_builder = OptionValueContainerBuilder()
-        else:
-            values_builder = self.for_scope(enclosing_scope(scope)).to_builder()
-
-        # Now add our values.
+        values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
         values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
-        if inherit_from_enclosing_scope:
+        if check_deprecations:
             values_builder = values.to_builder()
             self._check_and_apply_deprecations(scope, values_builder)
             values = values_builder.build()
@@ -431,7 +394,7 @@ class Options:
 
     def get_fingerprintable_for_scope(
         self,
-        bottom_scope: str,
+        scope: str,
         daemon_only: bool = False,
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
@@ -441,35 +404,25 @@ class Options:
         This method also searches enclosing options scopes of `bottom_scope` to determine the set of
         fingerprintable pairs.
 
-        :param bottom_scope: The scope to gather fingerprintable options for.
+        :param scope: The scope to gather fingerprintable options for.
         :param daemon_only: If true, only look at daemon=True options.
         """
 
         pairs = []
-
-        # Note that we iterate over options registered at `bottom_scope` and at all
-        # enclosing scopes, since option-using code can read those values indirectly
-        # via its own OptionValueContainer, so they can affect that code's output.
-        for registration_scope in all_enclosing_scopes(bottom_scope):
-            parser = self._parser_hierarchy.get_parser_by_scope(registration_scope)
-            # Sort the arguments, so that the fingerprint is consistent.
-            for (_, kwargs) in sorted(parser.option_registrations_iter()):
-                if kwargs.get("recursive", False) and not kwargs.get("recursive_root", False):
-                    continue  # We only need to fprint recursive options once.
-                if not kwargs.get("fingerprint", True):
-                    continue
-                if daemon_only and not kwargs.get("daemon", False):
-                    continue
-                # Note that we read the value from scope, even if the registration was on an enclosing
-                # scope, to get the right value for recursive options (and because this mirrors what
-                # option-using code does).
-                val = self.for_scope(bottom_scope)[kwargs["dest"]]
-                # If we have a list then we delegate to the fingerprinting implementation of the members.
-                if is_list_option(kwargs):
-                    val_type = kwargs.get("member_type", str)
-                else:
-                    val_type = kwargs.get("type", str)
-                pairs.append((val_type, val))
+        parser = self._parser_hierarchy.get_parser_by_scope(scope)
+        # Sort the arguments, so that the fingerprint is consistent.
+        for (_, kwargs) in sorted(parser.option_registrations_iter()):
+            if not kwargs.get("fingerprint", True):
+                continue
+            if daemon_only and not kwargs.get("daemon", False):
+                continue
+            val = self.for_scope(scope)[kwargs["dest"]]
+            # If we have a list then we delegate to the fingerprinting implementation of the members.
+            if is_list_option(kwargs):
+                val_type = kwargs.get("member_type", str)
+            else:
+                val_type = kwargs.get("type", str)
+            pairs.append((val_type, val))
         return pairs
 
     def __getitem__(self, scope: str) -> OptionValueContainer:

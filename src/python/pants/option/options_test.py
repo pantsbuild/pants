@@ -38,8 +38,6 @@ from pants.option.errors import (
     OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
-    RecursiveSubsystemOption,
-    Shadowing,
 )
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -542,37 +540,6 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
     assert not caplog.records
 
 
-def test_scope_deprecation_dependency(caplog) -> None:
-    # Test that a dependency scope can be deprecated.
-    class Subsystem1(Subsystem):
-        options_scope = "scope"
-
-    def register(opts: Options) -> None:
-        opts.register(Subsystem1.options_scope, "--foo")
-
-    opts = create_options(
-        [GLOBAL_SCOPE],
-        register,
-        ["--scope-sub-foo=vv"],
-        extra_scope_infos=[
-            Subsystem1.get_scope_info(),
-            # A deprecated, scoped dependency on `Subsystem1`. This
-            # imitates the construction of Subsystem.known_scope_infos.
-            ScopeInfo(
-                Subsystem1.subscope("sub"),
-                Subsystem1,
-                removal_version="9999.9.9.dev0",
-                removal_hint="Sayonara!",
-            ),
-        ],
-    )
-
-    caplog.clear()
-    assert opts.for_scope(Subsystem1.subscope("sub")).foo == "vv"
-    assert len(caplog.records) == 1
-    assert Subsystem1.subscope("sub") in caplog.text
-
-
 class OptionsTest(unittest.TestCase):
     @staticmethod
     def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
@@ -603,10 +570,9 @@ class OptionsTest(unittest.TestCase):
         ScopeInfo(scope)
         for scope in (
             GLOBAL_SCOPE,
+            "anotherscope",
             "compile",
             "compile.java",
-            "compile.scala",
-            "cache.compile.scala",
             "stale",
             "test",
             "test.junit",
@@ -633,8 +599,11 @@ class OptionsTest(unittest.TestCase):
         def register_global(*args, **kwargs):
             options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-        register_global("-z", "--verbose", type=bool, help="Verbose output.", recursive=True)
-        register_global("-n", "--num", type=int, default=99, recursive=True)
+        register_global("-z", "--verbose", type=bool, help="Verbose output.")
+        register_global("-n", "--num", type=int, default=99)
+        # To test that we can use the same name on the global scope and another scope.
+        options.register("anotherscope", "-n", "--num", type=int, default=99)
+
         register_global("--y", type=list, member_type=int)
         register_global(
             "--v2", help="Two-letter long-form option, used to test option name suggestions."
@@ -671,10 +640,6 @@ class OptionsTest(unittest.TestCase):
         # Implicit value.
         register_global("--implicit-valuey", default="default", implicit_value="implicit")
 
-        # For the design doc example test.
-        register_global("--a", type=int, recursive=True)
-        register_global("--b", type=int, recursive=True)
-
         # Mutual Exclusive options
         register_global("--mutex-foo", mutually_exclusive_group="mutex")
         register_global("--mutex-bar", mutually_exclusive_group="mutex")
@@ -683,20 +648,17 @@ class OptionsTest(unittest.TestCase):
         register_global("--new-name")
         register_global("--old-name", mutually_exclusive_group="new_name")
 
-        # For the design doc example test.
-        options.register("compile", "--c", type=int)
-
         # Test mutual exclusive options with a scope
         options.register("stale", "--mutex-a", mutually_exclusive_group="scope_mutex")
         options.register("stale", "--mutex-b", mutually_exclusive_group="scope_mutex")
         options.register("stale", "--crufty-old", mutually_exclusive_group="crufty_new")
         options.register("stale", "--crufty-new")
 
-        # For task identity test
-        options.register("compile.scala", "--modifycompile")
-        options.register("compile.scala", "--modifylogs", fingerprint=False)
+        # For scoped fingerprintable test
+        options.register("compile", "--modifycompile")
+        options.register("compile", "--modifylogs", fingerprint=False)
         options.register(
-            "compile.scala",
+            "compile",
             "--modifypassthrough",
             passthrough=True,
             type=list,
@@ -718,12 +680,12 @@ class OptionsTest(unittest.TestCase):
         options.register("fromfile", "--appendvalue", type=list, member_type=int)
 
         # For fingerprint tests
-        options.register(GLOBAL_SCOPE, "--implicitly-fingerprinted")
-        options.register(GLOBAL_SCOPE, "--explicitly-fingerprinted", fingerprint=True)
-        options.register(GLOBAL_SCOPE, "--explicitly-not-fingerprinted", fingerprint=False)
-        options.register(GLOBAL_SCOPE, "--implicitly-not-daemoned")
-        options.register(GLOBAL_SCOPE, "--explicitly-not-daemoned", daemon=False)
-        options.register(GLOBAL_SCOPE, "--explicitly-daemoned", daemon=True)
+        register_global("--implicitly-fingerprinted")
+        register_global("--explicitly-fingerprinted", fingerprint=True)
+        register_global("--explicitly-not-fingerprinted", fingerprint=False)
+        register_global("--implicitly-not-daemoned")
+        register_global("--explicitly-not-daemoned", daemon=False)
+        register_global("--explicitly-daemoned", daemon=True)
 
         # For enum tests
         options.register("enum-opt", "--some-enum", type=self.SomeEnumOption)
@@ -772,21 +734,10 @@ class OptionsTest(unittest.TestCase):
         with self.assertRaises(ParseError):
             self._parse(flags="--unregistered-option compile").for_global_scope()
 
-        # Scoping of different values of the same option.
-        # Also tests the --no-* boolean flag inverses.
-        options = self._parse(flags="--verbose compile.java --no-verbose")
-        self.assertEqual(True, options.for_global_scope().verbose)
-        self.assertEqual(True, options.for_scope("compile").verbose)
-        self.assertEqual(False, options.for_scope("compile.java").verbose)
-
-        options = self._parse(
-            flags="--verbose compile --no-verbose compile.java -z test test.junit --no-verbose"
-        )
-        self.assertEqual(True, options.for_global_scope().verbose)
-        self.assertEqual(False, options.for_scope("compile").verbose)
-        self.assertEqual(True, options.for_scope("compile.java").verbose)
-        self.assertEqual(True, options.for_scope("test").verbose)
-        self.assertEqual(False, options.for_scope("test.junit").verbose)
+        # Scoping of different values of options with the same name in different scopes.
+        options = self._parse(flags="--num=11 anotherscope --num=22")
+        self.assertEqual(11, options.for_global_scope().num)
+        self.assertEqual(22, options.for_scope("anotherscope").num)
 
         # Test list-typed option.
         global_options = self._parse(config={"DEFAULT": {"y": ["88", "-99"]}}).for_global_scope()
@@ -1087,35 +1038,20 @@ class OptionsTest(unittest.TestCase):
 
     def test_defaults(self) -> None:
         # Hard-coded defaults.
-        options = self._parse(flags="compile.java -n33")
+        options = self._parse(flags="anotherscope")
         self.assertEqual(99, options.for_global_scope().num)
-        self.assertEqual(99, options.for_scope("compile").num)
-        self.assertEqual(33, options.for_scope("compile.java").num)
-        self.assertEqual(99, options.for_scope("test").num)
-        self.assertEqual(99, options.for_scope("test.junit").num)
-
-        options = self._parse(flags="compile -n22 compile.java -n33")
-        self.assertEqual(99, options.for_global_scope().num)
-        self.assertEqual(22, options.for_scope("compile").num)
-        self.assertEqual(33, options.for_scope("compile.java").num)
+        self.assertEqual(99, options.for_scope("anotherscope").num)
 
         # Get defaults from config and environment.
-        config = {"DEFAULT": {"num": "88"}, "compile": {"num": "77"}, "compile.java": {"num": "66"}}
-        options = self._parse(flags="compile.java -n22", config=config)
+        config = {"DEFAULT": {"num": "88"}, "anotherscope": {"num": "77"}}
+        options = self._parse(flags="anotherscope", config=config)
         self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(77, options.for_scope("compile").num)
-        self.assertEqual(22, options.for_scope("compile.java").num)
+        self.assertEqual(77, options.for_scope("anotherscope").num)
 
-        env = {"PANTS_COMPILE_NUM": "55"}
-        options = self._parse(flags="compile", env=env, config=config)
+        env = {"PANTS_ANOTHERSCOPE_NUM": "55"}
+        options = self._parse(flags="anotherscope", env=env, config=config)
         self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(55, options.for_scope("compile").num)
-        self.assertEqual(55, options.for_scope("compile.java").num)
-
-        options = self._parse(flags="compile.java -n44", env=env, config=config)
-        self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(55, options.for_scope("compile").num)
-        self.assertEqual(44, options.for_scope("compile.java").num)
+        self.assertEqual(55, options.for_scope("anotherscope").num)
 
     def test_choices(self) -> None:
         options = self._parse(flags="--str-choices=foo")
@@ -1179,81 +1115,11 @@ class OptionsTest(unittest.TestCase):
         options.register("", "--opt1")
         options.register("foo", "-o", "--opt2")
 
-        def assert_raises_shadowing(*, scope: str, args: List[str]) -> None:
-            with self.assertRaises(Shadowing):
-                options.register(scope, *args)
-
-        assert_raises_shadowing(scope="", args=["--opt2"])
-        assert_raises_shadowing(scope="bar", args=["--opt1"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt1"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt2"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt1", "--opt3"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt3", "--opt2"])
-
-    def test_recursion(self) -> None:
-        # Recursive option.
-        options = self._parse(flags="-n=5 compile -n=6")
-        self.assertEqual(5, options.for_global_scope().num)
-        self.assertEqual(6, options.for_scope("compile").num)
-
-        # Non-recursive option.
-        options = self._parse(flags="--bar-baz=foo")
-        self.assertEqual("foo", options.for_global_scope().bar_baz)
-        options = self._parse(flags="compile --bar-baz=foo")
-        with self.assertRaises(ParseError):
-            options.for_scope("compile")
-
-    def test_no_recursive_subsystem_options(self) -> None:
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[global_scope(), subsystem("foo")],
-            args=["./pants"],
-        )
-        # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
-        # a separate instance of the subsystem, so it needs all the options).
-        # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
-        with self.assertRaises(RecursiveSubsystemOption):
-            options.register("foo", "--bar", recursive=False)
-            options.for_scope("foo")
-        with self.assertRaises(RecursiveSubsystemOption):
-            options.register("foo", "--baz", recursive=True)
-            options.for_scope("foo")
-
     def test_is_known_scope(self) -> None:
         options = self._parse()
         for scope_info in self._known_scope_infos:
             self.assertTrue(options.is_known_scope(scope_info.scope))
         self.assertFalse(options.is_known_scope("nonexistent_scope"))
-
-    def test_designdoc_example(self) -> None:
-        # The example from the design doc.
-        # Get defaults from config and environment.
-        config = {
-            "DEFAULT": {"b": "99"},
-            "compile": {"a": "88", "c": "77"},
-        }
-
-        env = {"PANTS_COMPILE_C": "66"}
-
-        options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
-            env=env,
-            config=config,
-        )
-
-        self.assertEqual(1, options.for_global_scope().a)
-        self.assertEqual(99, options.for_global_scope().b)
-        with self.assertRaises(AttributeError):
-            options.for_global_scope().c
-
-        self.assertEqual(1, options.for_scope("compile").a)
-        self.assertEqual(2, options.for_scope("compile").b)
-        self.assertEqual(66, options.for_scope("compile").c)
-
-        self.assertEqual(3, options.for_scope("compile.java").a)
-        self.assertEqual(2, options.for_scope("compile.java").b)
-        self.assertEqual(4, options.for_scope("compile.java").c)
 
     def test_file_spec_args(self) -> None:
         with temporary_file(binary_mode=False) as tmp:
@@ -1364,39 +1230,6 @@ class OptionsTest(unittest.TestCase):
         check_scoped_spam("scoped.a.bit", "value", {"PANTS_SCOPED_A_BIT_SPAM": "value"})
         check_scoped_spam("scoped.and-dashed", "value", {"PANTS_SCOPED_AND_DASHED_SPAM": "value"})
 
-    def test_drop_flag_values(self) -> None:
-        options = self._parse(
-            flags="--bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value simple -n1",
-            env={"PANTS_FOO": "BAR"},
-            config={"simple": {"num": 42}, "enum-opt": {"some-enum": "a-value"}},
-        )
-        defaulted_only_options = options.drop_flag_values()
-
-        # No option value supplied in any form.
-        self.assertEqual("fred", options.for_global_scope().bar_baz)
-        self.assertIsNone(defaulted_only_options.for_global_scope().bar_baz)
-
-        # A defaulted option value.
-        self.assertEqual(33, options.for_global_scope().num)
-        self.assertEqual(99, defaulted_only_options.for_global_scope().num)
-
-        # A config specified option value.
-        self.assertEqual(1, options.for_scope("simple").num)
-        self.assertEqual(42, defaulted_only_options.for_scope("simple").num)
-
-        # An env var specified option value.
-        self.assertEqual("red", options.for_global_scope().pants_foo)
-        self.assertEqual("BAR", defaulted_only_options.for_global_scope().pants_foo)
-
-        # Overriding an enum option value.
-        self.assertEqual(self.SomeEnumOption.another_value, options.for_scope("enum-opt").some_enum)
-
-        # Getting the default value for an enum option.
-        self.assertEqual(
-            self.SomeEnumOption.a_value,
-            defaulted_only_options.for_scope("separate-enum-opt-scope").some_enum_with_default,
-        )
-
     def test_enum_option_type_parse_error(self) -> None:
         with pytest.raises(ParseError) as exc:
             options = self._parse(flags="enum-opt --some-enum=invalid-value")
@@ -1409,7 +1242,7 @@ class OptionsTest(unittest.TestCase):
 
     def test_non_enum_option_type_parse_error(self) -> None:
         with pytest.raises(ParseError) as exc:
-            options = self._parse(flags="--a=not-a-number")
+            options = self._parse(flags="--num=not-a-number")
             options.for_global_scope()
 
         assert (
@@ -1490,70 +1323,6 @@ class OptionsTest(unittest.TestCase):
         assert_option_set("--mutex-foo=orz", "mutex_baz", None)
         assert_option_set("--mutex-bar=orz", "mutex_bar", "orz")
 
-    def test_middle_scoped_options(self) -> None:
-        """Make sure the rules for inheriting from a hierarchy of scopes.
-
-        Values should follow
-         1. A short circuit scan for a value from the following sources in-order:
-            flags, env, config, hardcoded defaults
-         2. Values for each source follow the . hierarchy scoping rule
-            within that source.
-        """
-
-        # Short circuit using command line.
-        options = self._parse(flags="--a=100 compile --a=99")
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        options = self._parse(config={"DEFAULT": {"a": 100}, "compile": {"a": 99}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        options = self._parse(env={"PANTS_A": "100", "PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line has precedence over config.
-        options = self._parse(flags="compile --a=99", config={"DEFAULT": {"a": 100}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line has precedence over environment.
-        options = self._parse(flags="compile --a=99", env={"PANTS_A": "100"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Env has precedence over config.
-        options = self._parse(config={"DEFAULT": {"a": 100}}, env={"PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line global overrides the middle scope setting in then env.
-        options = self._parse(flags="--a=100", env={"PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
-
-        # Command line global overrides the middle scope in config.
-        options = self._parse(flags="--a=100 ", config={"compile": {"a": 99}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
-
-        # Env global overrides the middle scope in config.
-        options = self._parse(
-            flags="--a=100 ", config={"compile": {"a": 99}}, env={"PANTS_A": "100"}
-        )
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
-
     def test_complete_scopes(self) -> None:
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
@@ -1578,27 +1347,15 @@ class OptionsTest(unittest.TestCase):
             set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
         )
 
-    @pytest.mark.skip("Temporarily skip until recursive options are removed, see comment.")
     def test_get_fingerprintable_for_scope(self) -> None:
-        # Note that until a recent change to fingerprinting code, this test operated under the
-        # old assumption that options are not fingerprintable by default. The change in question
-        # eliminated the ability to make this assumption in the tests (since that assumption was
-        # not true in non-test code). As a result, the fingerprintables now include all the
-        # registered options on compile.scala and all enclosing scopes, including global scope.
-        # There are too many of those to enumerate in this test, so we temporarily skip it, until
-        # we remove recursive options and this test becomes tractable again.
-
-        # Note: tests handling recursive and non-recursive options from enclosing scopes correctly.
         options = self._parse(
-            flags='--store-true-flag --num=88 compile.scala --num=77 --modifycompile="blah blah blah" '
+            flags='--store-true-flag --num=88 compile --modifycompile="blah blah blah" '
             '--modifylogs="durrrr" -- -d -v'
         )
 
         # NB: Passthrough args end up on our `--modifypassthrough` arg.
-        pairs = options.get_fingerprintable_for_scope("compile.scala")
-        self.assertEqual(
-            [(str, "blah blah blah"), (str, ["-d", "-v"]), (bool, True), (int, 77)], pairs
-        )
+        pairs = options.get_fingerprintable_for_scope("compile")
+        self.assertEqual([(str, "blah blah blah"), (str, ["-d", "-v"])], pairs)
 
     def test_fingerprintable(self) -> None:
         options = self._parse(
@@ -1606,7 +1363,7 @@ class OptionsTest(unittest.TestCase):
             "--explicitly-fingerprinted=also_shall_be_fingerprinted "
             "--explicitly-not-fingerprinted=shant_be_fingerprinted"
         )
-        pairs = options.get_fingerprintable_for_scope("fingerprinting")
+        pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE)
         self.assertIn((str, "shall_be_fingerprinted"), pairs)
         self.assertIn((str, "also_shall_be_fingerprinted"), pairs)
         self.assertNotIn((str, "shant_be_fingerprinted"), pairs)
@@ -1746,44 +1503,16 @@ class OptionsTest(unittest.TestCase):
         self.assertNotEqual(some, RankedValue(Rank.HARDCODED, "few"))
         self.assertNotEqual(some, RankedValue(Rank.CONFIG, "some"))
 
-    def test_pants_global_designdoc_example(self) -> None:
-        # The example from the design doc.
-        # Get defaults from config and environment.
-        config = {
-            "GLOBAL": {"b": "99"},
-            "compile": {"a": "88", "c": "77"},
-        }
-
-        env = {"PANTS_COMPILE_C": "66"}
-
-        options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
-            env=env,
-            config=config,
-        )
-
-        self.assertEqual(1, options.for_global_scope().a)
-        self.assertEqual(99, options.for_global_scope().b)
-        with self.assertRaises(AttributeError):
-            options.for_global_scope().c
-
-        self.assertEqual(1, options.for_scope("compile").a)
-        self.assertEqual(2, options.for_scope("compile").b)
-        self.assertEqual(66, options.for_scope("compile").c)
-
-        self.assertEqual(3, options.for_scope("compile.java").a)
-        self.assertEqual(2, options.for_scope("compile.java").b)
-        self.assertEqual(4, options.for_scope("compile.java").c)
-
     def test_pants_global_with_default(self) -> None:
         """This test makes sure values under [DEFAULT] still gets read."""
         # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
         # tell us that we can remove the cast.
         config = cast(
-            Dict[str, Dict[str, Any]], {"DEFAULT": {"b": "99"}, "GLOBAL": {"store_true_flag": True}}
+            Dict[str, Dict[str, Any]],
+            {"DEFAULT": {"num": "99"}, "GLOBAL": {"store_true_flag": True}},
         )
         global_options = self._parse(config=config).for_global_scope()
-        self.assertEqual(99, global_options.b)
+        self.assertEqual(99, global_options.num)
         self.assertTrue(global_options.store_true_flag)
 
     def test_double_registration(self) -> None:
