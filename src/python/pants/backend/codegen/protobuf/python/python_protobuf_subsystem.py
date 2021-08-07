@@ -56,11 +56,10 @@ class PythonProtobufSubsystem(Subsystem):
 
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
-    options_scope = PythonProtobufSubsystem.subscope("mypy-plugin")
-    help = (
-        "Configuration of the mypy-protobuf type stub generation plugin for the Protobuf Python "
-        "backend."
-    )
+    options_scope = "mypy-protobuf"
+    deprecated_options_scope = "python-protobuf.mypy-plugin"
+    deprecated_options_scope_removal_version = "2.8.0.dev0"
+    help = "Configuration of the mypy-protobuf type stub generation plugin."
 
     default_version = "mypy-protobuf==2.4"
 
