@@ -109,7 +109,6 @@ def test_default() -> None:
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
-            parent_parser=None,
         )
         parser.register(*args, **kwargs)
         oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
@@ -211,7 +210,6 @@ def test_grouping():
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
-            parent_parser=None,
         )
         parser.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
