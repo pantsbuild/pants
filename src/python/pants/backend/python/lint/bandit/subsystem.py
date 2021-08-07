@@ -126,9 +126,8 @@ async def setup_bandit_lockfile(
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
     #
-    # This ORs all unique interpreter constraints. When paired with
-    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that every
-    # possible Python interpreter used will be covered.
+    # This ORs all unique interpreter constraints. The net effect is that every possible Python
+    # interpreter used will be covered.
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     unique_constraints = {
         InterpreterConstraints.create_from_targets([tgt], python_setup)

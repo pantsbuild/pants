@@ -196,9 +196,8 @@ async def setup_pytest_lockfile(
     #
     # This first computes the constraints for each individual `python_tests` target
     # (which will AND across each target in the closure). Then, it ORs all unique resulting
-    # interpreter constraints. When paired with
-    # `InterpreterConstraints.partition_by_major_minor_versions`, the net effect is that
-    # every possible Python interpreter used will be covered.
+    # interpreter constraints. The net effect is that every possible Python interpreter used will
+    # be covered.
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     transitive_targets_per_test = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
