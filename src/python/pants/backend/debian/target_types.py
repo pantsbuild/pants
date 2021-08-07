@@ -5,6 +5,7 @@ from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     DictStringToStringField,
+    Sources,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -12,8 +13,9 @@ from pants.engine.target import (
 from pants.util.docutil import doc_url
 
 
-class DebianControlFile(StringField):
-    alias = "control"
+class DebianControlFile(Sources):
+    required = True
+    expected_num_files = 1
     help = "Path to a Debian control file for the package to be produced."
 
 
@@ -30,12 +32,13 @@ class DebianInstallPrefix(StringField):
 
 class DebianPackageDependencies(SpecialCasedDependencies):
     alias = "packages"
+    required = True
     help = (
         "Addresses to any targets that can be built with `./pants package`, e.g. "
         '`["project:app"]`.\n\nPants will build the assets as if you had run `./pants package`. '
         "It will include the results in your Debian package using the same name they would normally have, "
         "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
-        "be built by `./pants package`, e.g. a `pex_binary`, a `python_distribution`, or a `shell_library`."
+        "be built by `./pants package`, e.g. a `pex_binary`, a `python_distribution`, or an `archive`."
     )
 
 
