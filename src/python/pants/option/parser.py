@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, DefaultDict, Dict, Iterable, List, Mapping, Set, Tuple, Type
+from typing import Any, DefaultDict, Dict, Iterable, List, Mapping, Set, Tuple, Type
 
 import yaml
 
@@ -67,12 +67,7 @@ class OptionValueHistory:
 
 
 class Parser:
-    """An argument parser in a hierarchy.
-
-    Each node in the hierarchy is a 'scope': the root is the global scope, and the parent of a node
-    is the scope it's immediately contained in. E.g., the 'compile.java' scope is a child of the
-    'compile' scope, which is a child of the global scope.
-    """
+    """An argument parser."""
 
     @staticmethod
     def is_bool(kwargs: Mapping[str, Any]) -> bool:
@@ -115,15 +110,12 @@ class Parser:
         env: Mapping[str, str],
         config: Config,
         scope_info: ScopeInfo,
-        parent_parser: Parser | None,
     ) -> None:
         """Create a Parser instance.
 
         :param env: a dict of environment variables.
         :param config: data from a config file.
         :param scope_info: the scope this parser acts for.
-        :param parent_parser: the parser for the scope immediately enclosing this one, or
-                              None if this is the global scope.
         """
         self._env = env
         self._config = config
@@ -139,12 +131,6 @@ class Parser:
         # Map of dest -> history.
         self._history: Dict[str, OptionValueHistory] = {}
 
-        self._parent_parser = parent_parser
-        self._child_parsers: List["Parser"] = []
-
-        if self._parent_parser:
-            self._parent_parser._register_child_parser(self)
-
     @property
     def scope_info(self) -> ScopeInfo:
         return self._scope_info
@@ -155,12 +141,6 @@ class Parser:
 
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
-
-    def walk(self, callback: Callable) -> None:
-        """Invoke callback on this parser and its descendants, in depth-first order."""
-        callback(self)
-        for child in self._child_parsers:
-            child.walk(callback)
 
     @frozen_after_init
     @dataclass(unsafe_hash=True)
@@ -488,17 +468,6 @@ class Parser:
         if removal_version is not None:
             validate_deprecation_semver(removal_version, "removal version")
 
-    def _parents_transitive(self):
-        ancestor = self._parent_parser
-        while ancestor:
-            yield ancestor
-            ancestor = ancestor._parent_parser
-
-    def _children_transitive(self):
-        for child in self._child_parsers:
-            yield child
-            yield from child._children_transitive()
-
     _ENV_SANITIZER_RE = re.compile(r"[.-]")
 
     @staticmethod
@@ -783,9 +752,6 @@ class Parser:
         if arg.startswith("--no-"):
             raise BooleanOptionNameWithNo(self.scope, arg)
         return f"--no-{arg[2:]}"
-
-    def _register_child_parser(self, child: "Parser") -> None:
-        self._child_parsers.append(child)
 
     def _scope_str(self, scope: str | None = None) -> str:
         return self.scope_str(scope if scope is not None else self.scope)

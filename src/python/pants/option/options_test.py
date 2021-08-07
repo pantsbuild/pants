@@ -486,38 +486,6 @@ def test_scope_deprecation(caplog) -> None:
     assert vals2.qux == "uu"
 
 
-def test_scope_deprecation_parent(caplog) -> None:
-    # This test demonstrates that a scope can mark itself as deprecating a subscope of
-    # another scope.
-    class Subsystem1(Subsystem):
-        options_scope = "test"
-
-    class Subsystem2(Subsystem):
-        options_scope = "lint"
-        deprecated_options_scope = "test.a-bit-linty"
-        deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-    def register(opts: Options) -> None:
-        opts.register(Subsystem1.options_scope, "--bar")
-        opts.register(Subsystem2.options_scope, "--foo")
-
-    opts = create_options(
-        [GLOBAL_SCOPE],
-        register,
-        ["--test-a-bit-linty-foo=vv"],
-        extra_scope_infos=[Subsystem1.get_scope_info(), Subsystem2.get_scope_info()],
-    )
-
-    # NB: Order matters here because Subsystems are typically registered in sorted order.
-    Subsystem2.register_options_on_scope(opts)
-    Subsystem1.register_options_on_scope(opts)
-
-    caplog.clear()
-    assert opts.for_scope(Subsystem2.options_scope).foo == "vv"
-    assert len(caplog.records) == 1
-    assert "test.a-bit-linty" in caplog.text
-
-
 def test_scope_deprecation_default_config_section(caplog) -> None:
     # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
     class Subsystem1(Subsystem):
@@ -1324,28 +1292,21 @@ class OptionsTest(unittest.TestCase):
         assert_option_set("--mutex-bar=orz", "mutex_bar", "orz")
 
     def test_complete_scopes(self) -> None:
+        class OptCls:
+            deprecated_options_scope = "deprecated"
+
         self.assertEqual(
-            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({task("foo.bar.baz")})),
+            {ScopeInfo("foo"), ScopeInfo("bar")},
+            set(Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar")])),
         )
+
         self.assertEqual(
-            {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")})),
+            {ScopeInfo("foo"), ScopeInfo("bar", OptCls), ScopeInfo("deprecated", OptCls)},
+            set(Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar", OptCls)])),
         )
-        self.assertEqual(
-            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")})),
-        )
-        self.assertEqual(
-            {
-                intermediate("foo"),
-                intermediate("foo.bar"),
-                task("foo.bar.baz"),
-                intermediate("qux"),
-                task("qux.quux"),
-            },
-            set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
-        )
+
+        with self.assertRaises(Options.DuplicateScopeError):
+            Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar"), ScopeInfo("foo")])
 
     def test_get_fingerprintable_for_scope(self) -> None:
         options = self._parse(
