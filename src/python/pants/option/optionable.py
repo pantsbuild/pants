@@ -75,7 +75,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     deprecated_options_scope: Optional[str] = None
     deprecated_options_scope_removal_version: Optional[str] = None
 
-    _scope_name_component_re = re.compile(r"^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$")
+    _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @classproperty
     def optionable_cls(cls):
@@ -91,7 +91,8 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         if not cls.is_valid_scope_name_component(s):
             raise OptionsError(
                 f'Options scope "{s}" is not valid:\nReplace in code with a new scope name '
-                "consisting of only lower-case letters, digits and non-consecutive dashes."
+                "consisting of only lower-case letters, digits, underscores, "
+                "and non-consecutive dashes."
             )
 
     @classmethod
