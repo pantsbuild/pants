@@ -116,7 +116,7 @@ def rule_runner() -> RuleRunner:
 
 def test_get_pyenv_root() -> None:
     home = "/♡"
-    default_root = f"{home}/.cache"
+    default_root = f"{home}/.pyenv"
     explicit_root = f"{home}/explicit"
 
     assert explicit_root == get_pyenv_root(Environment({"PYENV_ROOT": explicit_root}))
