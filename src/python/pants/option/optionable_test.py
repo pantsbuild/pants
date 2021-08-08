@@ -41,10 +41,10 @@ class OptionableTest(unittest.TestCase):
         check_true("foo")
         check_true("foo-bar0")
         check_true("foo-bar0-1ba22z")
+        check_true("foo_bar")
 
         check_false("Foo")
         check_false("fOo")
         check_false("foo.bar")
-        check_false("foo_bar")
         check_false("foo--bar")
         check_false("foo-bar-")
