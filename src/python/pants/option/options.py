@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -14,7 +13,6 @@ from pants.option.config import Config
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
-from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -67,9 +65,6 @@ class Options:
       - None.
     """
 
-    class FrozenOptionsError(Exception):
-        """Options are frozen and can't be mutated."""
-
     class DuplicateScopeError(Exception):
         """More than one registration occurred for the same scope."""
 
@@ -78,34 +73,23 @@ class Options:
 
     @classmethod
     def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> FrozenOrderedSet[ScopeInfo]:
-        """Expand a set of scopes to include all enclosing scopes.
+        """Expand a set of scopes to include scopes they deprecate.
 
-        E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
-
-        Also adds any deprecated scopes.
+        Also validates that scopes do not collide.
         """
         ret: OrderedSet[ScopeInfo] = OrderedSet()
         original_scopes: Dict[str, ScopeInfo] = {}
         for si in sorted(scope_infos, key=lambda _si: _si.scope):
-            ret.add(si)
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
-                    "Scope `{}` claimed by {}, was also claimed by {}.".format(
-                        si.scope, si, original_scopes[si.scope]
-                    )
+                    f"Scope `{si.scope}` claimed by {si}, was also claimed "
+                    f"by {original_scopes[si.scope]}."
                 )
             original_scopes[si.scope] = si
+            ret.add(si)
             if si.deprecated_scope:
                 ret.add(ScopeInfo(si.deprecated_scope, si.optionable_cls))
                 original_scopes[si.deprecated_scope] = si
-
-        # TODO: Once scope name validation is enforced (so there can be no dots in scope name
-        # components) we can replace this line with `for si in scope_infos:`, because it will
-        # not be possible for a deprecated_scope to introduce any new intermediate scopes.
-        for si in copy.copy(ret):
-            for scope in all_enclosing_scopes(si.scope, allow_global=False):
-                if scope not in original_scopes:
-                    ret.add(ScopeInfo(scope))
         return FrozenOrderedSet(ret)
 
     @classmethod
@@ -153,7 +137,7 @@ class Options:
 
         help_request = splitter.help_request
 
-        parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
+        parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             goals=split_args.goals,
@@ -161,7 +145,7 @@ class Options:
             specs=split_args.specs,
             passthru=split_args.passthru,
             help_request=help_request,
-            parser_hierarchy=parser_hierarchy,
+            parser_by_scope=parser_by_scope,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
             allow_unknown_options=allow_unknown_options,
@@ -174,7 +158,7 @@ class Options:
         specs: List[str],
         passthru: List[str],
         help_request: Optional[HelpRequest],
-        parser_hierarchy: ParserHierarchy,
+        parser_by_scope: Dict[str, Parser],
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
@@ -188,17 +172,10 @@ class Options:
         self._specs = specs
         self._passthru = passthru
         self._help_request = help_request
-        self._parser_hierarchy = parser_hierarchy
+        self._parser_by_scope = parser_by_scope
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
-        self._frozen = False
-
-    # TODO: Eliminate this in favor of a builder/factory.
-    @property
-    def frozen(self) -> bool:
-        """Whether or not this Options object is frozen from writes."""
-        return self._frozen
 
     @property
     def help_request(self) -> Optional[HelpRequest]:
@@ -230,10 +207,6 @@ class Options:
     @property
     def scope_to_flags(self) -> Dict[str, List[str]]:
         return self._scope_to_flags
-
-    def freeze(self) -> None:
-        """Freezes this Options instance."""
-        self._frozen = True
 
     def verify_configs(self, global_config: Config) -> None:
         """Verify all loaded configs have correct scopes and options."""
@@ -273,13 +246,8 @@ class Options:
         """
         return scope in self._known_scope_to_info
 
-    def _assert_not_frozen(self) -> None:
-        if self._frozen:
-            raise self.FrozenOptionsError(f"cannot mutate frozen Options instance {self!r}.")
-
     def register(self, scope: str, *args, **kwargs) -> None:
         """Register an option in the given scope."""
-        self._assert_not_frozen()
         self.get_parser(scope).register(*args, **kwargs)
         deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
         if deprecated_scope:
@@ -287,7 +255,6 @@ class Options:
 
     def registration_function_for_optionable(self, optionable_class):
         """Returns a function for registering options on the given scope."""
-        self._assert_not_frozen()
 
         # TODO(benjy): Make this an instance of a class that implements __call__, so we can
         # docstring it, and so it's less weird than attaching properties to a function.
@@ -302,12 +269,10 @@ class Options:
 
     def get_parser(self, scope: str) -> Parser:
         """Returns the parser for the given scope, so code can register on it directly."""
-        self._assert_not_frozen()
-        return self._parser_hierarchy.get_parser_by_scope(scope)
-
-    def walk_parsers(self, callback):
-        self._assert_not_frozen()
-        self._parser_hierarchy.walk(callback)
+        try:
+            return self._parser_by_scope[scope]
+        except KeyError:
+            raise Config.ConfigValidationError(f"No such options scope: {scope}")
 
     def _check_and_apply_deprecations(self, scope, values):
         """Checks whether a ScopeInfo has options specified in a deprecated scope.
@@ -382,7 +347,7 @@ class Options:
         values_builder = OptionValueContainerBuilder()
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
-        values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
+        values = self.get_parser(scope).parse_args(parse_args_request)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if check_deprecations:
@@ -409,7 +374,7 @@ class Options:
         """
 
         pairs = []
-        parser = self._parser_hierarchy.get_parser_by_scope(scope)
+        parser = self.get_parser(scope)
         # Sort the arguments, so that the fingerprint is consistent.
         for (_, kwargs) in sorted(parser.option_registrations_iter()):
             if not kwargs.get("fingerprint", True):
