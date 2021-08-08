@@ -27,10 +27,9 @@ class ScopeInfo:
 
     scope: str
     optionable_cls: Optional[Type] = None
-    # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
-    # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
-    # deprecated via this `removal_version`, which allows for the deprecation of an entire scope,
-    # including that of a SubsystemDependency (ie, deprecation of a dependency on a scoped Subsystem).
+    # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents
+    # a previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
+    # deprecated via this `removal_version`, which allows for the deprecation of an entire scope.
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
 
