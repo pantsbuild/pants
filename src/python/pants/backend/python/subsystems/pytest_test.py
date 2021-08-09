@@ -5,12 +5,16 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.subsystems.pytest import PytestLockfileSentinel
+from pants.backend.python.subsystems.pytest import PyTest, PytestLockfileSentinel
 from pants.backend.python.subsystems.pytest import rules as subsystem_rules
 from pants.backend.python.target_types import PythonLibrary, PythonTests
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
+from pants.option.ranked_value import Rank, RankedValue
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -96,3 +100,44 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         ),
         ["==2.7.*", "==2.7.*,==3.6.*", ">=3.7,==3.8.*"],
     )
+
+
+def test_validate_pytest_cov_included() -> None:
+    def validate(
+        *,
+        extra_requirements: list[str] | None = None,
+        pytest_plugins: list[str] | None = None,
+    ) -> None:
+        extra_reqs_rv = (
+            RankedValue(Rank.CONFIG, extra_requirements)
+            if extra_requirements is not None
+            else RankedValue(Rank.HARDCODED, PyTest.default_extra_requirements)
+        )
+        plugins_rv = (
+            RankedValue(Rank.CONFIG, pytest_plugins)
+            if pytest_plugins is not None
+            else RankedValue(Rank.HARDCODED, PyTest.default_extra_requirements)
+        )
+        pytest = create_subsystem(
+            PyTest, pytest_plugins=plugins_rv, extra_requirements=extra_reqs_rv
+        )
+        pytest.validate_pytest_cov_included()
+
+    # Default should not error.
+    validate()
+    # Canonicalize project name.
+    validate(extra_requirements=["PyTeST_cOV"])
+
+    with pytest.raises(ValueError) as exc:
+        validate(extra_requirements=[])
+    assert "missing `pytest-cov`" in str(exc.value)
+    with pytest.raises(ValueError) as exc:
+        validate(extra_requirements=["custom-plugin"])
+    assert "missing `pytest-cov`" in str(exc.value)
+
+    with pytest.raises(ValueError) as exc:
+        validate(pytest_plugins=[])
+    assert "missing `pytest-cov`" in str(exc.value)
+    with pytest.raises(ValueError) as exc:
+        validate(pytest_plugins=["custom-plugin"])
+    assert "missing `pytest-cov`" in str(exc.value)

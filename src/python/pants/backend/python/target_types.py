@@ -520,7 +520,7 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def _format_invalid_requirement_string_error(
+def format_invalid_requirement_string_error(
     value: str, e: Exception, *, description_of_origin: str
 ) -> str:
     prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
@@ -580,7 +580,7 @@ class _RequirementSequenceField(Field):
                     parsed = Requirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
-                        _format_invalid_requirement_string_error(
+                        format_invalid_requirement_string_error(
                             v,
                             e,
                             description_of_origin=(
@@ -689,7 +689,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             yield Requirement.parse(line)
         except Exception as e:
             raise ValueError(
-                _format_invalid_requirement_string_error(
+                format_invalid_requirement_string_error(
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
