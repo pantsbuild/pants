@@ -96,6 +96,7 @@ impl StoreSetup {
         Duration::from_secs(1),
         1,
         256,
+        None,
       )
       .unwrap();
     StoreSetup {

@@ -9,13 +9,17 @@ use std::time::{Duration, Instant};
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bytes::{Bytes, BytesMut};
+use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
-use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
+use remexec::{
+  capabilities_client::CapabilitiesClient,
+  content_addressable_storage_client::ContentAddressableStorageClient, ServerCapabilities,
+};
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
 
@@ -27,6 +31,8 @@ pub struct ByteStore {
   rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
+  capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
+  capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -68,6 +74,7 @@ impl ByteStore {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -86,7 +93,9 @@ impl ByteStore {
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
 
-    let cas_client = Arc::new(ContentAddressableStorageClient::new(channel));
+    let cas_client = Arc::new(ContentAddressableStorageClient::new(channel.clone()));
+
+    let capabilities_client = Arc::new(CapabilitiesClient::new(channel));
 
     Ok(ByteStore {
       instance_name,
@@ -95,6 +104,9 @@ impl ByteStore {
       rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
+      capabilities_cell: capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
+      capabilities_client,
     })
   }
 
@@ -450,5 +462,27 @@ impl ByteStore {
       instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
       blob_digests: digests.map(|d| d.into()).collect::<Vec<_>>(),
     }
+  }
+
+  #[allow(dead_code)]
+  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
+    let capabilities_fut = async {
+      let mut request = remexec::GetCapabilitiesRequest::default();
+      if let Some(s) = self.instance_name.as_ref() {
+        request.instance_name = s.clone();
+      }
+
+      let mut client = self.capabilities_client.as_ref().clone();
+      client
+        .get_capabilities(request)
+        .await
+        .map(|r| r.into_inner())
+        .map_err(status_to_str)
+    };
+
+    self
+      .capabilities_cell
+      .get_or_try_init(capabilities_fut)
+      .await
   }
 }
