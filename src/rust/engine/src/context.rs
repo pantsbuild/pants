@@ -357,19 +357,13 @@ impl Core {
 
     // If the remote store and remote execution server are the same (address and headers),
     // then share the capabilities cache between them to avoid duplicate GetCapabilities calls.
-    let capabilities_cell_opt = match (
-      need_remote_store,
-      remoting_opts.execution_address.as_ref(),
-      remoting_opts.store_address.as_ref(),
-      &remoting_opts.execution_headers,
-      &remoting_opts.store_headers,
-    ) {
-      (true, Some(execution_address), Some(store_address), execution_headers, store_headers)
-        if execution_address == store_address && execution_headers == store_headers =>
-      {
-        Some(Arc::new(DoubleCheckedCell::new()))
-      }
-      _ => None,
+    let capabilities_cell_opt = if need_remote_store
+      && remoting_opts.execution_address == remoting_opts.store_address
+      && remoting_opts.execution_headers == remoting_opts.store_headers
+    {
+      Some(Arc::new(DoubleCheckedCell::new()))
+    } else {
+      None
     };
 
     safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
