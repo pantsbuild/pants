@@ -3,11 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, cast
-
-from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
-from pants.option.scope import ScopeInfo
 
 
 # TODO: Unite Optionable and Subsytem, since we no longer have any othe subtypes of
@@ -24,23 +20,3 @@ class Subsystem(Optionable):
 
     :API: public
     """
-
-    scope: str
-    options: OptionValueContainer
-
-    help: ClassVar[str]
-
-    @classmethod
-    def get_scope_info(cls) -> ScopeInfo:
-        cls.validate_scope_name_component(cast(str, cls.options_scope))
-        return super().get_scope_info()
-
-    def __init__(self, scope: str, options: OptionValueContainer) -> None:
-        super().__init__()
-        self.scope = scope
-        self.options = options
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) != type(other):
-            return False
-        return bool(self.scope == other.scope and self.options == other.options)

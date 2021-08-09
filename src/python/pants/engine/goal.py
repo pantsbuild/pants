@@ -49,7 +49,7 @@ class GoalSubsystem(Subsystem):
         for its options."""
 
     @classproperty
-    def options_scope(cls) -> str:  # type: ignore[override]
+    def options_scope(cls) -> str:
         return cast(str, cls.name)
 
 

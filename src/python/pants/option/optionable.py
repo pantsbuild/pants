@@ -6,16 +6,20 @@ from __future__ import annotations
 import functools
 import inspect
 import re
-from abc import ABCMeta, abstractmethod
-from typing import Optional, Type, TypeVar, cast
+from abc import ABCMeta
+from typing import Any, ClassVar, Optional, Type, TypeVar
 
 from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 
 
 class Optionable(metaclass=ABCMeta):
     """A mixin for classes that can register options on some scope."""
+
+    options_scope: str
+    help: ClassVar[str]
 
     # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -25,11 +29,6 @@ class Optionable(metaclass=ABCMeta):
     deprecated_options_scope_removal_version: Optional[str] = None
 
     _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
-
-    @property
-    @abstractmethod
-    def options_scope(self) -> str:
-        """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 
     @classmethod
     def signature(cls):
@@ -78,9 +77,10 @@ class Optionable(metaclass=ABCMeta):
     @classmethod
     def get_scope_info(cls) -> ScopeInfo:
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
+        cls.validate_scope_name_component(cls.options_scope)
         if cls.options_scope is None:
             raise OptionsError(f"{cls.__name__} must set options_scope.")
-        return cls.create_scope_info(scope=cast(str, cls.options_scope), optionable_cls=cls)
+        return cls.create_scope_info(scope=cls.options_scope, optionable_cls=cls)
 
     @classmethod
     def register_options(cls, register):
@@ -96,6 +96,16 @@ class Optionable(metaclass=ABCMeta):
         Subclasses should not generally need to override this method.
         """
         cls.register_options(options.registration_function_for_optionable(cls))
+
+    def __init__(self, scope: str, options: OptionValueContainer) -> None:
+        super().__init__()
+        self.scope = scope
+        self.options = options
+
+    def __eq__(self, other: Any) -> bool:
+        if type(self) != type(other):
+            return False
+        return bool(self.scope == other.scope and self.options == other.options)
 
 
 _T = TypeVar("_T", bound=Optionable)
