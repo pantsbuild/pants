@@ -445,8 +445,7 @@ async def build_pex(
             if python_setup.fail_on_invalid_lockfile:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
             else:
-                # TODO: add warning
-                pass
+                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
 
         requirements_file_digest = await Get(
             Digest,
@@ -463,8 +462,7 @@ async def build_pex(
             if python_setup.fail_on_invalid_lockfile:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
             else:
-                # TODO: add warning
-                pass
+                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
 
         requirements_file_digest = await Get(Digest, CreateDigest([content]))
     else:

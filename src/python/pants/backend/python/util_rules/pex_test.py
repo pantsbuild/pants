@@ -33,6 +33,7 @@ from pants.backend.python.util_rules.pex import (
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -535,3 +536,37 @@ def test_build_pex_description() -> None:
         use_repo_pex=True,
         expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
     )
+
+
+def _run_pex_for_lockfile_test(rule_runner, digest, behavior):
+    lockfile = f"""
+# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+# invalidation digest: {digest}
+# --- END PANTS LOCKFILE METADATA ---
+ansicolors==1.1.8
+"""
+    rule_runner.create_file("lockfile.txt", lockfile)
+
+    create_pex_and_get_all_data(
+        rule_runner,
+        requirements=PexRequirements(
+            file_path="lockfile.txt", file_path_description_of_origin="iceland"
+        ),
+        interpreter_constraints=InterpreterConstraints(
+            ["CPython>=3.9"]  # TODO: Remove before merging. Needed so chrisjrn can develop on ARM
+        ),
+        additional_pants_args=(
+            "--python-setup-experimental-lockfile=lockfile.txt",
+            f"--python-setup-invalid-lockfile-behavior={behavior}",
+        ),
+    )
+
+
+def test_error_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
+    with pytest.raises(ExecutionError):
+        _run_pex_for_lockfile_test(rule_runner, "flem", "error")
+
+
+def test_warn_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, "flem", "warn")
+    assert "Invalid lockfile provided." in caplog.text
