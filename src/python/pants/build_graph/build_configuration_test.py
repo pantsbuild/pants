@@ -9,7 +9,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule, union
-from pants.option.optionable import Optionable
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -79,11 +78,11 @@ def test_register_union_rules(bc_builder: BuildConfiguration.Builder) -> None:
 
 
 def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
-    def mk_dummy_opt(_options_scope: str, goal: bool = False) -> Type[Optionable]:
-        class DummyOptionable(GoalSubsystem if goal else Subsystem):  # type: ignore[misc]
+    def mk_dummy_subsys(_options_scope: str, goal: bool = False) -> Type[Subsystem]:
+        class DummySubsystem(GoalSubsystem if goal else Subsystem):  # type: ignore[misc]
             options_scope = _options_scope
 
-        return DummyOptionable
+        return DummySubsystem
 
     def mk_dummy_tgt(_alias: str) -> Type[Target]:
         class DummyTarget(Target):
@@ -92,13 +91,13 @@ def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
 
         return DummyTarget
 
-    bc_builder.register_optionables(
+    bc_builder.register_subsystems(
         (
-            mk_dummy_opt("foo"),
-            mk_dummy_opt("Bar-bar"),
-            mk_dummy_opt("baz"),
-            mk_dummy_opt("qux", goal=True),
-            mk_dummy_opt("global"),
+            mk_dummy_subsys("foo"),
+            mk_dummy_subsys("Bar-bar"),
+            mk_dummy_subsys("baz"),
+            mk_dummy_subsys("qux", goal=True),
+            mk_dummy_subsys("global"),
         )
     )
     bc_builder.register_target_types(

@@ -81,7 +81,7 @@ class Optionable(metaclass=ABCMeta):
     def get_scope_info(cls) -> ScopeInfo:
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
         cls.validate_scope()
-        return cls.create_scope_info(scope=cls.options_scope, optionable_cls=cls)
+        return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
     def register_options(cls, register):
@@ -96,7 +96,7 @@ class Optionable(metaclass=ABCMeta):
 
         Subclasses should not generally need to override this method.
         """
-        cls.register_options(options.registration_function_for_optionable(cls))
+        cls.register_options(options.registration_function_for_subsystem(cls))
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()

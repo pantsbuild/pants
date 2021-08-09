@@ -237,25 +237,25 @@ class HelpInfoExtracter:
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
             options.for_scope(scope_info.scope)  # Force parsing.
-            optionable_cls = scope_info.optionable_cls
+            subsystem_cls = scope_info.subsystem_cls
             if not scope_info.description:
                 cls_name = (
-                    f"{optionable_cls.__module__}.{optionable_cls.__qualname__}"
-                    if optionable_cls
+                    f"{subsystem_cls.__module__}.{subsystem_cls.__qualname__}"
+                    if subsystem_cls
                     else ""
                 )
                 raise ValueError(
                     f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
                     f"Add a class property `help`."
                 )
-            is_goal = optionable_cls is not None and issubclass(optionable_cls, GoalSubsystem)
+            is_goal = subsystem_cls is not None and issubclass(subsystem_cls, GoalSubsystem)
             oshi = HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                 scope_info.description, options.get_parser(scope_info.scope), is_goal
             )
             scope_to_help_info[oshi.scope] = oshi
 
             if is_goal:
-                goal_subsystem_cls = cast(Type[GoalSubsystem], optionable_cls)
+                goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 is_implemented = union_membership.has_members_for_all(
                     goal_subsystem_cls.required_union_implementations
                 )
