@@ -6,32 +6,25 @@ from __future__ import annotations
 import functools
 import inspect
 import re
-from abc import ABC, ABCMeta, abstractmethod
-from typing import Optional, Type, cast
+from abc import ABCMeta, abstractmethod
+from typing import Optional, Type, TypeVar, cast
 
 from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
-from pants.util.meta import classproperty
 
 
-async def _construct_optionable(optionable_factory):
-    scope = optionable_factory.options_scope
-    scoped_options = await Get(ScopedOptions, Scope(str(scope)))
-    return optionable_factory.optionable_cls(scope, scoped_options.options)
+class Optionable(metaclass=ABCMeta):
+    """A mixin for classes that can register options on some scope."""
 
+    # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
+    # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
+    # The deprecation warning becomes an error at the given Pants version (which must therefore be
+    # a valid semver).
+    deprecated_options_scope: Optional[str] = None
+    deprecated_options_scope_removal_version: Optional[str] = None
 
-class OptionableFactory(ABC):
-    """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
-
-    Optionable subclasses constructed in this manner must have a particular constructor shape, which
-    is loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
-    """
-
-    @property
-    @abstractmethod
-    def optionable_cls(self) -> Type[Optionable]:
-        """The Optionable class that is constructed by this OptionableFactory."""
+    _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @property
     @abstractmethod
@@ -57,30 +50,12 @@ class OptionableFactory(ABC):
         partial_construct_optionable.__line_number__ = class_definition_lineno
 
         return dict(
-            output_type=cls.optionable_cls,
+            output_type=cls,
             input_selectors=(),
             func=partial_construct_optionable,
             input_gets=(GetConstraints(output_type=ScopedOptions, input_type=Scope),),
             canonical_name=name,
         )
-
-
-class Optionable(OptionableFactory, metaclass=ABCMeta):
-    """A mixin for classes that can register options on some scope."""
-
-    # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
-    # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
-    # The deprecation warning becomes an error at the given Pants version (which must therefore be
-    # a valid semver).
-    deprecated_options_scope: Optional[str] = None
-    deprecated_options_scope_removal_version: Optional[str] = None
-
-    _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
-
-    @classproperty
-    def optionable_cls(cls):
-        # Fills the `OptionableFactory` contract.
-        return cls
 
     @classmethod
     def is_valid_scope_name_component(cls, s: str) -> bool:
@@ -121,3 +96,12 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         Subclasses should not generally need to override this method.
         """
         cls.register_options(options.registration_function_for_optionable(cls))
+
+
+_T = TypeVar("_T", bound=Optionable)
+
+
+async def _construct_optionable(optionable: Type[_T]) -> _T:
+    scope = optionable.options_scope
+    scoped_options = await Get(ScopedOptions, Scope(str(scope)))
+    return optionable(scope, scoped_options.options)
