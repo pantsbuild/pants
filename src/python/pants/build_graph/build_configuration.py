@@ -9,7 +9,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, DefaultDict, Dict, Set, Type, cast
+from typing import Any, DefaultDict, Dict, Set, Type
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
@@ -61,7 +61,7 @@ class BuildConfiguration:
         normalized_to_orig_name: Dict[str, str] = {}
 
         for opt in self.all_optionables:
-            scope = cast(str, opt.options_scope)
+            scope = opt.options_scope
             normalized_scope = normalize_scope(scope)
             name_to_categories[normalized_scope].add(
                 Category.goal if issubclass(opt, GoalSubsystem) else Category.subsystem

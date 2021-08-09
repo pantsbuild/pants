@@ -199,9 +199,9 @@ class PythonToolBase(PythonToolRequirementsBase):
         is_default_entry_point = self.options.is_default("entry_point")
         if not is_default_console_script and not is_default_entry_point:
             raise OptionsError(
-                f"Both [{self.scope}].console-script={self.options.console_script} and "
-                f"[{self.scope}].entry-point={self.options.entry_point} are configured but these "
-                f"options are mutually exclusive. Please pick one."
+                f"Both [{self.options_scope}].console-script={self.options.console_script} and "
+                f"[{self.options_scope}].entry-point={self.options.entry_point} are configured "
+                f"but these options are mutually exclusive. Please pick one."
             )
         if not is_default_console_script:
             return ConsoleScript(cast(str, self.options.console_script))

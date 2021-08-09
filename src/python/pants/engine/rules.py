@@ -31,7 +31,7 @@ from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
-from pants.option.optionable import OptionableFactory
+from pants.option.optionable import Optionable
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -76,7 +76,7 @@ class _RuleVisitor(ast.NodeVisitor):
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> TaskRule:
+def SubsystemRule(optionable_factory: Type[Optionable]) -> TaskRule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     return TaskRule(**optionable_factory.signature())
 
@@ -371,7 +371,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
                     for input in rule.input_selectors:
-                        if issubclass(input, OptionableFactory):
+                        if issubclass(input, Optionable):
                             yield SubsystemRule(input)
                     if issubclass(rule.output_type, Goal):
                         yield SubsystemRule(rule.output_type.subsystem_cls)

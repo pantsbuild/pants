@@ -87,7 +87,7 @@ class GraphSession:
             return tuple()
         consumed_types = self.goal_consumed_types(goal_product)
         return tuple(
-            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})  # type: ignore[misc]
+            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})
         )
 
     def goal_consumed_types(self, goal_product: type) -> set[type]:
