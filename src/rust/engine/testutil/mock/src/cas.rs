@@ -704,7 +704,7 @@ impl ContentAddressableStorage for StubCASResponder {
       let (data_opt, status) = read_blob(digest.clone(), &blobs);
       responses.push(remexec::batch_read_blobs_response::Response {
         digest: Some(digest),
-        data: data_opt.unwrap_or_else(|| Bytes::new()),
+        data: data_opt.unwrap_or_else(Bytes::new),
         status: Some(bazel_protos::gen::google::rpc::Status {
           code: status.code() as i32,
           message: status.message().to_string(),
