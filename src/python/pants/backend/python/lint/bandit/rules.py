@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet, BanditLockfileSentinel
+from pants.backend.python.lint.bandit.subsystem import (
+    Bandit,
+    BanditFieldSet,
+    BanditLockfileSentinel,
+)
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess

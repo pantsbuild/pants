@@ -15,7 +15,11 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools, SetuptoolsLockfileSentinel
+from pants.backend.python.subsystems.setuptools import (
+    PythonDistributionFieldSet,
+    Setuptools,
+    SetuptoolsLockfileSentinel,
+)
 from pants.backend.python.target_types import (
     PythonDistributionEntryPointsField,
     PythonProvidesField,
