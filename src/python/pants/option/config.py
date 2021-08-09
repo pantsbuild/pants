@@ -258,6 +258,7 @@ class _ConfigValues:
         Due to TOML's representation of the config as a nested dictionary, naively, it would appear
         that `cache` was defined even though the user never explicitly added it to their config.
         """
+        # TODO: Once we properly ban scopes with dots in them, we can get rid of this check.
         at_least_one_option_defined = any(
             _ConfigValues._is_an_option(section_value) for section_value in section_values.values()
         )

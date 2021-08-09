@@ -75,7 +75,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     deprecated_options_scope: Optional[str] = None
     deprecated_options_scope_removal_version: Optional[str] = None
 
-    _scope_name_component_re = re.compile(r"^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$")
+    _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @classproperty
     def optionable_cls(cls):
@@ -90,8 +90,9 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     def validate_scope_name_component(cls, s: str) -> None:
         if not cls.is_valid_scope_name_component(s):
             raise OptionsError(
-                f'Options scope "{s}" is not valid:\nReplace in code with a new scope name consisting of '
-                f"dash-separated-words, with words consisting only of lower-case letters and digits."
+                f'Options scope "{s}" is not valid:\nReplace in code with a new scope name '
+                "consisting of only lower-case letters, digits, underscores, "
+                "and non-consecutive dashes."
             )
 
     @classmethod
@@ -105,30 +106,6 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         if cls.options_scope is None:
             raise OptionsError(f"{cls.__name__} must set options_scope.")
         return cls.create_scope_info(scope=cast(str, cls.options_scope), optionable_cls=cls)
-
-    @classmethod
-    def subscope(cls, scope) -> str:
-        """Create a subscope under this Optionable's scope."""
-        return f"{cls.options_scope}.{scope}"
-
-    @classmethod
-    def known_scope_infos(cls):
-        """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
-
-        Specific Optionable subtypes may override to provide information about other optionables.
-        """
-        yield cls.get_scope_info()
-
-    @classmethod
-    def get_options_scope_equivalent_flag_component(cls):
-        """Return a string representing this optionable's scope as it would be in a command line
-        flag.
-
-        This method can be used to generate error messages with flags e.g. to fix some error with a
-        pants command. These flags will then be as specific as possible, including e.g. all
-        dependent subsystem scopes.
-        """
-        return re.sub(r"\.", "-", cls.options_scope)
 
     @classmethod
     def register_options(cls, register):

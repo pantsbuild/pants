@@ -256,9 +256,7 @@ class OptionsBootstrapper:
 
         # Parse and register options.
         known_scope_infos = [
-            si
-            for optionable in build_configuration.all_optionables
-            for si in optionable.known_scope_infos()
+            optionable.get_scope_info() for optionable in build_configuration.all_optionables
         ]
         options = self.full_options_for_scopes(
             known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options

@@ -226,7 +226,7 @@ class RuleRunner:
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
         raw_specs = self.options_bootstrapper.full_options_for_scopes(
-            [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
+            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
 
