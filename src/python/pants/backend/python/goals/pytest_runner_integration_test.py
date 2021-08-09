@@ -329,9 +329,8 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     assert result.coverage_data is not None
 
 
-def test_conftest_handling(rule_runner: RuleRunner) -> None:
-    """Tests that we a) inject a dependency on conftest.py and b) skip running directly on
-    conftest.py."""
+def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
+    # See `test_skip_tests` for a test that we properly skip running on conftest.py.
     rule_runner.write_files(
         {
             f"{SOURCE_ROOT}/conftest.py": dedent(
@@ -345,15 +344,10 @@ def test_conftest_handling(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": "python_tests()",
         }
     )
-
-    test_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, test_tgt, extra_args=["--pytest-args='-s'"])
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-args='-s'"])
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py In conftest!\n." in result.stdout
-
-    conftest_tgt = rule_runner.get_target(Address(SOURCE_ROOT, relative_file_path="conftest.py"))
-    result = run_pytest(rule_runner, conftest_tgt)
-    assert result.exit_code is None
 
 
 def test_execution_slot_variable(rule_runner: RuleRunner) -> None:
