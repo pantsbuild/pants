@@ -127,6 +127,7 @@ impl CommandRunner {
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
     cache_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
     let store_use_tls = store_address.starts_with("https://");
@@ -177,7 +178,8 @@ impl CommandRunner {
       platform,
       overall_deadline,
       retry_interval_duration,
-      capabilities_cell: Arc::new(DoubleCheckedCell::new()),
+      capabilities_cell: capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
       capabilities_client,
     };
 

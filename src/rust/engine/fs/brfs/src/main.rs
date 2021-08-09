@@ -755,6 +755,7 @@ async fn main() {
         1,
         value_t!(args.value_of("rpc-concurrency-limit"), usize)
           .expect("Bad rpc-concurrency-limit flag"),
+        None,
       )
       .expect("Error making remote store"),
     None => local_only_store,

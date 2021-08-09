@@ -74,6 +74,7 @@ impl ByteStore {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -103,7 +104,8 @@ impl ByteStore {
       rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
-      capabilities_cell: Arc::new(DoubleCheckedCell::new()),
+      capabilities_cell: capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
       capabilities_client,
     })
   }
