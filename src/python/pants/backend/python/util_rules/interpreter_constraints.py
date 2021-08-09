@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import itertools
 from collections import defaultdict
-from typing import FrozenSet, Iterable, List, Sequence, Set, Tuple, TypeVar
+from typing import FrozenSet, Iterable, Iterator, List, Sequence, Set, Tuple, TypeVar
 
 from pkg_resources import Requirement
 from typing_extensions import Protocol
@@ -46,6 +46,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             v if isinstance(v, Requirement) else self.parse_constraint(v)
             for v in sorted(constraints, key=lambda c: str(c))
         )
+
+    def __str__(self) -> str:
+        return " OR ".join(str(constraint) for constraint in self)
+
+    def debug_hint(self) -> str:
+        return str(self)
 
     @staticmethod
     def parse_constraint(constraint: str) -> Requirement:
@@ -170,16 +176,14 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             args.extend(["--interpreter-constraint", str(constraint)])
         return args
 
-    def _includes_version(
-        self, major_minor: str, last_patch: int = _EXPECTED_LAST_PATCH_VERSION
-    ) -> bool:
-        patch_versions = list(reversed(range(0, last_patch + 1)))
-        for req in self:
-            if any(
-                req.specifier.contains(f"{major_minor}.{p}") for p in patch_versions  # type: ignore[attr-defined]
-            ):
-                return True
-        return False
+    def _valid_patch_versions(self, major: int, minor: int) -> Iterator[int]:
+        for p in range(0, _EXPECTED_LAST_PATCH_VERSION + 1):
+            for req in self:
+                if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                    yield p
+
+    def _includes_version(self, major: int, minor: int) -> bool:
+        return any(True for _ in self._valid_patch_versions(major, minor))
 
     def includes_python2(self) -> bool:
         """Checks if any of the constraints include Python 2.
@@ -187,7 +191,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         This will return True even if the code works with Python 3 too, so long as at least one of
         the constraints works with Python 2.
         """
-        return self._includes_version("2.7")
+        return self._includes_version(2, 7)
 
     def minimum_python_version(self, interpreter_universe: Iterable[str]) -> str | None:
         """Find the lowest major.minor Python version that will work with these constraints.
@@ -195,34 +199,39 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         The constraints may also be compatible with later versions; this is the lowest version that
         still works.
         """
-        for major_minor in sorted(interpreter_universe, key=_major_minor_to_int):
-            if self._includes_version(major_minor):
-                return major_minor
+        for major, minor in sorted(_major_minor_to_int(s) for s in interpreter_universe):
+            if self._includes_version(major, minor):
+                return f"{major}.{minor}"
         return None
 
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
     ) -> bool:
+        if not self:
+            return False
         patch_versions = list(reversed(range(0, _EXPECTED_LAST_PATCH_VERSION)))
-        # We only need to look at the prior Python release. For example, consider Python 3.8+
+        # We only look at the prior Python release. For example, consider Python 3.8+
         # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
-        # `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work correctly as
+        # `==3.6.*,!=3.7.*,==3.8.*` is unlikely, and even that will work correctly as
         # it's an invalid constraint so setuptools returns False always. `['==2.7.*', '==3.8.*']`
         # will fail because not every single constraint is exclusively 3.8.
         prior_versions = [f"{prior_version}.{p}" for p in patch_versions]
         allowed_versions = [
             f"{major_minor}.{p}" for major_minor in allowed_versions for p in patch_versions
         ]
-        for req in self:
+
+        def valid_constraint(constraint: Requirement) -> bool:
             if any(
-                req.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
             ):
                 return False
             if not any(
-                req.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
             ):
                 return False
-        return True
+            return True
+
+        return all(valid_constraint(c) for c in self)
 
     def requires_python38_or_newer(self, interpreter_universe: Iterable[str]) -> bool:
         """Checks if the constraints are all for Python 3.8+.
@@ -230,19 +239,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         This will return False if Python 3.8 is allowed, but prior versions like 3.7 are also
         allowed.
         """
-
         py38_and_later = [
             interp for interp in interpreter_universe if _major_minor_to_int(interp) >= (3, 8)
         ]
         return self._requires_python3_version_or_newer(
             allowed_versions=py38_and_later, prior_version="3.7"
         )
-
-    def __str__(self) -> str:
-        return " OR ".join(str(constraint) for constraint in self)
-
-    def debug_hint(self) -> str:
-        return str(self)
 
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
