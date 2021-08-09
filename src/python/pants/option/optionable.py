@@ -61,11 +61,14 @@ class Optionable(metaclass=ABCMeta):
         return s == "" or cls._scope_name_component_re.match(s) is not None
 
     @classmethod
-    def validate_scope_name_component(cls, s: str) -> None:
-        if not cls.is_valid_scope_name_component(s):
+    def validate_scope(cls) -> None:
+        options_scope = getattr(cls, "options_scope", None)
+        if options_scope is None:
+            raise OptionsError(f"{cls.__name__} must set options_scope.")
+        if not cls.is_valid_scope_name_component(options_scope):
             raise OptionsError(
-                f'Options scope "{s}" is not valid:\nReplace in code with a new scope name '
-                "consisting of only lower-case letters, digits, underscores, "
+                f'Options scope "{options_scope}" is not valid:\nReplace in code with a new '
+                "scope name consisting of only lower-case letters, digits, underscores, "
                 "and non-consecutive dashes."
             )
 
@@ -77,9 +80,7 @@ class Optionable(metaclass=ABCMeta):
     @classmethod
     def get_scope_info(cls) -> ScopeInfo:
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
-        cls.validate_scope_name_component(cls.options_scope)
-        if cls.options_scope is None:
-            raise OptionsError(f"{cls.__name__} must set options_scope.")
+        cls.validate_scope()
         return cls.create_scope_info(scope=cls.options_scope, optionable_cls=cls)
 
     @classmethod
@@ -97,21 +98,19 @@ class Optionable(metaclass=ABCMeta):
         """
         cls.register_options(options.registration_function_for_optionable(cls))
 
-    def __init__(self, scope: str, options: OptionValueContainer) -> None:
-        super().__init__()
-        self.scope = scope
+    def __init__(self, options: OptionValueContainer) -> None:
+        self.validate_scope()
         self.options = options
 
     def __eq__(self, other: Any) -> bool:
         if type(self) != type(other):
             return False
-        return bool(self.scope == other.scope and self.options == other.options)
+        return bool(self.options == other.options)
 
 
 _T = TypeVar("_T", bound=Optionable)
 
 
 async def _construct_optionable(optionable: Type[_T]) -> _T:
-    scope = optionable.options_scope
-    scoped_options = await Get(ScopedOptions, Scope(str(scope)))
-    return optionable(scope, scoped_options.options)
+    scoped_options = await Get(ScopedOptions, Scope(str(optionable.options_scope)))
+    return optionable(scoped_options.options)
