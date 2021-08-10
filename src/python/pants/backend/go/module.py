@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import json
 import logging
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
@@ -12,7 +13,16 @@ from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySibling
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, RemovePrefix, Snapshot, Workspace
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    Digest,
+    DigestContents,
+    DigestSubset,
+    PathGlobs,
+    RemovePrefix,
+    Snapshot,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -200,6 +210,55 @@ async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> Go
         else:
             logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
     return GoResolveGoal(exit_code=0)
+
+
+@dataclass(frozen=True)
+class DownloadExternalModuleRequest:
+    path: str
+    version: str
+
+
+@dataclass(frozen=True)
+class DownloadedExternalModule:
+    path: str
+    version: str
+    digest: Digest
+
+
+@rule
+async def download_external_module(
+    request: DownloadExternalModuleRequest,
+) -> DownloadedExternalModule:
+    result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            input_digest=EMPTY_DIGEST,
+            command=("mod", "download", "-json", f"{request.path}@{request.version}"),
+            description=f"Download external Go module at {request.path}@{request.version}.",
+            output_directories=("gopath",),
+        ),
+    )
+
+    # Decode the module metadata.
+    metadata = json.loads(result.stdout)
+
+    # Find the path within the digest where the source was downloaded. The path will have a sandbox-specific
+    # prefix that we need to strip down to the `gopath` path component.
+    absolute_source_path = metadata["Dir"]
+    gopath_index = absolute_source_path.index("gopath/")
+    source_path = absolute_source_path[gopath_index:]
+
+    source_digest = await Get(
+        Digest, DigestSubset(result.output_digest, PathGlobs([f"{source_path}/**"]))
+    )
+    source_digest_stripped = await Get(Digest, RemovePrefix(source_digest, source_path))
+    snapshot = await Get(Snapshot, Digest, source_digest_stripped)
+    for name in snapshot.files:
+        print(f"  {name}")
+
+    return DownloadedExternalModule(
+        path=request.path, version=request.version, digest=source_digest_stripped
+    )
 
 
 def rules():
