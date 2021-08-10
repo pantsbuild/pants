@@ -61,17 +61,17 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    lockfile_digest = None
+    lockfile_hex_digest = None
     if docformatter.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, DocformatterLockfileSentinel())
-        lockfile_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.hex_digest
 
     docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=docformatter.pex_requirements(lockfile_digest),
+            requirements=docformatter.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
         ),

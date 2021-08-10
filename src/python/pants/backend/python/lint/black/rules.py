@@ -89,17 +89,17 @@ async def setup_black(
         else black.interpreter_constraints
     )
 
-    lockfile_digest = None
+    lockfile_hex_digest = None
     if black.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, BlackLockfileSentinel())
-        lockfile_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.hex_digest
 
     black_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
-            requirements=black.pex_requirements(lockfile_digest),
+            requirements=black.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=tool_interpreter_constraints,
             main=black.main,
         ),

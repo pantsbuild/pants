@@ -68,17 +68,17 @@ def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tu
 
 @rule(level=LogLevel.DEBUG)
 async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
-    lockfile_digest = None
+    lockfile_hex_digest = None
     if yapf.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, YapfLockfileSentinel())
-        lockfile_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.hex_digest
 
     yapf_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="yapf.pex",
             internal_only=True,
-            requirements=yapf.pex_requirements(lockfile_digest),
+            requirements=yapf.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
         ),

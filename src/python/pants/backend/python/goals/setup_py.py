@@ -420,17 +420,17 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
 
-    lockfile_digest = None
+    lockfile_hex_digest = None
     if setuptools.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, SetuptoolsLockfileSentinel())
-        lockfile_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.hex_digest
 
     setuptools_pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
-            requirements=setuptools.pex_requirements(lockfile_digest),
+            requirements=setuptools.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=req.interpreter_constraints,
         ),
     )
