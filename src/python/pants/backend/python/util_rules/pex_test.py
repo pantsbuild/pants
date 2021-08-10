@@ -580,12 +580,10 @@ def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior
 ansicolors==1.1.8
 """
     if use_file:
-        rule_runner.create_file("lockfile.txt", lockfile)
+        rule_runner.write_files({"lockfile.txt": lockfile})
         file_args = {"file_path": "lockfile.txt"}
     else:
-        content = FileContent(
-            path="lockfile.txt", content=lockfile.encode("utf-8"), is_executable=False
-        )
+        content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
         file_args = {"file_content": content}
 
     create_pex_and_get_all_data(
