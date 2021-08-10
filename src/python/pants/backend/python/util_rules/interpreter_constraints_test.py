@@ -139,6 +139,7 @@ def test_merge_interpreter_constraints() -> None:
         ["CPython>=2.7.13,<2.7.16"],
         ["CPython>=2.7.13,!=2.7.16"],
         ["PyPy>=2.7,<3"],
+        ["CPython"],
     ],
 )
 def test_interpreter_constraints_includes_python2(constraints) -> None:
@@ -153,6 +154,7 @@ def test_interpreter_constraints_includes_python2(constraints) -> None:
         ["CPython>=3.6", "CPython>=3.8"],
         ["CPython!=2.7.*"],
         ["PyPy>=3.6"],
+        [],
     ],
 )
 def test_interpreter_constraints_do_not_include_python2(constraints):
@@ -172,6 +174,8 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
         (["CPython==2.7.10"], "2.7"),
         (["CPython==3.5.*", "CPython>=3.6"], "3.5"),
         (["CPython==2.6.*"], None),
+        (["CPython"], "2.7"),
+        ([], None),
     ],
 )
 def test_interpreter_constraints_minimum_python_version(
@@ -216,6 +220,8 @@ def test_interpreter_constraints_require_python38(constraints) -> None:
         ["CPython==3.7.*", "CPython==3.8.*"],
         ["CPython==3.5.3", "CPython==3.8.3"],
         ["PyPy>=3.7"],
+        ["CPython"],
+        [],
     ],
 )
 def test_interpreter_constraints_do_not_require_python38(constraints):
