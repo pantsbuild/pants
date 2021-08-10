@@ -538,10 +538,25 @@ def test_build_pex_description() -> None:
     )
 
 
-def _run_pex_for_lockfile_test(rule_runner, digest, behavior):
+def test_error_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
+    with pytest.raises(ExecutionError):
+        _run_pex_for_lockfile_test(rule_runner, actual="1bad", expected="900d", behavior="error")
+
+
+def test_warn_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, actual="1bad", expected="900d", behavior="warn")
+    assert "Invalid lockfile provided." in caplog.text
+
+
+def test_no_warning_on_valid_lockfile(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, actual="900d", expected="900d", behavior="warn")
+    assert not caplog.text.strip()
+
+
+def _run_pex_for_lockfile_test(rule_runner, actual, expected, behavior):
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: {digest}
+# invalidation digest: {actual}
 # --- END PANTS LOCKFILE METADATA ---
 ansicolors==1.1.8
 """
@@ -550,7 +565,9 @@ ansicolors==1.1.8
     create_pex_and_get_all_data(
         rule_runner,
         requirements=PexRequirements(
-            file_path="lockfile.txt", file_path_description_of_origin="iceland"
+            file_path="lockfile.txt",
+            file_path_description_of_origin="iceland",
+            lockfile_hex_digest=expected,
         ),
         interpreter_constraints=InterpreterConstraints(
             ["CPython>=3.9"]  # TODO: Remove before merging. Needed so chrisjrn can develop on ARM
@@ -560,13 +577,3 @@ ansicolors==1.1.8
             f"--python-setup-invalid-lockfile-behavior={behavior}",
         ),
     )
-
-
-def test_error_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
-    with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(rule_runner, "flem", "error")
-
-
-def test_warn_on_invalid_lockfile(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, "flem", "warn")
-    assert "Invalid lockfile provided." in caplog.text
