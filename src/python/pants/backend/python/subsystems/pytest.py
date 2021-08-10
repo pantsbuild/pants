@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, cast
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
+from pkg_resources import Requirement
+
 from pants.backend.experimental.python.lockfile import (
     PythonLockfileRequest,
     PythonToolLockfileSentinel,
@@ -20,6 +23,7 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
     SkipPythonTestsField,
+    format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.deprecated import resolve_conflicting_options
@@ -36,8 +40,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import git_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_method, memoized_property
 
 
 @dataclass(frozen=True)
@@ -168,9 +173,9 @@ class PyTest(PythonToolBase):
             ),
         )
 
-    @property
-    def all_requirements(self) -> tuple[str, ...]:
-        extras = resolve_conflicting_options(
+    @memoized_property
+    def _extra_requirements(self) -> tuple[str, ...]:
+        result = resolve_conflicting_options(
             old_option="pytest_plugins",
             new_option="extra_requirements",
             old_scope=self.options_scope,
@@ -178,7 +183,11 @@ class PyTest(PythonToolBase):
             old_container=self.options,
             new_container=self.options,
         )
-        return (self.version, *extras)
+        return cast("tuple[str, ...]", result)
+
+    @property
+    def all_requirements(self) -> tuple[str, ...]:
+        return (self.version, *self._extra_requirements)
 
     @property
     def timeouts_enabled(self) -> bool:
@@ -207,6 +216,30 @@ class PyTest(PythonToolBase):
             discovery=cast(bool, self.options.config_discovery),
             check_existence=check_existence,
             check_content=check_content,
+        )
+
+    @memoized_method
+    def validate_pytest_cov_included(self) -> None:
+        for s in self._extra_requirements:
+            try:
+                req = Requirement.parse(s).project_name
+            except Exception as e:
+                raise ValueError(
+                    format_invalid_requirement_string_error(
+                        s, e, description_of_origin="`[pytest].extra_requirements`"
+                    )
+                )
+            if canonicalize_project_name(req) == "pytest-cov":
+                return
+
+        raise ValueError(
+            "You set `[test].use_coverage`, but `[pytest].extra_requirements` is missing "
+            "`pytest-cov`, which is needed to collect coverage data.\n\nThis happens when "
+            "overriding the `extra_requirements` option. Please either explicitly add back "
+            "`pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than "
+            "overriding it. Run `./pants help-advanced pytest` to see the default version of "
+            f"`pytest-cov` and see {doc_url('options#list-values')} for more on adding vs. "
+            "overriding list options."
         )
 
 

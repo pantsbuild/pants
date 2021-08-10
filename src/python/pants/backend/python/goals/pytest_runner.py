@@ -252,6 +252,7 @@ async def setup_pytest_for_target(
 
     coverage_args = []
     if test_subsystem.use_coverage and not request.is_debug:
+        pytest.validate_pytest_cov_included()
         output_files.append(".coverage")
 
         if coverage_subsystem.filter:
