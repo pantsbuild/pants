@@ -870,6 +870,7 @@ async fn sends_headers() {
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
     )
     .unwrap();
 
@@ -888,6 +889,7 @@ async fn sends_headers() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
   let context = Context {
@@ -1068,6 +1070,7 @@ async fn ensure_inline_stdio_is_stored() {
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
     )
     .unwrap();
 
@@ -1083,6 +1086,7 @@ async fn ensure_inline_stdio_is_stored() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -1447,6 +1451,7 @@ async fn execute_missing_file_uploads_if_known() {
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
     )
     .unwrap();
   store
@@ -1469,6 +1474,7 @@ async fn execute_missing_file_uploads_if_known() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -1525,6 +1531,7 @@ async fn execute_missing_file_errors_if_unknown() {
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
     )
     .unwrap();
 
@@ -1540,6 +1547,7 @@ async fn execute_missing_file_errors_if_unknown() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -2215,6 +2223,7 @@ fn create_command_runner(
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
@@ -2268,6 +2277,7 @@ pub(crate) fn make_store(
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
     )
     .unwrap()
 }

@@ -46,6 +46,17 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     # Only care about `python_tests` and their transitive deps, not unused `python_library`s.
     assert_ics("python_library(interpreter_constraints=['==2.7.*'])", [global_constraint])
 
+    # Ignore targets that are skipped.
+    assert_ics(
+        dedent(
+            """\
+            python_tests(name='a', interpreter_constraints=['==2.7.*'])
+            python_tests(name='b', interpreter_constraints=['==3.5.*'], skip_tests=True)
+            """
+        ),
+        ["==2.7.*"],
+    )
+
     # If there are multiple distinct ICs in the repo, we OR them because the lockfile needs to be
     # compatible with every target.
     assert_ics(

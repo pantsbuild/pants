@@ -3,6 +3,8 @@
 
 import unittest
 
+from pants.option.errors import OptionsError
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 
 
@@ -11,11 +13,13 @@ class OptionableTest(unittest.TestCase):
         class NoScope(Optionable):
             pass
 
-        with self.assertRaises(TypeError) as cm:
-            NoScope()  # type: ignore[abstract]
-        assert "with abstract methods options_scope" in str(
-            cm.exception
-        ) or "with abstract method options_scope" in str(cm.exception)
+        with self.assertRaises(OptionsError) as cm:
+            NoScope.get_scope_info()
+        assert "NoScope must set options_scope" in str(cm.exception)
+
+        with self.assertRaises(OptionsError) as cm:
+            NoScope(OptionValueContainer({}))
+        assert "NoScope must set options_scope" in str(cm.exception)
 
         class StringScope(Optionable):
             options_scope = "good"

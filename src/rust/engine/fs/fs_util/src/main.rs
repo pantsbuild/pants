@@ -326,6 +326,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
             value_t!(top_match.value_of("rpc-concurrency-limit"), usize)
               .expect("Bad rpc-concurrency-limit flag"),
+            None,
           ),
           true,
         )

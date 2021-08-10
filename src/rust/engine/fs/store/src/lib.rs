@@ -38,19 +38,6 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams};
 
-use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
-use bytes::Bytes;
-use concrete_time::TimeSpan;
-use fs::{default_cache_path, FileContent, RelativePath};
-use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
-use grpc_util::prost::MessageExt;
-use hashing::Digest;
-use serde_derive::Serialize;
-use sharded_lmdb::DEFAULT_LEASE_TIME;
-use tryfuture::try_future;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -59,13 +46,27 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::remote::ByteStoreError;
+use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
+use bytes::Bytes;
+use concrete_time::TimeSpan;
+use double_checked_cell_async::DoubleCheckedCell;
+use fs::{default_cache_path, FileContent, RelativePath};
+use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
+use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
+use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
-use remexec::Tree;
+use remexec::{ServerCapabilities, Tree};
+use serde_derive::Serialize;
+use sharded_lmdb::DEFAULT_LEASE_TIME;
+use tryfuture::try_future;
 use workunit_store::{get_workunit_store_handle, in_workunit, Level, Metric, WorkunitMetadata};
+
+use crate::remote::ByteStoreError;
 
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
@@ -325,6 +326,7 @@ impl Store {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
@@ -337,6 +339,7 @@ impl Store {
         upload_timeout,
         rpc_retries,
         rpc_concurrency_limit,
+        capabilities_cell_opt,
       )?)),
     })
   }

@@ -250,6 +250,7 @@ async fn main() {
         Duration::from_secs(30),
         args.store_rpc_retries,
         args.store_rpc_concurrency,
+        None,
       )
     }
     (None, None) => Ok(local_only_store),
@@ -298,6 +299,7 @@ async fn main() {
             Duration::from_millis(100),
             args.execution_rpc_concurrency,
             args.cache_rpc_concurrency,
+            None,
           )
           .expect("Failed to make command runner"),
         )
