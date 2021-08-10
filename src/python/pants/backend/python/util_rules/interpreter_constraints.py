@@ -286,7 +286,11 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             lower_bound = _determine_lower_bound(2, 7, valid_py27_patches[0])
             skipped.extend(
                 _determine_skipped(
-                    2, 7, valid_py27_patches, start_late=True, end_early=not valid_py3_patches
+                    2,
+                    7,
+                    valid_py27_patches,
+                    major_minor_is_lower_bound=True,
+                    major_minor_is_upper_bound=not valid_py3_patches,
                 )
             )
             if not valid_py3_patches:
@@ -317,8 +321,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 3,
                 first_py3_version,
                 first_py3_version_patches,
-                start_late=not valid_py27_patches,
-                end_early=only_one_py3_version,
+                major_minor_is_lower_bound=not valid_py27_patches,
+                major_minor_is_upper_bound=only_one_py3_version,
             )
         )
 
@@ -333,14 +337,28 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # This `range()` will do nothing if there are no versions between.
         for py3_minor in range(first_py3_version + 1, last_py3_version):
             if py3_minor in valid_py3_patches:
-                skipped.extend(_determine_skipped(3, py3_minor, valid_py3_patches[py3_minor]))
+                skipped.extend(
+                    _determine_skipped(
+                        3,
+                        py3_minor,
+                        valid_py3_patches[py3_minor],
+                        major_minor_is_lower_bound=False,
+                        major_minor_is_upper_bound=False,
+                    )
+                )
             else:
                 skipped.append(f"3.{py3_minor}.*")
 
         # Finally, set the upper bound to the last Py3 version.
         upper_bound = _determine_upper_bound(3, last_py3_version, last_py3_version_patches[-1])
         skipped.extend(
-            _determine_skipped(3, last_py3_version, last_py3_version_patches, end_early=True)
+            _determine_skipped(
+                3,
+                last_py3_version,
+                last_py3_version_patches,
+                major_minor_is_lower_bound=False,
+                major_minor_is_upper_bound=True,
+            )
         )
 
         return _combine_bounds_and_skipped_into_result()
@@ -407,14 +425,12 @@ def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
 
 
 def _determine_lower_bound(major: int, minor: int, first_valid_patch: int) -> str:
-    """Create a constraint with this major.minor version as the lower bound."""
     return (
         f">={major}.{minor}" if first_valid_patch == 0 else f">={major}.{minor}.{first_valid_patch}"
     )
 
 
 def _determine_upper_bound(major: int, minor: int, last_valid_patch: int) -> str:
-    """Create a constraint with this major.minor version as the upper bound."""
     return (
         f"<{major}.{minor + 1}"
         if last_valid_patch == _EXPECTED_LAST_PATCH_VERSION
@@ -427,20 +443,11 @@ def _determine_skipped(
     minor: int,
     valid_patches: list[int],
     *,
-    start_late: bool = False,
-    end_early: bool = False,
+    major_minor_is_lower_bound: bool,
+    major_minor_is_upper_bound: bool,
 ) -> list[str]:
-    """Determine all major.minor versions to skip for the version.
-
-    :param start_late: if True, start skipping invalid patches after the first valid patch, rather
-        than starting from patch 0. This should be set when the major/minor is the lower_bound for
-        the entire flattened interpreter constraint.
-    :param end_early: if True, skip invalid patches up to the last valid_patch, rather than up to
-        _EXPECTED_LAST_PATCH_VERSION. This should be set when this major/minor is the upper_bound
-        for the entire flattened interpreter constraint.
-    """
-    start = valid_patches[0] if start_late else 0
-    end = valid_patches[-1] if end_early else _EXPECTED_LAST_PATCH_VERSION + 1
+    start = valid_patches[0] if major_minor_is_lower_bound else 0
+    end = valid_patches[-1] if major_minor_is_upper_bound else _EXPECTED_LAST_PATCH_VERSION + 1
     expected = set(range(start, end))
     invalid_patches = expected - set(valid_patches)
     return [f"{major}.{minor}.{p}" for p in invalid_patches]
