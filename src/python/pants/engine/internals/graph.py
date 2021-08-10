@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import itertools
 import logging
 import os.path
+from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type
@@ -27,6 +29,7 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
@@ -80,7 +83,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.docutil import doc_url
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -175,157 +177,124 @@ async def resolve_targets(targets: UnexpandedTargets) -> Targets:
 # -----------------------------------------------------------------------------------------------
 
 
-class CycleException(Exception):
-    def __init__(self, subject: Address, path: Tuple[Address, ...]) -> None:
-        path_string = "\n".join((f"-> {a}" if a == subject else f"   {a}") for a in path)
-        super().__init__(
-            f"The dependency graph contained a cycle:\n{path_string}\n\nTo fix this, first verify "
-            "if your code has an actual import cycle. If it does, you likely need to re-architect "
-            "your code to avoid the cycle.\n\nIf there is no cycle in your code, then you may need "
-            "to use more granular targets. Split up the problematic targets into smaller targets "
-            "with more granular `sources` fields so that you can adjust the `dependencies` fields "
-            "to avoid introducing a cycle.\n\nAlternatively, use Python dependency inference "
-            "(`--python-infer-imports`), rather than explicit `dependencies`. Pants will infer "
-            "dependencies on specific files, rather than entire targets. This extra precision "
-            "means that you will only have cycles if your code actually does have cycles in it."
-        )
-        self.subject = subject
-        self.path = path
+@dataclass(frozen=True)
+class _TransitiveTargetRequest(EngineAwareParameter):
+    address: Address
+    include_special_cased_deps: bool
 
-
-def _detect_cycles(
-    roots: Tuple[Address, ...], dependency_mapping: Dict[Address, Tuple[Address, ...]]
-) -> None:
-    path_stack: OrderedSet[Address] = OrderedSet()
-    visited: Set[Address] = set()
-
-    def maybe_report_cycle(address: Address) -> None:
-        # NB: File-level dependencies are cycle tolerant.
-        if address.is_file_target or address not in path_stack:
-            return
-
-        # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
-        # the path representing the cycle contains a file dep, it is ignored.
-        in_cycle = False
-        for path_address in path_stack:
-            if in_cycle and path_address.is_file_target:
-                # There is a file address inside the cycle: do not report it.
-                return
-            elif in_cycle:
-                # Not a file address.
-                continue
-            else:
-                # We're entering the suffix of the path that contains the cycle if we've reached
-                # the address in question.
-                in_cycle = path_address == address
-        # If we did not break out early, it's because there were no file addresses in the cycle.
-        raise CycleException(address, (*path_stack, address))
-
-    def visit(address: Address):
-        if address in visited:
-            maybe_report_cycle(address)
-            return
-        path_stack.add(address)
-        visited.add(address)
-
-        for dep_address in dependency_mapping[address]:
-            visit(dep_address)
-
-        path_stack.remove(address)
-
-    for root in roots:
-        visit(root)
-        if path_stack:
-            raise AssertionError(
-                f"The stack of visited nodes should have been empty at the end of recursion, "
-                f"but it still contained: {path_stack}"
-            )
+    def debug_hint(self) -> Optional[str]:
+        return str(self.address)
 
 
 @dataclass(frozen=True)
-class _DependencyMappingRequest:
-    tt_request: TransitiveTargetsRequest
-    expanded_targets: bool
+class _TransitiveTarget:
+    """A recursive structure wrapping a Target root and TransitiveTarget deps.
 
+    See `transitive_targets`.
+    """
 
-@dataclass(frozen=True)
-class _DependencyMapping:
-    mapping: FrozenDict[Address, Tuple[Address, ...]]
-    visited: FrozenOrderedSet[Target]
-    roots_as_targets: Collection[Target]
+    root: Target
+    build_dependencies: Tuple["_TransitiveTarget", ...]
+    file_dependencies: Tuple[Address, ...]
 
 
 @rule
-async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _DependencyMapping:
-    """This uses iteration, rather than recursion, so that we can tolerate dependency cycles.
+async def transitive_target(request: _TransitiveTargetRequest) -> _TransitiveTarget:
+    wrapped_root = await Get(WrappedTarget, Address, request.address)
+    root = wrapped_root.target
+    if not root.has_field(Dependencies):
+        return _TransitiveTarget(root, (), ())
 
-    Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
-    improved performance / concurrency.
-    """
-    roots_as_targets: Collection[Target]
-    if request.expanded_targets:
-        roots_as_targets = await Get(Targets, Addresses(request.tt_request.roots))
-    else:
-        roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
-    visited: OrderedSet[Target] = OrderedSet()
-    queued = FrozenOrderedSet(roots_as_targets)
-    dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
-    while queued:
-        direct_dependencies: Tuple[Collection[Target], ...]
-        if request.expanded_targets:
-            direct_dependencies = await MultiGet(
-                Get(
-                    Targets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
-                    ),
-                )
-                for tgt in queued
-            )
-        else:
-            direct_dependencies = await MultiGet(
-                Get(
-                    UnexpandedTargets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
-                    ),
-                )
-                for tgt in queued
-            )
-
-        dependency_mapping.update(
-            zip(
-                (t.address for t in queued),
-                (tuple(t.address for t in deps) for deps in direct_dependencies),
-            )
-        )
-
-        queued = FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(
-            visited
-        )
-        visited.update(queued)
-
-    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
-    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
-    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
-    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
-    return _DependencyMapping(
-        FrozenDict(dependency_mapping), FrozenOrderedSet(visited), roots_as_targets
+    dependency_targets = await Get(
+        UnexpandedTargets,
+        DependenciesRequest(
+            root.get(Dependencies),
+            include_special_cased_deps=request.include_special_cased_deps,
+        ),
     )
+    build_addresses = []
+    file_addresses = []
+    for target in dependency_targets:
+        if target.address.is_file_target:
+            file_addresses.append(target.address)
+        else:
+            build_addresses.append(target.address)
+    build_dependencies = await MultiGet(
+        Get(_TransitiveTarget, _TransitiveTargetRequest, dataclasses.replace(request, address=a))
+        for a in build_addresses
+    )
+    return _TransitiveTarget(root, build_dependencies, tuple(file_addresses))
 
 
 @rule(desc="Resolve transitive targets")
 async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
-    """Find all the targets transitively depended upon by the target roots."""
+    """Find all the targets transitively depended upon by the target roots.
 
-    dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    This uses a hybrid of structure-shared recursive memoization for BUILD Addresses (which do not
+    allow cycles), and iteration for file Addresses (which do allow cycles).
+
+    The TransitiveTarget dataclass represents a structure-shared graph of BUILD (not file)
+    dependencies, which we walk and flatten here. The engine memoizes the computation of
+    TransitiveTarget, so when multiple TransitiveTargets objects are being constructed for multiple
+    roots, their structure will be shared.
+
+    The TransitiveTarget class is consumed by a batch/MultiGet iteration that expands file-
+    Addresses, so that those dependencies can tolerate cycles.
+    """
+
+    # We immediately flatten the structure-shared BUILD dependencies as they are encountered, and
+    # batch expand the file-level dependencies.
+    queued = OrderedSet(request.roots)
+    visited: OrderedSet[Address] = OrderedSet()
+    visited_targets: OrderedSet[Target] = OrderedSet()
+
+    def visit(tts: Iterable[_TransitiveTarget]) -> OrderedSet[Address]:
+        file_dependencies: OrderedSet[Address] = OrderedSet()
+        to_flatten = deque(tts)
+        while to_flatten:
+            tt = to_flatten.popleft()
+            if tt.root.address in visited:
+                continue
+            visited.add(tt.root.address)
+            visited_targets.add(tt.root)
+            to_flatten.extend(tt.build_dependencies)
+            file_dependencies.update(a for a in tt.file_dependencies if a not in visited)
+
+        return file_dependencies
+
+    # NB: We visit the roots independently first in order to separate them from their dependencies
+    # in the returned TransitiveTargets instance.
+    roots = await MultiGet(
+        Get(
+            _TransitiveTarget,
+            _TransitiveTargetRequest(
+                address=address, include_special_cased_deps=request.include_special_cased_deps
+            ),
+        )
+        for address in queued
+    )
+    roots_as_targets = tuple(tt.root for tt in roots)
+    queued = visit(d for tt in roots for d in tt.build_dependencies)
+    queued.update(a for tt in roots for a in tt.file_dependencies)
+
+    while queued:
+        queued = visit(
+            await MultiGet(
+                Get(
+                    _TransitiveTarget,
+                    _TransitiveTargetRequest(
+                        address=address,
+                        include_special_cased_deps=request.include_special_cased_deps,
+                    ),
+                )
+                for address in queued
+            )
+        )
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
+    for t in (*roots_as_targets, *visited_targets):
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
@@ -339,8 +308,8 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
         )
 
     return TransitiveTargets(
-        tuple(dependency_mapping.roots_as_targets),
-        FrozenOrderedSet(dependency_mapping.visited.difference(transitive_excludes)),
+        tuple(roots_as_targets),
+        FrozenOrderedSet(visited_targets.difference(transitive_excludes)),
     )
 
 
@@ -351,25 +320,52 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 
 @rule
 async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
-    dependency_mapping = await Get(
-        _DependencyMapping,
-        _DependencyMappingRequest(
-            # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
-            # requires a transitive graph walk (to ensure that all cycles are actually detected),
-            # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
-            # involved in a cycle with one of the input Addresses is discarded in the output.
-            TransitiveTargetsRequest(addresses, include_special_cased_deps=True),
-            expanded_targets=False,
-        ),
-    )
-    components = native_engine.strongly_connected_components(
-        list(dependency_mapping.mapping.items())
-    )
+    # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
+    # requires a transitive graph walk (to ensure that all cycles are actually detected),
+    # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
+    # involved in a cycle with one of the input Addresses is discarded in the output.
+    include_special_cased_deps = True
+
+    # We immediately flatten the structure-shared BUILD dependencies as they are encountered, and
+    # batch expand the file-level dependencies.
+    mapping: Dict[Address, Tuple[Address, ...]] = {}
+    addresses_to_targets: Dict[Address, Target] = {}
+
+    def visit(tts: Iterable[_TransitiveTarget]) -> OrderedSet[Address]:
+        file_dependencies: OrderedSet[Address] = OrderedSet()
+        to_flatten = deque(tts)
+        while to_flatten:
+            tt = to_flatten.popleft()
+            if tt.root.address in mapping:
+                continue
+            mapping[tt.root.address] = tuple(
+                [*(t.root.address for t in tt.build_dependencies), *tt.file_dependencies]
+            )
+            addresses_to_targets[tt.root.address] = tt.root
+
+            to_flatten.extend(tt.build_dependencies)
+            file_dependencies.update(a for a in tt.file_dependencies if a not in mapping)
+
+        return file_dependencies
+
+    queued = OrderedSet(addresses)
+    while queued:
+        queued = visit(
+            await MultiGet(
+                Get(
+                    _TransitiveTarget,
+                    _TransitiveTargetRequest(
+                        address=address,
+                        include_special_cased_deps=include_special_cased_deps,
+                    ),
+                )
+                for address in queued
+            )
+        )
+
+    components = native_engine.strongly_connected_components(list(mapping.items()))
 
     addresses_set = set(addresses)
-    addresses_to_targets = {
-        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
-    }
     targets = []
     for component in components:
         if not any(component_address in addresses_set for component_address in component):
@@ -377,7 +373,7 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
         component_set = set(component)
         members = tuple(addresses_to_targets[a] for a in component)
         dependencies = FrozenOrderedSet(
-            [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
+            [d for a in component for d in mapping[a] if d not in component_set]
         )
         targets.append(CoarsenedTarget(members, dependencies))
     return CoarsenedTargets(targets)

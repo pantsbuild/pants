@@ -3,6 +3,7 @@
 
 import itertools
 import os.path
+import re
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
@@ -32,7 +33,6 @@ from pants.engine.fs import (
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
-    CycleException,
     NoApplicableTargetsException,
     Owners,
     OwnersRequest,
@@ -300,11 +300,11 @@ def test_transitive_targets_tolerates_subtarget_cycles(
         [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
-    assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
+    assert result.roots[0].address == Address("", target_name="t2")
     assert [tgt.address for tgt in result.dependencies] == [
         Address("", relative_file_path="t1.txt", target_name="t1"),
-        Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
 
@@ -396,9 +396,16 @@ def assert_failed_cycle(
             [TransitiveTargetsRequest([Address("", target_name=root_target_name)])],
         )
     (cycle_exception,) = e.value.wrapped_exceptions
-    assert isinstance(cycle_exception, CycleException)
-    assert cycle_exception.subject == Address("", target_name=subject_target_name)
-    assert cycle_exception.path == tuple(Address("", target_name=p) for p in path_target_names)
+
+    address_pats = []
+    for target_name in path_target_names:
+        address = Address("", target_name=target_name)
+        address_pats.append(
+            f"{address}.* <-" if target_name == subject_target_name else f"{address}"
+        )
+
+    path_regex = ".*\n.*".join(address_pats)
+    assert re.search(path_regex, str(cycle_exception))
 
 
 def test_dep_cycle_self(transitive_targets_rule_runner: RuleRunner) -> None:
@@ -437,8 +444,8 @@ def test_dep_cycle_direct(transitive_targets_rule_runner: RuleRunner) -> None:
     assert_failed_cycle(
         transitive_targets_rule_runner,
         root_target_name="t2",
-        subject_target_name="t2",
-        path_target_names=("t2", "t1", "t2"),
+        subject_target_name="t1",
+        path_target_names=("t1", "t2", "t1"),
     )
 
 
@@ -457,7 +464,7 @@ def test_dep_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
         transitive_targets_rule_runner,
         root_target_name="t1",
         subject_target_name="t2",
-        path_target_names=("t1", "t2", "t3", "t2"),
+        path_target_names=("t2", "t3", "t2"),
     )
     assert_failed_cycle(
         transitive_targets_rule_runner,
