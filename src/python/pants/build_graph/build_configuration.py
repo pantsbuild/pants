@@ -17,8 +17,8 @@ from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
-from pants.option.optionable import Optionable
 from pants.option.scope import normalize_scope
+from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.vcs.changed import Changed
 
@@ -31,7 +31,7 @@ _RESERVED_NAMES = {"global", "targets", "goals"}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet({GlobalOptions, Changed})
+_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Subsystem]] = FrozenOrderedSet({GlobalOptions, Changed})
 
 
 @dataclass(frozen=True)
@@ -39,16 +39,16 @@ class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 
     registered_aliases: BuildFileAliases
-    optionables: FrozenOrderedSet[Type[Optionable]]
+    subsystems: FrozenOrderedSet[Type[Subsystem]]
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
     allow_unknown_options: bool
 
     @property
-    def all_optionables(self) -> FrozenOrderedSet[Type[Optionable]]:
-        """Return all optionables in the system: global and those registered via rule usage."""
-        return _GLOBAL_SUBSYSTEMS | self.optionables
+    def all_subsystems(self) -> FrozenOrderedSet[Type[Subsystem]]:
+        """Return all subsystems in the system: global and those registered via rule usage."""
+        return _GLOBAL_SUBSYSTEMS | self.subsystems
 
     def __post_init__(self) -> None:
         class Category(Enum):
@@ -60,7 +60,7 @@ class BuildConfiguration:
         name_to_categories: DefaultDict[str, Set[Category]] = defaultdict(set)
         normalized_to_orig_name: Dict[str, str] = {}
 
-        for opt in self.all_optionables:
+        for opt in self.all_subsystems:
             scope = opt.options_scope
             normalized_scope = normalize_scope(scope)
             name_to_categories[normalized_scope].add(
@@ -90,7 +90,7 @@ class BuildConfiguration:
     class Builder:
         _exposed_object_by_alias: Dict[Any, Any] = field(default_factory=dict)
         _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
-        _optionables: OrderedSet = field(default_factory=OrderedSet)
+        _subsystems: OrderedSet = field(default_factory=OrderedSet)
         _rules: OrderedSet = field(default_factory=OrderedSet)
         _union_rules: OrderedSet = field(default_factory=OrderedSet)
         _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
@@ -139,7 +139,7 @@ class BuildConfiguration:
             self._exposed_object_by_alias[alias] = obj
             # obj doesn't implement any common base class, so we have to test for this attr.
             if hasattr(obj, "subsystems"):
-                self.register_optionables(obj.subsystems())
+                self.register_subsystems(obj.subsystems())
 
         def _register_exposed_context_aware_object_factory(
             self, alias, context_aware_object_factory
@@ -154,28 +154,30 @@ class BuildConfiguration:
                 alias
             ] = context_aware_object_factory
 
-        # NB: We expect the parameter to be Iterable[Type[Optionable]], but we can't be confident
+        # NB: We expect the parameter to be Iterable[Type[Subsystem]], but we can't be confident
         # in this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_optionables(self, optionables: typing.Iterable[Type[Optionable]] | Any):
+        # TODO: Is this still true? Do we still support a hook for registering subsystems,
+        #  instead of just having them be discovered as rule params?
+        def register_subsystems(self, subsystems: typing.Iterable[Type[Subsystem]] | Any):
             """Registers the given subsystem types."""
-            if not isinstance(optionables, Iterable):
-                raise TypeError("The optionables must be an iterable, given {}".format(optionables))
-            optionables = tuple(optionables)
-            if not optionables:
+            if not isinstance(subsystems, Iterable):
+                raise TypeError("The subsystems must be an iterable, given {}".format(subsystems))
+            subsystems = tuple(subsystems)
+            if not subsystems:
                 return
 
-            invalid_optionables = [
-                s for s in optionables if not isinstance(s, type) or not issubclass(s, Optionable)
+            invalid_subsystems = [
+                s for s in subsystems if not isinstance(s, type) or not issubclass(s, Subsystem)
             ]
-            if invalid_optionables:
+            if invalid_subsystems:
                 raise TypeError(
-                    "The following items from the given optionables are not Optionable "
-                    "subclasses:\n\t{}".format("\n\t".join(str(i) for i in invalid_optionables))
+                    "The following items from the given subsystems are not Subsystems "
+                    "subclasses:\n\t{}".format("\n\t".join(str(i) for i in invalid_subsystems))
                 )
 
-            self._optionables.update(optionables)
+            self._subsystems.update(subsystems)
 
         def register_rules(self, rules):
             """Registers the given rules.
@@ -192,8 +194,8 @@ class BuildConfiguration:
             self._rules.update(rule_index.rules)
             self._rules.update(rule_index.queries)
             self._union_rules.update(rule_index.union_rules)
-            self.register_optionables(
-                rule.output_type for rule in self._rules if issubclass(rule.output_type, Optionable)
+            self.register_subsystems(
+                rule.output_type for rule in self._rules if issubclass(rule.output_type, Subsystem)
             )
 
         # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in
@@ -234,7 +236,7 @@ class BuildConfiguration:
             )
             return BuildConfiguration(
                 registered_aliases=registered_aliases,
-                optionables=FrozenOrderedSet(self._optionables),
+                subsystems=FrozenOrderedSet(self._subsystems),
                 rules=FrozenOrderedSet(self._rules),
                 union_rules=FrozenOrderedSet(self._union_rules),
                 target_types=FrozenOrderedSet(self._target_types),

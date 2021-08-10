@@ -88,7 +88,7 @@ class Options:
             original_scopes[si.scope] = si
             ret.add(si)
             if si.deprecated_scope:
-                ret.add(ScopeInfo(si.deprecated_scope, si.optionable_cls))
+                ret.add(ScopeInfo(si.deprecated_scope, si.subsystem_cls))
                 original_scopes[si.deprecated_scope] = si
         return FrozenOrderedSet(ret)
 
@@ -253,18 +253,18 @@ class Options:
         if deprecated_scope:
             self.get_parser(deprecated_scope).register(*args, **kwargs)
 
-    def registration_function_for_optionable(self, optionable_class):
+    def registration_function_for_subsystem(self, subsystem_cls):
         """Returns a function for registering options on the given scope."""
 
         # TODO(benjy): Make this an instance of a class that implements __call__, so we can
         # docstring it, and so it's less weird than attaching properties to a function.
         def register(*args, **kwargs):
-            self.register(optionable_class.options_scope, *args, **kwargs)
+            self.register(subsystem_cls.options_scope, *args, **kwargs)
 
         # Clients can access the bootstrap option values as register.bootstrap.
         register.bootstrap = self.bootstrap_option_values()
         # Clients can access the scope as register.scope.
-        register.scope = optionable_class.options_scope
+        register.scope = subsystem_cls.options_scope
         return register
 
     def get_parser(self, scope: str) -> Parser:
@@ -299,8 +299,8 @@ class Options:
                 )
 
         # Check if we're the new name of a deprecated scope, and clone values from that scope.
-        # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
-        # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
+        # Note that deprecated_scope and scope share the same Subsystem class, so deprecated_scope's
+        # Subsystem has a deprecated_options_scope equal to deprecated_scope. Therefore we must
         # check that scope != deprecated_scope to prevent infinite recursion.
         deprecated_scope = si.deprecated_scope
         if deprecated_scope is not None and scope != deprecated_scope:
