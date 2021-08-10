@@ -595,9 +595,6 @@ ansicolors==1.1.8
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected,
         ),
-        interpreter_constraints=InterpreterConstraints(
-            ["CPython>=3.9"]  # TODO: Remove before merging. Needed so chrisjrn can develop on ARM
-        ),
         additional_pants_args=(
             "--python-setup-experimental-lockfile=lockfile.txt",
             f"--python-setup-invalid-lockfile-behavior={behavior}",
