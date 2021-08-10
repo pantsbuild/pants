@@ -714,7 +714,7 @@ async fn main() {
           .default_value("128")
     ).arg(
     Arg::with_name("batch-api-size-limit")
-        .help("Total size of blobs allowed to be sent in a single batch API call")
+        .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
         .takes_value(true)
         .long("batch-api-size-limit")
         .required(false)

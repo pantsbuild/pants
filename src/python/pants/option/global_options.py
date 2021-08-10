@@ -1210,7 +1210,7 @@ class GlobalOptions(Subsystem):
             type=int,
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
-            help="The total size of blobs allowed to be sent in a single batch API call to the remote store.",
+            help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
         )
 
         register(
