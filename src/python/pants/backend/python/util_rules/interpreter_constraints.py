@@ -414,7 +414,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 "interpreter versions from `[python-setup].interpreter_versions_universe`.\n\n"
                 "Please either change these interpreter constraints or update the "
                 "`interpreter_versions_universe` to include the interpreters set in these "
-                "constraints. Run `./pants help-advanced pytest` for more information on the "
+                "constraints. Run `./pants help-advanced python-setup` for more information on the "
                 "`interpreter_versions_universe` option."
             )
 
