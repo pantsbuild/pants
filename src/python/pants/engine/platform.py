@@ -41,6 +41,10 @@ class Platform(Enum):
         Platform.deprecated_due_to_no_architecture()
         return Platform.macos_x86_64
 
+    @property
+    def is_macos(self) -> bool:
+        return self in [Platform.macos_arm64, Platform.macos_x86_64]
+
     def matches(self, value):
         """Returns true if the provided value is the value for this platform, or if the provided
         value is the value for the deprecated platform symbol from before we qualified based on
