@@ -37,7 +37,7 @@ async def find_open_program(
     plat: Platform,
     complete_env: CompleteEnvironment,
 ) -> OpenFiles:
-    open_program_name = "open" if plat == Platform.darwin else "xdg-open"
+    open_program_name = "open" if plat.is_macos else "xdg-open"
     open_program_paths = await Get(
         BinaryPaths,
         BinaryPathRequest(binary_name=open_program_name, search_path=("/bin", "/usr/bin")),
@@ -52,7 +52,7 @@ async def find_open_program(
         logger.error(error)
         return OpenFiles(())
 
-    if plat == Platform.darwin:
+    if plat.is_macos:
         processes = [
             InteractiveProcess(
                 argv=(open_program_paths.first_path.path, *(str(f) for f in request.files)),
