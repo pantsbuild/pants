@@ -222,11 +222,11 @@ class ArgSplitterTest(unittest.TestCase):
 
     def test_passthru_args(self) -> None:
         self.assert_valid_split(
-            "./pants test foo/bar -- -t arg",
+            "./pants test foo/bar -- -t 'this is the arg'",
             expected_goals=["test"],
             expected_scope_to_flags={"": [], "test": []},
             expected_specs=["foo/bar"],
-            expected_passthru=["-t", "arg"],
+            expected_passthru=["-t", "this is the arg"],
         )
         self.assert_valid_split(
             "./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii "

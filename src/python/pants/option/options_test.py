@@ -1144,20 +1144,31 @@ class OptionsTest(unittest.TestCase):
         # Test that passthrough args are not interpreted.
         options = Options.create(
             env={},
-            config=self._create_config(),
+            config=self._create_config(
+                {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
+            ),
             known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
-            args=["./pants", "--consumer-shlexed=a", "--consumer-string=b", "test", "--", "[bar]"],
+            args=[
+                "./pants",
+                "--consumer-shlexed=a",
+                "--consumer-string=b",
+                "test",
+                "--",
+                "[bar]",
+                "multi token from passthrough",
+            ],
         )
         options.register(
             "consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str
         )
         options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
+
         self.assertEqual(
-            ["a", "[bar]"],
+            ["from", "config", "a", "[bar]", "multi token from passthrough"],
             options.for_scope("consumer").shlexed,
         )
         self.assertEqual(
-            ["b", "[bar]"],
+            ["from config", "b", "[bar]", "multi token from passthrough"],
             options.for_scope("consumer").string,
         )
 
