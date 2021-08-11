@@ -328,7 +328,7 @@ class PythonSetup(Subsystem):
         :param bool asdf_local: If True, only use the interpreter specified by
                                 '.tool-versions' file under `build_root`.
         """
-        asdf_dir = get_asdf_dir(env)
+        asdf_dir = get_asdf_data_dir(env)
         if not asdf_dir:
             return []
 
@@ -487,14 +487,29 @@ class PythonSetup(Subsystem):
         return paths
 
 
-def get_asdf_dir(env: Environment) -> PurePath | None:
-    """See https://asdf-vm.com/#/core-configuration?id=environment-variables."""
-    asdf_dir = env.get("ASDF_DIR", env.get("ASDF_DATA_DIR"))
-    if not asdf_dir:
+def get_asdf_data_dir(env: Environment) -> PurePath | None:
+    """Returns the location of asdf's installed tool versions.
+
+    See https://asdf-vm.com/manage/configuration.html#environment-variables.
+
+    `ASDF_DATA_DIR` is an environment variable that can be set to override the directory
+    in which the plugins, installs, and shims are installed.
+
+    `ASDF_DIR` is another environment variable that can be set, but we ignore it since
+    that location only specifies where the asdf tool itself is installed, not the managed versions.
+
+    Per the documentation, if `ASDF_DATA_DIR` is not specified, the tool will fall back to
+    `$HOME/.asdf`, so we do that as well.
+
+    :param env: The environment to use to look up asdf.
+    :return: Path to the data directory, or None if it couldn't be found in the environment.
+    """
+    asdf_data_dir = env.get("ASDF_DATA_DIR")
+    if not asdf_data_dir:
         home = env.get("HOME")
         if home:
             return PurePath(home) / ".asdf"
-    return PurePath(asdf_dir) if asdf_dir else None
+    return PurePath(asdf_data_dir) if asdf_data_dir else None
 
 
 def get_pyenv_root(env: Environment) -> str | None:
