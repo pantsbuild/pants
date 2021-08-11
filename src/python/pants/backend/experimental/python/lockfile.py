@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-from textwrap import dedent
 from dataclasses import dataclass
 
 from pants.backend.experimental.python.lockfile_metadata import (
@@ -18,6 +17,7 @@ from pants.backend.python.subsystems.python_tool_base import (
 from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.poetry_conversions import create_pyproject_toml
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
@@ -110,19 +110,8 @@ class PythonLockfileRequest:
 async def generate_lockfile(
     req: PythonLockfileRequest, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
 ) -> PythonLockfile:
-    # TODO: code to generate a pyproject.toml
-    pyproject_toml = dedent(
-        """\
-        [tool.poetry]
-        name = "pants-lockfile-generation"
-        version = "0.1.0"
-        description = ""
-        authors = ["pantsbuild"]
-
-        [tool.poetry.dependencies]
-        python = ">=3.6,<3.10"
-        flake8 = "*"
-        """
+    pyproject_toml = create_pyproject_toml(
+        req.requirements, req.interpreter_constraints, python_setup.interpreter_universe
     )
     input_requirements = await Get(
         Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml.encode())])
@@ -158,11 +147,9 @@ async def generate_lockfile(
             argv=("export", "-o", req.dest),
             input_digest=poetry_lock_result.output_digest,
             output_files=(req.dest,),
-            description=(
-                f"Exporting Poetry lockfile to requirements.txt format for {req.dest}"
-            ),
+            description=(f"Exporting Poetry lockfile to requirements.txt format for {req.dest}"),
             level=LogLevel.DEBUG,
-        )
+        ),
     )
 
     lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
@@ -171,9 +158,7 @@ async def generate_lockfile(
         req.hex_digest,
         lockfile_digest_contents[0].content,
     )
-    final_lockfile = await Get(
-        Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)])
-    )
+    final_lockfile = await Get(Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)]))
 
     return PythonLockfile(final_lockfile, req.dest)
 

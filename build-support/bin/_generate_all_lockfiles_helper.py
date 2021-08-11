@@ -38,11 +38,6 @@ def validate_python_installed(binary: str) -> None:
 
 
 def main() -> None:
-    # TODO(#12314): Pants should automatically validate that the necessary Python interpreters
-    #  are used. This is a temporary measure.
-    for v in ("3.6", "3.7", "3.8", "3.9"):
-        validate_python_installed(f"python{v}")
-
     # First, generate what we internally use.
     logger.info("First, generating lockfiles for internal usage")
     subprocess.run(
@@ -137,11 +132,6 @@ def main() -> None:
             "tool-lock",
         ],
         check=True,
-    )
-
-    logger.warning(
-        "Please fix Black, Pytest, Flake8, and iPython to use environment markers like it was "
-        "before. (This will be automated.)"
     )
 
 
