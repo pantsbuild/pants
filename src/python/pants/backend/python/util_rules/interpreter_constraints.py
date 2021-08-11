@@ -278,9 +278,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             result = f"{lower_bound},{upper_bound}"
             if skipped:
                 result += "," + ",".join(f"!={v}" for v in skipped)
-            return Requirement.parse(  # type:ignore[no-any-return]
+            return Requirement.parse(  # type:ignore[no-any-return,attr-defined]
                 f"doesnt-matter{result}"
-            ).specifier  # type: ignore[attr-defined]
+            ).specifier
 
         if valid_py27_patches:
             lower_bound = _determine_lower_bound(2, 7, valid_py27_patches[0])
