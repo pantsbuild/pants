@@ -67,7 +67,9 @@ def main() -> None:
             # Bandit.
             "--backend-packages=+['pants.backend.python.lint.bandit']",
             f"--bandit-version={Bandit.default_version}",
-            f"--bandit-extra-requirements={repr(Bandit.default_extra_requirements)}",
+            # TODO(#12314): restore this once Poetry parsing can handle multiple deps for the same
+            #  project.
+            f"--bandit-extra-requirements={repr(['setuptools', 'stevedore<3'])}",
             f"--bandit-experimental-lockfile={Bandit.default_lockfile_path}",
             # Black.
             f"--black-version={Black.default_version}",
@@ -81,7 +83,9 @@ def main() -> None:
             f"--docformatter-experimental-lockfile={Docformatter.default_lockfile_path}",
             # Flake8.
             f"--flake8-version={Flake8.default_version}",
-            f"--flake8-extra-requirements={repr(Flake8.default_extra_requirements)}",
+            # TODO(#12314): restore this once Poetry parsing can handle multiple deps for the same
+            #  project.
+            f"--flake8-extra-requirements={repr(['setuptools'])}",
             f"--flake8-experimental-lockfile={Flake8.default_lockfile_path}",
             # Isort.
             f"--isort-version={Isort.default_version}",
@@ -107,12 +111,12 @@ def main() -> None:
             f"--setuptools-version={Setuptools.default_version}",
             f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
             f"--setuptools-experimental-lockfile={Setuptools.default_lockfile_path}",
-            # Python Protobuf MyPy plugin.
+            # MyPy Protobuf.
             "--backend-packages=+['pants.backend.codegen.protobuf.python']",
-            f"--python-protobuf-mypy-plugin-version={PythonProtobufMypyPlugin.default_version}",
-            f"--python-protobuf-mypy-plugin-extra-requirements={repr(PythonProtobufMypyPlugin.default_extra_requirements)}",
-            f"--python-protobuf-mypy-plugin-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
-            f"--python-protobuf-mypy-plugin-experimental-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
+            f"--mypy-protobuf-version={PythonProtobufMypyPlugin.default_version}",
+            f"--mypy-protobuf-extra-requirements={repr(PythonProtobufMypyPlugin.default_extra_requirements)}",
+            f"--mypy-protobuf-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
+            f"--mypy-protobuf-experimental-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
             # Lambdex.
             "--backend-packages=+['pants.backend.awslambda.python']",
             f"--lambdex-version={Lambdex.default_version}",

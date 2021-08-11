@@ -34,7 +34,7 @@ class Black(PythonToolBase):
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6.2"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")

@@ -87,7 +87,9 @@ experimental_lockfile = "<default>"
 
 [flake8]
 config = "build-support/flake8/.flake8"
-extra_requirements.add = [
+# TODO(#12314): Go back to using `.add` once Poetry parsing can handle multiple values for same
+# 3rdparty dep.
+extra_requirements = [
   "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0"
 ]
