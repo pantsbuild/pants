@@ -6,6 +6,7 @@ from __future__ import annotations
 import inspect
 import os
 import re
+import shlex
 from enum import Enum
 from typing import Dict, Iterable, List, Pattern, Sequence
 
@@ -121,6 +122,14 @@ def _convert_list(val, member_type, is_enum):
     return [item if isinstance(item, member_type) else member_type(item) for item in converted]
 
 
+def _flatten_shlexed_list(shlexed_args: Sequence[str]) -> List[str]:
+    """Convert a list of shlexed args into a flattened list of individual args.
+
+    For example, ['arg1 arg2=foo', '--arg3'] would be converted to ['arg1', 'arg2=foo', '--arg3'].
+    """
+    return [arg for shlexed_arg in shlexed_args for arg in shlex.split(shlexed_arg)]
+
+
 class ListValueComponent:
     """A component of the value of a list-typed option.
 
@@ -208,6 +217,9 @@ class ListValueComponent:
                       indicating modification instead of replacement), or any allowed member_type.
                       May also be a comma-separated sequence of modifications.
         """
+        if isinstance(value, cls):  # Ensure idempotency.
+            return value
+
         if isinstance(value, bytes):
             value = value.decode()
 
@@ -220,11 +232,7 @@ class ListValueComponent:
         appends: Sequence[str] = []
         filters: Sequence[str] = []
         is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
-        if isinstance(value, cls):  # Ensure idempotency.
-            action = value._action
-            appends = value._appends
-            filters = value._filters
-        elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
+        if isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
             action = cls.REPLACE
             appends = value
         elif value.startswith("[") or value.startswith("("):
@@ -240,6 +248,11 @@ class ListValueComponent:
             appends = [value]
         else:
             appends = _convert(f"[{value}]", list)
+
+        if member_type == shell_str:
+            appends = _flatten_shlexed_list(appends)
+            filters = _flatten_shlexed_list(filters)
+
         return cls(action, list(appends), list(filters))
 
     def __repr__(self) -> str:
