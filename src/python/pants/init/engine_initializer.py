@@ -177,6 +177,7 @@ class EngineInitializer:
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
+        engine_visualize_to = GlobalOptions.compute_engine_visualize_to(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
@@ -189,7 +190,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             include_trace_on_error=bootstrap_options.print_stacktrace,
-            native_engine_visualize_to=bootstrap_options.native_engine_visualize_to,
+            engine_visualize_to=engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
         )
 
@@ -207,7 +208,7 @@ class EngineInitializer:
         ca_certs_path: Optional[str] = None,
         build_root: Optional[str] = None,
         include_trace_on_error: bool = True,
-        native_engine_visualize_to: Optional[str] = None,
+        engine_visualize_to: Optional[str] = None,
         watch_filesystem: bool = True,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
@@ -294,7 +295,7 @@ class EngineInitializer:
             execution_options=execution_options,
             local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
-            visualize_to_dir=native_engine_visualize_to,
+            visualize_to_dir=engine_visualize_to,
             watch_filesystem=watch_filesystem,
         )
 

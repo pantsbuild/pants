@@ -23,6 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
@@ -636,8 +637,11 @@ class GlobalOptions(Subsystem):
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
+            deprecation_start_version="2.8.0.dev0",
+            removal_version="2.9.0.dev0",
+            removal_hint="Unused: this option has no necessary equivalent in v2.",
             default=os.path.join(buildroot, "build-support"),
-            help="Unused. Will be deprecated in 2.2.0.",
+            help="Used only for templating in `pants.toml`.",
         )
         register(
             "--pants-distdir",
@@ -843,8 +847,22 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=None,
             type=dir_option,
-            help="A directory to write execution and rule graphs to as `dot` files. The contents "
-            "of the directory will be overwritten if any filenames collide.",
+            removal_version="2.8.0.dev0",
+            removal_hint="Use `--engine-visualize-to` instead.",
+            help=(
+                "A directory to write execution and rule graphs to as `dot` files. The contents "
+                "of the directory will be overwritten if any filenames collide."
+            ),
+        )
+        register(
+            "--engine-visualize-to",
+            advanced=True,
+            default=None,
+            type=dir_option,
+            help=(
+                "A directory to write execution and rule graphs to as `dot` files. The contents "
+                "of the directory will be overwritten if any filenames collide."
+            ),
         )
 
         # Pants Daemon options.
@@ -1387,7 +1405,7 @@ class GlobalOptions(Subsystem):
         register(
             loop_flag,
             type=bool,
-            help="Run goals continuously as file changes are detected. Alpha feature.",
+            help="Run goals continuously as file changes are detected.",
         )
         register(
             "--loop-max",
@@ -1522,6 +1540,18 @@ class GlobalOptions(Subsystem):
         return PyExecutorPyO3(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
+
+    @staticmethod
+    def compute_engine_visualize_to(bootstrap_options: OptionValueContainer) -> str | None:
+        result = resolve_conflicting_options(
+            old_option="native_engine_visualize_to",
+            new_option="native_engine_visualize_to",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
+        return cast("str | None", result)
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):

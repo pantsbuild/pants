@@ -21,6 +21,7 @@ import toml
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -326,8 +327,10 @@ class _ConfigValues:
         def recursively_format_str(value: str) -> str:
             # It's possible to interpolate with a value that itself has an interpolation. We must
             # fully evaluate all expressions for parity with configparser.
-            if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
+            match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
+            if not match:
                 return value
+            self._maybe_deprecated_default(match.group(1))
             return recursively_format_str(value=format_str(value))
 
         return recursively_format_str(raw_value)
@@ -404,13 +407,16 @@ class _ConfigValues:
 
     def has_option(self, section: str, option: str) -> bool:
         try:
-            self.get_value(section, option)
+            self._get_value(section, option, allow_default=False)
         except (configparser.NoSectionError, configparser.NoOptionError):
             return False
         else:
             return True
 
     def get_value(self, section: str, option: str) -> str | None:
+        return self._get_value(section, option)
+
+    def _get_value(self, section: str, option: str, *, allow_default: bool = True) -> str | None:
         section_values = self._find_section_values(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
@@ -421,8 +427,9 @@ class _ConfigValues:
             section_values=section_values,
         )
         if option not in section_values:
-            if option not in self.defaults:
+            if not allow_default or option not in self.defaults:
                 raise configparser.NoOptionError(option, section)
+            self._maybe_deprecated_default(option)
             return stringify(raw_value=self.defaults[option])
         option_value = section_values[option]
         # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
@@ -455,6 +462,16 @@ class _ConfigValues:
             if default_option not in result
         )
         return result
+
+    def _maybe_deprecated_default(self, option: str) -> None:
+        matched = option == "pants_supportdir"
+        value = self.defaults[option] if matched else None
+        deprecated_conditional(
+            lambda: matched,
+            "2.8.0.dev0",
+            "The `pants_supportdir` default value in `pants.toml`",
+            hint=f"Replace use of the variable with the literal: {repr(value)}.",
+        )
 
     @property
     def defaults(self) -> Mapping[str, str]:
