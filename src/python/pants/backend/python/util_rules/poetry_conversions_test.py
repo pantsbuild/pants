@@ -19,7 +19,7 @@ from pants.backend.python.util_rules.poetry_conversions import PoetryDependency
         ("dep", PoetryDependency("dep", version=None)),
         # Extras.
         ("dep[extra1]", PoetryDependency("dep", version=None, extras=("extra1",))),
-        ("dep[extra1,extra2]", PoetryDependency("dep", version=None, extras=("extra2", "extra1"))),
+        ("dep[extra1,extra2]", PoetryDependency("dep", version=None, extras=("extra1", "extra2"))),
         # Markers.
         (
             "dep ; sys_platform == 'darwin'",

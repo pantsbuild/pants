@@ -21,7 +21,7 @@ class PoetryDependency:
         return PoetryDependency(
             requirement.project_name,
             version=str(requirement.specifier) or None,  # type: ignore[attr-defined]
-            extras=requirement.extras,
+            extras=tuple(sorted(requirement.extras)),
             markers=str(requirement.marker) if requirement.marker else None,
         )
 
