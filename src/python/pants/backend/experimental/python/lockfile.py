@@ -5,16 +5,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
+from textwrap import dedent
 
 from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
     lockfile_content_with_header,
 )
-from pants.backend.python.subsystems.python_tool_base import (
-    PythonToolBase,
-    PythonToolRequirementsBase,
-)
-from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.poetry_conversions import create_pyproject_toml
@@ -44,18 +43,34 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------------
 
 
-class PoetrySubsystem(PythonToolBase):
+class PoetrySubsystem(PythonToolRequirementsBase):
     options_scope = "poetry"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
     default_version = "poetry==1.1.7"
-    default_main = ConsoleScript("poetry")
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
-    # TODO: add lockfile support? Would that suffer from chicken and egg? Note that I tried using
-    #  ExternalTool with their GitHub releases, but they are deprecating that release process.
+    # TODO(#12314): add lockfile support, but that has to be manually added rather than having Pants
+    #  auto-generate it to workaround chicken-and-egg.
+
+
+# We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed
+# in Poetry 1.2. See https://github.com/python-poetry/poetry/issues/1584.
+# TODO(#12314): only use this custom launcher if using Poetry 1.1. (Ban 1.0 and earlier, probably).
+POETRY_LAUNCHER = FileContent(
+    "__pants_poetry_launcher.py",
+    dedent(
+        """\
+        from poetry.console import main
+        from poetry.puzzle.provider import Provider
+
+        Provider.UNSAFE_PACKAGES = set()
+        main()
+        """
+    ).encode(),
+)
 
 
 @dataclass(frozen=True)
@@ -112,9 +127,10 @@ async def generate_lockfile(
 ) -> PythonLockfile:
     pyproject_toml = create_pyproject_toml(
         req.requirements, req.interpreter_constraints, python_setup.interpreter_universe
-    )
-    input_requirements = await Get(
-        Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml.encode())])
+    ).encode()
+    pyproject_toml_digest, launcher_digest = await MultiGet(
+        Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
+        Get(Digest, CreateDigest([POETRY_LAUNCHER])),
     )
 
     poetry_pex = await Get(
@@ -124,7 +140,8 @@ async def generate_lockfile(
             internal_only=True,
             requirements=poetry_subsystem.pex_requirements,
             interpreter_constraints=poetry_subsystem.interpreter_constraints,
-            main=poetry_subsystem.main,
+            main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
+            sources=launcher_digest,
         ),
     )
 
@@ -135,7 +152,7 @@ async def generate_lockfile(
         VenvPexProcess(
             poetry_pex,
             argv=("lock",),
-            input_digest=input_requirements,
+            input_digest=pyproject_toml_digest,
             output_files=("poetry.lock", "pyproject.toml"),
             description=req.description,
         ),
