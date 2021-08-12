@@ -295,6 +295,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         sudo apt-get install -y pkg-config fuse libfuse-dev
                         ./build-support/bin/check_rust_pre_commit.sh
                         ./cargo test --all --tests -- --nocapture
+                        ./cargo build --benches
                         """
                     ),
                     "if": DONT_SKIP_RUST,
