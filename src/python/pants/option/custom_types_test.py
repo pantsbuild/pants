@@ -5,12 +5,27 @@ import unittest
 from textwrap import dedent
 from typing import Dict, List, Union
 
-from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool
+from pants.option.custom_types import (
+    DictValueComponent,
+    ListValueComponent,
+    UnsetBool,
+    _flatten_shlexed_list,
+)
 from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
 ParsedList = List[ValidPrimitives]
 ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
+
+
+def test_flatten_shlexed_list() -> None:
+    assert _flatten_shlexed_list(["arg1", "arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2=foo", "--arg3"]) == ["arg1", "arg2=foo", "--arg3"]
+    assert _flatten_shlexed_list(["arg1='foo bar'", "arg2='baz'"]) == [
+        "arg1=foo bar",
+        "arg2=baz",
+    ]
 
 
 class CustomTypesTest(unittest.TestCase):
