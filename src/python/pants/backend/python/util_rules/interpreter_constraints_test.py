@@ -295,7 +295,8 @@ _SKIPPED_PY3 = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
         (["==2.7.*"], "==2.7.*"),
         (["==2.7.*", ">=3.6,!=3.6.1"], "==2.7.* || !=3.6.1,>=3.6"),
         ([], "*"),
-        (["CPython==2.7", "Cpython"], "*"),
+        # If any of the constraints are unconstrained (e.g. `CPython`), use a wildcard.
+        (["==2.7", ""], "*"),
     ),
 )
 def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
