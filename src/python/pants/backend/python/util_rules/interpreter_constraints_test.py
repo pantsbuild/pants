@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import List
 
 import pytest
-from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import InterpreterConstraintsField
@@ -293,105 +292,15 @@ _SKIPPED_PY3 = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 @pytest.mark.parametrize(
     "constraints,expected",
     (
-        # If it's a single constraint already, simply preserve it.
-        (["==2.7.3"], "==2.7.3"),
-        ([">=3.6,<4"], ">=3.6,<4"),
-        ([">=2.7.3,<2.7.6,!=2.7.4"], ">=2.7.3,<2.7.6,!=2.7.4"),
-        # Python 2.7 only.
-        (["==2.7.13", "==2.7.14"], ">=2.7.13,<=2.7.14"),
-        (["==2.7.13", "==2.7.14", "==2.7.15"], ">=2.7.13,<=2.7.15"),
-        (["==2.7.13", ">=2.7.15,<3"], ">=2.7.13,<2.8,!=2.7.14"),
-        (["==2.7.*", ">=2.7.15,<2.8"], ">=2.7,<2.8"),
-        (["==2.7.*,!=2.7.1", ">=2.7.15,<2.8"], ">=2.7,<2.8,!=2.7.1"),
-        # Python 3, single minor version only.
-        (["==3.6.8", "==3.6.9"], ">=3.6.8,<=3.6.9"),
-        (["==3.6.13", ">=3.6.15,<3.7"], ">=3.6.13,<3.7,!=3.6.14"),
-        (["==3.6.*", ">=3.6.15,<3.7"], ">=3.6,<3.7"),
-        (["==3.6.*,!=3.6.1", ">=3.6.15,<3.7"], ">=3.6,<3.7,!=3.6.1"),
-        # Python 3, multiple versions.
-        (["==3.6.*", "==3.7.*"], ">=3.6,<3.8"),
-        ([">=3.6.2,<3.7", "==3.7.*"], ">=3.6.2,<3.8"),
-        (["==3.6.*,!=3.6.5", "==3.7.*"], ">=3.6,<3.8,!=3.6.5"),
-        (["==3.6.*", "==3.8.*"], ">=3.6,<3.9,!=3.7.*"),
-        # Python 2.7 mixed w/ Python 3.
-        (["==2.7.*", ">=3.5,<4"], f">=2.7,<3.10,{_SKIPPED_PY3}"),
-        (["==2.7.*,!=2.7.18", ">=3.5,<4"], f">=2.7,<3.10,!=2.7.18,{_SKIPPED_PY3}"),
-        (["==2.7.*", ">=3.5,<3.6"], f">=2.7,<3.6,{_SKIPPED_PY3}"),
-        (["==2.7.*", ">=3.5,<3.5.4"], f">=2.7,<=3.5.3,{_SKIPPED_PY3}"),
-        (["==2.7.*", ">=3.5.2,<3.6"], f">=2.7,<3.6,{_SKIPPED_PY3},!=3.5.0,!=3.5.1"),
-        (["==2.7.*", ">=3.5.2,<3.5.4"], f">=2.7,<=3.5.3,{_SKIPPED_PY3},!=3.5.0,!=3.5.1"),
-        (
-            ["==2.7.13", "==3.5.3"],
-            (
-                ">=2.7.13,<=3.5.3,"
-                + ",".join(f"!=2.7.{p}" for p in range(14, _EXPECTED_LAST_PATCH_VERSION + 1))
-                + f",{_SKIPPED_PY3},!=3.5.0,!=3.5.1,!=3.5.2"
-            ),
-        ),
-        (["==2.7.*", ">=3.5,<3.6.4"], f">=2.7,<=3.6.3,{_SKIPPED_PY3}"),
-        (["==2.7.*", ">=3.5.2,<3.6.4"], f">=2.7,<=3.6.3,{_SKIPPED_PY3},!=3.5.0,!=3.5.1"),
-        (["==2.7.*", ">=3.5,<3.6.4,!=3.6.0"], f">=2.7,<=3.6.3,{_SKIPPED_PY3},!=3.6.0"),
-        (["==2.7.*", "==3.5.*", "==3.8.*"], f">=2.7,<3.9,{_SKIPPED_PY3},!=3.6.*,!=3.7.*"),
-        (
-            ["==2.7.*", "==3.5.*", ">=3.7.15,<3.8", "==3.8.*"],
-            (f">=2.7,<3.9,{_SKIPPED_PY3},!=3.6.*," + ",".join(f"!=3.7.{p}" for p in range(0, 15))),
-        ),
+        (["==2.7.*"], "==2.7.*"),
+        (["==2.7.*", ">=3.6,!=3.6.1"], "==2.7.* || !=3.6.1,>=3.6"),
+        ([], "*"),
+        # If any of the constraints are unconstrained (e.g. `CPython`), use a wildcard.
+        (["==2.7", ""], "*"),
     ),
 )
-def test_flatten(constraints: list[str], expected: str) -> None:
-    result = InterpreterConstraints(constraints).flatten(
-        interpreter_universe=["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
-    )
-    # Note that `__eq__` does not work properly on SpecifierSet, so we cast to a str.
-    assert str(result) == str(SpecifierSet(expected))
+def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
+    assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
 
 
 _ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
-
-
-@pytest.mark.parametrize(
-    "constraints,expected",
-    (
-        (["==2.7.15"], ([15], {})),
-        (["==2.7.*"], (_ALL_PATCHES, {})),
-        (["==3.6.15", "==3.7.15"], ([], {6: [15], 7: [15]})),
-        (["==3.6.*", "==3.7.*"], ([], {6: _ALL_PATCHES, 7: _ALL_PATCHES})),
-        (
-            ["==2.7.1", ">=3.6.15"],
-            (
-                [1],
-                {
-                    6: list(range(15, _EXPECTED_LAST_PATCH_VERSION + 1)),
-                    7: _ALL_PATCHES,
-                    8: _ALL_PATCHES,
-                    9: _ALL_PATCHES,
-                },
-            ),
-        ),
-        ([], ([], {})),
-    ),
-)
-def test_determine_all_valid_py2_and_py3_patches(
-    constraints: list[str], expected: tuple[list[int], dict[int, list[int]]]
-) -> None:
-    assert (
-        InterpreterConstraints(constraints)._determine_all_valid_py2_and_py3_patches(
-            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
-        )
-        == expected
-    )
-
-
-def test_determine_all_valid_py2_and_py3_patches_none_matching() -> None:
-    with pytest.raises(ValueError):
-        InterpreterConstraints(["==3.6.*"])._determine_all_valid_py2_and_py3_patches(
-            interpreter_universe=["2.7"]
-        )
-
-
-@pytest.mark.parametrize("version", ["2.6", "2.8", "4.1", "1.0"])
-def test_determine_all_valid_py2_and_py3_patches_invalid_universe(version: str) -> None:
-    with pytest.raises(AssertionError):
-        InterpreterConstraints(["==2.7.*", "==3.5.*"])._determine_all_valid_py2_and_py3_patches(
-            [version]
-        )
