@@ -6,6 +6,9 @@
 # invalidation digest: a049aba24b8fd338775fc1f46144ba7abeebe7dc2914997b2adc28cc316abf2f
 # --- END PANTS LOCKFILE METADATA ---
 
+colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.6" and python_version < "4.0" and python_full_version >= "3.5.0" \
+    --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
+    --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
 isort==5.5.5; python_version >= "3.6" and python_version < "4.0" \
     --hash=sha256:87355bbc3465bf096a8bf09c4dd949b6b9294958c478740442fd9fbd01b817f2 \
     --hash=sha256:47e0fdc03aed3a9ba507284f90e4b3b6f2a4725d919816a7b547675befc38ffb

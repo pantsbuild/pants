@@ -38,3 +38,6 @@ coverage==5.0.4; (python_version >= "2.7" and python_full_version < "3.0.0") or 
     --hash=sha256:7c9762f80a25d8d0e4ab3cb1af5d9dffbddb3ee5d21c43e3474c84bf5ff941f7 \
     --hash=sha256:4482f69e0701139d0f2c44f3c395d1d1d37abd81bfafbf9b6efbe2542679d892 \
     --hash=sha256:1b60a95fc995649464e0cd48cecc8288bac5f4198f21d04b8229dc4097d76823
+toml==0.10.2; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version < "4" \
+    --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
+    --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

@@ -3,7 +3,7 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 896fd376afc2f65f119967155017393e327697b337b800e7e74aea5c960c3917
+# invalidation digest: 443653bdbc8facef9b521f860e1c11e48d670630150c948dbd5ae444d0796c19
 # --- END PANTS LOCKFILE METADATA ---
 
 flake8-2020==1.6.0; python_full_version >= "3.6.1" \
@@ -27,6 +27,11 @@ pycodestyle==2.7.0; python_version >= "3.6" and python_full_version < "3.0.0" or
 pyflakes==2.3.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6" \
     --hash=sha256:7893783d01b8a89811dd72d7dfd4d84ff098e5eed95cfa8905b22bbffe52efc3 \
     --hash=sha256:f5bc8ecabc05bb9d291eb5203d6810b49040f6ff446a756326104746cc00c1db
+setuptools==44.1.1; python_full_version == "2.7.*" or python_version > "2.7" \
+    --hash=sha256:27a714c09253134e60a6fa68130f78c7037e5562c4f21f8f318f2ae900d152d5 \
+    --hash=sha256:c67aa55db532a0dadc4d2e20ba9961cbd3ccc84d544e9029699822542b5a476b \
+    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
+    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465
 typing-extensions==3.10.0.0; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.6" \
     --hash=sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497 \
     --hash=sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84 \
