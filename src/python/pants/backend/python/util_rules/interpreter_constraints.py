@@ -8,7 +8,6 @@ import itertools
 from collections import defaultdict
 from typing import FrozenSet, Iterable, Iterator, List, Sequence, Set, Tuple, TypeVar
 
-from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 

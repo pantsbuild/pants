@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import List
 
 import pytest
-from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import InterpreterConstraintsField
