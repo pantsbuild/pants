@@ -185,9 +185,9 @@ criterion_main!(benches);
 
 ///
 /// Returns a Store (and the TempDir it is stored in) and a Digest for a nested directory
-/// containing one file per line in "all_the_henries".
+/// containing the given number of files, each with roughly the given size.
 ///
-pub fn large_snapshot(
+pub fn snapshot(
   executor: &Executor,
   max_files: usize,
   file_target_size: usize,
@@ -242,7 +242,7 @@ pub fn large_snapshot(
     .map(|mut path| {
       let store = store2.clone();
       async move {
-        // We use the path as the content as well: would be interesting to make this tunable.
+        // We use the (repeated) path as the content as well.
         let content: Bytes = {
           let base = Bytes::copy_from_slice(path.as_os_str().as_bytes());
           base.repeat(file_target_size / base.len()).into()
