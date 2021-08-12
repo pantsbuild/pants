@@ -407,16 +407,13 @@ class _ConfigValues:
 
     def has_option(self, section: str, option: str) -> bool:
         try:
-            self._get_value(section, option, allow_default=False)
+            self.get_value(section, option)
         except (configparser.NoSectionError, configparser.NoOptionError):
             return False
         else:
             return True
 
     def get_value(self, section: str, option: str) -> str | None:
-        return self._get_value(section, option)
-
-    def _get_value(self, section: str, option: str, *, allow_default: bool = True) -> str | None:
         section_values = self._find_section_values(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
@@ -427,9 +424,8 @@ class _ConfigValues:
             section_values=section_values,
         )
         if option not in section_values:
-            if not allow_default or option not in self.defaults:
+            if option not in self.defaults:
                 raise configparser.NoOptionError(option, section)
-            self._maybe_deprecated_default(option)
             return stringify(raw_value=self.defaults[option])
         option_value = section_values[option]
         # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.

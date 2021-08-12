@@ -1545,7 +1545,7 @@ class GlobalOptions(Subsystem):
     def compute_engine_visualize_to(bootstrap_options: OptionValueContainer) -> str | None:
         result = resolve_conflicting_options(
             old_option="native_engine_visualize_to",
-            new_option="native_engine_visualize_to",
+            new_option="engine_visualize_to",
             old_scope="",
             new_scope="",
             old_container=bootstrap_options,
