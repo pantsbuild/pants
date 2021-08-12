@@ -50,7 +50,7 @@ from pants.option.errors import (
     RegistrationError,
     UnknownFlagsError,
 )
-from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
+from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
@@ -679,10 +679,7 @@ class Parser:
         if is_list_option(kwargs):
 
             def process_list(lst):
-                lst = [self._convert_member_type(member_type, val) for val in lst]
-                if member_type == shell_str:
-                    lst = flatten_shlexed_list(lst)
-                return lst
+                return [self._convert_member_type(member_type, val) for val in lst]
 
             historic_ranked_vals = group(ListValueComponent, process_list)
         elif is_dict_option(kwargs):
