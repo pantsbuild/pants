@@ -3,7 +3,7 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 0e936756224019e4d726120711a9949e2ff6ffaade333024b6ed9d91e5b80559
+# invalidation digest: 8060f207b7f54fc3fd04d2e815359f3240e90ece00700d3904cc72e45bb0b9e0
 # --- END PANTS LOCKFILE METADATA ---
 
 #
@@ -289,7 +289,7 @@ zipp==3.5.0 \
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==56.2.0 \
-    --hash=sha256:7bb5652625e94e73b9358b7ed8c6431b732e80cf31f4e0972294c64f0e5b849e \
-    --hash=sha256:bc30153eec47d82f20c6f5e1a13d4ee725c6deb7013a67557f89bfe5d25235c4
+setuptools==57.4.0 \
+    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465 \
+    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6
     # via -r reqs.txt
