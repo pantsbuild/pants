@@ -15,8 +15,14 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 def test_metadata_round_trip() -> None:
     val = "help_i_am_trapped_inside_a_unit_test_string"
-    output = read_lockfile_metadata(lockfile_metadata_header(val))
+    constraints = InterpreterConstraints(
+        ["this", "is", "just", "to" "test>=3.0", "parsing!=9.9999999,<10", "semantics==93"]
+    )
+    metadata = lockfile_metadata_header(val, [str(i) for i in constraints])
+    print(metadata.decode("ascii"))
+    output = read_lockfile_metadata(metadata)
     assert val == output.invalidation_digest
+    assert constraints == output.valid_interpreter_constraints
 
 
 def test_validated_lockfile_content() -> None:
@@ -30,7 +36,12 @@ def test_validated_lockfile_content() -> None:
 #    ./pants lock
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 000faaafcacacaca
+# {
+#   "invalidation_digest": "000faaafcacacaca",
+#   "valid_interpreter_constraints": [
+#     "CPython>=3.7"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 dave==3.1.4 \\
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
@@ -39,42 +50,29 @@ dave==3.1.4 \\
     # Helper function to make the test case more resilient to reformatting
     line_by_line = lambda b: [i for i in (j.strip() for j in b.splitlines()) if i]
     assert line_by_line(
-        lockfile_content_with_header("./pants lock", "000faaafcacacaca", content)
+        lockfile_content_with_header(
+            "./pants lock", "000faaafcacacaca", InterpreterConstraints([">=3.7"]), content
+        )
     ) == line_by_line(output)
 
 
-_interpreter_constraints = [">=3.7", "<3.10"]
 _requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
 
 
 @pytest.mark.parametrize(
-    "requirements,interpreter_constraints,expected",
+    "requirements,expected",
     [
-        ([], [], "51f5289473089f1de64ab760af3f03ff55cd769f25cce7ea82dd1ac88aac5ff4"),
-        (
-            _interpreter_constraints,
-            [],
-            "821e8eef80573c7d2460185da4d436b6a8c59e134f5f0758000be3c85e9819eb",
-        ),
-        ([], _requirements, "604fb99ed6d6d83ba2c4eb1230184dd7f279a446cda042e9e87099448f28dddb"),
-        (
-            _interpreter_constraints,
-            _requirements,
-            "9264a3b59a592d7eeac9cb4bbb4f5b2200907694bfe92b48757c99b1f71485f0",
-        ),
+        ([], "c8e8d0a6d6ec36bee3942091046d81d86e3b83b143b37a7cc714e2d022bf4f85"),
+        (_requirements, "66327c52225d2f798ffad7f092bf1b51da8a66777f3ebf654e2444d7eb1429f4"),
     ],
 )
-def test_hex_digest(requirements, interpreter_constraints, expected) -> None:
-    assert (
-        calculate_invalidation_digest(
-            FrozenOrderedSet(requirements), InterpreterConstraints(interpreter_constraints)
-        )
-        == expected
-    )
+def test_hex_digest(requirements, expected) -> None:
+    assert calculate_invalidation_digest(FrozenOrderedSet(requirements)) == expected
 
 
 def test_hash_depends_on_requirement_source() -> None:
+    # TODO: This test is a bit weird now. Do we still need it?
     reqs = ["CPython"]
-    assert calculate_invalidation_digest(
-        FrozenOrderedSet(reqs), InterpreterConstraints([])
-    ) != calculate_invalidation_digest(FrozenOrderedSet([]), InterpreterConstraints(reqs))
+    assert calculate_invalidation_digest(FrozenOrderedSet(reqs)) != calculate_invalidation_digest(
+        FrozenOrderedSet([])
+    )
