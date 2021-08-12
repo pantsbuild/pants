@@ -53,7 +53,7 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, collect_rules, rule
 from pants.python.python_repos import PythonRepos
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import InvalidLockfileBehavior, PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -442,9 +442,9 @@ async def build_pex(
         )
         metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
         if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
-            if python_setup.fail_on_invalid_lockfile:
+            if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
-            else:
+            elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
                 logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
 
         requirements_file_digest = await Get(
@@ -459,9 +459,9 @@ async def build_pex(
 
         metadata = read_lockfile_metadata(content.content)
         if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
-            if python_setup.fail_on_invalid_lockfile:
+            if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
-            else:
+            elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
                 logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
 
         requirements_file_digest = await Get(Digest, CreateDigest([content]))

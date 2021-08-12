@@ -550,6 +550,11 @@ def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> 
     assert "Invalid lockfile provided." in caplog.text
 
 
+def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="ignore")
+    assert not caplog.text.strip()
+
+
 def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, True, actual="900d", expected="900d", behavior="warn")
     assert not caplog.text.strip()

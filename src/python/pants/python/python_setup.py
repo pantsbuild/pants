@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 @enum.unique
 class InvalidLockfileBehavior(enum.Enum):
     error = "error"
+    ignore = "ignore"
     warn = "warn"
 
 
@@ -140,7 +141,7 @@ class PythonSetup(Subsystem):
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
-            default=InvalidLockfileBehavior.warn,
+            default=InvalidLockfileBehavior.ignore,
             help=(
                 "Set the behavior when Pants encounters a lockfile that was generated with different "
                 "requirements or interpreter constraints than those currently specified.\n\n"
@@ -230,11 +231,8 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.experimental_lockfile)
 
     @property
-    def fail_on_invalid_lockfile(self) -> bool:
-        return (
-            cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
-            == InvalidLockfileBehavior.error
-        )
+    def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
+        return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
 
     @property
     def lockfile_custom_regeneration_command(self) -> str | None:
