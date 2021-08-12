@@ -140,7 +140,7 @@ class PythonSetup(Subsystem):
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
-            default=InvalidLockfileBehavior.error,
+            default=InvalidLockfileBehavior.warn,
             help=(
                 "Set the behavior when Pants encounters a lockfile that was generated with different "
                 "requirements or interpreter constraints than those currently specified.\n\n"
