@@ -28,7 +28,7 @@ class Lambdex(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class LambdexLockfileSentinel(PythonToolLockfileSentinel):
+class LambdexLockfileSentinel:
     pass
 
 

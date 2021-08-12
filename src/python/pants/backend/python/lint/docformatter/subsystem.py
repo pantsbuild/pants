@@ -61,7 +61,7 @@ class Docformatter(PythonToolBase):
         return tuple(self.options.args)
 
 
-class DocformatterLockfileSentinel(PythonToolLockfileSentinel):
+class DocformatterLockfileSentinel:
     pass
 
 

@@ -9,6 +9,7 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
+from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
@@ -29,6 +30,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *black_rules(),
+            *black_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
             QueryRule(LintResults, (BlackRequest,)),

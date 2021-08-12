@@ -7,6 +7,9 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
@@ -45,6 +48,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *protobuf_subsystem_rules(),
             *additional_fields.rules(),
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),

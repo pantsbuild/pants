@@ -8,6 +8,7 @@ from zipfile import ZipFile
 
 import pytest
 
+from pants.backend.awslambda.python.lambdex import rules as awslambda_python_subsystem_rules
 from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
@@ -26,6 +27,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *awslambda_python_rules(),
+            *awslambda_python_subsystem_rules(),
             *target_rules(),
             *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),

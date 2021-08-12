@@ -77,7 +77,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):
+class MypyProtobufLockfileSentinel:
     pass
 
 

@@ -4,13 +4,14 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.lambdex import Lambdex
+from pants.backend.awslambda.python.lambdex import Lambdex, LambdexLockfileSentinel
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
 )
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -86,10 +87,15 @@ async def package_python_awslambda(
         ],
     )
 
+    lockfile_hex_digest = None
+    if lambdex.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, LambdexLockfileSentinel())
+        lockfile_hex_digest = lockfile_request.hex_digest
+
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=lambdex.pex_requirements,
+        requirements=lambdex.pex_requirements(lockfile_hex_digest),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )
