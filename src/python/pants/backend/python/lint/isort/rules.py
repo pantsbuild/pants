@@ -4,8 +4,9 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.isort.skip_field import SkipIsortField
-from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.lint.isort.subsystem import Isort, IsortLockfileSentinel
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
@@ -77,12 +78,17 @@ def generate_argv(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
+    lockfile_hex_digest = None
+    if isort.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, IsortLockfileSentinel())
+        lockfile_hex_digest = lockfile_request.hex_digest
+
     isort_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="isort.pex",
             internal_only=True,
-            requirements=isort.pex_requirements,
+            requirements=isort.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=isort.interpreter_constraints,
             main=isort.main,
         ),

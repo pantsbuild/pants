@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
+from pants.backend.python.lint.docformatter.subsystem import rules as docformatter_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
@@ -23,6 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *docformatter_rules(),
+            *docformatter_subsystem_rules(),
             *source_files.rules(),
             QueryRule(LintResults, (DocformatterRequest,)),
             QueryRule(FmtResult, (DocformatterRequest,)),

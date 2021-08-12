@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import enum
 import logging
 import os
 import re
@@ -21,6 +22,13 @@ from pants.util.memo import memoized_method
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
+
+
+@enum.unique
+class InvalidLockfileBehavior(enum.Enum):
+    error = "error"
+    ignore = "ignore"
+    warn = "warn"
 
 
 class PythonSetup(Subsystem):
@@ -130,6 +138,17 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--invalid-lockfile-behavior",
+            advanced=True,
+            type=InvalidLockfileBehavior,
+            default=InvalidLockfileBehavior.ignore,
+            help=(
+                "Set the behavior when Pants encounters a lockfile that was generated with different "
+                "requirements or interpreter constraints than those currently specified.\n\n"
+                "We strongly recommend setting to `error` in CI or release builds."
+            ),
+        )
+        register(
             "--interpreter-search-paths",
             advanced=True,
             type=list,
@@ -210,6 +229,10 @@ class PythonSetup(Subsystem):
     @property
     def lockfile(self) -> str | None:
         return cast("str | None", self.options.experimental_lockfile)
+
+    @property
+    def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
+        return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
 
     @property
     def lockfile_custom_regeneration_command(self) -> str | None:

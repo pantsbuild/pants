@@ -8,7 +8,6 @@ import itertools
 from collections import defaultdict
 from typing import FrozenSet, Iterable, Iterator, List, Sequence, Set, Tuple, TypeVar
 
-from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
@@ -247,208 +246,19 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             allowed_versions=py38_and_later, prior_version="3.7"
         )
 
-    def flatten(self, interpreter_universe: Iterable[str]) -> SpecifierSet:
-        """Flatten into a single specifier set.
-
-        Each element in the original list gets ORed, which we must preserve. We do this by including
-        the whole universe but excluding anything not in the original range.
-
-        Note that this does not preserve the interpreter name, e.g. `PyPy` vs. `CPython`. This is
-        to handle when users OR different interpreters, like CPython==3.7.* OR PyPY==3.7.*.
-        """
-        if not self:
-            return SpecifierSet("")
-        if len(self) == 1:
-            return next(iter(self)).specifier  # type: ignore[attr-defined,no-any-return]
-
-        # Strategy: find the upper and lower bounds, while also finding any versions to skip.
-        # To make the result more readable, try to consolidate when possible, e.g. prefer
-        # `!=3.2.*` over `!=3.2,0,!=3.2.1` and so on.
-        valid_py27_patches, valid_py3_patches = self._determine_all_valid_py2_and_py3_patches(
-            interpreter_universe
-        )
-        if not valid_py27_patches and not valid_py3_patches:
-            return SpecifierSet("")
-
-        lower_bound: str | None = None
-        upper_bound: str | None = None
-        skipped: list[str] = []
-
-        def _combine_bounds_and_skipped_into_result() -> SpecifierSet:
-            result = f"{lower_bound},{upper_bound}"
-            if skipped:
-                result += "," + ",".join(f"!={v}" for v in skipped)
-            return Requirement.parse(  # type:ignore[no-any-return,attr-defined]
-                f"doesnt-matter{result}"
-            ).specifier
-
-        if valid_py27_patches:
-            lower_bound = _determine_lower_bound(2, 7, valid_py27_patches[0])
-            skipped.extend(
-                _determine_skipped(
-                    2,
-                    7,
-                    valid_py27_patches,
-                    major_minor_is_lower_bound=True,
-                    major_minor_is_upper_bound=not valid_py3_patches,
-                )
-            )
-            if not valid_py3_patches:
-                upper_bound = _determine_upper_bound(2, 7, valid_py27_patches[-1])
-                return _combine_bounds_and_skipped_into_result()
-
-        assert valid_py3_patches
-        all_valid_py3_versions = list(valid_py3_patches)
-        first_py3_version = all_valid_py3_versions[0]
-        last_py3_version = all_valid_py3_versions[-1]
-        only_one_py3_version = first_py3_version == last_py3_version
-
-        first_py3_version_patches = valid_py3_patches[first_py3_version]
-        last_py3_version_patches = valid_py3_patches[last_py3_version]
-
-        # Either skip all Py3 versions between 2.7 and the first Py3 version, or set that Py3
-        # version as the lower bound if Py27 not in use.
-        if valid_py27_patches:
-            skipped.extend(f"3.{m}.*" for m in range(0, first_py3_version))
-        else:
-            assert lower_bound is None
-            lower_bound = _determine_lower_bound(3, first_py3_version, first_py3_version_patches[0])
-        assert lower_bound is not None
-
-        # Skip all invalid patches in the first Py3 minor version.
-        skipped.extend(
-            _determine_skipped(
-                3,
-                first_py3_version,
-                first_py3_version_patches,
-                major_minor_is_lower_bound=not valid_py27_patches,
-                major_minor_is_upper_bound=only_one_py3_version,
-            )
-        )
-
-        # If there is only one Py3 version, set that as the upper bound and return.
-        if only_one_py3_version:
-            upper_bound = _determine_upper_bound(
-                3, first_py3_version, first_py3_version_patches[-1]
-            )
-            return _combine_bounds_and_skipped_into_result()
-
-        # Skip any Py3 versions between the lowest Py3 version and last Py3 version.
-        # This `range()` will do nothing if there are no versions between.
-        for py3_minor in range(first_py3_version + 1, last_py3_version):
-            if py3_minor in valid_py3_patches:
-                skipped.extend(
-                    _determine_skipped(
-                        3,
-                        py3_minor,
-                        valid_py3_patches[py3_minor],
-                        major_minor_is_lower_bound=False,
-                        major_minor_is_upper_bound=False,
-                    )
-                )
+    def to_poetry_constraint(self) -> str:
+        specifiers = []
+        wildcard_encountered = False
+        for constraint in self:
+            specifier = str(constraint.specifier)  # type: ignore[attr-defined]
+            if specifier:
+                specifiers.append(specifier)
             else:
-                skipped.append(f"3.{py3_minor}.*")
-
-        # Finally, set the upper bound to the last Py3 version.
-        upper_bound = _determine_upper_bound(3, last_py3_version, last_py3_version_patches[-1])
-        skipped.extend(
-            _determine_skipped(
-                3,
-                last_py3_version,
-                last_py3_version_patches,
-                major_minor_is_lower_bound=False,
-                major_minor_is_upper_bound=True,
-            )
-        )
-
-        return _combine_bounds_and_skipped_into_result()
-
-    def _determine_all_valid_py2_and_py3_patches(
-        self, interpreter_universe: Iterable[str]
-    ) -> tuple[list[int], dict[int, list[int]]]:
-        """Return a list of all valid Python 2.7 patches and a dictionary of all Python 3 minor
-        versions to their valid patches, if any.
-
-        This also validates our assumptions around the `interpreter_universe`:
-
-        - Python 2.7 is the only Python 2 version in the universe, if at all.
-        - Python 3 is the last major release of Python, which the core devs have committed to in
-          public several times.
-        """
-        if not self:
-            return ([], {})
-
-        py2_minors = []
-        py3_minors = []
-        for major_minor in interpreter_universe:
-            major, minor = _major_minor_to_int(major_minor)
-            if major == 2:
-                if minor != 7:
-                    raise AssertionError(
-                        "Unexpected value in `[python-setup].interpreter_versions_universe`: "
-                        f"{major_minor}. Expected the only Python 2 value to be '2.7', given that "
-                        f"all other versions are unmaintained or do not exist."
-                    )
-                py2_minors.append(minor)
-            elif major == 3:
-                py3_minors.append(minor)
-            else:
-                raise AssertionError(
-                    "Unexpected value in `[python-setup].interpreter_versions_universe`: "
-                    f"{major_minor}. Expected to only include '2.7' and/or Python 3 versions, "
-                    "given that Python 3 will be the last major Python version. Please open an "
-                    "issue at https://github.com/pantsbuild/pants/issues/new if this is no longer "
-                    "true."
-                )
-
-        valid_py27_patches = list(self._valid_patch_versions(2, 7)) if py2_minors else []
-        valid_py3_patches: dict[int, list[int]] = {}
-        for minor in sorted(py3_minors):
-            valid_patches = list(self._valid_patch_versions(3, minor))
-            if valid_patches:
-                valid_py3_patches[minor] = valid_patches
-
-        if not valid_py27_patches and not valid_py3_patches:
-            raise ValueError(
-                f"The interpreter constraints `{self}` are not compatible with any of the "
-                "interpreter versions from `[python-setup].interpreter_versions_universe`.\n\n"
-                "Please either change these interpreter constraints or update the "
-                "`interpreter_versions_universe` to include the interpreters set in these "
-                "constraints. Run `./pants help-advanced python-setup` for more information on the "
-                "`interpreter_versions_universe` option."
-            )
-
-        return valid_py27_patches, valid_py3_patches
+                wildcard_encountered = True
+        if not specifiers or wildcard_encountered:
+            return "*"
+        return " || ".join(specifiers)
 
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
-
-
-def _determine_lower_bound(major: int, minor: int, first_valid_patch: int) -> str:
-    return (
-        f">={major}.{minor}" if first_valid_patch == 0 else f">={major}.{minor}.{first_valid_patch}"
-    )
-
-
-def _determine_upper_bound(major: int, minor: int, last_valid_patch: int) -> str:
-    return (
-        f"<{major}.{minor + 1}"
-        if last_valid_patch == _EXPECTED_LAST_PATCH_VERSION
-        else f"<={major}.{minor}.{last_valid_patch}"
-    )
-
-
-def _determine_skipped(
-    major: int,
-    minor: int,
-    valid_patches: list[int],
-    *,
-    major_minor_is_lower_bound: bool,
-    major_minor_is_upper_bound: bool,
-) -> list[str]:
-    start = valid_patches[0] if major_minor_is_lower_bound else 0
-    end = valid_patches[-1] if major_minor_is_upper_bound else _EXPECTED_LAST_PATCH_VERSION + 1
-    expected = set(range(start, end))
-    invalid_patches = expected - set(valid_patches)
-    return [f"{major}.{minor}.{p}" for p in invalid_patches]

@@ -110,7 +110,7 @@ class Black(PythonToolBase):
         )
 
 
-class BlackLockfileSentinel(PythonToolLockfileSentinel):
+class BlackLockfileSentinel:
     pass
 
 

@@ -13,8 +13,13 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
+from pants.backend.python.subsystems.setuptools import (
+    PythonDistributionFieldSet,
+    Setuptools,
+    SetuptoolsLockfileSentinel,
+)
 from pants.backend.python.target_types import (
     PythonDistributionEntryPointsField,
     PythonProvidesField,
@@ -414,12 +419,18 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     """Run a setup.py command on a single exported target."""
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
+
+    lockfile_hex_digest = None
+    if setuptools.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, SetuptoolsLockfileSentinel())
+        lockfile_hex_digest = lockfile_request.hex_digest
+
     setuptools_pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
-            requirements=setuptools.pex_requirements,
+            requirements=setuptools.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=req.interpreter_constraints,
         ),
     )

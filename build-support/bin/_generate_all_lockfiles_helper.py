@@ -9,7 +9,6 @@ should be.
 """
 
 import logging
-import shutil
 import subprocess
 
 from pants.backend.awslambda.python.lambdex import Lambdex
@@ -28,13 +27,6 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
-
-
-def validate_python_installed(binary: str) -> None:
-    if not shutil.which(binary):
-        raise Exception(
-            f"Must have `{binary}` installed and discoverable to safely generate lockfiles."
-        )
 
 
 def main() -> None:
@@ -67,9 +59,7 @@ def main() -> None:
             # Bandit.
             "--backend-packages=+['pants.backend.python.lint.bandit']",
             f"--bandit-version={Bandit.default_version}",
-            # TODO(#12314): restore this once Poetry parsing can handle multiple deps for the same
-            #  project.
-            f"--bandit-extra-requirements={repr(['setuptools', 'stevedore<3'])}",
+            f"--bandit-extra-requirements={repr(Bandit.default_extra_requirements)}",
             f"--bandit-experimental-lockfile={Bandit.default_lockfile_path}",
             # Black.
             f"--black-version={Black.default_version}",
@@ -83,9 +73,7 @@ def main() -> None:
             f"--docformatter-experimental-lockfile={Docformatter.default_lockfile_path}",
             # Flake8.
             f"--flake8-version={Flake8.default_version}",
-            # TODO(#12314): restore this once Poetry parsing can handle multiple deps for the same
-            #  project.
-            f"--flake8-extra-requirements={repr(['setuptools'])}",
+            f"--flake8-extra-requirements={repr(Flake8.default_extra_requirements)}",
             f"--flake8-experimental-lockfile={Flake8.default_lockfile_path}",
             # Isort.
             f"--isort-version={Isort.default_version}",

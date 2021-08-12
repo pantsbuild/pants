@@ -126,7 +126,7 @@ class Flake8(PythonToolBase):
         )
 
 
-class Flake8LockfileSentinel(PythonToolLockfileSentinel):
+class Flake8LockfileSentinel:
     pass
 
 

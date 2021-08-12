@@ -109,7 +109,7 @@ class Bandit(PythonToolBase):
         )
 
 
-class BanditLockfileSentinel(PythonToolLockfileSentinel):
+class BanditLockfileSentinel:
     pass
 
 

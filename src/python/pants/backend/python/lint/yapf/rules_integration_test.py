@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.python.lint.yapf.rules import YapfFieldSet, YapfRequest
 from pants.backend.python.lint.yapf.rules import rules as yapf_rules
+from pants.backend.python.lint.yapf.subsystem import rules as yapf_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
@@ -23,6 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *yapf_rules(),
+            *yapf_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
             QueryRule(LintResults, (YapfRequest,)),

@@ -117,8 +117,7 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return (self.version, *self.extra_requirements)
 
-    @property
-    def pex_requirements(self) -> PexRequirements:
+    def pex_requirements(self, expected_lockfile_hex_digest: str | None = None) -> PexRequirements:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
@@ -133,14 +132,14 @@ class PythonToolRequirementsBase(Subsystem):
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                is_lockfile=True,
+                lockfile_hex_digest=expected_lockfile_hex_digest,
             )
         return PexRequirements(
             file_path=self.lockfile,
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"
             ),
-            is_lockfile=True,
+            lockfile_hex_digest=expected_lockfile_hex_digest,
         )
 
     @property

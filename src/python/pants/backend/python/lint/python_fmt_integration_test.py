@@ -6,7 +6,9 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python.lint.black.rules import rules as black_rules
+from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.lint.isort.rules import rules as isort_rules
+from pants.backend.python.lint.isort.subsystem import rules as isort_subsystem_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import LanguageFmtResults, enrich_fmt_result
@@ -28,6 +30,8 @@ def rule_runner() -> RuleRunner:
             format_python_target,
             *black_rules(),
             *isort_rules(),
+            *black_subsystem_rules(),
+            *isort_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
             QueryRule(LanguageFmtResults, (PythonFmtTargets,)),

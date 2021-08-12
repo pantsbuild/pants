@@ -32,8 +32,8 @@ class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help = "Python setuptools, used to package `python_distribution` targets."
 
-    default_version = "setuptools>=50.3.0,<57.0"
-    default_extra_requirements = ["wheel>=0.35.1,<0.37"]
+    default_version = "setuptools>=50.3.0,<58.0"
+    default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_lockfile.txt")
@@ -41,7 +41,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
+class SetuptoolsLockfileSentinel:
     pass
 
 

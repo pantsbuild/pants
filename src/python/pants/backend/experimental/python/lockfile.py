@@ -125,9 +125,7 @@ class PythonLockfileRequest:
 async def generate_lockfile(
     req: PythonLockfileRequest, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
 ) -> PythonLockfile:
-    pyproject_toml = create_pyproject_toml(
-        req.requirements, req.interpreter_constraints, python_setup.interpreter_universe
-    ).encode()
+    pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
     pyproject_toml_digest, launcher_digest = await MultiGet(
         Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
         Get(Digest, CreateDigest([POETRY_LAUNCHER])),
@@ -138,7 +136,7 @@ async def generate_lockfile(
         PexRequest(
             output_filename="poetry.pex",
             internal_only=True,
-            requirements=poetry_subsystem.pex_requirements,
+            requirements=poetry_subsystem.pex_requirements(),
             interpreter_constraints=poetry_subsystem.interpreter_constraints,
             main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
             sources=launcher_digest,

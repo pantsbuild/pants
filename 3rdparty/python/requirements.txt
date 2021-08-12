@@ -16,7 +16,7 @@ pytest>=6.0.1,<6.3
 PyYAML>=5.4,<5.5
 requests[security]>=2.25.1
 setproctitle==1.2.2
-setuptools>=56.0.0,<57.0
+setuptools>=56.0.0,<58.0
 toml==0.10.2
 types-freezegun==0.1.4
 types-PyYAML==5.4.3

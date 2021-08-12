@@ -33,6 +33,7 @@ from pants.backend.python.util_rules.pex import (
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -534,4 +535,71 @@ def test_build_pex_description() -> None:
         PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
         use_repo_pex=True,
         expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
+    )
+
+
+def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError):
+        _run_pex_for_lockfile_test(
+            rule_runner, True, actual="1bad", expected="900d", behavior="error"
+        )
+
+
+def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
+    assert "Invalid lockfile provided." in caplog.text
+
+
+def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="ignore")
+    assert not caplog.text.strip()
+
+
+def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, True, actual="900d", expected="900d", behavior="warn")
+    assert not caplog.text.strip()
+
+
+def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError):
+        _run_pex_for_lockfile_test(
+            rule_runner, False, actual="1bad", expected="900d", behavior="error"
+        )
+
+
+def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, False, actual="1bad", expected="900d", behavior="warn")
+    assert "Invalid lockfile provided." in caplog.text
+
+
+def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, False, actual="900d", expected="900d", behavior="warn")
+    assert not caplog.text.strip()
+
+
+def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior):
+    lockfile = f"""
+# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+# invalidation digest: {actual}
+# --- END PANTS LOCKFILE METADATA ---
+ansicolors==1.1.8
+"""
+    if use_file:
+        rule_runner.write_files({"lockfile.txt": lockfile})
+        file_args = {"file_path": "lockfile.txt"}
+    else:
+        content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
+        file_args = {"file_content": content}
+
+    create_pex_and_get_all_data(
+        rule_runner,
+        requirements=PexRequirements(
+            **file_args,
+            file_path_description_of_origin="iceland",
+            lockfile_hex_digest=expected,
+        ),
+        additional_pants_args=(
+            "--python-setup-experimental-lockfile=lockfile.txt",
+            f"--python-setup-invalid-lockfile-behavior={behavior}",
+        ),
     )
