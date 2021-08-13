@@ -1,0 +1,16 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+
+from setuptools import Extension, setup  # type: ignore[import]
+
+native_impl = Extension("native.impl", sources=["impl.c"])
+
+setup(
+    name="native",
+    version="2.3.4",
+    packages=["native"],
+    namespace_packages=["native"],
+    package_dir={"native": "."},
+    ext_modules=[native_impl],
+)
