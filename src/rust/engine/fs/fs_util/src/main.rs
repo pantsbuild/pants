@@ -385,10 +385,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .ok_or_else(|| format!("Tried to save file {:?} but it did not exist", path))?;
           match file {
             fs::Stat::File(f) => {
-              let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                .store_by_digest(f)
-                .await
-                .unwrap();
+              let digest =
+                store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs), false)
+                  .store_by_digest(f)
+                  .await
+                  .unwrap();
 
               let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
                 .await
@@ -458,7 +459,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         let snapshot = Snapshot::from_path_stats(
           store_copy.clone(),
-          store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+          store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
           paths,
         )
         .await?;

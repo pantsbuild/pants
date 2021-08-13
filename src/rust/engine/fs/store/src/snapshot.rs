@@ -269,7 +269,7 @@ impl Snapshot {
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
         store.clone(),
-        OneOffStoreFileByDigest::new(store, posix_fs),
+        OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
       .await
@@ -354,17 +354,23 @@ pub trait StoreFileByDigest<Error> {
 }
 
 ///
-/// A StoreFileByDigest which reads with a PosixFS and writes to a Store, with no caching.
+/// A StoreFileByDigest which reads immutable files with a PosixFS and writes to a Store, with no
+/// caching.
 ///
 #[derive(Clone)]
 pub struct OneOffStoreFileByDigest {
   store: Store,
   posix_fs: Arc<PosixFS>,
+  immutable: bool,
 }
 
 impl OneOffStoreFileByDigest {
-  pub fn new(store: Store, posix_fs: Arc<PosixFS>) -> OneOffStoreFileByDigest {
-    OneOffStoreFileByDigest { store, posix_fs }
+  pub fn new(store: Store, posix_fs: Arc<PosixFS>, immutable: bool) -> OneOffStoreFileByDigest {
+    OneOffStoreFileByDigest {
+      store,
+      posix_fs,
+      immutable,
+    }
   }
 }
 
@@ -372,12 +378,12 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
   fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
     let store = self.store.clone();
     let posix_fs = self.posix_fs.clone();
+    let immutable = self.immutable;
     let res = async move {
-      let content = posix_fs
-        .read_file(&file)
+      let path = posix_fs.file_path(&file);
+      store
+        .store_file(true, immutable, move || std::fs::File::open(&path))
         .await
-        .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))?;
-      store.store_file_bytes(content.content, true).await
     };
     res.boxed()
   }
