@@ -81,6 +81,7 @@ pub struct RemotingOptions {
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub cache_rpc_concurrency: usize,
@@ -151,6 +152,7 @@ impl Core {
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
+        remoting_opts.store_batch_api_size_limit,
       )
     } else {
       Ok(local_only)

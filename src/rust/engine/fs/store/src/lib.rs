@@ -327,6 +327,7 @@ impl Store {
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    batch_api_size_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
@@ -340,6 +341,7 @@ impl Store {
         rpc_retries,
         rpc_concurrency_limit,
         capabilities_cell_opt,
+        batch_api_size_limit,
       )?)),
     })
   }

@@ -21,6 +21,7 @@ import toml
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -326,8 +327,10 @@ class _ConfigValues:
         def recursively_format_str(value: str) -> str:
             # It's possible to interpolate with a value that itself has an interpolation. We must
             # fully evaluate all expressions for parity with configparser.
-            if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
+            match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
+            if not match:
                 return value
+            self._maybe_deprecated_default(match.group(1))
             return recursively_format_str(value=format_str(value))
 
         return recursively_format_str(raw_value)
@@ -455,6 +458,16 @@ class _ConfigValues:
             if default_option not in result
         )
         return result
+
+    def _maybe_deprecated_default(self, option: str) -> None:
+        matched = option == "pants_supportdir"
+        value = self.defaults[option] if matched else None
+        deprecated_conditional(
+            lambda: matched,
+            "2.8.0.dev0",
+            "The `pants_supportdir` default value in `pants.toml`",
+            hint=f"Replace use of the variable with the literal: {repr(value)}.",
+        )
 
     @property
     def defaults(self) -> Mapping[str, str]:

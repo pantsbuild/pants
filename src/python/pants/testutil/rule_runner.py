@@ -171,7 +171,7 @@ class RuleRunner:
             executor=_EXECUTOR,
             execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
             ca_certs_path=ca_certs_path,
-            native_engine_visualize_to=None,
+            engine_visualize_to=None,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(

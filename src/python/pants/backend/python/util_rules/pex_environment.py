@@ -281,9 +281,5 @@ class CompletePexEnvironment:
         return d
 
 
-class WorkspacePexEnvironment(CompletePexEnvironment):
-    pass
-
-
 def rules():
     return [*collect_rules(), *process.rules(), *subprocess_environment.rules()]

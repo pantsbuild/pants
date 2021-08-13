@@ -112,6 +112,10 @@ jobs:
       run: './pants --version
 
         '
+    - name: Validate CI config
+      run: './pants run build-support/bin/generate_github_workflows.py -- --check
+
+        '
     - name: Run smoke tests
       run: './pants list ::
 
@@ -148,6 +152,8 @@ jobs:
         ./build-support/bin/check_rust_pre_commit.sh
 
         ./cargo test --all --tests -- --nocapture
+
+        ./cargo build --benches
 
         '
     strategy:

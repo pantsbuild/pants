@@ -9,13 +9,13 @@ from pants.util.contextutil import temporary_dir
 
 
 def test_visualize_to():
-    # Tests usage of the `--native-engine-visualize-to=` option, which triggers background
+    # Tests usage of the `--engine-visualize-to=` option, which triggers background
     # visualization of the graph. There are unit tests confirming the content of the rendered
     # results.
     with temporary_dir(root_dir=os.getcwd()) as destdir:
         run_pants(
             [
-                f"--native-engine-visualize-to={destdir}",
+                f"--engine-visualize-to={destdir}",
                 "--backend-packages=pants.backend.python",
                 "list",
                 "testprojects/src/python/hello/greet",

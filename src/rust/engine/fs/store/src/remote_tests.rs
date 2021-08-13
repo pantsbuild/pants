@@ -159,6 +159,7 @@ async fn write_file_multiple_chunks() {
     1,
     256,
     None,
+    0, // disable batch API, force streaming API
   )
   .unwrap();
 
@@ -230,6 +231,7 @@ async fn write_connection_error() {
     1,
     256,
     None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap();
   let error = store
@@ -307,6 +309,7 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
     1,
     256,
     None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap()
 }

@@ -50,7 +50,7 @@ class PoetrySubsystem(PythonToolRequirementsBase):
     default_version = "poetry==1.1.7"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.9"]
 
     # TODO(#12314): add lockfile support, but that has to be manually added rather than having Pants
     #  auto-generate it to workaround chicken-and-egg.

@@ -712,7 +712,15 @@ async fn main() {
           .long("rpc-concurrency-limit")
           .required(false)
           .default_value("128")
-    ).get_matches();
+    ).arg(
+    Arg::with_name("batch-api-size-limit")
+        .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+        .takes_value(true)
+        .long("batch-api-size-limit")
+        .required(false)
+        .default_value("4194304")
+  )
+      .get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
@@ -756,6 +764,8 @@ async fn main() {
         value_t!(args.value_of("rpc-concurrency-limit"), usize)
           .expect("Bad rpc-concurrency-limit flag"),
         None,
+        value_t!(args.value_of("batch-api-size-limit"), usize)
+          .expect("Bad batch-api-size-limit flag"),
       )
       .expect("Error making remote store"),
     None => local_only_store,

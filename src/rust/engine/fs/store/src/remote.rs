@@ -18,7 +18,8 @@ use hashing::Digest;
 use log::Level;
 use remexec::{
   capabilities_client::CapabilitiesClient,
-  content_addressable_storage_client::ContentAddressableStorageClient, ServerCapabilities,
+  content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
+  ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
@@ -33,6 +34,7 @@ pub struct ByteStore {
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
   capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
+  batch_api_size_limit: usize,
 }
 
 impl fmt::Debug for ByteStore {
@@ -75,6 +77,7 @@ impl ByteStore {
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -107,6 +110,7 @@ impl ByteStore {
       capabilities_cell: capabilities_cell_opt
         .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
       capabilities_client,
+      batch_api_size_limit,
     })
   }
 
@@ -199,6 +203,60 @@ impl ByteStore {
   }
 
   async fn store_bytes_source<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let len = digest.size_bytes;
+
+    let max_batch_total_size_bytes = {
+      let capabilities = self.get_capabilities().await?;
+
+      capabilities
+        .cache_capabilities
+        .as_ref()
+        .map(|c| c.max_batch_total_size_bytes as usize)
+        .unwrap_or_default()
+    };
+
+    let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
+    let batch_api_allowed_by_server_config =
+      max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
+    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+      self.store_bytes_source_batch(digest, bytes).await
+    } else {
+      self.store_bytes_source_stream(digest, bytes).await
+    }
+  }
+
+  async fn store_bytes_source_batch<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let request = BatchUpdateBlobsRequest {
+      instance_name: self.instance_name.clone().unwrap_or_default(),
+      requests: vec![remexec::batch_update_blobs_request::Request {
+        digest: Some(digest.into()),
+        data: bytes(0..digest.size_bytes),
+      }],
+    };
+
+    let mut client = self.cas_client.as_ref().clone();
+    client
+      .batch_update_blobs(request)
+      .await
+      .map_err(ByteStoreError::Grpc)?;
+    Ok(())
+  }
+
+  async fn store_bytes_source_stream<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
@@ -464,8 +522,7 @@ impl ByteStore {
     }
   }
 
-  #[allow(dead_code)]
-  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
+  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {
     let capabilities_fut = async {
       let mut request = remexec::GetCapabilitiesRequest::default();
       if let Some(s) = self.instance_name.as_ref() {
@@ -477,7 +534,7 @@ impl ByteStore {
         .get_capabilities(request)
         .await
         .map(|r| r.into_inner())
-        .map_err(status_to_str)
+        .map_err(ByteStoreError::Grpc)
     };
 
     self
