@@ -55,7 +55,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   let mut cgroup = c.benchmark_group("materialize_directory");
 
   for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000)] {
-    let (store, _tempdir, digest) = large_snapshot(&executor, count, size);
+    let (store, _tempdir, digest) = snapshot(&executor, count, size);
     let parent_dest = TempDir::new().unwrap();
     let parent_dest_path = parent_dest.path();
     cgroup
@@ -78,7 +78,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
   let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
   // NB: We use a much larger snapshot size compared to the materialize benchmark!
-  let (store, _tempdir, digest) = large_snapshot(&executor, 1000, 100);
+  let (store, _tempdir, digest) = snapshot(&executor, 1000, 100);
 
   let mut cgroup = c.benchmark_group("digest_subset");
 
@@ -106,7 +106,7 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
 pub fn criterion_benchmark_merge(c: &mut Criterion) {
   let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
   let num_files: usize = 4000;
-  let (store, _tempdir, digest) = large_snapshot(&executor, num_files, 100);
+  let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 
   let (directory, _metadata) = executor
     .block_on(store.load_directory(digest))
