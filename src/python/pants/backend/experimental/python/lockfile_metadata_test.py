@@ -4,6 +4,7 @@
 import pytest
 
 from pants.backend.experimental.python.lockfile_metadata import (
+    LockfileMetadata,
     calculate_invalidation_digest,
     lockfile_content_with_header,
     lockfile_metadata_header,
@@ -75,4 +76,58 @@ def test_hash_depends_on_requirement_source() -> None:
     reqs = ["CPython"]
     assert calculate_invalidation_digest(FrozenOrderedSet(reqs)) != calculate_invalidation_digest(
         FrozenOrderedSet([])
+    )
+
+
+_AAAH_REAL_PYTHONS = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+
+
+@pytest.mark.parametrize(
+    "user_digest, expected_digest, user_ic, expected_ic, matches",
+    [
+        (
+            "yes",
+            "yes",
+            [">=3.5.5"],
+            [">=3.5, <=3.6"],
+            False,
+        ),  # User ICs contain versions in the 3.6 range
+        ("yes", "yes", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], True),
+        ("yes", "no", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], False),  # Digests do not match
+        (
+            "yes",
+            "yes",
+            [">=3.5.5, <=3.5.10"],
+            [">=3.5", "<=3.6"],
+            True,
+        ),  # User ICs match each of the actual ICs individually
+        (
+            "yes",
+            "yes",
+            [">=3.5.5, <=3.5.10"],
+            [">=3.5", "<=3.5.4"],
+            True,
+        ),  # User ICs do not match one of the individual ICs
+        ("yes", "yes", ["==3.5.*, !=3.5.10"], [">=3.5, <=3.6"], True),
+        (
+            "yes",
+            "yes",
+            ["==3.5.*"],
+            [">=3.5, <=3.6, !=3.5.10"],
+            False,
+        ),  # Excluded IC from expected range is valid for user ICs
+        ("yes", "yes", [">=3.5, <=3.6", ">= 3.8"], [">=3.5"], True),
+        (
+            "yes",
+            "yes",
+            [">=3.5, <=3.6", ">= 3.8"],
+            [">=3.5, !=3.7.10"],
+            True,
+        ),  # Excluded version from expected ICs is not in a range specified
+    ],
+)
+def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
+    m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
+    assert (
+        m.is_valid_for(user_digest, InterpreterConstraints(user_ic), _AAAH_REAL_PYTHONS) == matches
     )

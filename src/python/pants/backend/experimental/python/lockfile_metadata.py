@@ -20,6 +20,36 @@ class LockfileMetadata:
     invalidation_digest: str | None
     valid_interpreter_constraints: InterpreterConstraints | None
 
+    def is_valid_for(
+        self,
+        expected_invalidation_digest: str | None,
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+    ) -> bool:
+        """Returns True if this `LockfileMetadata` represents a lockfile that can be used in the
+        current execution context.
+
+        A lockfile can be used in the current execution context if `expected_invalidation_digest ==
+        invalidation_digest`, and if `user_interpreter_constraints` matches no interpreters
+        specified by `valid_interpreter_constraints`.
+        """
+
+        if self.invalidation_digest != expected_invalidation_digest:
+            return False
+
+        if self.valid_interpreter_constraints is None:
+            # This lockfile matches all interpreter constraints (TODO: check this)
+            return True
+
+        valid_versions = self.valid_interpreter_constraints.enumerate_python_versions(
+            interpreter_universe=interpreter_universe
+        )
+        user_versions = user_interpreter_constraints.enumerate_python_versions(
+            interpreter_universe=interpreter_universe
+        )
+
+        return user_versions.issubset(valid_versions)
+
 
 def calculate_invalidation_digest(
     requirements: FrozenOrderedSet[str],

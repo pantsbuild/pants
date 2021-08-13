@@ -441,7 +441,11 @@ async def build_pex(
             globs,
         )
         metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
-        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+        if not metadata.is_valid_for(
+            request.requirements.lockfile_hex_digest,
+            request.interpreter_constraints,
+            python_setup.interpreter_universe,
+        ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
@@ -458,7 +462,11 @@ async def build_pex(
         argv.extend(["--requirement", content.path])
 
         metadata = read_lockfile_metadata(content.content)
-        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+        if not metadata.is_valid_for(
+            request.requirements.lockfile_hex_digest,
+            request.interpreter_constraints,
+            python_setup.interpreter_universe,
+        ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
                 raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
