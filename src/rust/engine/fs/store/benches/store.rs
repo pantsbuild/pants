@@ -76,6 +76,54 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   }
 }
 
+///
+/// NB: More accurately, this benchmarks `Snapshot::digest_from_path_stats`, which avoids
+/// filesystem traversal overheads and focuses on digesting/capturing.
+///
+pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
+  let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
+
+  let mut cgroup = c.benchmark_group("snapshot_capture");
+
+  // The number of files, file size, whether the inputs should be assumed to be immutable, and the
+  // number of times to capture (only the first capture actually stores anything: the rest should
+  // ignore the duplicated data.)
+  for params in vec![
+    (100, 100, false, 100),
+    (20, 10_000_000, true, 10),
+    (1, 200_000_000, true, 10),
+  ] {
+    let (count, size, _immutable, captures) = params;
+    let storedir = TempDir::new().unwrap();
+    let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
+    let (tempdir, path_stats) = tempdir_containing(count, size);
+    let posix_fs = Arc::new(
+      PosixFS::new(
+        tempdir.path(),
+        GitignoreStyleExcludes::empty(),
+        executor.clone(),
+      )
+      .unwrap(),
+    );
+    cgroup
+      .sample_size(10)
+      .measurement_time(Duration::from_secs(30))
+      .bench_function(format!("snapshot_capture({:?})", params), |b| {
+        b.iter(|| {
+          for _ in 0..captures {
+            let _ = executor
+              .block_on(Snapshot::digest_from_path_stats(
+                store.clone(),
+                OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone()),
+                path_stats.clone(),
+              ))
+              .unwrap();
+          }
+        })
+      });
+  }
+}
+
 pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
   let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
   // NB: We use a much larger snapshot size compared to the materialize benchmark!
@@ -179,6 +227,7 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
 criterion_group!(
   benches,
   criterion_benchmark_materialize,
+  criterion_benchmark_snapshot_capture,
   criterion_benchmark_subset_wildcard,
   criterion_benchmark_merge
 );
