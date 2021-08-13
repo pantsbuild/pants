@@ -30,21 +30,22 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bytes::Bytes;
-use fs::{GlobExpansionConjunction, PreparedPathGlobs, RelativePath, StrictGlobMatching};
-use futures::future;
+use fs::{
+  File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, PosixFS, PreparedPathGlobs,
+  StrictGlobMatching,
+};
 use hashing::{Digest, EMPTY_DIGEST};
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use store::{SnapshotOps, Store, SubsetParams};
+use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   // Create an executor, store containing the stuff to materialize, and a digest for the stuff.
@@ -60,7 +61,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
     let parent_dest_path = parent_dest.path();
     cgroup
       .sample_size(10)
-      .measurement_time(Duration::from_secs(60))
+      .measurement_time(Duration::from_secs(30))
       .bench_function(format!("materialize_directory({}, {})", count, size), |b| {
         b.iter(|| {
           // NB: We forget this child tempdir to avoid deleting things during the run.
@@ -184,16 +185,12 @@ criterion_group!(
 criterion_main!(benches);
 
 ///
-/// Returns a Store (and the TempDir it is stored in) and a Digest for a nested directory
-/// containing the given number of files, each with roughly the given size.
+/// Creates and returns a TempDir containing the given number of files, each approximately of size
+/// file_target_size.
 ///
-pub fn snapshot(
-  executor: &Executor,
-  max_files: usize,
-  file_target_size: usize,
-) -> (Store, TempDir, Digest) {
+fn tempdir_containing(max_files: usize, file_target_size: usize) -> (TempDir, Vec<PathStat>) {
   let henries_lines = {
-    let f = File::open(
+    let f = std::fs::File::open(
       PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("testdata")
         .join("all_the_henries"),
@@ -202,7 +199,8 @@ pub fn snapshot(
     BufReader::new(f).lines()
   };
 
-  let henries_paths = henries_lines
+  let mut produced = HashSet::new();
+  let paths = henries_lines
     .filter_map(|line| {
       // Clean up to lowercase ascii.
       let clean_line = line
@@ -222,49 +220,78 @@ pub fn snapshot(
 
       // NB: Split the line by whitespace, then accumulate a PathBuf using each word as a path
       // component!
-      let path_buf = clean_line.split_whitespace().collect::<PathBuf>();
+      let mut path_buf = clean_line.split_whitespace().collect::<PathBuf>();
       // Drop empty or too-long candidates.
       let components_too_long = path_buf.components().any(|c| c.as_os_str().len() > 255);
       if components_too_long || path_buf.as_os_str().is_empty() || path_buf.as_os_str().len() > 512
       {
         None
       } else {
-        Some(path_buf)
+        // We add an extension to files to avoid collisions with directories (which are created
+        // implicitly based on leading components).
+        path_buf.set_extension("txt");
+        Some(PathStat::file(
+          path_buf.clone(),
+          File {
+            path: path_buf,
+            is_executable: false,
+          },
+        ))
       }
     })
-    .take(max_files);
+    .filter(move |path| produced.insert(path.clone()))
+    .take(max_files)
+    .collect::<Vec<_>>();
 
+  let tempdir = TempDir::new().unwrap();
+  for path in &paths {
+    // We use the (repeated) path as the content as well.
+    let abs_path = tempdir.path().join(path.path());
+    if let Some(parent) = abs_path.parent() {
+      fs::safe_create_dir_all(parent).unwrap();
+    }
+    let mut f = BufWriter::new(std::fs::File::create(abs_path).unwrap());
+    let bytes = path.path().as_os_str().as_bytes();
+    let lines_to_write = file_target_size / bytes.len();
+    for _ in 0..lines_to_write {
+      f.write_all(bytes).unwrap();
+      f.write_all(b"\n").unwrap();
+    }
+  }
+  (tempdir, paths)
+}
+
+///
+/// Returns a Store (and the TempDir it is stored in) and a Digest for a nested directory
+/// containing the given number of files, each with roughly the given size.
+///
+fn snapshot(
+  executor: &Executor,
+  max_files: usize,
+  file_target_size: usize,
+) -> (Store, TempDir, Digest) {
+  // NB: We create the files in a tempdir rather than in memory in order to allow for more
+  // realistic benchmarking involving large files. The tempdir is dropped at the end of this method
+  // (after everything has been captured out of it).
+  let (tempdir, path_stats) = tempdir_containing(max_files, file_target_size);
   let storedir = TempDir::new().unwrap();
   let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
 
   let store2 = store.clone();
-  let digests = henries_paths
-    .map(|mut path| {
-      let store = store2.clone();
-      async move {
-        // We use the (repeated) path as the content as well.
-        let content: Bytes = {
-          let base = Bytes::copy_from_slice(path.as_os_str().as_bytes());
-          base.repeat(file_target_size / base.len()).into()
-        };
-        // We add an extension to files to avoid collisions with directories (which are created
-        // implicitly based on leading components).
-        path.set_extension("txt");
-        let relpath = RelativePath::new(path)?;
-        let digest = store.store_file_bytes(content, true).await?;
-        let snapshot = store.snapshot_of_one_file(relpath, digest, false).await?;
-        let res: Result<_, String> = Ok(snapshot.digest);
-        res
-      }
-    })
-    .collect::<Vec<_>>();
-
   let digest = executor
-    .block_on({
-      async move {
-        let digests = future::try_join_all(digests).await?;
-        store2.merge(digests).await
-      }
+    .block_on(async move {
+      let posix_fs = PosixFS::new(
+        tempdir.path(),
+        GitignoreStyleExcludes::empty(),
+        executor.clone(),
+      )
+      .unwrap();
+      Snapshot::digest_from_path_stats(
+        store2.clone(),
+        OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs)),
+        path_stats,
+      )
+      .await
     })
     .unwrap();
 
