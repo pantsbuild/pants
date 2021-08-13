@@ -353,38 +353,48 @@ def test_enumerate_python_versions_invalid_universe(version: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "narrower,wider,matches",
+    "candidate,target,matches",
     (
-        ([">=3.5.5"], [">=3.5, <=3.6"], False),  # User ICs contain versions in the 3.6 range
-        ([">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], True),
+        ([">=3.5,<=3.6"], [">=3.5.5"], False),  # Target ICs contain versions in the 3.6 range
+        ([">=3.5,<=3.6"], [">=3.5.5,<=3.5.10"], True),
         (
-            [">=3.5.5, <=3.5.10"],
             [">=3.5", "<=3.6"],
+            [">=3.5.5,<=3.5.10"],
             True,
-        ),  # User ICs match each of the actual ICs individually
+        ),  # Target ICs match each of the actual ICs individually
         (
-            [">=3.5.5, <=3.5.10"],
             [">=3.5", "<=3.5.4"],
+            [">=3.5.5,<=3.5.10"],
             True,
-        ),  # User ICs do not match one of the individual ICs
-        (["==3.5.*, !=3.5.10"], [">=3.5, <=3.6"], True),
+        ),  # Target ICs do not match any candidate ICs
+        ([">=3.5,<=3.6"], ["==3.5.*,!=3.5.10"], True),
         (
+            [">=3.5,<=3.6, !=3.5.10"],
             ["==3.5.*"],
-            [">=3.5, <=3.6, !=3.5.10"],
             False,
-        ),  # Excluded IC from expected range is valid for user ICs
-        ([">=3.5, <=3.6", ">= 3.8"], [">=3.5"], True),
+        ),  # Excluded IC from candidate range is valid for target ICs
+        ([">=3.5"], [">=3.5,<=3.6", ">= 3.8"], True),
         (
-            [">=3.5, <=3.6", ">= 3.8"],
-            [">=3.5, !=3.7.10"],
+            [">=3.5,!=3.7.10"],
+            [">=3.5,<=3.6", ">= 3.8"],
             True,
-        ),  # Excluded version from expected ICs is not in a range specified
+        ),  # Excluded version from candidate ICs is not in a range specified by target ICs
+        (
+            [">=3.5,<=3.6", ">= 3.8"],
+            [">=3.9"],
+            True,
+        ),  # matches only one of the candidate specifications
+        (
+            ["<3.6", ">=3.6"],
+            [">=3.5"],
+            True,
+        ),  # target matches a weirdly specified non-disjoint IC list
     ),
 )
-def test_contains(narrower, wider, matches) -> None:
+def test_contains(candidate, target, matches) -> None:
     assert (
-        InterpreterConstraints(wider).contains(
-            InterpreterConstraints(narrower), ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+        InterpreterConstraints(candidate).contains(
+            InterpreterConstraints(target), ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
         )
         == matches
     )
