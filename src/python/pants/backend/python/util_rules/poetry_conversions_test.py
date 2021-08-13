@@ -28,11 +28,10 @@ def test_create_pyproject_toml() -> None:
         ],
         InterpreterConstraints(["==3.7.*", "==3.8.*"]),
     )
-    print(created)
     assert created == {
         "tool": {
             "poetry": {
-                **_HEADER,
+                **_HEADER,  # type: ignore[arg-type]
                 "dependencies": {
                     "python": "==3.7.* || ==3.8.*",
                     "dep1": {"version": "*"},
