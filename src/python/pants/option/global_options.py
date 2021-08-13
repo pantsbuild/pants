@@ -339,6 +339,7 @@ class ExecutionOptions:
     remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
     remote_store_rpc_concurrency: int
+    remote_store_batch_api_size_limit: int
 
     remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
@@ -378,6 +379,7 @@ class ExecutionOptions:
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
+            remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
@@ -456,6 +458,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
+    remote_store_batch_api_size_limit=4194304,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
     remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
@@ -1219,6 +1222,13 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
             help="The number of concurrent requests allowed to the remote store service.",
+        )
+        register(
+            "--remote-store-batch-api-size-limit",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
+            help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
         )
 
         register(
