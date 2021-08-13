@@ -273,6 +273,14 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
+                    "name": "Validate CI config",
+                    "run": dedent(
+                        """\
+                        ./pants run build-support/bin/generate_github_workflows.py --check
+                        """
+                    ),
+                },
+                {
                     "name": "Run smoke tests",
                     "run": dedent(
                         """\
