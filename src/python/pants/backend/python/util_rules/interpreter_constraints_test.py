@@ -303,4 +303,50 @@ def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
     assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
 
 
-_ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+_ALL_PATCHES = set(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+
+
+def patches(major, minor, unqualified_patches):
+    return {(major, minor, patch) for patch in unqualified_patches}
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        (["==2.7.15"], patches(2, 7, {15})),
+        (["==2.7.*"], patches(2, 7, _ALL_PATCHES)),
+        (["==3.6.15", "==3.7.15"], patches(3, 6, {15}) | patches(3, 7, {15})),
+        (["==3.6.*", "==3.7.*"], patches(3, 6, _ALL_PATCHES) | patches(3, 7, _ALL_PATCHES)),
+        (
+            ["==2.7.1", ">=3.6.15"],
+            (
+                patches(2, 7, {1})
+                | patches(3, 6, set(range(15, _EXPECTED_LAST_PATCH_VERSION + 1)))
+                | patches(3, 7, _ALL_PATCHES)
+                | patches(3, 8, _ALL_PATCHES)
+                | patches(3, 9, _ALL_PATCHES)
+            ),
+        ),
+        ([], set()),
+    ),
+)
+def test_enumerate_python_versions(
+    constraints: list[str], expected: set[tuple[int, int, int]]
+) -> None:
+    assert (
+        InterpreterConstraints(constraints).enumerate_python_versions(
+            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
+        )
+        == expected
+    )
+
+
+def test_enumerate_python_versions_none_matching() -> None:
+    with pytest.raises(ValueError):
+        InterpreterConstraints(["==3.6.*"]).enumerate_python_versions(interpreter_universe=["2.7"])
+
+
+@pytest.mark.parametrize("version", ["2.6", "2.8", "4.1", "1.0"])
+def test_enumerate_python_versions_invalid_universe(version: str) -> None:
+    with pytest.raises(AssertionError):
+        InterpreterConstraints(["==2.7.*", "==3.5.*"]).enumerate_python_versions([version])
