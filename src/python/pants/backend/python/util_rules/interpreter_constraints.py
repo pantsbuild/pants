@@ -259,6 +259,71 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             return "*"
         return " || ".join(specifiers)
 
+    def enumerate_python_versions(
+        self, interpreter_universe: Iterable[str]
+    ) -> set[tuple[int, int, int]]:
+        """Return a set of all plausible (major, minor, patch) tuples for all Python 2.7/3.x in the
+        specified interpreter universe that matches this set of interpreter constraints.
+
+        This also validates our assumptions around the `interpreter_universe`:
+
+        - Python 2.7 is the only Python 2 version in the universe, if at all.
+        - Python 3 is the last major release of Python, which the core devs have committed to in
+          public several times.
+        """
+        if not self:
+            return set()
+
+        minors = []
+        for major_minor in interpreter_universe:
+            major, minor = _major_minor_to_int(major_minor)
+            if major == 2:
+                if minor != 7:
+                    raise AssertionError(
+                        "Unexpected value in `[python-setup].interpreter_versions_universe`: "
+                        f"{major_minor}. Expected the only Python 2 value to be '2.7', given that "
+                        f"all other versions are unmaintained or do not exist."
+                    )
+                minors.append((2, minor))
+            elif major == 3:
+                minors.append((3, minor))
+            else:
+                raise AssertionError(
+                    "Unexpected value in `[python-setup].interpreter_versions_universe`: "
+                    f"{major_minor}. Expected to only include '2.7' and/or Python 3 versions, "
+                    "given that Python 3 will be the last major Python version. Please open an "
+                    "issue at https://github.com/pantsbuild/pants/issues/new if this is no longer "
+                    "true."
+                )
+
+        valid_patches = set(
+            (major, minor, patch)
+            for (major, minor) in sorted(minors)
+            for patch in self._valid_patch_versions(major, minor)
+        )
+
+        if not valid_patches:
+            raise ValueError(
+                f"The interpreter constraints `{self}` are not compatible with any of the "
+                "interpreter versions from `[python-setup].interpreter_versions_universe`.\n\n"
+                "Please either change these interpreter constraints or update the "
+                "`interpreter_versions_universe` to include the interpreters set in these "
+                "constraints. Run `./pants help-advanced python-setup` for more information on the "
+                "`interpreter_versions_universe` option."
+            )
+
+        return valid_patches
+
+    def contains(self, other: InterpreterConstraints, universe: Iterable[str]) -> bool:
+        """Returns True if the `InterpreterConstraints` specified in `other` is a subset of these
+        `InterpreterConstraints`.
+
+        This is restricted to the set of minor Python versions specified in `universe`.
+        """
+        this = self.enumerate_python_versions(universe)
+        that = other.enumerate_python_versions(universe)
+        return this.issuperset(that)
+
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
