@@ -314,6 +314,21 @@ impl<W: Write> Write for WriterHasher<W> {
   }
 }
 
+///
+/// A Write implementation which discards its inputs.
+///
+pub struct NoopWriter;
+
+impl Write for NoopWriter {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    Ok(buf.len())
+  }
+
+  fn flush(&mut self) -> io::Result<()> {
+    Ok(())
+  }
+}
+
 #[cfg(test)]
 mod fingerprint_tests;
 

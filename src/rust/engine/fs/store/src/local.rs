@@ -1,11 +1,13 @@
 use super::{EntryType, ShrinkBehavior};
 
 use std::collections::BinaryHeap;
+use std::fmt::Debug;
+use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{self, Duration};
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
@@ -250,18 +252,31 @@ impl ByteStore {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    self
+      .store(entry_type, initial_lease, true, move || {
+        Ok(bytes.clone().reader())
+      })
+      .await
+  }
+
+  pub async fn store<F, R>(
+    &self,
+    entry_type: EntryType,
+    initial_lease: bool,
+    data_is_immutable: bool,
+    data_provider: F,
+  ) -> Result<Digest, String>
+  where
+    R: Read + Debug,
+    F: Fn() -> Result<R, io::Error> + Send + 'static,
+  {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    let bytes2 = bytes.clone();
-    let digest = self
-      .inner
-      .executor
-      .spawn_blocking(move || Digest::of_bytes(&bytes))
-      .await;
-    dbs?.store_bytes(digest.hash, bytes2, initial_lease).await?;
-    Ok(digest)
+    dbs?
+      .store(initial_lease, data_is_immutable, data_provider)
+      .await
   }
 
   ///

@@ -27,18 +27,21 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Debug;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::{self, Duration};
+
 use bytes::Bytes;
-use hashing::{Fingerprint, FINGERPRINT_SIZE};
+use hashing::{Digest, Fingerprint, NoopWriter, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
 };
 use log::trace;
-use std::collections::HashMap;
-use std::fmt;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::{self, Duration};
 use tempfile::TempDir;
 
 ///
@@ -378,6 +381,109 @@ impl ShardedLmdb {
       .await
   }
 
+  ///
+  /// Stores the given Read instance under its computed digest. This method performs two passes
+  /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
+  /// re-hash the data to confirm that it hasn't changed.
+  ///
+  pub async fn store<F, R>(
+    &self,
+    initial_lease: bool,
+    data_is_immutable: bool,
+    data_provider: F,
+  ) -> Result<Digest, String>
+  where
+    R: Read + Debug,
+    F: Fn() -> Result<R, io::Error> + Send + 'static,
+  {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(move || {
+        let mut attempts = 0;
+        loop {
+          // First pass: compute the Digest.
+          let digest = {
+            let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+            let mut hasher = WriterHasher::new(NoopWriter);
+            let _ = std::io::copy(&mut read, &mut hasher)
+              .map_err(|e| format!("Failed to read from {:?}: {}", read, e))?;
+            hasher.finish().0
+          };
+
+          let effective_key = VersionedFingerprint::new(digest.hash, ShardedLmdb::SCHEMA_VERSION);
+          let (env, db, lease_database) = store.get(&digest.hash);
+          let put_res: Result<(), StoreError> = env
+            .begin_rw_txn()
+            .map_err(StoreError::Lmdb)
+            .and_then(|mut txn| {
+              // Second pass: copy into the reserved memory.
+              let dest = txn.reserve(
+                db,
+                &effective_key,
+                digest.size_bytes,
+                WriteFlags::NO_OVERWRITE,
+              )?;
+              let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+              if data_is_immutable {
+                // Trust that the data hasn't changed.
+                read
+                  .read_exact(dest)
+                  .map_err(|e| format!("Failed to read from {:?}: {:?}", read, e))?
+              } else {
+                // Confirm that the data hasn't changed.
+                let length_changed = read.read_exact(dest).map(|()| false).or_else(|e| match e
+                  .kind()
+                {
+                  std::io::ErrorKind::UnexpectedEof => {
+                    // If the source was shortened, we should retry rather than erroring.
+                    Ok(true)
+                  }
+                  _ => Err(format!("Failed to read from {:?}: {:?}", read, e)),
+                })?;
+
+                // Should retry if the length changed, or the Digest changed between reads.
+                if length_changed || digest != Digest::of_bytes(dest) {
+                  let msg = format!("Input {:?} changed while reading.", read);
+                  log::debug!("{}", msg);
+                  return Err(StoreError::Retry(msg));
+                }
+              };
+
+              if initial_lease {
+                store.lease_inner(
+                  lease_database,
+                  &effective_key,
+                  store.lease_until_secs_since_epoch(),
+                  &mut txn,
+                )?;
+              }
+              txn.commit()?;
+              Ok(())
+            });
+
+          match put_res {
+            Ok(()) => return Ok(digest),
+            Err(StoreError::Retry(msg)) => {
+              // Input changed during reading: maybe retry.
+              if attempts > 10 {
+                return Err(msg);
+              } else {
+                attempts += 1;
+                continue;
+              }
+            }
+            Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(digest),
+            Err(StoreError::Lmdb(err)) => {
+              return Err(format!("Error storing {:?}: {}", digest, err))
+            }
+            Err(StoreError::Io(err)) => return Err(format!("Error storing {:?}: {}", digest, err)),
+          };
+        }
+      })
+      .await
+  }
+
   pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), lmdb::Error> {
     let store = self.clone();
     self
@@ -481,6 +587,24 @@ impl ShardedLmdb {
       std::mem::drop(new_dir);
     }
     Ok(())
+  }
+}
+
+enum StoreError {
+  Lmdb(lmdb::Error),
+  Io(String),
+  Retry(String),
+}
+
+impl From<lmdb::Error> for StoreError {
+  fn from(err: lmdb::Error) -> Self {
+    Self::Lmdb(err)
+  }
+}
+
+impl From<String> for StoreError {
+  fn from(err: String) -> Self {
+    Self::Io(err)
   }
 }
 

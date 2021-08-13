@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
@@ -381,22 +380,5 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
       store.store_file_bytes(content.content, true).await
     };
     res.boxed()
-  }
-}
-
-#[derive(Clone)]
-pub struct StoreManyFileDigests {
-  pub hash: HashMap<PathBuf, Digest>,
-}
-
-impl StoreFileByDigest<String> for StoreManyFileDigests {
-  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
-    future::ready(self.hash.get(&file.path).copied().ok_or_else(|| {
-      format!(
-        "Could not find file {} when storing file by digest",
-        file.path.display()
-      )
-    }))
-    .boxed()
   }
 }
