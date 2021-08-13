@@ -100,7 +100,7 @@ async def generate_python_from_protobuf(
     lockfile_hex_digest = None
     if python_protobuf_mypy_plugin.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, MypyProtobufLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"

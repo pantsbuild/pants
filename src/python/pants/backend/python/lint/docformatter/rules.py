@@ -64,7 +64,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
     lockfile_hex_digest = None
     if docformatter.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, DocformatterLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     docformatter_pex_get = Get(
         VenvPex,

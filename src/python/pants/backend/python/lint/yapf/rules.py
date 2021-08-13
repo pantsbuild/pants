@@ -71,7 +71,7 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
     lockfile_hex_digest = None
     if yapf.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, YapfLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     yapf_pex_get = Get(
         VenvPex,

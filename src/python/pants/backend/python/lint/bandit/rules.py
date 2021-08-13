@@ -49,7 +49,7 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
     lockfile_hex_digest = None
     if bandit.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, BanditLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     bandit_pex_get = Get(
         VenvPex,

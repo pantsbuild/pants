@@ -337,7 +337,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
     lockfile_hex_digest = None
     if coverage.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, CoveragePyLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     pex = await Get(
         VenvPex,

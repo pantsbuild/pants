@@ -423,7 +423,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     lockfile_hex_digest = None
     if setuptools.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, SetuptoolsLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     setuptools_pex = await Get(
         VenvPex,

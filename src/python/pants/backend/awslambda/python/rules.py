@@ -90,7 +90,7 @@ async def package_python_awslambda(
     lockfile_hex_digest = None
     if lambdex.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, LambdexLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",

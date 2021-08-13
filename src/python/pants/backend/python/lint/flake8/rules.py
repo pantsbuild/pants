@@ -49,7 +49,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
     lockfile_hex_digest = None
     if flake8.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, Flake8LockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     flake8_pex_get = Get(
         VenvPex,

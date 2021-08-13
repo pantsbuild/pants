@@ -81,7 +81,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
     lockfile_hex_digest = None
     if isort.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, IsortLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     isort_pex_get = Get(
         VenvPex,

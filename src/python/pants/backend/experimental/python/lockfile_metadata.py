@@ -41,7 +41,9 @@ class LockfileMetadata:
             # This lockfile matches all interpreter constraints (TODO: check this)
             return True
 
-        return self.valid_interpreter_constraints.contains(user_interpreter_constraints, interpreter_universe)
+        return self.valid_interpreter_constraints.contains(
+            user_interpreter_constraints, interpreter_universe
+        )
 
 
 def calculate_invalidation_digest(
@@ -132,7 +134,7 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
     T = TypeVar("T")
 
     def coerce(t: Callable[[Any], T], key: str) -> T | None:
-        """ Gets a value from `metadata`, coercing it to type `t` if not `None`."""
+        """Gets a value from `metadata`, coercing it to type `t` if not `None`."""
         v = metadata.get(key, None)
         try:
             return t(v) if v is not None else None
@@ -142,5 +144,7 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
 
     return LockfileMetadata(
         invalidation_digest=coerce(str, "invalidation_digest"),
-        valid_interpreter_constraints=coerce(InterpreterConstraints, "valid_interpreter_constraints"),
+        valid_interpreter_constraints=coerce(
+            InterpreterConstraints, "valid_interpreter_constraints"
+        ),
     )
