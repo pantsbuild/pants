@@ -314,6 +314,16 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         return valid_patches
 
+    def contains(self, other: InterpreterConstraints, universe: Iterable[str]) -> bool:
+        """Returns True if the `InterpreterConstraints` specified in `other` is a subset of these
+        `InterpreterConstraints`.
+
+        This is restricted to the set of minor Python versions specified in `universe`.
+        """
+        this = self.enumerate_python_versions(universe)
+        that = other.enumerate_python_versions(universe)
+        return this.issuperset(that)
+
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
