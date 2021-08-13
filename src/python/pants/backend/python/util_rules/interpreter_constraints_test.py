@@ -313,9 +313,9 @@ def patches(major, minor, unqualified_patches):
 @pytest.mark.parametrize(
     "constraints,expected",
     (
-        (["==2.7.15"], patches(2, 7, {15})),
+        (["==2.7.15"], {(2, 7, 15)}),
         (["==2.7.*"], patches(2, 7, _ALL_PATCHES)),
-        (["==3.6.15", "==3.7.15"], patches(3, 6, {15}) | patches(3, 7, {15})),
+        (["==3.6.15", "==3.7.15"], {(3, 6, 15), (3, 7, 15)}),
         (["==3.6.*", "==3.7.*"], patches(3, 6, _ALL_PATCHES) | patches(3, 7, _ALL_PATCHES)),
         (
             ["==2.7.1", ">=3.6.15"],
