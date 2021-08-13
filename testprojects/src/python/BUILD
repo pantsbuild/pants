@@ -27,6 +27,11 @@ files(
 )
 
 files(
+  name = 'native_directory',
+  sources = ['native/**/*'],
+)
+
+files(
   name = 'no_build_file_directory',
   sources = ['no_build_file/**/*'],
 )

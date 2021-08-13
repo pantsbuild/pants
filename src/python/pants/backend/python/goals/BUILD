@@ -11,6 +11,13 @@ python_tests(
 
 python_tests(
   name="integration",
-  sources=["*_integration_test.py"],
+  sources=["*_integration_test.py", "!setup_py_integration_test.py"],
   timeout=480,
+)
+
+python_tests(
+  name="setup_py_integration",
+  sources=["setup_py_integration_test.py"],
+  dependencies=["testprojects/src/python:native_directory"],
+  timeout=180,
 )
