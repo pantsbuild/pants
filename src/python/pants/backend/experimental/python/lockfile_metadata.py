@@ -30,7 +30,7 @@ class LockfileMetadata:
         current execution context.
 
         A lockfile can be used in the current execution context if `expected_invalidation_digest ==
-        invalidation_digest`, and if `user_interpreter_constraints` matches no interpreters
+        invalidation_digest`, and if `user_interpreter_constraints` matches only interpreters
         specified by `valid_interpreter_constraints`.
         """
 
@@ -41,14 +41,7 @@ class LockfileMetadata:
             # This lockfile matches all interpreter constraints (TODO: check this)
             return True
 
-        valid_versions = self.valid_interpreter_constraints.enumerate_python_versions(
-            interpreter_universe=interpreter_universe
-        )
-        user_versions = user_interpreter_constraints.enumerate_python_versions(
-            interpreter_universe=interpreter_universe
-        )
-
-        return user_versions.issubset(valid_versions)
+        return self.valid_interpreter_constraints.contains(user_interpreter_constraints, interpreter_universe)
 
 
 def calculate_invalidation_digest(
@@ -138,9 +131,9 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
 
     T = TypeVar("T")
 
-    def coerce(t: Callable[[Any], T], k: str) -> T | None:
+    def coerce(t: Callable[[Any], T], key: str) -> T | None:
         """ Gets a value from `metadata`, coercing it to type `t` if not `None`."""
-        v = metadata.get(k, None)
+        v = metadata.get(key, None)
         try:
             return t(v) if v is not None else None
         except Exception:
