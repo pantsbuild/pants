@@ -138,7 +138,8 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
 
     T = TypeVar("T")
 
-    def c(t: Callable[[Any], T], k: str) -> T | None:
+    def coerce(t: Callable[[Any], T], k: str) -> T | None:
+        """ Gets a value from `metadata`, coercing it to type `t` if not `None`."""
         v = metadata.get(k, None)
         try:
             return t(v) if v is not None else None
@@ -147,6 +148,6 @@ def read_lockfile_metadata(contents: bytes) -> LockfileMetadata:
             return None
 
     return LockfileMetadata(
-        invalidation_digest=c(str, "invalidation_digest"),
-        valid_interpreter_constraints=c(InterpreterConstraints, "valid_interpreter_constraints"),
+        invalidation_digest=coerce(str, "invalidation_digest"),
+        valid_interpreter_constraints=coerce(InterpreterConstraints, "valid_interpreter_constraints"),
     )

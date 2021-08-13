@@ -20,7 +20,6 @@ def test_metadata_round_trip() -> None:
         ["this", "is", "just", "to" "test>=3.0", "parsing!=9.9999999,<10", "semantics==93"]
     )
     metadata = lockfile_metadata_header(val, [str(i) for i in constraints])
-    print(metadata.decode("ascii"))
     output = read_lockfile_metadata(metadata)
     assert val == output.invalidation_digest
     assert constraints == output.valid_interpreter_constraints
