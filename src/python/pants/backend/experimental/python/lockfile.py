@@ -5,18 +5,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
+from textwrap import dedent
 
 from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
     lockfile_content_with_header,
 )
-from pants.backend.python.subsystems.python_tool_base import (
-    PythonToolBase,
-    PythonToolRequirementsBase,
-)
-from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.poetry_conversions import create_pyproject_toml
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
@@ -43,12 +43,34 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------------
 
 
-class PipToolsSubsystem(PythonToolBase):
-    options_scope = "pip-tools"
+class PoetrySubsystem(PythonToolRequirementsBase):
+    options_scope = "poetry"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
-    default_version = "pip-tools==6.2.0"
-    default_main = ConsoleScript("pip-compile")
+    default_version = "poetry==1.1.7"
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.9"]
+
+    # TODO(#12314): add lockfile support, but that has to be manually added rather than having Pants
+    #  auto-generate it to workaround chicken-and-egg.
+
+
+# We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed
+# in Poetry 1.2. See https://github.com/python-poetry/poetry/issues/1584.
+# TODO(#12314): only use this custom launcher if using Poetry 1.1. (Ban 1.0 and earlier, probably).
+POETRY_LAUNCHER = FileContent(
+    "__pants_poetry_launcher.py",
+    dedent(
+        """\
+        from poetry.console import main
+        from poetry.puzzle.provider import Provider
+
+        Provider.UNSAFE_PACKAGES = set()
+        main()
+        """
+    ).encode(),
+)
 
 
 @dataclass(frozen=True)
@@ -101,62 +123,59 @@ class PythonLockfileRequest:
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: PythonLockfileRequest, pip_tools_subsystem: PipToolsSubsystem, python_setup: PythonSetup
+    req: PythonLockfileRequest, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
 ) -> PythonLockfile:
-    reqs_filename = "reqs.txt"
-    input_requirements = await Get(
-        Digest, CreateDigest([FileContent(reqs_filename, "\n".join(req.requirements).encode())])
+    pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
+    pyproject_toml_digest, launcher_digest = await MultiGet(
+        Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
+        Get(Digest, CreateDigest([POETRY_LAUNCHER])),
     )
 
-    pip_compile_pex = await Get(
+    poetry_pex = await Get(
         VenvPex,
         PexRequest(
-            output_filename="pip_compile.pex",
+            output_filename="poetry.pex",
             internal_only=True,
-            requirements=pip_tools_subsystem.pex_requirements(),
-            interpreter_constraints=req.interpreter_constraints,
-            main=pip_tools_subsystem.main,
-            description=(
-                "Building pip_compile.pex with interpreter constraints: "
-                f"{req.interpreter_constraints}"
-            ),
+            requirements=poetry_subsystem.pex_requirements(),
+            interpreter_constraints=poetry_subsystem.interpreter_constraints,
+            main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
+            sources=launcher_digest,
         ),
     )
 
-    generated_lockfile = await Get(
+    # TODO(#12314): Wire up Poetry to named_caches.
+    # TODO(#12314): Wire up all the pip options like indexes.
+    poetry_lock_result = await Get(
         ProcessResult,
-        # TODO(#12314): Figure out named_caches for pip-tools. The best would be to share
-        #  the cache between Pex and Pip. Next best is a dedicated named_cache.
         VenvPexProcess(
-            pip_compile_pex,
+            poetry_pex,
+            argv=("lock",),
+            input_digest=pyproject_toml_digest,
+            output_files=("poetry.lock", "pyproject.toml"),
             description=req.description,
-            # TODO(#12314): Wire up all the pip options like indexes.
-            argv=[
-                reqs_filename,
-                "--generate-hashes",
-                f"--output-file={req.dest}",
-                # NB: This allows pinning setuptools et al, which we must do. This will become
-                # the default in a future version of pip-tools.
-                "--allow-unsafe",
-            ],
-            input_digest=input_requirements,
+        ),
+    )
+    poetry_export_result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            poetry_pex,
+            argv=("export", "-o", req.dest),
+            input_digest=poetry_lock_result.output_digest,
             output_files=(req.dest,),
+            description=(f"Exporting Poetry lockfile to requirements.txt format for {req.dest}"),
+            level=LogLevel.DEBUG,
         ),
     )
 
-    _lockfile_contents_iter = await Get(DigestContents, Digest, generated_lockfile.output_digest)
-    lockfile_contents = _lockfile_contents_iter[0]
-
-    content_with_header = lockfile_content_with_header(
+    lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
+    lockfile_with_header = lockfile_content_with_header(
         python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
         req.hex_digest,
-        lockfile_contents.content,
+        lockfile_digest_contents[0].content,
     )
-    complete_lockfile = await Get(
-        Digest, CreateDigest([FileContent(req.dest, content_with_header)])
-    )
+    final_lockfile = await Get(Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)]))
 
-    return PythonLockfile(complete_lockfile, req.dest)
+    return PythonLockfile(final_lockfile, req.dest)
 
 
 # --------------------------------------------------------------------------------------
