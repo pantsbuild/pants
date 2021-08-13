@@ -276,7 +276,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "name": "Validate CI config",
                     "run": dedent(
                         """\
-                        ./pants run build-support/bin/generate_github_workflows.py --check
+                        ./pants run build-support/bin/generate_github_workflows.py -- --check
                         """
                     ),
                 },

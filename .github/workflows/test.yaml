@@ -113,7 +113,7 @@ jobs:
 
         '
     - name: Validate CI config
-      run: './pants run build-support/bin/generate_github_workflows.py --check
+      run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
     - name: Run smoke tests
