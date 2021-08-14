@@ -52,8 +52,9 @@ use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{self, Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -352,7 +353,10 @@ impl Store {
   }
 
   ///
-  /// Store a file locally.
+  /// A convenience method for storing a file.
+  ///
+  /// NB: This method should not be used for large blobs: prefer to stream them from their source
+  /// using `store_file`.
   ///
   pub async fn store_file_bytes(
     &self,
@@ -362,6 +366,30 @@ impl Store {
     self
       .local
       .store_bytes(EntryType::File, bytes, initial_lease)
+      .await
+  }
+
+  ///
+  /// Store a file locally by streaming its contents.
+  ///
+  pub async fn store_file<F, R>(
+    &self,
+    initial_lease: bool,
+    data_is_immutable: bool,
+    data_provider: F,
+  ) -> Result<Digest, String>
+  where
+    R: Read + Debug,
+    F: Fn() -> Result<R, io::Error> + Send + 'static,
+  {
+    self
+      .local
+      .store(
+        EntryType::File,
+        initial_lease,
+        data_is_immutable,
+        data_provider,
+      )
       .await
   }
 

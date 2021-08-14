@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+use bytes::{Buf, Bytes};
+use hashing::Digest;
+use parking_lot::Mutex;
 use task_executor::Executor;
 use tempfile::TempDir;
 
@@ -22,7 +25,7 @@ fn new_store(shard_count: u8) -> (ShardedLmdb, TempDir) {
 async fn shard_counts() {
   let shard_counts = vec![1, 2, 4, 8, 16, 32, 64, 128];
   for shard_count in shard_counts {
-    let (s, _) = new_store(shard_count);
+    let (s, _tempdir) = new_store(shard_count);
     assert_eq!(s.all_lmdbs().len(), shard_count as usize);
 
     // Confirm that each database gets an even share.
@@ -37,4 +40,57 @@ async fn shard_counts() {
       assert_eq!(count, 256 / shard_count as usize);
     }
   }
+}
+
+#[tokio::test]
+async fn store_immutable() {
+  let (s, _tempdir) = new_store(1);
+  let digest = s.store(true, true, || Ok(bytes(0).reader())).await.unwrap();
+  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
+}
+
+#[tokio::test]
+async fn store_stable() {
+  let (s, _tempdir) = new_store(1);
+  let digest = s
+    .store(true, false, || Ok(bytes(0).reader()))
+    .await
+    .unwrap();
+  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
+}
+
+#[tokio::test]
+async fn store_changing() {
+  let (s, _tempdir) = new_store(1);
+
+  // Produces Readers that change during the first two reads, but stabilize on the third and
+  // fourth.
+  let contents = Mutex::new(vec![bytes(0), bytes(1), bytes(2), bytes(2)].into_iter());
+
+  let digest = s
+    .store(true, false, move || {
+      Ok(contents.lock().next().unwrap().reader())
+    })
+    .await
+    .unwrap();
+  assert_eq!(digest, Digest::of_bytes(&bytes(2)));
+}
+
+#[tokio::test]
+async fn store_failure() {
+  let (s, _tempdir) = new_store(1);
+
+  // Produces Readers that never stabilize.
+  let contents = Mutex::new((0..100).map(|b| bytes(b)));
+
+  let result = s
+    .store(true, false, move || {
+      Ok(contents.lock().next().unwrap().reader())
+    })
+    .await;
+  assert!(result.is_err());
+}
+
+fn bytes(content: u8) -> Bytes {
+  Bytes::from(vec![content; 100])
 }

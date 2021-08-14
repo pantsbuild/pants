@@ -2889,6 +2889,7 @@ dependencies = [
  "hashing",
  "lmdb",
  "log 0.4.11",
+ "parking_lot",
  "task_executor",
  "tempfile",
  "tokio",
