@@ -35,8 +35,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration};
 
-use bytes::Bytes;
-use hashing::{Digest, Fingerprint, NoopWriter, WriterHasher, FINGERPRINT_SIZE};
+use bytes::{BufMut, Bytes};
+use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -386,6 +386,9 @@ impl ShardedLmdb {
   /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
   /// re-hash the data to confirm that it hasn't changed.
   ///
+  /// If the Read instance gets longer between Reads, we will not detect that here, but any
+  /// captured data will still be valid.
+  ///
   pub async fn store<F, R>(
     &self,
     initial_lease: bool,
@@ -405,8 +408,8 @@ impl ShardedLmdb {
           // First pass: compute the Digest.
           let digest = {
             let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
-            let mut hasher = WriterHasher::new(NoopWriter);
-            let _ = std::io::copy(&mut read, &mut hasher)
+            let mut hasher = WriterHasher::new(io::sink());
+            let _ = io::copy(&mut read, &mut hasher)
               .map_err(|e| format!("Failed to read from {:?}: {}", read, e))?;
             hasher.finish().0
           };
@@ -418,37 +421,45 @@ impl ShardedLmdb {
             .map_err(StoreError::Lmdb)
             .and_then(|mut txn| {
               // Second pass: copy into the reserved memory.
-              let dest = txn.reserve(
-                db,
-                &effective_key,
-                digest.size_bytes,
-                WriteFlags::NO_OVERWRITE,
-              )?;
+              let mut writer = txn
+                .reserve(
+                  db,
+                  &effective_key,
+                  digest.size_bytes,
+                  WriteFlags::NO_OVERWRITE,
+                )?
+                .writer();
               let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
-              if data_is_immutable {
-                // Trust that the data hasn't changed.
-                read
-                  .read_exact(dest)
-                  .map_err(|e| format!("Failed to read from {:?}: {:?}", read, e))?
-              } else {
-                // Confirm that the data hasn't changed.
-                let length_changed = read.read_exact(dest).map(|()| false).or_else(|e| match e
-                  .kind()
-                {
-                  std::io::ErrorKind::UnexpectedEof => {
-                    // If the source was shortened, we should retry rather than erroring.
-                    Ok(true)
-                  }
-                  _ => Err(format!("Failed to read from {:?}: {:?}", read, e)),
+              let should_retry = if data_is_immutable {
+                // Trust that the data hasn't changed, and only validate its length.
+                let copied = io::copy(&mut read, &mut writer).map_err(|e| {
+                  format!(
+                    "Failed to copy from {:?} or store in {:?}: {:?}",
+                    read, env, e
+                  )
                 })?;
 
-                // Should retry if the length changed, or the Digest changed between reads.
-                if length_changed || digest != Digest::of_bytes(dest) {
-                  let msg = format!("Input {:?} changed while reading.", read);
-                  log::debug!("{}", msg);
-                  return Err(StoreError::Retry(msg));
-                }
+                // Should retry if the file got shorter between reads.
+                copied as usize != digest.size_bytes
+              } else {
+                // Confirm that the data hasn't changed.
+                let mut hasher = WriterHasher::new(writer);
+                let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
+                  format!(
+                    "Failed to copy from {:?} or store in {:?}: {:?}",
+                    read, env, e
+                  )
+                })?;
+
+                // Should retry if the Digest changed between reads.
+                digest != hasher.finish().0
               };
+
+              if should_retry {
+                let msg = format!("Input {:?} changed while reading.", read);
+                log::debug!("{}", msg);
+                return Err(StoreError::Retry(msg));
+              }
 
               if initial_lease {
                 store.lease_inner(
