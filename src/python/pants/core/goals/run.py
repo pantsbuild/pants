@@ -105,7 +105,7 @@ async def run(
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, RunFieldSet, field_set)
 
-    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
+    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         workspace.write_digest(
             request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
         )

@@ -9,6 +9,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -48,6 +49,14 @@ async def create_pex_binary_run_request(
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
 
+    local_dists_request = Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [field_set.address],
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+        ),
+    )
+
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
@@ -74,14 +83,19 @@ async def create_pex_binary_run_request(
         ),
     )
 
-    requirements, sources, runner_pex = await MultiGet(
-        requirements_request, sources_request, runner_pex_request
+    requirements, local_dists, sources, runner_pex = await MultiGet(
+        requirements_request, local_dists_request, sources_request, runner_pex_request
     )
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
-            [requirements.digest, sources.source_files.snapshot.digest, runner_pex.digest]
+            [
+                requirements.digest,
+                local_dists.pex.digest,
+                sources.source_files.snapshot.digest,
+                runner_pex.digest,
+            ]
         ),
     )
 
@@ -94,7 +108,12 @@ async def create_pex_binary_run_request(
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
-        "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
+        "PEX_PATH": os.pathsep.join(
+            [
+                in_chroot(requirements_pex_request.output_filename),
+                in_chroot(local_dists.pex.name),
+            ],
+        ),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 

@@ -11,17 +11,20 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import package_pex_binary, pytest_runner
+from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
+from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import (
     PexBinary,
+    PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
 )
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
     TestDebugRequest,
     TestResult,
@@ -53,10 +56,20 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             get_filtered_environment,
             *target_types_rules.rules(),
+            *local_dists.rules(),
+            *setup_py.rules(),
+            *setuptools_rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
-        target_types=[PexBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
+        target_types=[
+            PexBinary,
+            PythonLibrary,
+            PythonTests,
+            PythonRequirementLibrary,
+            PythonDistribution,
+        ],
+        objects={"python_artifact": PythonArtifact},
     )
 
 
@@ -486,6 +499,48 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+
+
+def test_local_dists(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/foo/bar.py": "BAR = 'LOCAL DIST'",
+            f"{PACKAGE}/foo/setup.py": dedent(
+                """\
+                from setuptools import setup
+
+                setup(name="foo", version="9.8.7", packages=["foo"], package_dir={"foo": "."},)
+                """
+            ),
+            f"{PACKAGE}/foo/bar_test.py": dedent(
+                """
+                from foo.bar import BAR
+
+                def test_bar():
+                  assert BAR == "LOCAL DIST"
+                """
+            ),
+            f"{PACKAGE}/foo/BUILD": dedent(
+                """\
+                python_library(name="lib")
+
+                python_distribution(
+                    name="dist",
+                    dependencies=[":lib"],
+                    provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
+                    setup_py_commands=["bdist_wheel",]
+                )
+
+                # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
+                python_tests(name="tests", sources=["bar_test.py"],
+                             dependencies=[":dist", "!!:lib"])
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address(os.path.join(PACKAGE, "foo"), target_name="tests"))
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
 

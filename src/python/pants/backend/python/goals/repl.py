@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -10,6 +12,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.repl import ReplImplementation, ReplRequest
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -22,19 +25,38 @@ class PythonRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
-    requirements_request = Get(
-        Pex,
+
+    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex) so
+    # that we can get the interpreter constraints for use in local_dists_request.
+    requirements_pex_request = await Get(
+        PexRequest,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
             (tgt.address for tgt in repl.targets), internal_only=True
         ),
     )
+    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+
+    local_dists_request = Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            Addresses(tgt.address for tgt in repl.targets),
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+        ),
+    )
+
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
     )
-    requirements_pex, sources = await MultiGet(requirements_request, sources_request)
+
+    requirements_pex, local_dists, sources = await MultiGet(
+        requirements_request, local_dists_request, sources_request
+    )
     merged_digest = await Get(
-        Digest, MergeDigests((requirements_pex.digest, sources.source_files.snapshot.digest))
+        Digest,
+        MergeDigests(
+            (requirements_pex.digest, local_dists.pex.digest, sources.source_files.snapshot.digest)
+        ),
     )
 
     complete_pex_env = pex_env.in_workspace()
@@ -46,6 +68,7 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        "PEX_PATH": repl.in_chroot(local_dists.pex.name),
     }
 
     return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
@@ -59,8 +82,8 @@ class IPythonRepl(ReplImplementation):
 async def create_ipython_repl_request(
     repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
 ) -> ReplRequest:
-    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
-    # so that we can get the interpreter constraints for use in ipython_request.
+    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex) so
+    # that we can get the interpreter constraints for use in ipython_request/local_dists_request.
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
@@ -70,6 +93,14 @@ async def create_ipython_repl_request(
     )
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+
+    local_dists_request = Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [tgt.address for tgt in repl.targets],
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+        ),
+    )
 
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
@@ -86,13 +117,18 @@ async def create_ipython_repl_request(
         ),
     )
 
-    requirements_pex, sources, ipython_pex = await MultiGet(
-        requirements_request, sources_request, ipython_request
+    requirements_pex, local_dists, sources, ipython_pex = await MultiGet(
+        requirements_request, local_dists_request, sources_request, ipython_request
     )
     merged_digest = await Get(
         Digest,
         MergeDigests(
-            (requirements_pex.digest, sources.source_files.snapshot.digest, ipython_pex.digest)
+            (
+                requirements_pex.digest,
+                local_dists.pex.digest,
+                sources.source_files.snapshot.digest,
+                ipython_pex.digest,
+            )
         ),
     )
 
@@ -106,7 +142,12 @@ async def create_ipython_repl_request(
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
-        "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
+        "PEX_PATH": os.pathsep.join(
+            [
+                repl.in_chroot(requirements_pex_request.output_filename),
+                repl.in_chroot(local_dists.pex.name),
+            ]
+        ),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
