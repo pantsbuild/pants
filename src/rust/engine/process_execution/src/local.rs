@@ -117,7 +117,7 @@ impl CommandRunner {
         .await?;
       Snapshot::from_path_stats(
         store.clone(),
-        OneOffStoreFileByDigest::new(store, posix_fs),
+        OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
       .await

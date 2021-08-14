@@ -93,7 +93,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
     (20, 10_000_000, true, 10),
     (1, 200_000_000, true, 10),
   ] {
-    let (count, size, _immutable, captures) = params;
+    let (count, size, immutable, captures) = params;
     let storedir = TempDir::new().unwrap();
     let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
     let (tempdir, path_stats) = tempdir_containing(count, size);
@@ -114,7 +114,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
             let _ = executor
               .block_on(Snapshot::digest_from_path_stats(
                 store.clone(),
-                OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone()),
+                OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), immutable),
                 path_stats.clone(),
               ))
               .unwrap();
@@ -337,7 +337,7 @@ fn snapshot(
       .unwrap();
       Snapshot::digest_from_path_stats(
         store2.clone(),
-        OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs)),
+        OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
         path_stats,
       )
       .await

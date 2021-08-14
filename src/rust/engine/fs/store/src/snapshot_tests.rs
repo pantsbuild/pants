@@ -36,7 +36,7 @@ pub fn setup() -> (
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
   let ignorer = GitignoreStyleExcludes::create(vec![]).unwrap();
   let posix_fs = Arc::new(PosixFS::new(dir.path(), ignorer, executor).unwrap());
-  let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
+  let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), true);
   (store, dir, posix_fs, file_saver)
 }
 

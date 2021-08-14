@@ -2930,6 +2930,7 @@ dependencies = [
  "hashing",
  "lmdb",
  "log 0.4.14",
+ "parking_lot",
  "task_executor",
  "tempfile",
  "tokio",

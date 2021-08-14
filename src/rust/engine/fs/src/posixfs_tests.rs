@@ -29,37 +29,16 @@ async fn is_executable_true() {
 }
 
 #[tokio::test]
-async fn read_file() {
+async fn file_path() {
   let dir = tempfile::TempDir::new().unwrap();
   let path = PathBuf::from("marmosets");
-  let content = "cute".as_bytes().to_vec();
-  make_file(
-    &std::fs::canonicalize(dir.path()).unwrap().join(&path),
-    &content,
-    0o600,
-  );
   let fs = new_posixfs(&dir.path());
-  let file_content = fs
-    .read_file(&File {
-      path: path.clone(),
-      is_executable: false,
-    })
-    .await
-    .unwrap();
-  assert_eq!(file_content.path, path);
-  assert_eq!(file_content.content, content);
-}
-
-#[tokio::test]
-async fn read_file_missing() {
-  let dir = tempfile::TempDir::new().unwrap();
-  new_posixfs(&dir.path())
-    .read_file(&File {
-      path: PathBuf::from("marmosets"),
-      is_executable: false,
-    })
-    .await
-    .expect_err("Expected error");
+  let expected_path = std::fs::canonicalize(dir.path()).unwrap().join(&path);
+  let actual_path = fs.file_path(&File {
+    path: path.clone(),
+    is_executable: false,
+  });
+  assert_eq!(actual_path, expected_path);
 }
 
 #[tokio::test]
