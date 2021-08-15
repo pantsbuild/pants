@@ -30,6 +30,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Williams
 + Christopher Livingston
 + Christopher Neugebauer
 + Cody Gibb
