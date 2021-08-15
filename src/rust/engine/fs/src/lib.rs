@@ -39,7 +39,7 @@ pub use crate::glob_matching::{
 };
 
 use std::cmp::min;
-use std::io::{self, Read};
+use std::io;
 use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
@@ -522,31 +522,8 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  pub async fn read_file(&self, file: &File) -> Result<FileContent, io::Error> {
-    let path = file.path.clone();
-    let path_abs = self.root.0.join(&file.path);
-    self
-      .executor
-      .spawn_blocking(move || {
-        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-        std::fs::File::open(&path_abs)
-          .and_then(|mut f| {
-            let mut content = Vec::new();
-            f.read_to_end(&mut content)?;
-            Ok(FileContent {
-              path: path,
-              content: Bytes::from(content),
-              is_executable,
-            })
-          })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read file {:?}: {}", path_abs, e),
-            )
-          })
-      })
-      .await
+  pub fn file_path(&self, file: &File) -> PathBuf {
+    self.root.0.join(&file.path)
   }
 
   pub async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {

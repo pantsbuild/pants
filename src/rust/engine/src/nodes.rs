@@ -523,16 +523,11 @@ impl WrappedNode for DigestFile {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<hashing::Digest> {
-    let content = context
-      .core
-      .vfs
-      .read_file(&self.0)
-      .map_err(|e| throw(&format!("{}", e)))
-      .await?;
+    let path = context.core.vfs.file_path(&self.0);
     context
       .core
       .store()
-      .store_file_bytes(content.content, true)
+      .store_file(true, false, move || std::fs::File::open(&path))
       .map_err(|e| throw(&e))
       .await
   }
