@@ -6,7 +6,7 @@ import pytest
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.target_types import PythonLibrary
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import pex_from_targets, local_dists
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
@@ -21,6 +21,7 @@ def rule_runner() -> RuleRunner:
             *repl_rules(),
             *python_repl.rules(),
             *pex_from_targets.rules(),
+            *local_dists.rules(),
             QueryRule(Process, (PexProcess,)),
         ],
         target_types=[PythonLibrary, ProtobufLibrary],
