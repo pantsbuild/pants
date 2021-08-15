@@ -12,7 +12,7 @@ python_distribution(
     provides = setup_py(
         name = "native",
         version = "2.3.4",
-        setup_script='testprojects/src/python/native/setup.py',
+        setup_script='setup.py',
     ),
     setup_py_commands = ["bdist_wheel",]
 )

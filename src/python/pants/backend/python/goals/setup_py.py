@@ -539,7 +539,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 f"{','.join(sorted(invalid_keys))}."
             )
         stripped_setup_script = await Get(
-            StrippedSourceFileNames, SourcesPaths(files=(setup_script,), dirs=())
+            StrippedSourceFileNames,
+            SourcesPaths(files=(os.path.join(target.address.spec_path, setup_script),), dirs=()),
         )
         return SetupPyChroot(
             sources.digest,
