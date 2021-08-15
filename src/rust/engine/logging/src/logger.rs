@@ -4,6 +4,7 @@ use crate::PythonLogLevel;
 
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fmt::Write as FmtWrite;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
@@ -27,7 +28,6 @@ struct Inner {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: LevelFilter,
-  use_color: bool,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
   log_level_filters: HashMap<String, log::LevelFilter>,
@@ -44,7 +44,6 @@ impl PantsLogger {
       log_file: Mutex::new(None),
       global_level: LevelFilter::Off,
       show_rust_3rdparty_logs: true,
-      use_color: false,
       show_target: false,
       log_level_filters: HashMap::new(),
       literal_filters: Vec::new(),
@@ -55,7 +54,6 @@ impl PantsLogger {
   pub fn init(
     max_level: u64,
     show_rust_3rdparty_logs: bool,
-    use_color: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
     literal_filters: Vec<String>,
@@ -88,7 +86,6 @@ impl PantsLogger {
       per_run_logs: Mutex::default(),
       log_file: Mutex::new(Some(log_file)),
       global_level,
-      use_color,
       show_rust_3rdparty_logs,
       show_target,
       log_level_filters,
@@ -102,6 +99,9 @@ impl PantsLogger {
     // TODO this should be whatever the most verbose log level specified in log_levels_by_target -
     // but I'm not sure if it's actually much of a gain over just setting this to Trace.
     set_max_level(LevelFilter::Trace);
+    // We make per-destination decisions about whether to render color, and should never use
+    // environment variables to decide.
+    colored::control::set_override(true);
     Ok(())
   }
 
@@ -182,36 +182,37 @@ impl Log for PantsLogger {
       return;
     }
 
-    let time_str = {
-      let cur_date = chrono::Local::now();
-      format!(
-        "{}.{:02}",
-        cur_date.format(TIME_FORMAT_STR),
-        cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
-      )
-    };
+    let destination = stdio::get_destination();
 
-    // TODO: Fix application of color for log-files: see https://github.com/pantsbuild/pants/issues/11020
-    let level = record.level();
-    let level_marker = match level {
-      _ if !inner.use_color => format!("[{}]", level).normal().clear(),
-      Level::Info => format!("[{}]", level).normal(),
-      Level::Error => format!("[{}]", level).red(),
-      Level::Warn => format!("[{}]", level).red(),
-      Level::Debug => format!("[{}]", level).green(),
-      Level::Trace => format!("[{}]", level).magenta(),
-    };
+    // Build the message string.
+    let log_string = {
+      let mut log_string = {
+        let cur_date = chrono::Local::now();
+        format!(
+          "{}.{:02}",
+          cur_date.format(TIME_FORMAT_STR),
+          cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
+        )
+      };
 
-    let log_string = if inner.show_target {
-      format!(
-        "{} {} ({}) {}\n",
-        time_str,
-        level_marker,
-        record.target(),
-        log_msg,
-      )
-    } else {
-      format!("{} {} {}\n", time_str, level_marker, log_msg)
+      let use_color = destination.stderr_use_color();
+
+      let level = record.level();
+      let level_marker = match level {
+        _ if !use_color => format!("[{}]", level).normal().clear(),
+        Level::Info => format!("[{}]", level).normal(),
+        Level::Error => format!("[{}]", level).red(),
+        Level::Warn => format!("[{}]", level).red(),
+        Level::Debug => format!("[{}]", level).green(),
+        Level::Trace => format!("[{}]", level).magenta(),
+      };
+      write!(log_string, " {}", level_marker).unwrap();
+
+      if inner.show_target {
+        write!(log_string, " ({})", record.target()).unwrap();
+      };
+      writeln!(log_string, " {}", log_msg).unwrap();
+      log_string
     };
     let log_bytes = log_string.as_bytes();
 
@@ -225,8 +226,7 @@ impl Log for PantsLogger {
 
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
-    let destination = stdio::get_destination();
-    if stdio::Destination::write_stderr_raw(&destination, log_bytes).is_err() {
+    if destination.write_stderr_raw(log_bytes).is_err() {
       let mut maybe_file = inner.log_file.lock();
       if let Some(ref mut file) = *maybe_file {
         match file.write_all(log_bytes) {

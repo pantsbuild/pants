@@ -3568,6 +3568,7 @@ dependencies = [
  "futures",
  "indexmap",
  "indicatif",
+ "logging",
  "stdio",
  "task_executor",
  "uuid",

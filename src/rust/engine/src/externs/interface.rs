@@ -43,6 +43,7 @@
 /// how we expose ourselves back to Python.
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::hash_map::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
@@ -70,7 +71,6 @@ use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
-use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
@@ -96,7 +96,6 @@ py_module_initializer!(native_engine, |py, m| {
       stdio_initialize(
         a: u64,
         b: bool,
-        c: bool,
         d: bool,
         e: PyDict,
         f: Vec<String>,
@@ -112,6 +111,11 @@ py_module_initializer!(native_engine, |py, m| {
       py,
       stdio_thread_console_set(stdin_fileno: i32, stdout_fileno: i32, stderr_fileno: i32)
     ),
+  )?;
+  m.add(
+    py,
+    "stdio_thread_console_color_mode_set",
+    py_fn!(py, stdio_thread_console_color_mode_set(use_color: bool)),
   )?;
   m.add(
     py,
@@ -1798,7 +1802,6 @@ fn stdio_initialize(
   py: Python,
   level: u64,
   show_rust_3rdparty_logs: bool,
-  use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
   literal_filters: Vec<String>,
@@ -1832,7 +1835,6 @@ fn stdio_initialize(
   Logger::init(
     level,
     show_rust_3rdparty_logs,
-    use_color,
     show_target,
     log_levels_by_target,
     literal_filters,
@@ -1861,6 +1863,11 @@ fn stdio_thread_console_set(
 ) -> PyUnitResult {
   let destination = stdio::new_console_destination(stdin_fileno, stdout_fileno, stderr_fileno);
   stdio::set_thread_destination(destination);
+  Ok(None)
+}
+
+fn stdio_thread_console_color_mode_set(_: Python, use_color: bool) -> PyUnitResult {
+  stdio::get_destination().stderr_set_use_color(use_color);
   Ok(None)
 }
 
