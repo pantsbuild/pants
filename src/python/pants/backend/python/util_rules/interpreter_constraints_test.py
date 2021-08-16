@@ -402,7 +402,7 @@ def test_contains(candidate, target, matches) -> None:
 
 def test_constraints_are_correctly_sorted_at_construction() -> None:
     # #12578: This list itself is out of order, and `CPython>=3.6,<4,!=3.7.*` is specified with out-of-order component requirements.
-    # This test verifie
+    # This test verifies that the list is fully sorted after the first call to `InterpreterConstraints()`
     inputs = ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
     a = InterpreterConstraints(inputs)
     a_str = [str(i) for i in a]
