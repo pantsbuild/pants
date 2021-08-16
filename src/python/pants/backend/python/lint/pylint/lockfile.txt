@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 559ff1ead893e958c2262d2fc7e10a8614a34ba400e635f961b4eea0e8b9b803
+# {
+#   "requirements_invalidation_digest": "b098df4cb8b4729e91282a0894f8804314269decfafe1a00d65b254074c63b8b",
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.6"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 astroid==2.4.2; python_version >= "3.5" \

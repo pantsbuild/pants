@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 51261468d53ac35dacae084fd4d365bb3de09da9f8cdec3e0a022e3d261b929b
+# {
+#   "requirements_invalidation_digest": "babed61947e74aedbe0cdbaefdaec172db6d4a9d27e12acc80be5ab623e3acdf",
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.6"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 mypy-protobuf==2.4; python_version >= "3.6" \

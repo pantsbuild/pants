@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 066d10fe955dba4f9c6f2171aa5e55210f4bc154a1ad4ca12170e5c8c063d6cf
+# {
+#   "requirements_invalidation_digest": "fe82372002915f2550a0b25fea5b6f360c639252ad607a978e7e2f6cbd94c99a",
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.6"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 appnope==0.1.2; sys_platform == "darwin" and python_version >= "3.6" \
@@ -42,9 +47,9 @@ prompt-toolkit==3.0.3; python_version >= "3.6" \
 ptyprocess==0.7.0; sys_platform != "win32" and python_version >= "3.6" \
     --hash=sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35 \
     --hash=sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220
-pygments==2.9.0; python_version >= "3.6" \
-    --hash=sha256:d66e804411278594d764fc69ec36ec13d9ae9147193a1740cd34d272ca383b8e \
-    --hash=sha256:a18f47b506a429f6f4b9df81bb02beab9ca21d0a5fee38ed15aef65f0545519f
+pygments==2.10.0; python_version >= "3.6" \
+    --hash=sha256:b8e67fe6af78f492b3c4b3e2970c0624cbf08beb1e493b2c99b9fa1b67a20380 \
+    --hash=sha256:f398865f7eb6874156579fdf36bc840a03cab64d1cde9e93d68f46a425ec52c6
 setuptools==57.4.0; python_version >= "3.6" \
     --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
     --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465

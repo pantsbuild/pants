@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 724f32205c504a490bde69bf8c756eff86e73bed2f83008c1308812c6c9421cd
+# {
+#   "requirements_invalidation_digest": "cbf22af846824c323ff23c432aee4f9bfc2fe69f5ea15ad234a1c689b24564e9",
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.6"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 bandit==1.7.0; python_version >= "3.5" \
