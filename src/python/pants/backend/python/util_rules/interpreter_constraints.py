@@ -45,9 +45,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # #12578 `parse_constraint` will sort the requirement's component constraints into a stable form.
         # We need to sort the component constraints for each requirement _before_ sorting the entire list
         # for the ordering to be correct.
-        parsed_constraints = [
+        parsed_constraints = (
             i if isinstance(i, Requirement) else self.parse_constraint(i) for i in constraints
-        ]
+        )
         super().__init__(sorted(parsed_constraints, key=lambda c: str(c)))
 
     def __str__(self) -> str:
