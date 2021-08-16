@@ -42,10 +42,13 @@ _EXPECTED_LAST_PATCH_VERSION = 18
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
-        super().__init__(
-            v if isinstance(v, Requirement) else self.parse_constraint(v)
-            for v in sorted(constraints, key=lambda c: str(c))
-        )
+        # #12578 `parse_constraint` will sort the requirement's component constraints into a stable form.
+        # We need to sort the component constraints for each requirement _before_ sorting the entire list
+        # for the ordering to be correct.
+        parsed_constraints = [
+            i if isinstance(i, Requirement) else self.parse_constraint(i) for i in constraints
+        ]
+        super().__init__(sorted(parsed_constraints, key=lambda c: str(c)))
 
     def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)

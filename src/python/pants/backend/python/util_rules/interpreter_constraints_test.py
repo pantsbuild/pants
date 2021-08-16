@@ -293,7 +293,7 @@ _SKIPPED_PY3 = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
     "constraints,expected",
     (
         (["==2.7.*"], "==2.7.*"),
-        (["==2.7.*", ">=3.6,!=3.6.1"], "==2.7.* || !=3.6.1,>=3.6"),
+        (["==2.7.*", ">=3.6,!=3.6.1"], "!=3.6.1,>=3.6 || ==2.7.*"),
         ([], "*"),
         # If any of the constraints are unconstrained (e.g. `CPython`), use a wildcard.
         (["==2.7", ""], "*"),
@@ -398,3 +398,13 @@ def test_contains(candidate, target, matches) -> None:
         )
         == matches
     )
+
+
+def test_constraints_are_correctly_sorted_at_construction() -> None:
+    # #12578: This list itself is out of order, and `CPython>=3.6,<4,!=3.7.*` is specified with out-of-order component requirements.
+    # This test verifie
+    inputs = ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
+    a = InterpreterConstraints(inputs)
+    a_str = [str(i) for i in a]
+    b = InterpreterConstraints(a_str)
+    assert a == b
