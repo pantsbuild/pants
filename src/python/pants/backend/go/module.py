@@ -28,6 +28,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -249,12 +250,21 @@ async def download_external_module(
     source_path = absolute_source_path[gopath_index:]
 
     source_digest = await Get(
-        Digest, DigestSubset(result.output_digest, PathGlobs([f"{source_path}/**"]))
+        Digest,
+        DigestSubset(
+            result.output_digest,
+            PathGlobs(
+                [f"{source_path}/**"],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=(
+                    f"Attempted to download external Go module {request.path}@{request.version}, "
+                    "but the download was empty."
+                ),
+            ),
+        ),
     )
+
     source_digest_stripped = await Get(Digest, RemovePrefix(source_digest, source_path))
-    snapshot = await Get(Snapshot, Digest, source_digest_stripped)
-    for name in snapshot.files:
-        print(f"  {name}")
 
     return DownloadedExternalModule(
         path=request.path, version=request.version, digest=source_digest_stripped

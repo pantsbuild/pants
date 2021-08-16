@@ -77,6 +77,9 @@ def test_download_external_module(rule_runner: RuleRunner) -> None:
             )
         ],
     )
+    assert downloaded_module.path == "github.com/google/uuid"
+    assert downloaded_module.version == "v1.3.0"
+
     digest_contents = rule_runner.request(DigestContents, [downloaded_module.digest])
     found_uuid_go_file = False
     for file_content in digest_contents:
