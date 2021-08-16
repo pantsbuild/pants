@@ -243,7 +243,7 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel(PythonToolLockfileSentinel):
+class PytestLockfileSentinel:
     pass
 
 
