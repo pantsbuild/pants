@@ -38,7 +38,9 @@ class GoPackage(Target):
     help = "A single Go package."
 
 
+# -----------------------------------------------------------------------------------------------
 # `go_module` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoModuleSources(Sources):
@@ -62,7 +64,9 @@ class GoModule(Target):
     help = "First-party Go module."
 
 
-# `go_external_module`
+# -----------------------------------------------------------------------------------------------
+# `go_external_module` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoExternalModulePath(StringField):
@@ -87,7 +91,27 @@ class GoExternalModule(Target):
     help = "External Go module."
 
 
+# -----------------------------------------------------------------------------------------------
+# `_go_ext_mod_package` target
+# -----------------------------------------------------------------------------------------------
+
+# Represents a Go package within a third-party Go package.
+# TODO: Create this target synthetically instead of relying on `./pants tailor` to create.
+class GoExtModPackage(Target):
+    alias = "_go_ext_mod_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
+        GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
+        GoImportPath,
+        GoPackageSources,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
 # `go_binary` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoBinaryName(StringField):
