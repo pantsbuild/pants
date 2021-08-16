@@ -25,6 +25,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
     ProcessResult,
+    SequentialProcesses,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
@@ -36,6 +37,7 @@ def new_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(ProcessResult, [Process]),
+            QueryRule(ProcessResult, [SequentialProcesses]),
             QueryRule(FallibleProcessResult, [Process]),
         ],
     )
@@ -133,6 +135,26 @@ def test_failing_process(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(ProcessResult, [process])
     assert "Process 'failure' failed with exit code 1." in str(exc.value)
+
+
+def test_sequential_processes(rule_runner: RuleRunner) -> None:
+    processes = (
+        Process(
+            argv=("/bin/bash", "-c", "/usr/bin/touch $ONE"),
+            env={"ONE": "one-file"},
+            description="touch",
+        ),
+        Process(
+            argv=("/bin/bash", "-c", "/bin/mv one-file two-file"),
+            output_files=["two-file"],
+            description="mv",
+        ),
+    )
+    result = rule_runner.request(
+        ProcessResult, [SequentialProcesses(processes, description="touch then mv")]
+    )
+    digest_contents = rule_runner.request(DigestContents, [result.output_digest])
+    assert digest_contents == DigestContents([FileContent("two-file", b"", False)])
 
 
 def test_cache_scope_always(rule_runner: RuleRunner) -> None:

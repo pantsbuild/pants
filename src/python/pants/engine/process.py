@@ -6,6 +6,8 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import logging
+import shlex
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -14,7 +16,14 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    FileContent,
+    FileDigest,
+    MergeDigests,
+)
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
@@ -577,6 +586,99 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             if result.exit_code == 0
         ],
     )
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SequentialProcesses:
+    """A series of Processes to be executed sequentially inside a single hermetic sandbox.
+
+    Because they will run inside a single sandbox, the Processes may consume one another's
+    outputs, even if they are not referenced in input_files/output_files.
+
+    Almost all parameters to Process are supported, but in some cases, parameters will need to
+    have consistent values in order to compose.
+    """
+
+    processes: Tuple[MultiPlatformProcess, ...]
+    description: str
+    level: LogLevel
+
+    # If true, only the output_files/output_directories of the final Process in the sequence will
+    # be captured. If false, all intermediate outputs will be captured as well.
+    # TODO: Experimental: it's unclear what the default semantics should be, and its possible that
+    # removing MPP would make it easier for a caller to directly manipulate outputs instead.
+    only_final_outputs: bool
+
+    def __init__(
+        self,
+        processes: Iterable[MultiPlatformProcess | Process],
+        *,
+        description: str,
+        level: LogLevel = LogLevel.INFO,
+        only_final_outputs: bool = False,
+    ) -> None:
+        self.processes = tuple(
+            (p if isinstance(p, MultiPlatformProcess) else MultiPlatformProcess({None: p}))
+            for p in processes
+        )
+        self.description = description
+        self.level = level
+        self.only_final_outputs = only_final_outputs
+        self.__post_init__()
+
+    def __post_init__(self):
+        platforms = {mp.platform_constraints for mp in self.processes}
+        if len(platforms) > 1:
+            raise ValueError(
+                f"Only Processes that target the same platforms may be composed: got {platforms}."
+            )
+
+
+@rule
+async def compose_sequential_processes(
+    sp: SequentialProcesses, bash: BashBinary
+) -> MultiPlatformProcess:
+    processes_by_platform: dict[Platform | None, list[Process]] = defaultdict(list)
+    for mp in sp.processes:
+        for platform_str, p in zip(mp.platform_constraints, mp.processes):
+            processes_by_platform[Platform[platform_str] if platform_str else None].append(p)
+
+    script_processes: dict[Platform | None, Process] = {}
+    for pc, processes in processes_by_platform.items():
+        scripts = []
+        for p in processes:
+            env = " ".join(f"{k}={shlex.quote(v)}" for k, v in p.env.items())
+            args = " ".join(shlex.quote(a) for a in p.argv)
+            scripts.append(f"# {repr(p.description)}\n({env} {args})")
+        script = "\n".join(scripts).encode("utf-8")
+        script_name_hex = hashlib.sha256(script).hexdigest()[:16]
+        script_name = f"__sequential_processes_{script_name_hex}.sh"
+
+        script_digest = await Get(Digest, CreateDigest([FileContent(script_name, script)]))
+
+        input_root_digest = await Get(
+            Digest,
+            MergeDigests([script_digest, *[p.input_digest for p in processes]]),
+        )
+
+        if sp.only_final_outputs:
+            output_files = processes[-1].output_files
+            output_directories = processes[-1].output_directories
+        else:
+            output_files = tuple(f for p in processes for f in p.output_files)
+            output_directories = tuple(d for p in processes for d in p.output_directories)
+        # TODO: Do validating merges of the rest of the fields of Process.
+        script_processes[pc] = Process(
+            argv=[bash.path, "-ex", script_name],
+            input_digest=input_root_digest,
+            description=sp.description,
+            output_files=output_files,
+            output_directories=output_directories,
+            level=sp.level,
+        )
+
+    return MultiPlatformProcess(script_processes)
 
 
 def rules():
