@@ -58,6 +58,8 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.subsystems.pytest import PytestLockfileSentinel
 
 logger = logging.getLogger()
 
@@ -169,6 +171,11 @@ async def setup_pytest_for_target(
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
+    lockfile_hex_digest = None
+    if pytest.lockfile != "<none>":
+        lockfile_request = await Get(PythonLockfileRequest, PytestLockfileSentinel())
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
+
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
@@ -178,7 +185,7 @@ async def setup_pytest_for_target(
         Pex,
         PexRequest(
             output_filename="pytest.pex",
-            requirements=pytest.pex_requirements(),
+            requirements=pytest.pex_requirements(lockfile_hex_digest),
             interpreter_constraints=interpreter_constraints,
             internal_only=True,
         ),
