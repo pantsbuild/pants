@@ -75,6 +75,9 @@ class LockfileMetadata:
         specified by `valid_interpreter_constraints`.
         """
 
+        if expected_invalidation_digest is None:
+            return True
+
         if self.invalidation_digest != expected_invalidation_digest:
             return False
 

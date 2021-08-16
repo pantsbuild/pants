@@ -304,7 +304,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     file_path_description_of_origin=(
                         "the option `[python-setup].experimental_lockfile`"
                     ),
-                    lockfile_hex_digest=calculate_invalidation_digest(requirements.req_strings),
                 ),
                 interpreter_constraints=interpreter_constraints,
                 platforms=request.platforms,
