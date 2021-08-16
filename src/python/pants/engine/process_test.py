@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -260,11 +262,13 @@ def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 
 
-def test_find_binary_non_existent(rule_runner: RuleRunner) -> None:
+# NB: The two tests correspond to `which` being discoverable or not.
+@pytest.mark.parametrize("extra_search_path", ([], ["/bin", "/usr/bin"]))
+def test_find_binary_non_existent(extra_search_path: list[str], rule_runner: RuleRunner) -> None:
     with temporary_dir() as tmpdir:
-        search_path = [tmpdir]
+        search_path = [tmpdir, *extra_search_path]
         binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name="anybin", search_path=search_path)]
+            BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=search_path)]
         )
         assert binary_paths.first_path is None
 

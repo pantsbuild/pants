@@ -523,7 +523,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         f"""\
         {shebang}
 
-        set -euox pipefail
+        set -uox pipefail
 
         if command -v which > /dev/null; then
             command which -a $1 || true
