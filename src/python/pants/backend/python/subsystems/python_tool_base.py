@@ -117,7 +117,7 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return (self.version, *self.extra_requirements)
 
-    def pex_requirements(self, expected_lockfile_hex_digest: str | None = None) -> PexRequirements:
+    def pex_requirements(self, expected_lockfile_hex_digest: str | None) -> PexRequirements:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
