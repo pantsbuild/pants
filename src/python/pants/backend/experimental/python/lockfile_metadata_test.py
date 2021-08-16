@@ -14,15 +14,22 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-def test_metadata_round_trip() -> None:
-    val = "help_i_am_trapped_inside_a_unit_test_string"
-    constraints = InterpreterConstraints(
-        ["this", "is", "just", "to" "test>=3.0", "parsing!=9.9999999,<10", "semantics==93"]
+def test_metadata_header_round_trip() -> None:
+    input_metadata = LockfileMetadata(
+        "cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef",
+        InterpreterConstraints(["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]),
     )
-    metadata = lockfile_metadata_header(val, [str(i) for i in constraints])
-    output = read_lockfile_metadata(metadata)
-    assert val == output.invalidation_digest
-    assert constraints == output.valid_interpreter_constraints
+    serialized_metadata = lockfile_metadata_header(input_metadata)
+    output_metadata = read_lockfile_metadata(serialized_metadata)
+
+    print(input_metadata.valid_interpreter_constraints)
+    print(output_metadata.valid_interpreter_constraints)
+    print(serialized_metadata.decode("ascii"))
+
+    assert (
+        input_metadata.valid_interpreter_constraints
+        == output_metadata.valid_interpreter_constraints
+    )
 
 
 def test_validated_lockfile_content() -> None:
@@ -66,19 +73,8 @@ _requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
         (_requirements, "66327c52225d2f798ffad7f092bf1b51da8a66777f3ebf654e2444d7eb1429f4"),
     ],
 )
-def test_hex_digest(requirements, expected) -> None:
+def test_invalidation_digest(requirements, expected) -> None:
     assert calculate_invalidation_digest(FrozenOrderedSet(requirements)) == expected
-
-
-def test_hash_depends_on_requirement_source() -> None:
-    # TODO: This test is a bit weird now. Do we still need it?
-    reqs = ["CPython"]
-    assert calculate_invalidation_digest(FrozenOrderedSet(reqs)) != calculate_invalidation_digest(
-        FrozenOrderedSet([])
-    )
-
-
-_AAAH_REAL_PYTHONS = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
 
 @pytest.mark.parametrize(
@@ -128,5 +124,10 @@ _AAAH_REAL_PYTHONS = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
     m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
     assert (
-        m.is_valid_for(user_digest, InterpreterConstraints(user_ic), _AAAH_REAL_PYTHONS) == matches
+        m.is_valid_for(
+            user_digest,
+            InterpreterConstraints(user_ic),
+            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+        )
+        == matches
     )
