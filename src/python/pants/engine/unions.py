@@ -5,11 +5,23 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Mapping, Type, TypeVar
+from typing import Any, DefaultDict, Iterable, Mapping, Type, TypeVar
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+# _B = TypeVar("_B", bound=Protocol)
+
+
+# @dataclass(frozen=True)
+# class UnionRule2(Generic[_B]):
+#     """Specify that an instance of `union_member` can be substituted wherever `union_base` is used.
+
+#     """
+
+#     union_base: _B
+#     union_member: Type[_B]
 
 
 @decorated_type_checkable
@@ -18,9 +30,9 @@ def union(cls):
     polymorphism.
 
     Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
-    MemberClass)`. Then, you can use `await Get(Output, UnionBase, concrete_union_member)`. This
-    would be similar to writing `UnionRule(Output, ConcreteUnionMember,
-    concrete_union_member_instance)`, but allows you to write generic code without knowing what
+    MemberClass)`. Then, you can use `await Get(Output, BaseClass, concrete_union_member)`. This
+    would be similar to writing `Get(Output, MemberClass,
+    concrete_union_member)`, but allows you to write generic code without knowing what
     concrete classes might later implement that union.
 
     Often, union bases are abstract classes, but they need not be.
@@ -45,18 +57,19 @@ class UnionRule:
     union_base: Type
     union_member: Type
 
-    def __post_init__(self) -> None:
-        if not union.is_instance(self.union_base):
-            msg = (
-                f"The first argument must be a class annotated with @union "
-                f"(from pants.engine.unions), but was {self.union_base}."
-            )
-            if union.is_instance(self.union_member):
-                msg += (
-                    "\n\nHowever, the second argument was annotated with `@union`. Did you "
-                    "switch the first and second arguments to `UnionRule()`?"
-                )
-            raise ValueError(msg)
+    # def __post_init__(self) -> None:
+    #     # WIP: skip check, for now..
+    #     if not union.is_instance(self.union_base):
+    #         msg = (
+    #             f"The first argument must be a class annotated with @union "
+    #             f"(from pants.engine.unions), but was {self.union_base}."
+    #         )
+    #         if union.is_instance(self.union_member):
+    #             msg += (
+    #                 "\n\nHowever, the second argument was annotated with `@union`. Did you "
+    #                 "switch the first and second arguments to `UnionRule()`?"
+    #             )
+    #         raise ValueError(msg)
 
 
 _T = TypeVar("_T", bound=type)
@@ -103,7 +116,7 @@ class UnionMembership:
         """
         return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
 
-    def is_member(self, union_type: Type, putative_member: Type) -> bool:
+    def is_member(self, union_type: Type, putative_member: Any) -> bool:
         members = self.union_rules.get(union_type)
         if members is None:
             raise TypeError(f"Not a registered union type: {union_type}")
