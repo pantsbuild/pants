@@ -256,10 +256,7 @@ async def download_external_module(
             PathGlobs(
                 [f"{source_path}/**"],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=(
-                    f"Attempted to download external Go module {request.path}@{request.version}, "
-                    "but the download was empty."
-                ),
+                description_of_origin=f"the DownloadExternalModuleRequest for {request.path}@{request.version}{request.path}@{request.version}",
             ),
         ),
     )
