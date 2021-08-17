@@ -23,7 +23,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -113,12 +113,13 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
+    platform: Platform,
     pex_binary: PexPEX,
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
     pex_runtime_env: PexRuntimeEnvironment,
-) -> Process:
+) -> MultiPlatformProcess:
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
     cert_args = []
@@ -174,16 +175,23 @@ async def setup_pex_cli_process(
         **(request.extra_env or {}),
     }
 
-    return Process(
-        normalized_argv,
-        description=request.description,
-        input_digest=input_digest,
-        env=env,
-        output_files=request.output_files,
-        output_directories=request.output_directories,
-        append_only_caches=complete_pex_env.append_only_caches,
-        level=request.level,
-        cache_scope=request.cache_scope,
+    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
+    # without cross-building, we specify that our PEX command should be run on the current local
+    # platform.
+    return MultiPlatformProcess(
+        {
+            platform: Process(
+                normalized_argv,
+                description=request.description,
+                input_digest=input_digest,
+                env=env,
+                output_files=request.output_files,
+                output_directories=request.output_directories,
+                append_only_caches=complete_pex_env.append_only_caches,
+                level=request.level,
+                cache_scope=request.cache_scope,
+            )
+        }
     )
 
 

@@ -43,7 +43,6 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.platform import Platform
 from pants.engine.process import (
     BashBinary,
     MultiPlatformProcess,
@@ -292,6 +291,18 @@ async def find_interpreter(
 
 
 @dataclass(frozen=True)
+class BuildPexProcess:
+    """Wraps a prepared request to build a Pex.
+
+    TODO: Necessary because adding a direct conversion from PexRequest to PexCliProcess (which is
+    executable) causes graph ambiguity.
+    """
+
+    process: MultiPlatformProcess
+    python: PythonExecutable | None = None
+
+
+@dataclass(frozen=True)
 class BuildPexResult:
     result: ProcessResult
     pex_filename: str
@@ -303,13 +314,11 @@ class BuildPexResult:
 
 
 @rule(level=LogLevel.DEBUG)
-async def build_pex(
+async def prepare_pex_cli_process(
     request: PexRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
-    platform: Platform,
-    pex_runtime_env: PexRuntimeEnvironment,
-) -> BuildPexResult:
+) -> BuildPexProcess:
     """Returns a PEX with the given settings."""
     argv = ["--output-file", request.output_filename, *request.additional_args]
 
@@ -463,7 +472,7 @@ async def build_pex(
     )
 
     process = await Get(
-        Process,
+        MultiPlatformProcess,
         PexCliProcess(
             python=python,
             argv=argv,
@@ -472,11 +481,13 @@ async def build_pex(
             output_files=[request.output_filename],
         ),
     )
+    return BuildPexProcess(process, python)
 
-    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
-    # without cross-building, we specify that our PEX command should be run on the current local
-    # platform.
-    result = await Get(ProcessResult, MultiPlatformProcess({platform: process}))
+
+@rule(level=LogLevel.DEBUG)
+async def build_pex(request: PexRequest, pex_runtime_env: PexRuntimeEnvironment) -> BuildPexResult:
+    build_pex_process = await Get(BuildPexProcess, PexRequest, request)
+    result = await Get(ProcessResult, MultiPlatformProcess, build_pex_process.process)
 
     if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()
@@ -492,7 +503,10 @@ async def build_pex(
     )
 
     return BuildPexResult(
-        result=result, pex_filename=request.output_filename, digest=digest, python=python
+        result=result,
+        pex_filename=request.output_filename,
+        digest=digest,
+        python=build_pex_process.python,
     )
 
 

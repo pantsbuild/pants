@@ -8,7 +8,7 @@ import pytest
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.engine.fs import DigestContents
-from pants.engine.process import Process
+from pants.engine.process import MultiPlatformProcess
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
@@ -19,7 +19,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_cli.rules(),
-            QueryRule(Process, (PexCliProcess,)),
+            QueryRule(MultiPlatformProcess, (PexCliProcess,)),
         ]
     )
 
@@ -33,11 +33,11 @@ def test_custom_ca_certs(rule_runner: RuleRunner) -> None:
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         proc = rule_runner.request(
-            Process,
+            MultiPlatformProcess,
             [PexCliProcess(argv=["some", "--args"], description="")],
         )
-        assert proc.argv[2:4] == ("--cert", "certsfile")
-        files = rule_runner.request(DigestContents, [proc.input_digest])
+        assert proc.processes[0].argv[2:4] == ("--cert", "certsfile")
+        files = rule_runner.request(DigestContents, [proc.processes[0].input_digest])
         chrooted_certs_file = [f for f in files if f.path == "certsfile"]
         assert len(chrooted_certs_file) == 1
         assert b"Some fake cert" == chrooted_certs_file[0].content
