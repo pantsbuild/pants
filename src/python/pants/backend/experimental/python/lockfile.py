@@ -112,13 +112,9 @@ class PythonLockfileRequest:
         )
 
     @property
-    def hex_digest(self) -> str:
-        """Produces a hex digest of this lockfile's inputs, which should uniquely specify the
-        resolution of this lockfile request.
-
-        Inputs are definted as requirements and interpreter constraints.
-        """
-        return calculate_invalidation_digest(self.requirements, self.interpreter_constraints)
+    def requirements_hex_digest(self) -> str:
+        """Produces a hex digest of the requirements input for this lockfile."""
+        return calculate_invalidation_digest(self.requirements)
 
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
@@ -170,7 +166,8 @@ async def generate_lockfile(
     lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
     lockfile_with_header = lockfile_content_with_header(
         python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
-        req.hex_digest,
+        req.requirements_hex_digest,
+        req.interpreter_constraints,
         lockfile_digest_contents[0].content,
     )
     final_lockfile = await Get(Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)]))

@@ -177,7 +177,7 @@ async def setup_pytest_for_target(
     lockfile_hex_digest = None
     if pytest.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, PytestLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     requirements_pex_get = Get(
         Pex,

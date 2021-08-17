@@ -92,7 +92,7 @@ async def setup_black(
     lockfile_hex_digest = None
     if black.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, BlackLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     black_pex_get = Get(
         VenvPex,
