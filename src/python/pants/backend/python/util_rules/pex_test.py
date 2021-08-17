@@ -578,9 +578,15 @@ def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, capl
 
 
 def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior):
+    constraints = "CPython>=3.9"
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: {actual}
+# {{
+#   "invalidation_digest": "{actual}",
+#   "valid_interpreter_constraints": [
+#     "{ constraints }"
+#   ]
+# }}
 # --- END PANTS LOCKFILE METADATA ---
 ansicolors==1.1.8
 """
