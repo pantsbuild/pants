@@ -31,11 +31,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ProductDescription:
-    value: str
-
-
 class ProcessCacheScope(Enum):
     # Cached in all locations, regardless of success or failure.
     ALWAYS = "always"
@@ -155,8 +150,8 @@ class MultiPlatformProcess:
         self.processes = tuple(request_dict.values())
 
     @property
-    def product_description(self) -> ProductDescription:
-        return ProductDescription(self.processes[0].description)
+    def description(self) -> str:
+        return self.processes[0].description
 
 
 @dataclass(frozen=True)
@@ -231,21 +226,15 @@ class ProcessExecutionFailure(Exception):
 
 
 @rule
-def get_multi_platform_request_description(req: MultiPlatformProcess) -> ProductDescription:
-    return req.product_description
-
-
-@rule
 def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
     return MultiPlatformProcess({None: req})
 
 
 @rule
-def fallible_to_exec_result_or_raise(
-    fallible_result: FallibleProcessResult, description: ProductDescription
-) -> ProcessResult:
+async def fallible_to_exec_result_or_raise(process: MultiPlatformProcess) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
+    fallible_result = await Get(FallibleProcessResult, MultiPlatformProcess, process)
 
     if fallible_result.exit_code == 0:
         return ProcessResult(
@@ -259,7 +248,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.exit_code,
         fallible_result.stdout,
         fallible_result.stderr,
-        description.value,
+        process.description,
     )
 
 
