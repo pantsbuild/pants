@@ -79,7 +79,7 @@ async def create_ipython_repl_request(
     lockfile_hex_digest = None
     if ipython.lockfile != "<none>":
         lockfile_request = await Get(PythonLockfileRequest, IPythonLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.lockfile_hex_digest
+        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     ipython_request = Get(
         Pex,
