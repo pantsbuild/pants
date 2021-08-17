@@ -3,13 +3,24 @@
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.fs import Digest, DigestContents, FileContent
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.custom_types import file_option, shell_str, target_option
+from pants.util.docutil import doc_url
+
+logger = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------------------
+# Subsystem
+# --------------------------------------------------------------------------------------
 
 
 class MyPy(PythonToolBase):
@@ -106,3 +117,53 @@ class MyPy(PythonToolBase):
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+
+    def check_and_warn_if_python_version_configured(self, config: FileContent | None) -> bool:
+        """Determine if we can dynamically set `--python-version` and warn if not."""
+        configured = []
+        if config and b"python_version" in config.content:
+            configured.append(
+                f"`python_version` in {config.path} (which is used because of either config "
+                "discovery or the `[mypy].config` option)"
+            )
+        if "--py2" in self.args:
+            configured.append("`--py2` in the `--mypy-args` option")
+        if any(arg.startswith("--python-version") for arg in self.args):
+            configured.append("`--python-version` in the `--mypy-args` option")
+        if configured:
+            formatted_configured = " and you set ".join(configured)
+            logger.warning(
+                f"You set {formatted_configured}. Normally, Pants would automatically set this "
+                "for you based on your code's interpreter constraints "
+                f"({doc_url('python-interpreter-compatibility')}). Instead, it will "
+                "use what you set.\n\n"
+                "(Automatically setting the option allows Pants to partition your targets by their "
+                "constraints, so that, for example, you can run MyPy on Python 2-only code and "
+                "Python 3-only code at the same time. This feature may no longer work.)"
+            )
+        return bool(configured)
+
+
+# --------------------------------------------------------------------------------------
+# Config files
+# --------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MyPyConfigFile:
+    digest: Digest
+    python_version_configured: bool
+
+
+@rule
+async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
+    digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+    python_version_configured = mypy.check_and_warn_if_python_version_configured(
+        digest_contents[0] if digest_contents else None
+    )
+    return MyPyConfigFile(config_files.snapshot.digest, python_version_configured)
+
+
+def rules():
+    return collect_rules()
