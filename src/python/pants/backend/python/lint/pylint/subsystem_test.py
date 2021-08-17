@@ -5,26 +5,101 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.pylint import skip_field
-from pants.backend.python.lint.pylint.subsystem import PylintLockfileSentinel
+from pants.backend.python.lint.pylint.subsystem import (
+    PylintFirstPartyPlugins,
+    PylintLockfileSentinel,
+)
 from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonLibrary,
+    PythonRequirementLibrary,
+)
+from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
+from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
-def test_setup_lockfile_interpreter_constraints() -> None:
-    rule_runner = RuleRunner(
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
+            *python_sources.rules(),
+            QueryRule(PylintFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget],
+        target_types=[PythonLibrary, GenericTarget, PythonRequirementLibrary],
     )
 
+
+def test_first_party_plugins(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement_library(name='pylint', requirements=['pylint==2.6.2'])
+                python_requirement_library(name='colors', requirements=['ansicolors'])
+                """
+            ),
+            "pylint-plugins/subdir1/util.py": "",
+            "pylint-plugins/subdir1/BUILD": dedent(
+                """\
+                python_library(
+                    interpreter_constraints=['==3.5.*'],
+                    dependencies=['pylint-plugins/subdir2']
+                )
+                """
+            ),
+            "pylint-plugins/subdir2/another_util.py": "",
+            "pylint-plugins/subdir2/BUILD": ("python_library(interpreter_constraints=['==3.4.*'])"),
+            "pylint-plugins/plugin.py": "",
+            "pylint-plugins/BUILD": dedent(
+                """\
+                python_library(
+                    dependencies=['//:pylint', '//:colors', "pylint-plugins/subdir1"]
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=pylint-plugins",
+            "--pylint-source-plugins=pylint-plugins/plugin.py",
+        ]
+    )
+    first_party_plugins = rule_runner.request(PylintFirstPartyPlugins, [])
+    assert first_party_plugins.requirement_strings == FrozenOrderedSet(
+        ["ansicolors", "pylint==2.6.2"]
+    )
+    assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
+        [
+            InterpreterConstraintsField(ic, Address("", target_name="tgt"))
+            for ic in (None, ["==3.5.*"], ["==3.4.*"])
+        ]
+    )
+    assert (
+        first_party_plugins.sources_digest
+        == rule_runner.make_snapshot(
+            {
+                f"{PylintFirstPartyPlugins.PREFIX}/plugin.py": "",
+                f"{PylintFirstPartyPlugins.PREFIX}/subdir1/util.py": "",
+                f"{PylintFirstPartyPlugins.PREFIX}/subdir2/another_util.py": "",
+            }
+        ).digest
+    )
+
+
+def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
     global_constraint = "==3.9.*"
     rule_runner.set_options(
         [], env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"}

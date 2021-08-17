@@ -14,17 +14,30 @@ from pants.backend.experimental.python.lockfile import (
 )
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, PythonSources
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    InterpreterConstraintsField,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
+)
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSet,
     Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
@@ -32,6 +45,7 @@ from pants.option.custom_types import file_option, shell_str, target_option
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 @dataclass(frozen=True)
@@ -44,6 +58,11 @@ class PylintFieldSet(FieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipPylintField).value
+
+
+# --------------------------------------------------------------------------------------
+# Subsystem
+# --------------------------------------------------------------------------------------
 
 
 class Pylint(PythonToolBase):
@@ -112,7 +131,7 @@ class Pylint(PythonToolBase):
                 "'build-support/pylint' to `[source].root_patterns` in `pants.toml`. This is "
                 "necessary for Pants to know how to tell Pylint to discover your plugin. See "
                 f"{doc_url('source-roots')}\n\nYou must also set `load-plugins=$module_name` in "
-                "your Pylint config file, and set the `[pylint].config` option in `pants.toml`."
+                "your Pylint config file."
                 "\n\nWhile your plugin's code can depend on other first-party code and third-party "
                 "requirements, all first-party dependencies of the plugin must live in the same "
                 "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
@@ -147,6 +166,70 @@ class Pylint(PythonToolBase):
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+
+
+# --------------------------------------------------------------------------------------
+# First-party plugins
+# --------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PylintFirstPartyPlugins:
+    requirement_strings: FrozenOrderedSet[str]
+    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
+    sources_digest: Digest
+
+    PREFIX = "__plugins"
+
+    def __bool__(self) -> bool:
+        return self.sources_digest != EMPTY_DIGEST
+
+
+@rule("Prepare [pylint].source_plugins", level=LogLevel.DEBUG)
+async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
+    if not pylint.source_plugins:
+        return PylintFirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)
+
+    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, pylint.source_plugins)
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    )
+
+    requirements_fields: OrderedSet[PythonRequirementsField] = OrderedSet()
+    interpreter_constraints_fields: OrderedSet[InterpreterConstraintsField] = OrderedSet()
+    for tgt in transitive_targets.closure:
+        if tgt.has_field(PythonRequirementsField):
+            requirements_fields.add(tgt[PythonRequirementsField])
+        if tgt.has_field(InterpreterConstraintsField):
+            interpreter_constraints_fields.add(tgt[InterpreterConstraintsField])
+
+    # NB: Pylint source plugins must be explicitly loaded via PYTHONPATH (i.e. PEX_EXTRA_SYS_PATH).
+    # The value must point to the plugin's directory, rather than to a parent's directory, because
+    # `load-plugins` takes a module name rather than a path to the module; i.e. `plugin`, but
+    # not `path.to.plugin`. (This means users must have specified the parent directory as a
+    # source root.)
+    stripped_sources = await Get(
+        StrippedPythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure)
+    )
+    prefixed_sources = await Get(
+        Digest,
+        AddPrefix(
+            stripped_sources.stripped_source_files.snapshot.digest, PylintFirstPartyPlugins.PREFIX
+        ),
+    )
+
+    return PylintFirstPartyPlugins(
+        requirement_strings=PexRequirements.create_from_requirement_fields(
+            requirements_fields
+        ).req_strings,
+        interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
+        sources_digest=prefixed_sources,
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Lockfile
+# --------------------------------------------------------------------------------------
 
 
 class PylintLockfileSentinel:
