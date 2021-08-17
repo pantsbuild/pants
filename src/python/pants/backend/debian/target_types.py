@@ -16,12 +16,18 @@ from pants.util.docutil import doc_url
 class DebianControlFile(Sources):
     required = True
     expected_num_files = 1
-    help = "Path to a Debian control file for the package to be produced."
+    help = (
+        "Path to a Debian control file for the package to be produced.\n\n"
+        "Paths are relative to the BUILD file's directory."
+    )
 
 
 class DebianSymlinks(DictStringToStringField):
     alias = "symlinks"
-    help = "Symlinks to create for each target being packaged."
+    help = (
+        "Symlinks to create for each target being packaged.\n\n"
+        "For example, you could set symlinks={'command-name': 'entrypoint-name'}."
+    )
 
 
 class DebianInstallPrefix(StringField):
@@ -52,4 +58,9 @@ class DebianPackage(Target):
         DebianInstallPrefix,
         DebianPackageDependencies,
     )
-    help = "A Debian package containing an artifact.\n\n" f"See {doc_url('debian-package')}."
+    help = (
+        "A Debian package containing an artifact.\n\n"
+        "This will not install the package, only create a .deb file "
+        "that you can then distribute and install, e.g. via dpkg.\n\n"
+        f"See {doc_url('debian-package')}."
+    )
