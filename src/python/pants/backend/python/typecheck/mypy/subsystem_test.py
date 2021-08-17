@@ -5,6 +5,7 @@ import pytest
 
 from pants.backend.python.typecheck.mypy import subsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPyConfigFile
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -34,7 +35,15 @@ def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> N
 
         assert result.digest == (config_digest if has_config else EMPTY_DIGEST)
         should_be_configured = has_config or bool(args)
-        assert result.python_version_configured == should_be_configured
+        assert result._python_version_configured == should_be_configured
+
+        autoset_python_version = result.python_version_to_autoset(
+            InterpreterConstraints([">=3.6"]), ["2.7", "3.6", "3.7", "3.8"]
+        )
+        if should_be_configured:
+            assert autoset_python_version is None
+        else:
+            assert autoset_python_version == "3.6"
 
         if should_be_configured:
             assert len(caplog.records) == 1

@@ -5,15 +5,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import cast
+from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.custom_types import file_option, shell_str, target_option
+from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url
 
 logger = logging.getLogger(__name__)
@@ -152,11 +154,20 @@ class MyPy(PythonToolBase):
 @dataclass(frozen=True)
 class MyPyConfigFile:
     digest: Digest
-    python_version_configured: bool
+    _python_version_configured: bool
+
+    def python_version_to_autoset(
+        self, interpreter_constraints: InterpreterConstraints, interpreter_universe: Iterable[str]
+    ) -> str | None:
+        """If the user did not already set `--python-version`, return the major.minor version to
+        use."""
+        if self._python_version_configured:
+            return None
+        return interpreter_constraints.minimum_python_version(interpreter_universe)
 
 
 @rule
-async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
+async def setup_mypy_config(mypy: MyPy, python_setup: PythonSetup) -> MyPyConfigFile:
     config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
     digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
     python_version_configured = mypy.check_and_warn_if_python_version_configured(

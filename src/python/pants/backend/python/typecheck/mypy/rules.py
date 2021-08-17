@@ -114,16 +114,6 @@ async def mypy_typecheck_partition(
         if plugin_tgt.has_field(PythonRequirementsField)
     )
 
-    # If the user did not set `--python-version` already, we set it ourselves based on their code's
-    # interpreter constraints. This determines what AST is used by MyPy.
-    python_version = (
-        None
-        if config_file.python_version_configured
-        else partition.interpreter_constraints.minimum_python_version(
-            python_setup.interpreter_universe
-        )
-    )
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -249,7 +239,9 @@ async def mypy_typecheck_partition(
                 mypy,
                 typechecked_venv_pex,
                 file_list_path=file_list_path,
-                python_version=python_version,
+                python_version=config_file.python_version_to_autoset(
+                    partition.interpreter_constraints, python_setup.interpreter_universe
+                ),
             ),
             input_digest=merged_input_files,
             extra_env=env,
