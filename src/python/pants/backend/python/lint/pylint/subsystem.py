@@ -244,10 +244,13 @@ class PylintLockfileSentinel:
     level=LogLevel.DEBUG,
 )
 async def setup_pylint_lockfile(
-    _: PylintLockfileSentinel, pylint: Pylint, python_setup: PythonSetup
+    _: PylintLockfileSentinel,
+    first_party_plugins: PylintFirstPartyPlugins,
+    pylint: Pylint,
+    python_setup: PythonSetup,
 ) -> PythonLockfileRequest:
     # While Pylint will run in partitions, we need a single lockfile that works with every
-    # partition.
+    # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
     #
     # This first computes the constraints for each individual target, including its direct
     # dependencies (which will AND across each target in the closure). Then, it ORs all unique
@@ -259,13 +262,33 @@ async def setup_pylint_lockfile(
         Get(UnexpandedTargets, DependenciesRequest(tgt.get(Dependencies)))
         for tgt in relevant_targets
     )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets([tgt, *direct_deps], python_setup)
-        for tgt, direct_deps in zip(relevant_targets, direct_deps_per_target)
-    }
+
+    unique_constraints = set()
+    for tgt, direct_deps in zip(relevant_targets, direct_deps_per_target):
+        constraints_fields = (
+            t[InterpreterConstraintsField]
+            for t in (tgt, *direct_deps)
+            if t.has_field(InterpreterConstraintsField)
+        )
+        unique_constraints.add(
+            InterpreterConstraints.create_from_compatibility_fields(
+                (*constraints_fields, *first_party_plugins.interpreter_constraints_fields),
+                python_setup,
+            )
+        )
+    if not unique_constraints:
+        unique_constraints.add(
+            InterpreterConstraints.create_from_compatibility_fields(
+                first_party_plugins.interpreter_constraints_fields,
+                python_setup,
+            )
+        )
+
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return PythonLockfileRequest.from_tool(
-        pylint, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        pylint,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        extra_requirements=first_party_plugins.requirement_strings,
     )
 
 
