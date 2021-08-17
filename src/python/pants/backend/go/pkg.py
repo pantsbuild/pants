@@ -27,7 +27,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import UnexpandedTargets
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +238,7 @@ class ResolveExternalGoModuleToPackagesRequest:
 
 @dataclass(frozen=True)
 class ResolveExternalGoModuleToPackagesResult:
-    packages: OrderedSet[ResolvedGoPackage]
+    packages: FrozenOrderedSet[ResolvedGoPackage]
 
 
 @rule
@@ -272,7 +272,7 @@ async def resolve_external_module_to_go_packages(
         )
         packages.add(package)
 
-    return ResolveExternalGoModuleToPackagesResult(packages=packages)
+    return ResolveExternalGoModuleToPackagesResult(packages=FrozenOrderedSet(packages))
 
 
 def rules():
