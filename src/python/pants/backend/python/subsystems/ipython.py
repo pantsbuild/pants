@@ -50,7 +50,7 @@ class IPython(PythonToolBase):
         )
 
 
-class IPythonLockfileSentinel(PythonToolLockfileSentinel):
+class IPythonLockfileSentinel:
     pass
 
 
