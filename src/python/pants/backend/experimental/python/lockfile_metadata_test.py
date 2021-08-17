@@ -22,14 +22,7 @@ def test_metadata_header_round_trip() -> None:
     serialized_metadata = lockfile_metadata_header(input_metadata)
     output_metadata = read_lockfile_metadata(serialized_metadata)
 
-    print(input_metadata.valid_interpreter_constraints)
-    print(output_metadata.valid_interpreter_constraints)
-    print(serialized_metadata.decode("ascii"))
-
-    assert (
-        input_metadata.valid_interpreter_constraints
-        == output_metadata.valid_interpreter_constraints
-    )
+    assert input_metadata == output_metadata
 
 
 def test_validated_lockfile_content() -> None:
@@ -44,8 +37,8 @@ def test_validated_lockfile_content() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "invalidation_digest": "000faaafcacacaca",
-#   "valid_interpreter_constraints": [
+#   "requirements_invalidation_digest": "000faaafcacacaca",
+#   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
 #   ]
 # }

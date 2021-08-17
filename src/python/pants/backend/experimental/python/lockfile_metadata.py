@@ -17,8 +17,8 @@ END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 @dataclass
 class LockfileMetadata:
-    invalidation_digest: str | None
-    valid_interpreter_constraints: InterpreterConstraints | None
+    requirements_invalidation_digest: str | None
+    valid_for_interpreter_constraints: InterpreterConstraints | None
 
     @staticmethod
     def from_json_bytes(json_literal: str | bytes) -> LockfileMetadata:
@@ -42,18 +42,20 @@ class LockfileMetadata:
                 return None
 
         return LockfileMetadata(
-            invalidation_digest=coerce(str, "invalidation_digest"),
-            valid_interpreter_constraints=coerce(
-                InterpreterConstraints, "valid_interpreter_constraints"
+            requirements_invalidation_digest=coerce(str, "requirements_invalidation_digest"),
+            valid_for_interpreter_constraints=coerce(
+                InterpreterConstraints, "valid_for_interpreter_constraints"
             ),
         )
 
     def to_json_literal(self) -> str:
         """Produces a JSON-encoded dictionary that represents the contents of this metadata."""
-        constraints = self.valid_interpreter_constraints
+        constraints = self.valid_for_interpreter_constraints
         metadata = {
-            "invalidation_digest": self.invalidation_digest,
-            "valid_interpreter_constraints": [str(i) for i in constraints] if constraints else None,
+            "requirements_invalidation_digest": self.requirements_invalidation_digest,
+            "valid_for_interpreter_constraints": [str(i) for i in constraints]
+            if constraints
+            else None,
         }
         return json.dumps(
             metadata,
@@ -71,21 +73,21 @@ class LockfileMetadata:
         current execution context.
 
         A lockfile can be used in the current execution context if `expected_invalidation_digest ==
-        invalidation_digest`, and if `user_interpreter_constraints` matches only interpreters
-        specified by `valid_interpreter_constraints`.
+        requirements_invalidation_digest`, and if `user_interpreter_constraints` matches only
+        interpreters specified by `valid_for_interpreter_constraints`.
         """
 
         if expected_invalidation_digest is None:
             return True
 
-        if self.invalidation_digest != expected_invalidation_digest:
+        if self.requirements_invalidation_digest != expected_invalidation_digest:
             return False
 
-        if self.valid_interpreter_constraints is None:
+        if self.valid_for_interpreter_constraints is None:
             # This lockfile matches all interpreter constraints (TODO: check this)
             return True
 
-        return self.valid_interpreter_constraints.contains(
+        return self.valid_for_interpreter_constraints.contains(
             user_interpreter_constraints, interpreter_universe
         )
 

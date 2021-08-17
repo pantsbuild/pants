@@ -6,12 +6,17 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
+from pants.backend.python.subsystems.pytest import (
+    PyTest,
+    PytestLockfileSentinel,
+    PythonTestFieldSet,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -58,8 +63,6 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.subsystems.pytest import PytestLockfileSentinel
 
 logger = logging.getLogger()
 

@@ -582,8 +582,8 @@ def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {{
-#   "invalidation_digest": "{actual}",
-#   "valid_interpreter_constraints": [
+#   "requirements_invalidation_digest": "{actual}",
+#   "valid_for_interpreter_constraints": [
 #     "{ constraints }"
 #   ]
 # }}

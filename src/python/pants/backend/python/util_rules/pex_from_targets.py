@@ -12,7 +12,6 @@ from typing import Iterable, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import (
     MainSpecification,
     PythonRequirementsField,
