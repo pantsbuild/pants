@@ -99,23 +99,13 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
 
 
 def test_resolve_packages_of_go_external_module(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": textwrap.dedent(
-                """\
-        go_external_module(
-          name="go_cmp",
-          path="github.com/google/go-cmp",
-          version="v0.5.6",
-        )
-        """
-            )
-        }
-    )
-
     result = rule_runner.request(
         ResolveExternalGoModuleToPackagesResult,
-        [ResolveExternalGoModuleToPackagesRequest(Address("foo", target_name="go_cmp"))],
+        [
+            ResolveExternalGoModuleToPackagesRequest(
+                path="github.com/google/go-cmp", version="v0.5.6"
+            )
+        ],
     )
 
     import_path_to_package = {pkg.import_path: pkg for pkg in result.packages}

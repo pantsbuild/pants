@@ -105,7 +105,6 @@ class GoExtModPackage(Target):
         GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
         GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
         GoImportPath,
-        GoPackageSources,
     )
 
 

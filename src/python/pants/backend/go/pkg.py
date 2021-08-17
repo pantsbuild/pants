@@ -18,13 +18,7 @@ from pants.backend.go.module import (
     ResolveGoModuleRequest,
 )
 from pants.backend.go.sdk import GoSdkProcess
-from pants.backend.go.target_types import (
-    GoExternalModulePath,
-    GoExternalModuleVersion,
-    GoImportPath,
-    GoModuleSources,
-    GoPackageSources,
-)
+from pants.backend.go.target_types import GoImportPath, GoModuleSources, GoPackageSources
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -238,7 +232,8 @@ async def resolve_go_package(
 
 @dataclass(frozen=True)
 class ResolveExternalGoModuleToPackagesRequest:
-    address: Address
+    path: str
+    version: str
 
 
 @dataclass(frozen=True)
@@ -250,16 +245,9 @@ class ResolveExternalGoModuleToPackagesResult:
 async def resolve_external_module_to_go_packages(
     request: ResolveExternalGoModuleToPackagesRequest,
 ) -> ResolveExternalGoModuleToPackagesResult:
-    targets = await Get(UnexpandedTargets, Addresses([request.address]))
-    if not targets:
-        raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
-    elif len(targets) > 1:
-        raise AssertionError(f"Address `{request.address}` resolved to multiple targets.")
-    target = targets[0]
-
-    module_path = target[GoExternalModulePath].value
+    module_path = request.path
     assert module_path
-    module_version = target[GoExternalModuleVersion].value
+    module_version = request.version
     assert module_version
 
     downloaded_module = await Get(
