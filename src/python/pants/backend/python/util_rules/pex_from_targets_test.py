@@ -212,13 +212,13 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         additional_args=additional_args,
     )
     assert pex_req1.requirements == PexRequirements(
-        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
+        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req], apply_constraints=True
     )
 
     pex_req1_direct = get_pex_request(
         "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
     )
-    assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
+    assert pex_req1_direct.requirements == PexRequirements(["baz", url_req], apply_constraints=True)
 
     pex_req2 = get_pex_request(
         "constraints1.txt",
@@ -299,4 +299,4 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.requirements == PexRequirements(["foo"])
+    assert result.requirements == PexRequirements(["foo"], apply_constraints=True)
