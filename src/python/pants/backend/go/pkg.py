@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # A fully-resolved Go package. The metadata is obtained by invoking `go list` on the package.
 # TODO: Add class docstring with info on the fields.
+# TODO: Consider renaming some of these fields once use of this class has stabilized.
 @dataclass(frozen=True)
 class ResolvedGoPackage:
     # Address of the `go_package` target (if any).
