@@ -66,12 +66,12 @@ class MyPyRequest(TypecheckRequest):
 
 def generate_argv(
     mypy: MyPy,
-    typechecked_venv_pex: VenvPex,
+    mypy_runner_pex: VenvPex,
     *,
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={typechecked_venv_pex.python.argv0}", *mypy.args]
+    args = [f"--python-executable={mypy_runner_pex.python.argv0}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
@@ -148,24 +148,11 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    # TODO(John Sirois): Scope the extra requirements to the partition.
-    #  Right now we just use a global set of extra requirements and these might not be compatible
-    #  with all partitions. See: https://github.com/pantsbuild/pants/issues/11556
-    mypy_extra_requirements_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="mypy_extra_requirements.pex",
-            internal_only=True,
-            requirements=PexRequirements(mypy.extra_requirements),
-            interpreter_constraints=partition.interpreter_constraints,
-        ),
-    )
     mypy_pex_get = Get(
-        VenvPex,
+        Pex,
         PexRequest(
             output_filename="mypy.pex",
             internal_only=True,
-            main=mypy.main,
             requirements=PexRequirements(
                 (*mypy.all_requirements, *plugin_requirements.req_strings)
             ),
@@ -173,20 +160,12 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (
-        plugin_sources,
-        closure_sources,
-        roots_sources,
-        mypy_pex,
-        requirements_pex,
-        mypy_extra_requirements_pex,
-    ) = await MultiGet(
+    plugin_sources, closure_sources, roots_sources, mypy_pex, requirements_pex = await MultiGet(
         plugin_sources_get,
         closure_sources_get,
         roots_sources_get,
         mypy_pex_get,
         requirements_pex_get,
-        mypy_extra_requirements_pex_get,
     )
 
     python_files = determine_python_files(roots_sources.snapshot.files)
@@ -196,18 +175,19 @@ async def mypy_typecheck_partition(
         CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())]),
     )
 
-    typechecked_venv_pex_request = Get(
+    mypy_runner_pex_get = Get(
         VenvPex,
         PexRequest(
-            output_filename="typechecked_venv.pex",
+            output_filename="mypy_runner.pex",
             internal_only=True,
-            pex_path=[requirements_pex, mypy_extra_requirements_pex],
-            interpreter_constraints=partition.interpreter_constraints,
+            main=mypy.main,
+            pex_path=[requirements_pex, mypy_pex],
+            interpreter_constraints=tool_interpreter_constraints,
         ),
     )
 
-    typechecked_venv_pex, file_list_digest = await MultiGet(
-        typechecked_venv_pex_request, file_list_digest_request
+    mypy_runner_pex, file_list_digest = await MultiGet(
+        mypy_runner_pex_get, file_list_digest_request
     )
 
     merged_input_files = await Get(
@@ -217,7 +197,7 @@ async def mypy_typecheck_partition(
                 file_list_digest,
                 plugin_sources.source_files.snapshot.digest,
                 closure_sources.source_files.snapshot.digest,
-                typechecked_venv_pex.digest,
+                mypy_runner_pex.digest,
                 config_file.digest,
             ]
         ),
@@ -234,10 +214,10 @@ async def mypy_typecheck_partition(
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
-            mypy_pex,
+            mypy_runner_pex,
             argv=generate_argv(
                 mypy,
-                typechecked_venv_pex,
+                mypy_runner_pex,
                 file_list_path=file_list_path,
                 python_version=config_file.python_version_to_autoset(
                     partition.interpreter_constraints, python_setup.interpreter_universe
