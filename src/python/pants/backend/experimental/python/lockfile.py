@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
+from typing import Iterable
 
 from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
@@ -89,6 +90,8 @@ class PythonLockfileRequest:
         cls,
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
+        *,
+        extra_requirements: Iterable[str] = (),
     ) -> PythonLockfileRequest:
         """Create a request for a dedicated lockfile for the tool.
 
@@ -97,7 +100,7 @@ class PythonLockfileRequest:
         `interpreter_constraints`.
         """
         return cls(
-            requirements=FrozenOrderedSet(subsystem.all_requirements),
+            requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
             interpreter_constraints=(
                 interpreter_constraints
                 if interpreter_constraints is not None

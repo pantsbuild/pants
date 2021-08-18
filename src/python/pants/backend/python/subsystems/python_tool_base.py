@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import importlib.resources
-from typing import ClassVar, Sequence, cast
+from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -117,14 +117,19 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return (self.version, *self.extra_requirements)
 
-    def pex_requirements(self, expected_lockfile_hex_digest: str | None) -> PexRequirements:
+    def pex_requirements(
+        self,
+        expected_lockfile_hex_digest: str | None,
+        *,
+        extra_requirements: Iterable[str] = (),
+    ) -> PexRequirements:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
         if not self.register_lockfile or self.lockfile == "<none>":
-            return PexRequirements(self.all_requirements)
+            return PexRequirements((*self.all_requirements, *extra_requirements))
         if self.lockfile == "<default>":
             assert self.default_lockfile_resource is not None
             return PexRequirements(
