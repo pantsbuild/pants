@@ -165,15 +165,13 @@ async def find_putative_go_external_module_targets(
             )
 
     for address, packages in resolved_ext_mod_packages.items():
-        i = 0
-        for package in packages:
+        for i, package in enumerate(packages):
             assert package.module_path
             assert package.module_version
             ext_mod_target_name = compute_go_external_module_target_name(
                 package.module_path, package.module_version
             )
             target_name = f"{ext_mod_target_name}-{i}"  # TODO: append subpath in module instead
-            i += 1
             putative_targets.append(
                 PutativeTarget.for_target_type(
                     GoExtModPackage,
