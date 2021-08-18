@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 import ijson
 
@@ -37,18 +37,18 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ResolvedGoPackage:
     # Address of the `go_package` target (if any).
-    address: Optional[Address]
+    address: Address | None
 
     # Import path of this package. The import path will be inferred from an owning `go_module` if present.
     import_path: str
 
     # Address of the owning `go_module` if present. The owning `go_module` is the nearest go_module at the same
     # or higher level of the source tree.
-    module_address: Optional[Address]
+    module_address: Address | None
 
     # External module information
-    module_path: Optional[str]
-    module_version: Optional[str]
+    module_path: str | None
+    module_version: str | None
 
     # Name of the package as given by `package` directives in the source files. Obtained from `Name` key in
     # package metadata.
@@ -86,11 +86,11 @@ class ResolvedGoPackage:
         cls,
         metadata: dict,
         *,
-        import_path: Optional[str] = None,
-        address: Optional[Address] = None,
-        module_address: Optional[Address] = None,
-        module_path: Optional[str] = None,
-        module_version: Optional[str] = None,
+        import_path: str | None = None,
+        address: Address | None = None,
+        module_address: Address | None = None,
+        module_path: str | None = None,
+        module_version: str | None = None,
     ) -> ResolvedGoPackage:
         # TODO: Raise an exception on errors. They are only emitted as warnings for now because the `go` tool is
         # flagging missing first-party code as a dependency error. But we want dependency inference and won't know
