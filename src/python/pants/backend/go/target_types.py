@@ -106,6 +106,7 @@ class GoExtModPackage(Target):
         GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
         GoImportPath,
     )
+    help = "Package in an external Go module."
 
 
 # -----------------------------------------------------------------------------------------------
