@@ -145,7 +145,7 @@ impl Core {
       local_only.into_with_remote(
         remote_store_address,
         remoting_opts.instance_name.clone(),
-        root_ca_certs.clone(),
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,

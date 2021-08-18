@@ -116,6 +116,7 @@ fs = { path = "fs" }
 futures = "0.3"
 futures-core = "^0.3.0"
 graph = { path = "graph" }
+grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
 indexmap = "1.4"
 itertools = "0.10"
