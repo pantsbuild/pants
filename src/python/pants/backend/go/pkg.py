@@ -239,6 +239,7 @@ class ResolveExternalGoModuleToPackagesRequest:
 
 @dataclass(frozen=True)
 class ResolveExternalGoModuleToPackagesResult:
+    # TODO: Consider using DeduplicatedCollection.
     packages: FrozenOrderedSet[ResolvedGoPackage]
 
 
