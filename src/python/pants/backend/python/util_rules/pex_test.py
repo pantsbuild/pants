@@ -82,22 +82,20 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def create_pex_and_get_all_data(
-    rule_runner: RuleRunner,
+def pex_request(
     *,
-    pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
+    requirements: PexRequirements
+    | Lockfile
+    | LockfileContent = PexRequirements(apply_constraints=True),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
     additional_inputs: Digest | None = None,
-    additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    env: Mapping[str, str] | None = None,
     internal_only: bool = True,
-) -> Dict:
-    request = PexRequest(
+) -> PexRequest:
+    return PexRequest(
         output_filename="test.pex",
         internal_only=internal_only,
         requirements=requirements,
@@ -107,8 +105,17 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
-        apply_requirement_constraints=True,
     )
+
+
+def create_pex_and_get_all_data(
+    rule_runner: RuleRunner,
+    request: PexRequest,
+    *,
+    pex_type: type[Pex | VenvPex] = Pex,
+    additional_pants_args: Tuple[str, ...] = (),
+    env: Mapping[str, str] | None = None,
+) -> Dict:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
         env=env,
@@ -164,30 +171,24 @@ def create_pex_and_get_all_data(
 
 def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
+    request: PexRequest,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
-    additional_pex_args: Tuple[str, ...] = (),
-    internal_only: bool = True,
+    env: Mapping[str, str] | None = None,
 ) -> Dict:
     return cast(
         Dict,
         create_pex_and_get_all_data(
             rule_runner,
+            request,
             pex_type=pex_type,
-            requirements=requirements,
-            main=main,
-            interpreter_constraints=interpreter_constraints,
-            platforms=platforms,
-            sources=sources,
             additional_pants_args=additional_pants_args,
-            additional_pex_args=additional_pex_args,
-            internal_only=internal_only,
+            env=env,
         )["info"],
     )
 
@@ -204,7 +205,9 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, main=EntryPoint("main"), sources=sources)
+    pex_output = create_pex_and_get_all_data(
+        rule_runner, pex_request(main=EntryPoint("main"), sources=sources)
+    )
 
     pex_files = pex_output["files"]
     assert "pex" not in pex_files
@@ -246,14 +249,16 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
     )
     pex_output = create_pex_and_get_all_data(
         rule_runner,
+        pex_request(
+            main=EntryPoint("main"),
+            sources=sources,
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        ),
         pex_type=pex_type,
-        main=EntryPoint("main"),
-        sources=sources,
         additional_pants_args=(
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
@@ -301,10 +306,12 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
     pex_output = create_pex_and_get_all_data(
         rule_runner,
+        pex_request(
+            main=EntryPoint("main"),
+            sources=sources,
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        ),
         pex_type=pex_type,
-        main=EntryPoint("main"),
-        sources=sources,
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
     )
 
     pex = pex_output["pex"]
@@ -341,7 +348,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
-    pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
+    pex_info = create_pex_and_get_pex_info(rule_runner, pex_request(requirements=requirements))
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
     assert set(parse_requirements(requirements.req_strings)).issubset(
@@ -360,7 +367,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps)
+        rule_runner, pex_request(requirements=PexRequirements(direct_deps, apply_constraints=True))
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -375,7 +382,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps),
+        pex_request(requirements=PexRequirements(direct_deps, apply_constraints=True)),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -390,20 +397,22 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
     entry_point = "pydoc"
-    pex_info = create_pex_and_get_pex_info(rule_runner, main=EntryPoint(entry_point))
+    pex_info = create_pex_and_get_pex_info(rule_runner, pex_request(main=EntryPoint(entry_point)))
     assert pex_info["entry_point"] == entry_point
 
 
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_info = create_pex_and_get_pex_info(
-        rule_runner, interpreter_constraints=constraints, internal_only=False
+        rule_runner, pex_request(interpreter_constraints=constraints, internal_only=False)
     )
     assert set(pex_info["interpreter_constraints"]) == {str(c) for c in constraints}
 
 
 def test_additional_args(rule_runner: RuleRunner) -> None:
-    pex_info = create_pex_and_get_pex_info(rule_runner, additional_pex_args=("--not-zip-safe",))
+    pex_info = create_pex_and_get_pex_info(
+        rule_runner, pex_request(additional_pex_args=("--not-zip-safe",))
+    )
     assert pex_info["zip_safe"] is False
 
 
@@ -414,10 +423,12 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_output = create_pex_and_get_all_data(
         rule_runner,
-        requirements=PexRequirements(["cryptography==2.9"]),
-        platforms=platforms,
-        interpreter_constraints=constraints,
-        internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
+        pex_request(
+            requirements=PexRequirements(["cryptography==2.9"]),
+            platforms=platforms,
+            interpreter_constraints=constraints,
+            internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
+        ),
     )
     assert any(
         "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_output["files"]
@@ -439,7 +450,8 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
     )
     additional_pex_args = (f"--preamble-file={preamble_file}",)
     pex_output = create_pex_and_get_all_data(
-        rule_runner, additional_inputs=additional_inputs, additional_pex_args=additional_pex_args
+        rule_runner,
+        pex_request(additional_inputs=additional_inputs, additional_pex_args=additional_pex_args),
     )
     with zipfile.ZipFile(pex_output["local_path"], "r") as zipfp:
         with zipfp.open("__main__.py", "r") as main:
@@ -459,8 +471,8 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     venv_pex = create_pex_and_get_all_data(
         rule_runner,
+        pex_request(requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True)),
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"]),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
@@ -596,7 +608,7 @@ ansicolors==1.1.8
 
     create_pex_and_get_all_data(
         rule_runner,
-        requirements=requirements,
+        pex_request(requirements=requirements),
         additional_pants_args=(
             "--python-setup-experimental-lockfile=lockfile.txt",
             f"--python-setup-invalid-lockfile-behavior={behavior}",

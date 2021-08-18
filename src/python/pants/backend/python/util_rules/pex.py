@@ -78,17 +78,25 @@ class LockfileContent:
 @dataclass(unsafe_hash=True)
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
+    apply_constraints: bool
     repository_pex: Pex | None
 
     def __init__(
-        self, req_strings: Iterable[str] = (), *, repository_pex: Pex | None = None
+        self,
+        req_strings: Iterable[str] = (),
+        *,
+        apply_constraints: bool = False,
+        repository_pex: Pex | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
+        :param apply_constraints: Whether to apply any configured
+            requirement_constraints while building this PEX.
         :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
             `--pex-repository` option.
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
+        self.apply_constraints = apply_constraints
         self.repository_pex = repository_pex
 
     @classmethod
@@ -97,9 +105,12 @@ class PexRequirements:
         fields: Iterable[PythonRequirementsField],
         *,
         additional_requirements: Iterable[str] = (),
+        apply_constraints: bool = True,
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
-        return PexRequirements({*field_requirements, *additional_requirements})
+        return PexRequirements(
+            {*field_requirements, *additional_requirements}, apply_constraints=apply_constraints
+        )
 
     def __bool__(self) -> bool:
         return bool(self.req_strings)
@@ -133,7 +144,6 @@ class PexRequest(EngineAwareParameter):
     main: MainSpecification | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
-    apply_requirement_constraints: bool
     description: str | None = dataclasses.field(compare=False)
 
     def __init__(
@@ -150,7 +160,6 @@ class PexRequest(EngineAwareParameter):
         main: MainSpecification | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
-        apply_requirement_constraints: bool = False,
         description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
@@ -175,8 +184,6 @@ class PexRequest(EngineAwareParameter):
             left off, the Pex will open up as a REPL.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
-        :param apply_requirement_constraints: Whether to apply any configured
-            requirement_constraints while building this PEX.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -191,7 +198,6 @@ class PexRequest(EngineAwareParameter):
         self.main = main
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
-        self.apply_requirement_constraints = apply_requirement_constraints
         self.description = description
         self.__post_init__()
 
@@ -329,10 +335,6 @@ async def build_pex(
             ]
         )
 
-    is_lockfile = isinstance(request.requirements, (Lockfile, LockfileContent))
-    if is_lockfile:
-        argv.append("--no-transitive")
-
     python: PythonExecutable | None = None
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
@@ -386,24 +388,12 @@ async def build_pex(
 
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
     repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
-
     constraint_file_digest = EMPTY_DIGEST
-    if (
-        not is_lockfile and request.apply_requirement_constraints
-    ) and python_setup.requirement_constraints is not None:
-        argv.extend(["--constraints", python_setup.requirement_constraints])
-        constraint_file_digest = await Get(
-            Digest,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="the option `[python-setup].requirement_constraints`",
-            ),
-        )
-
     requirements_file_digest = EMPTY_DIGEST
+
     if isinstance(request.requirements, Lockfile):
         argv.extend(["--requirement", request.requirements.file_path])
+        argv.append("--no-transitive")
 
         globs = PathGlobs(
             [request.requirements.file_path],
@@ -428,6 +418,7 @@ async def build_pex(
     elif isinstance(request.requirements, LockfileContent):
         file_content = request.requirements.file_content
         argv.extend(["--requirement", file_content.path])
+        argv.append("--no-transitive")
 
         metadata = LockfileMetadata.from_lockfile(file_content.content)
         if not metadata.is_valid_for(
@@ -442,6 +433,19 @@ async def build_pex(
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
+        if (
+            request.requirements.apply_constraints
+            and python_setup.requirement_constraints is not None
+        ):
+            argv.extend(["--constraints", python_setup.requirement_constraints])
+            constraint_file_digest = await Get(
+                Digest,
+                PathGlobs(
+                    [python_setup.requirement_constraints],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="the option `[python-setup].requirement_constraints`",
+                ),
+            )
         argv.extend(request.requirements.req_strings)
 
     merged_digest = await Get(
