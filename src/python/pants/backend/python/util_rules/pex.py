@@ -435,11 +435,7 @@ async def build_pex(
         )
 
         # use contents to invalidate here
-        requirements_file_digest_contents = await Get(
-            DigestContents,
-            PathGlobs,
-            globs,
-        )
+        requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
         metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
         if not metadata.is_valid_for(
             request.requirements.lockfile_hex_digest,
@@ -447,15 +443,11 @@ async def build_pex(
             python_setup.interpreter_universe,
         ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
+                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
 
-        requirements_file_digest = await Get(
-            Digest,
-            PathGlobs,
-            globs,
-        )
+        requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
     elif request.requirements.file_content:
         content = request.requirements.file_content
@@ -468,9 +460,9 @@ async def build_pex(
             python_setup.interpreter_universe,
         ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
+                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
 
         requirements_file_digest = await Get(Digest, CreateDigest([content]))
     else:

@@ -289,9 +289,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].requirement_constraints` must also be set."
         )
     elif python_setup.lockfile and requirements:
-        # TODO(#12314): This does not handle the case where requirements are disjoint to the
-        #  lockfile. We should likely regenerate the lockfile (or warn/error), as the inputs have
-        #  changed.
+        # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles are supported.
         repository_pex = await Get(
             Pex,
             PexRequest(
