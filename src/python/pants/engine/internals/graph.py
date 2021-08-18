@@ -182,7 +182,7 @@ class _TransitiveTargetRequest(EngineAwareParameter):
     address: Address
     include_special_cased_deps: bool
 
-    def debug_hint(self) -> Optional[str]:
+    def debug_hint(self) -> str | None:
         return str(self.address)
 
 
@@ -194,8 +194,8 @@ class _TransitiveTarget:
     """
 
     root: Target
-    build_dependencies: Tuple["_TransitiveTarget", ...]
-    file_dependencies: Tuple[Address, ...]
+    build_dependencies: tuple[_TransitiveTarget, ...]
+    file_dependencies: tuple[Address, ...]
 
 
 @rule

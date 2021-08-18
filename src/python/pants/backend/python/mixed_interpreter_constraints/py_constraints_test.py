@@ -66,12 +66,12 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
         CPython==3.7.*
           app
 
+        CPython==2.7.* OR CPython>=3.5
+          lib1
+
         CPython>=3.6
           lib2/a.py
           lib2/b.py
-
-        CPython==2.7.* OR CPython>=3.5
-          lib1
         """
     )
 
