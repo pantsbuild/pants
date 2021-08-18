@@ -2,18 +2,19 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::PythonLogLevel;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::fs::File;
-use std::fs::OpenOptions;
+use std::fmt::Write as FmtWrite;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use arc_swap::ArcSwap;
+use chrono::Timelike;
 use colored::*;
 use lazy_static::lazy_static;
-use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, set_logger, set_max_level, Level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use regex::Regex;
 
@@ -23,45 +24,43 @@ lazy_static! {
   pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
 }
 
-// TODO: The non-atomic portions of this struct should likely be composed into a single RwLock.
-pub struct PantsLogger {
+struct Inner {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
-  global_level: Mutex<RefCell<LevelFilter>>,
-  use_color: AtomicBool,
-  show_rust_3rdparty_logs: AtomicBool,
-  show_target: AtomicBool,
-  log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
-  literal_filters: Mutex<Vec<String>>,
-  regex_filters: Mutex<Vec<Regex>>,
+  global_level: LevelFilter,
+  show_rust_3rdparty_logs: bool,
+  show_target: bool,
+  log_level_filters: HashMap<String, log::LevelFilter>,
+  literal_filters: Vec<String>,
+  regex_filters: Vec<Regex>,
 }
+
+pub struct PantsLogger(ArcSwap<Inner>);
 
 impl PantsLogger {
   pub fn new() -> PantsLogger {
-    PantsLogger {
+    PantsLogger(ArcSwap::from(Arc::new(Inner {
       per_run_logs: Mutex::new(None),
       log_file: Mutex::new(None),
-      global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
-      show_rust_3rdparty_logs: AtomicBool::new(true),
-      use_color: AtomicBool::new(false),
-      show_target: AtomicBool::new(false),
-      log_level_filters: Mutex::new(HashMap::new()),
-      literal_filters: Mutex::new(Vec::new()),
-      regex_filters: Mutex::new(Vec::new()),
-    }
+      global_level: LevelFilter::Off,
+      show_rust_3rdparty_logs: true,
+      show_target: false,
+      log_level_filters: HashMap::new(),
+      literal_filters: Vec::new(),
+      regex_filters: Vec::new(),
+    })))
   }
 
   pub fn init(
     max_level: u64,
     show_rust_3rdparty_logs: bool,
-    use_color: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
     literal_filters: Vec<String>,
     regex_filters: Vec<Regex>,
     log_file_path: PathBuf,
   ) -> Result<(), String> {
-    let log_levels_by_target = log_levels_by_target
+    let log_level_filters = log_levels_by_target
       .iter()
       .map(|(k, v)| {
         let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
@@ -75,42 +74,41 @@ impl PantsLogger {
     let max_python_level: PythonLogLevel = max_level
       .try_into()
       .map_err(|e| format!("Unrecognised log level from Python: {}: {}", max_level, e))?;
-    let level: LevelFilter = max_python_level.into();
+    let global_level: LevelFilter = max_python_level.into();
 
-    // TODO this should be whatever the most verbose log level specified in log_domain_levels -
-    // but I'm not sure if it's actually much of a gain over just setting this to Trace.
-    set_max_level(LevelFilter::Trace);
-    PANTS_LOGGER.global_level.lock().replace(level);
+    let log_file = OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(log_file_path)
+      .map_err(|err| format!("Error opening pantsd logfile: {}", err))?;
 
-    PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
-    PANTS_LOGGER
-      .show_rust_3rdparty_logs
-      .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-    *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
-    *PANTS_LOGGER.literal_filters.lock() = literal_filters;
-    *PANTS_LOGGER.regex_filters.lock() = regex_filters;
-    PANTS_LOGGER
-      .show_target
-      .store(show_target, Ordering::SeqCst);
-    *PANTS_LOGGER.log_file.lock() = {
-      let log_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_file_path)
-        .map_err(|err| format!("Error opening pantsd logfile: {}", err))?;
-      Some(log_file)
-    };
+    PANTS_LOGGER.0.store(Arc::new(Inner {
+      per_run_logs: Mutex::default(),
+      log_file: Mutex::new(Some(log_file)),
+      global_level,
+      show_rust_3rdparty_logs,
+      show_target,
+      log_level_filters,
+      literal_filters,
+      regex_filters,
+    }));
 
     if set_logger(&*PANTS_LOGGER).is_err() {
       debug!("Logging already initialized.");
     }
+    // TODO this should be whatever the most verbose log level specified in log_levels_by_target -
+    // but I'm not sure if it's actually much of a gain over just setting this to Trace.
+    set_max_level(LevelFilter::Trace);
+    // We make per-destination decisions about whether to render color, and should never use
+    // environment variables to decide.
+    colored::control::set_override(true);
     Ok(())
   }
 
   pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
     match per_run_log_path {
       None => {
-        *self.per_run_logs.lock() = None;
+        *self.0.load().per_run_logs.lock() = None;
       }
       Some(path) => {
         let file = OpenOptions::new()
@@ -119,7 +117,7 @@ impl PantsLogger {
           .open(path)
           .map_err(|err| format!("Error opening per-run logfile: {}", err))
           .unwrap();
-        *self.per_run_logs.lock() = Some(file);
+        *self.0.load().per_run_logs.lock() = Some(file);
       }
     };
   }
@@ -137,10 +135,10 @@ impl PantsLogger {
 
 impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    let global_level: LevelFilter = { *self.global_level.lock().borrow() };
-    let enabled_globally = metadata.level() <= global_level;
-    let log_level_filters = self.log_level_filters.lock();
-    let enabled_for_target = log_level_filters
+    let inner = self.0.load();
+    let enabled_globally = metadata.level() <= inner.global_level;
+    let enabled_for_target = inner
+      .log_level_filters
       .get(metadata.target())
       .map(|lf| metadata.level() <= *lf)
       .unwrap_or(false);
@@ -149,14 +147,12 @@ impl Log for PantsLogger {
   }
 
   fn log(&self, record: &Record) {
-    use chrono::Timelike;
-    use log::Level;
-
     if !self.enabled(record.metadata()) {
       return;
     }
+    let inner = self.0.load();
 
-    let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
+    let mut should_log = inner.show_rust_3rdparty_logs;
     if !should_log {
       if let Some(module_path) = record.module_path() {
         for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
@@ -174,54 +170,54 @@ impl Log for PantsLogger {
     }
 
     let log_msg = format!("{}", record.args());
+    if inner
+      .literal_filters
+      .iter()
+      .any(|filt| log_msg.starts_with(filt))
     {
-      let literal_filters = self.literal_filters.lock();
-      if literal_filters.iter().any(|filt| log_msg.starts_with(filt)) {
-        return;
-      }
-
-      let regex_filters = self.regex_filters.lock();
-      if regex_filters.iter().any(|re| re.is_match(&log_msg)) {
-        return;
-      }
+      return;
     }
 
-    let cur_date = chrono::Local::now();
-    let time_str = format!(
-      "{}.{:02}",
-      cur_date.format(TIME_FORMAT_STR),
-      cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
-    );
+    if inner.regex_filters.iter().any(|re| re.is_match(&log_msg)) {
+      return;
+    }
 
-    let show_target = self.show_target.load(Ordering::SeqCst);
-    let level = record.level();
-    // TODO: Fix application of color for log-files: see https://github.com/pantsbuild/pants/issues/11020
-    let use_color = self.use_color.load(Ordering::SeqCst);
+    let destination = stdio::get_destination();
 
-    let level_marker = match level {
-      _ if !use_color => format!("[{}]", level).normal().clear(),
-      Level::Info => format!("[{}]", level).normal(),
-      Level::Error => format!("[{}]", level).red(),
-      Level::Warn => format!("[{}]", level).red(),
-      Level::Debug => format!("[{}]", level).green(),
-      Level::Trace => format!("[{}]", level).magenta(),
-    };
+    // Build the message string.
+    let log_string = {
+      let mut log_string = {
+        let cur_date = chrono::Local::now();
+        format!(
+          "{}.{:02}",
+          cur_date.format(TIME_FORMAT_STR),
+          cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
+        )
+      };
 
-    let log_string = if show_target {
-      format!(
-        "{} {} ({}) {}\n",
-        time_str,
-        level_marker,
-        record.target(),
-        log_msg,
-      )
-    } else {
-      format!("{} {} {}\n", time_str, level_marker, log_msg)
+      let use_color = destination.stderr_use_color();
+
+      let level = record.level();
+      let level_marker = match level {
+        _ if !use_color => format!("[{}]", level).normal().clear(),
+        Level::Info => format!("[{}]", level).normal(),
+        Level::Error => format!("[{}]", level).red(),
+        Level::Warn => format!("[{}]", level).red(),
+        Level::Debug => format!("[{}]", level).green(),
+        Level::Trace => format!("[{}]", level).magenta(),
+      };
+      write!(log_string, " {}", level_marker).unwrap();
+
+      if inner.show_target {
+        write!(log_string, " ({})", record.target()).unwrap();
+      };
+      writeln!(log_string, " {}", log_msg).unwrap();
+      log_string
     };
     let log_bytes = log_string.as_bytes();
 
     {
-      let mut maybe_per_run_file = self.per_run_logs.lock();
+      let mut maybe_per_run_file = inner.per_run_logs.lock();
       if let Some(ref mut file) = *maybe_per_run_file {
         // deliberately ignore errors writing to per-run log file
         let _ = file.write_all(log_bytes);
@@ -230,9 +226,8 @@ impl Log for PantsLogger {
 
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
-    let destination = stdio::get_destination();
-    if stdio::Destination::write_stderr_raw(&destination, log_bytes).is_err() {
-      let mut maybe_file = self.log_file.lock();
+    if destination.write_stderr_raw(log_bytes).is_err() {
+      let mut maybe_file = inner.log_file.lock();
       if let Some(ref mut file) = *maybe_file {
         match file.write_all(log_bytes) {
           Ok(()) => (),

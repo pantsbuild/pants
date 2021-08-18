@@ -575,7 +575,8 @@ class GlobalOptions(Subsystem):
             default=sys.stdout.isatty(),
             help=(
                 "Whether Pants should use colors in output or not. This may also impact whether "
-                "some tools Pants run use color."
+                "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
+                "whether the output destination supports color."
             ),
         )
 

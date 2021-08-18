@@ -370,8 +370,8 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.14.0"
-source = "git+https://github.com/pantsbuild/console?rev=b6e9aa7ce734517691934d558d79a459609633db#b6e9aa7ce734517691934d558d79a459609633db"
+version = "0.14.1"
+source = "git+https://github.com/mitsuhiko/console?rev=3232775295149e6f0aace26d4cfe61013ed3e2d8#3232775295149e6f0aace26d4cfe61013ed3e2d8"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -1543,6 +1543,7 @@ dependencies = [
 name = "logging"
 version = "0.0.1"
 dependencies = [
+ "arc-swap",
  "cargo_metadata",
  "chrono",
  "colored",
@@ -3582,6 +3583,7 @@ dependencies = [
  "futures",
  "indexmap",
  "indicatif",
+ "logging",
  "stdio",
  "task_executor",
  "uuid",

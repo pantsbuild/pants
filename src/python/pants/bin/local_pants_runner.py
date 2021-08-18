@@ -30,6 +30,7 @@ from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
+from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
 from pants.option.arg_splitter import HelpRequest
@@ -119,9 +120,21 @@ class LocalPantsRunner:
         build_config, options = options_initializer.build_config_and_options(
             options_bootstrapper, env, raise_=True
         )
+        stdio_destination_use_color(options.for_global_scope().colors)
 
         run_tracker = RunTracker(options_bootstrapper.args, options)
         union_membership = UnionMembership.from_rules(build_config.union_rules)
+
+        # Option values are usually computed lazily on demand, but command line options are
+        # eagerly computed for validation.
+        with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
+            for scope in options.scope_to_flags.keys():
+                options.for_scope(scope)
+
+        # Verify configs.
+        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        if global_bootstrap_options.verify_config:
+            options.verify_configs(options_bootstrapper.config)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
@@ -135,17 +148,6 @@ class LocalPantsRunner:
             scheduler,
             cancellation_latch,
         )
-
-        # Option values are usually computed lazily on demand, but command line options are
-        # eagerly computed for validation.
-        with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
-            for scope in options.scope_to_flags.keys():
-                options.for_scope(scope)
-
-        # Verify configs.
-        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
 
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,

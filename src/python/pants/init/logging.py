@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import http.client
 import locale
 import logging
@@ -86,6 +88,19 @@ def stdio_destination(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int)
         native_engine.stdio_thread_console_clear()
 
 
+def stdio_destination_use_color(use_color: bool) -> None:
+    """Sets a color mode for the current thread's destination.
+
+    True or false force color to be used or not used: None causes TTY detection to decide whether
+    color will be used.
+
+    NB: This method is independent from either `stdio_destination` or `initialize_stdio` because
+    we cannot decide whether to use color for a particular destination until it is open AND we have
+    parsed options for the relevant connection.
+    """
+    native_engine.stdio_thread_console_color_mode_set(use_color)
+
+
 @contextmanager
 def _python_logging_setup(
     level: LogLevel, *, print_stacktrace: bool, local_cleanup: bool
@@ -151,7 +166,6 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     """
     global_level = global_bootstrap_options.level
     log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
-    use_color = global_bootstrap_options.colors
     show_target = global_bootstrap_options.show_log_target
     log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
     print_stacktrace = global_bootstrap_options.print_stacktrace
@@ -175,7 +189,6 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
         raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
             log_show_rust_3rdparty,
-            use_color,
             show_target,
             {k: v.level for k, v in log_levels_by_target.items()},
             tuple(literal_filters),
