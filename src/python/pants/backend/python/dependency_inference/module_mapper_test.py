@@ -320,9 +320,11 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 module_mapping={"different_THAN-mapping": ["module_mapping_un_normalized"]},
             ),
             # We extract the module from type stub dependencies.
-            req("stubs1_types", "stubs1-types"),
-            req("stubs2_types", "types-stubs2"),
-            req("stubs3_types", "stubs3-foo", stubs_mapping={"stubs3-foo": ["stubs3"]}),
+            req("typed-dep1", "typed-dep1-types"),
+            req("typed-dep2", "types-typed-dep2"),
+            req("typed-dep3", "typed-dep3-stubs"),
+            req("typed-dep4", "stubs-typed-dep4"),
+            req("typed-dep5", "typed-dep5-foo", stubs_mapping={"typed-dep5-foo": ["typed_dep5"]}),
             # A 3rd-party dependency can have both a type stub and implementation.
             req("req2", "req2==1"),
             req("req2_types", "types-req2==1"),
@@ -340,9 +342,9 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("ambiguous_again_t1", "ambiguous-again==1.2"),
             req("ambiguous_again_t2", "ambiguous-again==1.3"),
             req("ambiguous_again_t3", "ambiguous-again-types==1.3"),
-            req("ambiguous_again_stubs_t1", "ambiguous-again-stubs-types==1.2"),
-            req("ambiguous_again_stubs_t2", "types-ambiguous-again-stubs==1.3"),
-            req("ambiguous_again_stubs_t3", "ambiguous-again-stubs==1.3"),
+            req("ambiguous_again_stubby_t1", "ambiguous-again-stubby-types==1.2"),
+            req("ambiguous_again_stubby_t2", "types-ambiguous-again-stubby==1.3"),
+            req("ambiguous_again_stubby_t3", "ambiguous-again-stubby==1.3"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req(
                 "looks_like_stubs",
@@ -366,9 +368,11 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "req2": (Address("", target_name="req2"), Address("", target_name="req2_types")),
                 "req3": (Address("", target_name="req3"), Address("", target_name="req3_types")),
                 "req4": (Address("", target_name="req4"), Address("", target_name="req4_types")),
-                "stubs1": (Address("", target_name="stubs1_types"),),
-                "stubs2": (Address("", target_name="stubs2_types"),),
-                "stubs3": (Address("", target_name="stubs3_types"),),
+                "typed_dep1": (Address("", target_name="typed-dep1"),),
+                "typed_dep2": (Address("", target_name="typed-dep2"),),
+                "typed_dep3": (Address("", target_name="typed-dep3"),),
+                "typed_dep4": (Address("", target_name="typed-dep4"),),
+                "typed_dep5": (Address("", target_name="typed-dep5"),),
                 "un_normalized_project": (Address("", target_name="un_normalized"),),
                 "vcs_dist": (Address("", target_name="vcs_dist"),),
             }
@@ -384,10 +388,10 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                     Address("", target_name="ambiguous_again_t2"),
                     Address("", target_name="ambiguous_again_t3"),
                 ),
-                "ambiguous_again_stubs": (
-                    Address("", target_name="ambiguous_again_stubs_t1"),
-                    Address("", target_name="ambiguous_again_stubs_t2"),
-                    Address("", target_name="ambiguous_again_stubs_t3"),
+                "ambiguous_again_stubby": (
+                    Address("", target_name="ambiguous_again_stubby_t1"),
+                    Address("", target_name="ambiguous_again_stubby_t2"),
+                    Address("", target_name="ambiguous_again_stubby_t3"),
                 ),
                 "ambiguous_stubs": (
                     Address("", target_name="ambiguous_stubs_t1"),
@@ -416,9 +420,9 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_library(name="script", sources=["script.py"])
                 python_requirement_library(name="valid_dep", requirements=["valid_dep"])
                 # Dependency with a type stub.
-                python_requirement_library(name="dep_w_stubs", requirements=["dep_w_stubs"])
+                python_requirement_library(name="dep_w_stub", requirements=["dep_w_stub"])
                 python_requirement_library(
-                    name="dep_w_stubs-types", requirements=["dep_w_stubs-types"]
+                    name="dep_w_stub-types", requirements=["dep_w_stub-types"]
                 )
                 """
             ),
@@ -495,8 +499,8 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     assert_owners("typing", [])
     assert_owners("valid_dep", [Address("", target_name="valid_dep")])
     assert_owners(
-        "dep_w_stubs",
-        [Address("", target_name="dep_w_stubs"), Address("", target_name="dep_w_stubs-types")],
+        "dep_w_stub",
+        [Address("", target_name="dep_w_stub"), Address("", target_name="dep_w_stub-types")],
     )
     assert_owners(
         "script.Demo", [Address("", target_name="script", relative_file_path="script.py")]
