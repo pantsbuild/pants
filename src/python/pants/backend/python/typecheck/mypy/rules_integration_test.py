@@ -217,9 +217,18 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
 
 
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
+    # NB: We install `django-stubs` both with `[mypy].extra_requirements` and a user requirement
+    # (`python_requirement_library`). This awkwardness is because its used both as a plugin and
+    # type stubs.
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='django', requirements=['Django==2.2.5'])",
+            "BUILD": dedent(
+                """\
+                python_requirement_library(
+                    name='django', requirements=['Django==2.2.5', 'django-stubs==1.8.0'],
+                )
+                """
+            ),
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -255,7 +264,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--mypy-extra-requirements=django-stubs==1.5.0", "--mypy-version=mypy==0.770"],
+        extra_args=["--mypy-extra-requirements=django-stubs==1.8.0", "--mypy-version=mypy==0.812"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1

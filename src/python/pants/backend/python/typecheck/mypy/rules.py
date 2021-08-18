@@ -66,12 +66,12 @@ class MyPyRequest(TypecheckRequest):
 
 def generate_argv(
     mypy: MyPy,
-    typechecked_venv_pex: VenvPex,
     *,
+    venv_python: str,
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={typechecked_venv_pex.python.argv0}", *mypy.args]
+    args = [f"--python-executable={venv_python}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
@@ -138,6 +138,7 @@ async def mypy_typecheck_partition(
         SourceFiles, SourceFilesRequest(tgt.get(PythonSources) for tgt in partition.root_targets)
     )
 
+    # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
@@ -148,18 +149,6 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    # TODO(John Sirois): Scope the extra requirements to the partition.
-    #  Right now we just use a global set of extra requirements and these might not be compatible
-    #  with all partitions. See: https://github.com/pantsbuild/pants/issues/11556
-    mypy_extra_requirements_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="mypy_extra_requirements.pex",
-            internal_only=True,
-            requirements=PexRequirements(mypy.extra_requirements),
-            interpreter_constraints=partition.interpreter_constraints,
-        ),
-    )
     mypy_pex_get = Get(
         VenvPex,
         PexRequest(
@@ -173,20 +162,12 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (
-        plugin_sources,
-        closure_sources,
-        roots_sources,
-        mypy_pex,
-        requirements_pex,
-        mypy_extra_requirements_pex,
-    ) = await MultiGet(
+    plugin_sources, closure_sources, roots_sources, mypy_pex, requirements_pex = await MultiGet(
         plugin_sources_get,
         closure_sources_get,
         roots_sources_get,
         mypy_pex_get,
         requirements_pex_get,
-        mypy_extra_requirements_pex_get,
     )
 
     python_files = determine_python_files(roots_sources.snapshot.files)
@@ -196,18 +177,25 @@ async def mypy_typecheck_partition(
         CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())]),
     )
 
-    typechecked_venv_pex_request = Get(
+    # This creates a venv with all the 3rd-party requirements used by the code. We tell MyPy to
+    # use this venv by setting `--python-executable`. Note that this Python interpreter is
+    # different than what we run MyPy with.
+    #
+    # We could have directly asked the `PexFromTargetsRequest` to return a `VenvPex`, rather than
+    # `Pex`, but that would mean missing out on sharing a cache with other goals like `test` and
+    # `run`.
+    requirements_venv_pex_request = Get(
         VenvPex,
         PexRequest(
-            output_filename="typechecked_venv.pex",
+            output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=[requirements_pex, mypy_extra_requirements_pex],
+            pex_path=[requirements_pex],
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
 
-    typechecked_venv_pex, file_list_digest = await MultiGet(
-        typechecked_venv_pex_request, file_list_digest_request
+    requirements_venv_pex, file_list_digest = await MultiGet(
+        requirements_venv_pex_request, file_list_digest_request
     )
 
     merged_input_files = await Get(
@@ -217,7 +205,7 @@ async def mypy_typecheck_partition(
                 file_list_digest,
                 plugin_sources.source_files.snapshot.digest,
                 closure_sources.source_files.snapshot.digest,
-                typechecked_venv_pex.digest,
+                requirements_venv_pex.digest,
                 config_file.digest,
             ]
         ),
@@ -237,7 +225,7 @@ async def mypy_typecheck_partition(
             mypy_pex,
             argv=generate_argv(
                 mypy,
-                typechecked_venv_pex,
+                venv_python=requirements_venv_pex.python.argv0,
                 file_list_path=file_list_path,
                 python_version=config_file.python_version_to_autoset(
                     partition.interpreter_constraints, python_setup.interpreter_universe
