@@ -143,7 +143,6 @@ async def mypy_typecheck_partition(
             internal_only=True,
             main=mypy.main,
             requirements=mypy.pex_requirements(
-                expected_lockfile_hex_digest=None,
                 extra_requirements=first_party_plugins.requirement_strings,
             ),
             interpreter_constraints=tool_interpreter_constraints,

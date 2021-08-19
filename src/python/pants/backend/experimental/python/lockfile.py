@@ -132,7 +132,7 @@ async def generate_lockfile(
         PexRequest(
             output_filename="poetry.pex",
             internal_only=True,
-            requirements=poetry_subsystem.pex_requirements(expected_lockfile_hex_digest=None),
+            requirements=poetry_subsystem.pex_requirements(),
             interpreter_constraints=poetry_subsystem.interpreter_constraints,
             main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
             sources=launcher_digest,
