@@ -5,7 +5,12 @@ import textwrap
 import pytest
 
 from pants.backend.go import module, pkg, sdk
-from pants.backend.go.pkg import ResolvedGoPackage, ResolveGoPackageRequest
+from pants.backend.go.pkg import (
+    ResolvedGoPackage,
+    ResolveExternalGoModuleToPackagesRequest,
+    ResolveExternalGoModuleToPackagesResult,
+    ResolveGoPackageRequest,
+)
 from pants.backend.go.target_types import GoExternalModule, GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
@@ -23,6 +28,9 @@ def rule_runner() -> RuleRunner:
             *pkg.rules(),
             *sdk.rules(),
             QueryRule(ResolvedGoPackage, [ResolveGoPackageRequest]),
+            QueryRule(
+                ResolveExternalGoModuleToPackagesResult, [ResolveExternalGoModuleToPackagesRequest]
+            ),
         ],
         target_types=[GoPackage, GoModule, GoExternalModule],
     )
@@ -88,3 +96,23 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
     assert not resolved_go_package.ignored_other_files
     assert resolved_go_package.test_go_files == ("bar_test.go",)
     assert not resolved_go_package.xtest_go_files
+
+
+def test_resolve_packages_of_go_external_module(rule_runner: RuleRunner) -> None:
+    result = rule_runner.request(
+        ResolveExternalGoModuleToPackagesResult,
+        [
+            ResolveExternalGoModuleToPackagesRequest(
+                path="github.com/google/go-cmp", version="v0.5.6"
+            )
+        ],
+    )
+
+    import_path_to_package = {pkg.import_path: pkg for pkg in result.packages}
+    assert len(import_path_to_package) > 1
+
+    pkg = import_path_to_package["github.com/google/go-cmp/cmp"]
+    assert pkg is not None
+    assert pkg.address is None
+    assert pkg.package_name == "cmp"
+    assert len(pkg.go_files) > 0
