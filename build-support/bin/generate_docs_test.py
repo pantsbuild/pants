@@ -8,20 +8,10 @@ from generate_docs import (
     DocUrlMatcher,
     DocUrlRewriter,
     get_title_from_page_content,
-    html_safe,
-    markdown_safe,
     value_strs_iter,
 )
 
 from pants.util.docutil import doc_url
-
-
-def test_markdown_safe():
-    assert "\\*A\\_B&lt;C&amp;" == markdown_safe("*A_B<C&")
-
-
-def test_html_safe():
-    assert "foo <code>bar==&#x27;baz&#x27;</code> qux" == html_safe("foo `bar=='baz'` qux")
 
 
 def test_gather_value_strs():
