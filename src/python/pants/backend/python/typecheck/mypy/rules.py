@@ -6,14 +6,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
     MyPyConfigFile,
     MyPyFirstPartyPlugins,
-    MyPyLockfileSentinel,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -106,11 +104,6 @@ async def mypy_typecheck_partition(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> TypecheckResult:
-    lockfile_hex_digest = None
-    if mypy.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, MyPyLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.requirements_hex_digest
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -150,7 +143,6 @@ async def mypy_typecheck_partition(
             internal_only=True,
             main=mypy.main,
             requirements=mypy.pex_requirements(
-                expected_lockfile_hex_digest=lockfile_hex_digest,
                 extra_requirements=first_party_plugins.requirement_strings,
             ),
             interpreter_constraints=tool_interpreter_constraints,

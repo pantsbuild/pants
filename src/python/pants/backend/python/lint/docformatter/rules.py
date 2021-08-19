@@ -4,12 +4,8 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
-from pants.backend.python.lint.docformatter.subsystem import (
-    Docformatter,
-    DocformatterLockfileSentinel,
-)
+from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
@@ -61,17 +57,13 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    lockfile_hex_digest = None
-    if docformatter.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, DocformatterLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.requirements_hex_digest
 
     docformatter_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
-            requirements=docformatter.pex_requirements(lockfile_hex_digest),
+            requirements=docformatter.pex_requirements(),
             interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
         ),

@@ -5,12 +5,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
     PylintFieldSet,
     PylintFirstPartyPlugins,
-    PylintLockfileSentinel,
 )
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules import pex_from_targets
@@ -82,11 +80,6 @@ def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
 async def pylint_lint_partition(
     partition: PylintPartition, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
 ) -> LintResult:
-    lockfile_hex_digest = None
-    if pylint.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, PylintLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.requirements_hex_digest
-
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
@@ -108,7 +101,6 @@ async def pylint_lint_partition(
             internal_only=True,
             requirements=pylint.pex_requirements(
                 extra_requirements=first_party_plugins.requirement_strings,
-                expected_lockfile_hex_digest=lockfile_hex_digest,
             ),
             interpreter_constraints=partition.interpreter_constraints,
         ),

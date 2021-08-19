@@ -1,8 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.subsystems.ipython import IPython, IPythonLockfileSentinel
+from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -76,17 +75,12 @@ async def create_ipython_repl_request(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
     )
 
-    lockfile_hex_digest = None
-    if ipython.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, IPythonLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.requirements_hex_digest
-
     ipython_request = Get(
         Pex,
         PexRequest(
             output_filename="ipython.pex",
             main=ipython.main,
-            requirements=ipython.pex_requirements(lockfile_hex_digest),
+            requirements=ipython.pex_requirements(),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             internal_only=True,
         ),
