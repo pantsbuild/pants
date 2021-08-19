@@ -13,14 +13,13 @@ from pants.backend.experimental.python.lockfile import (
     PythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
+from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField, PythonSources
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
-    PythonSources,
 )
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
