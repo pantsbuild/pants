@@ -14,6 +14,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
+from pants.engine.fs import CreateDigest, Digest
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -37,24 +38,38 @@ async def package_debian_package(field_set: DebianPackageFieldSet) -> BuiltPacka
     dpkg_deb_path = await Get(
         BinaryPaths,
         BinaryPathRequest(
-            binary_name="touch",
+            binary_name="dpkg-deb",
             search_path=["/usr/bin"],
         ),
     )
     if not dpkg_deb_path.first_path:
-        raise OSError("Could not find the `touch` program on search paths ")
+        raise OSError("Could not find the `dpkg-deb` program on search paths ")
 
-    output_filename = field_set.output_path.value_or_default(file_ending="deb")
+    output_filename = field_set.output_path.value_or_default(
 
-    # TODO(alexey): add Debian packaging logic
+        file_ending="deb",
+    )
+
+    # TODO: need to create a digest from the directory from the "sources" field of
+    #  "debian_package" target, i.e. field_set.control.filespec['includes'][0]
+    package_metadata_dir_digest = await Get(Digest, CreateDigest("?"))
+
     result = await Get(
         ProcessResult,
         Process(
             argv=(
-                "touch",
-                output_filename,
+                "/usr/bin/dpkg-deb",
+                "--build",
+                # this is assumed to be a directory from the "sources" field of
+                # "debian_package" target
+                field_set.control.filespec["includes"][0],
             ),
             description="Create a Debian package from the produced packages.",
+            input_digest=package_metadata_dir_digest,
+            # TODO: don't need the working_dir since the "sources" will become available?
+            #  and the output .deb file will become available as a BuiltPackage because
+            #  it has been specified in the "output_files"?
+            working_dir="?",
             output_files=(output_filename,),
         ),
     )
