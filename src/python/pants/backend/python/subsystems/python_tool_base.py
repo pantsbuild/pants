@@ -130,11 +130,12 @@ class PythonToolRequirementsBase(Subsystem):
         `all_requirements`.
         """
 
-        if not self.is_lockfile:
+        requirements = (*self.all_requirements, *extra_requirements)
+
+        if not self.uses_lockfile:
             return PexRequirements((*self.all_requirements, *extra_requirements))
 
-        requirements = FrozenOrderedSet([*self.all_requirements, *extra_requirements])
-        hex_digest = calculate_invalidation_digest(requirements)
+        hex_digest = calculate_invalidation_digest(FrozenOrderedSet(requirements))
 
         if self.lockfile == "<default>":
             assert self.default_lockfile_resource is not None
@@ -162,11 +163,7 @@ class PythonToolRequirementsBase(Subsystem):
         return cast(str, self.options.experimental_lockfile)
 
     @property
-    def is_lockfile(self) -> bool:
-        """True if these requirements represent a lockfile.
-
-        (i.e. the lockfile path is not '<none>' and class property `register_lockfile == True`.
-        """
+    def uses_lockfile(self) -> bool:
         return self.register_lockfile and self.lockfile != "<none>"
 
     @property
