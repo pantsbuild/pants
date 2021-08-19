@@ -6,18 +6,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.python.target_types import PythonRequirementsField, PythonSources
+from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
-from pants.backend.python.typecheck.mypy.subsystem import MyPy, MyPyConfigFile
+from pants.backend.python.typecheck.mypy.subsystem import (
+    MyPy,
+    MyPyConfigFile,
+    MyPyFirstPartyPlugins,
+)
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -30,7 +28,6 @@ from pants.core.goals.typecheck import (
     TypecheckResults,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -101,19 +98,12 @@ def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
 
 @rule
 async def mypy_typecheck_partition(
-    partition: MyPyPartition, config_file: MyPyConfigFile, mypy: MyPy, python_setup: PythonSetup
+    partition: MyPyPartition,
+    config_file: MyPyConfigFile,
+    first_party_plugins: MyPyFirstPartyPlugins,
+    mypy: MyPy,
+    python_setup: PythonSetup,
 ) -> TypecheckResult:
-    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
-    plugin_transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
-    )
-
-    plugin_requirements = PexRequirements.create_from_requirement_fields(
-        plugin_tgt[PythonRequirementsField]
-        for plugin_tgt in plugin_transitive_targets.closure
-        if plugin_tgt.has_field(PythonRequirementsField)
-    )
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -130,9 +120,6 @@ async def mypy_typecheck_partition(
         else mypy.interpreter_constraints
     )
 
-    plugin_sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
-    )
     closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     roots_sources_get = Get(
         SourceFiles, SourceFilesRequest(tgt.get(PythonSources) for tgt in partition.root_targets)
@@ -155,19 +142,16 @@ async def mypy_typecheck_partition(
             output_filename="mypy.pex",
             internal_only=True,
             main=mypy.main,
-            requirements=PexRequirements(
-                (*mypy.all_requirements, *plugin_requirements.req_strings)
+            requirements=mypy.pex_requirements(
+                expected_lockfile_hex_digest=None,
+                extra_requirements=first_party_plugins.requirement_strings,
             ),
             interpreter_constraints=tool_interpreter_constraints,
         ),
     )
 
-    plugin_sources, closure_sources, roots_sources, mypy_pex, requirements_pex = await MultiGet(
-        plugin_sources_get,
-        closure_sources_get,
-        roots_sources_get,
-        mypy_pex_get,
-        requirements_pex_get,
+    closure_sources, roots_sources, mypy_pex, requirements_pex = await MultiGet(
+        closure_sources_get, roots_sources_get, mypy_pex_get, requirements_pex_get
     )
 
     python_files = determine_python_files(roots_sources.snapshot.files)
@@ -203,7 +187,7 @@ async def mypy_typecheck_partition(
         MergeDigests(
             [
                 file_list_digest,
-                plugin_sources.source_files.snapshot.digest,
+                first_party_plugins.sources_digest,
                 closure_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
                 config_file.digest,
@@ -212,7 +196,7 @@ async def mypy_typecheck_partition(
     )
 
     all_used_source_roots = sorted(
-        set(itertools.chain(plugin_sources.source_roots, closure_sources.source_roots))
+        set(itertools.chain(first_party_plugins.source_roots, closure_sources.source_roots))
     )
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
