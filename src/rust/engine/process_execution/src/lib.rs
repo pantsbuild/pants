@@ -28,7 +28,7 @@
 extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
-use hashing::{Digest, EMPTY_FINGERPRINT};
+use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
@@ -329,51 +329,6 @@ impl Process {
   }
 }
 
-impl TryFrom<MultiPlatformProcess> for Process {
-  type Error = String;
-
-  fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req.0.get(&None) {
-      Some(crossplatform_req) => Ok(crossplatform_req.clone()),
-      None => Err(String::from(
-        "Cannot coerce to a simple Process, no cross platform request exists.",
-      )),
-    }
-  }
-}
-
-///
-/// A container of platform constrained processes.
-///
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
-
-impl MultiPlatformProcess {
-  pub fn user_facing_name(&self) -> String {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.description.clone())
-      .unwrap_or_else(|| "<Unnamed process>".to_string())
-  }
-
-  pub fn workunit_level(&self) -> log::Level {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.level)
-      .unwrap_or(Level::Info)
-  }
-}
-
-impl From<Process> for MultiPlatformProcess {
-  fn from(proc: Process) -> Self {
-    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
-  }
-}
-
 ///
 /// Metadata surrounding an Process which factors into its cache key when cached
 /// externally from the engine graph (e.g. when using remote execution or an external process
@@ -559,40 +514,15 @@ pub trait CommandRunner: Send + Sync {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String>;
-
-  ///
-  /// Given a multi platform request which may have some platform
-  /// constraints determine if any of the requests contained within are compatible
-  /// with the current command runners platform configuration. If so return the
-  /// first candidate that will be run if the multi platform request is submitted to
-  /// `fn run(..)`
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
-  let mut hashes: Vec<String> = req
-    .0
-    .values()
-    .map(|process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| {
-      er.action_digest
-        .map(|d| d.hash)
-        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
-    })
-    .collect();
-  hashes.sort();
-  Digest::of_bytes(
-    hashes
-      .iter()
-      .fold(String::new(), |mut acc, hash| {
-        acc.push_str(hash);
-        acc
-      })
-      .as_bytes(),
-  )
+pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+  let (_, _, execute_request) =
+    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+  execute_request.action_digest.unwrap().try_into().unwrap()
 }
 
 ///
@@ -617,7 +547,7 @@ impl CommandRunner for BoundedCommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    mut req: MultiPlatformProcess,
+    mut process: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let semaphore_acquisition = self.inner.1.acquire();
     let permit = in_workunit!(
@@ -636,24 +566,18 @@ impl CommandRunner for BoundedCommandRunner {
 
     log::debug!(
       "Running {} under semaphore with concurrency id: {}",
-      req.user_facing_name(),
+      process.description,
       permit.concurrency_slot()
     );
 
-    for (_, process) in req.0.iter_mut() {
-      if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-        process.env.insert(
-          execution_slot_env_var.clone(),
-          format!("{}", permit.concurrency_slot()),
-        );
-      }
+    if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+      process.env.insert(
+        execution_slot_env_var.clone(),
+        format!("{}", permit.concurrency_slot()),
+      );
     }
 
-    self.inner.0.run(context, workunit, req).await
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.inner.0.extract_compatible_request(req)
+    self.inner.0.run(context, workunit, process).await
   }
 }
 

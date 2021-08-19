@@ -33,7 +33,7 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -234,15 +234,6 @@ impl ChildResults {
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
-  }
-
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
@@ -250,9 +241,8 @@ impl super::CommandRunner for CommandRunner {
     &self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
       context.workunit_store.clone(),

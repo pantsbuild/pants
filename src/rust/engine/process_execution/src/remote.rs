@@ -43,8 +43,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -734,19 +734,18 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
-  /// Run the given MultiPlatformProcess via the Remote Execution API.
+  /// Run the given Process via the Remote Execution API.
   async fn run(
     &self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-    request: MultiPlatformProcess,
+    request: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Retrieve capabilities for this server.
     let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self.extract_compatible_request(&request).unwrap();
     let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
@@ -849,16 +848,6 @@ impl crate::CommandRunner for CommandRunner {
       },
     )
     .await
-  }
-
-  // TODO: This is a copy of the same method on crate::remote::CommandRunner.
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
   }
 }
 

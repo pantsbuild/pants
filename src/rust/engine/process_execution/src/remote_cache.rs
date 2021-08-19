@@ -26,8 +26,7 @@ use workunit_store::{
 
 use crate::remote::make_execute_request;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
@@ -559,19 +558,13 @@ impl crate::CommandRunner for CommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    request: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self
-      .extract_compatible_request(&req)
-      .ok_or_else(|| "No compatible Process found for checking remote cache.".to_owned())?;
     let (action, command, _execute_request) =
       make_execute_request(&request, self.metadata.clone())?;
-    let write_failures_to_cache = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+    let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
@@ -583,13 +576,16 @@ impl crate::CommandRunner for CommandRunner {
           context.clone(),
           cache_lookup_start,
           action_digest,
-          &request,
-          self.underlying.run(context.clone(), workunit, req),
+          &request.clone(),
+          self.underlying.run(context.clone(), workunit, request),
         )
         .await?
     } else {
       (
-        self.underlying.run(context.clone(), workunit, req).await?,
+        self
+          .underlying
+          .run(context.clone(), workunit, request)
+          .await?,
         false,
       )
     };
@@ -648,9 +644,5 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     Ok(result)
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.underlying.extract_compatible_request(req)
   }
 }

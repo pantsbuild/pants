@@ -16,8 +16,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -53,23 +53,16 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.underlying.extract_compatible_request(req)
-  }
-
   async fn run(
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let cache_lookup_start = Instant::now();
-    let write_failures_to_cache = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+    let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
-      digest: Some(crate::digest(req.clone(), &self.metadata).into()),
+      digest: Some(crate::digest(&req, &self.metadata).into()),
       key_type: CacheKeyType::Process.into(),
     };
 
@@ -80,7 +73,7 @@ impl crate::CommandRunner for CommandRunner {
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
-        desc: Some(format!("Local cache lookup: {}", req.user_facing_name())),
+        desc: Some(format!("Local cache lookup: {}", req.description)),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
