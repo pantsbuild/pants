@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
     args = create_parser().parse_args()
-    version = determine_pants_version()
+    version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
     doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
     logger.info("Found the following docsite URLs:")
@@ -61,8 +61,12 @@ def main() -> None:
         generator.render()
 
 
-def determine_pants_version() -> str:
+def determine_pants_version(no_prompt: bool) -> str:
     version = MAJOR_MINOR
+    if no_prompt:
+        logger.info(f"Generating docs for Pants {version}.")
+        return version
+
     key_confirmation = input(
         f"Generating docs for Pants {version}. Is this the correct version? [Y/n]: "
     )
@@ -163,6 +167,12 @@ def get_titles(urls: set[str]) -> dict[str, str]:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
+    parser.add_argument(
+        "--no-prompt",
+        action="store_true",
+        default=False,
+        help="Don't prompt the user, accept defaults for all questions.",
+    )
     parser.add_argument(
         "--sync",
         action="store_true",
