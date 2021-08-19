@@ -103,7 +103,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
 def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
     global_constraint = "==3.9.*"
 
-    def assert_lockfile_requst(
+    def assert_lockfile_request(
         build_file: str,
         expected_ics: list[str],
         *,
@@ -125,17 +125,17 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             ]
         )
 
-    assert_lockfile_requst("python_library()", [global_constraint])
-    assert_lockfile_requst("python_library(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
-    assert_lockfile_requst(
+    assert_lockfile_request("python_library()", [global_constraint])
+    assert_lockfile_request("python_library(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
+    assert_lockfile_request(
         "python_library(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
     )
 
     # If no Python targets in repo, fall back to global python-setup constraints.
-    assert_lockfile_requst("target()", [global_constraint])
+    assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(name='a', interpreter_constraints=['==2.7.*'])
@@ -147,7 +147,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
 
     # If there are multiple distinct ICs in the repo, we OR them because the lockfile needs to be
     # compatible with every target.
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(name='a', interpreter_constraints=['==2.7.*'])
@@ -156,7 +156,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         ),
         ["==2.7.*", "==3.5.*"],
     )
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(name='a', interpreter_constraints=['==2.7.*', '==3.5.*'])
@@ -165,7 +165,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         ),
         ["==2.7.*", "==3.5.*", ">=3.5"],
     )
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(name='a')
@@ -178,7 +178,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
 
     # Also consider direct deps (but not transitive). They should be ANDed within each target's
     # closure like normal, but then ORed across each closure.
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(
@@ -195,7 +195,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         ),
         ["==2.7.*", "==2.7.*,==3.6.*"],
     )
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(
@@ -214,7 +214,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
 
     # Check that source_plugins are included, even if they aren't linted directly. Plugins
     # consider transitive deps.
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(
@@ -233,7 +233,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         ["==2.7.*,==3.6.*"],
         args=["--pylint-source-plugins=project:plugin"],
     )
-    assert_lockfile_requst(
+    assert_lockfile_request(
         dedent(
             """\
             python_library(

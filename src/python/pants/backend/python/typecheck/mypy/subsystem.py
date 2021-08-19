@@ -3,29 +3,57 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from dataclasses import dataclass
 from typing import Iterable, cast
 
+from pants.backend.experimental.python.lockfile import (
+    PythonLockfileRequest,
+    PythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
+from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
+    PythonSources,
 )
+from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    FieldSet,
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    UnexpandedTargets,
+)
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url
+from pants.python.python_setup import PythonSetup
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MyPyFieldSet(FieldSet):
+    required_fields = (PythonSources,)
+
+    sources: PythonSources
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipMyPyField).value
+
 
 # --------------------------------------------------------------------------------------
 # Subsystem
@@ -38,11 +66,14 @@ class MyPy(PythonToolBase):
 
     default_version = "mypy==0.910"
     default_main = ConsoleScript("mypy")
-    # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
-    # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
-    # 3.5 is EOL, and users can tweak this back, this seems like a more sensible default.
+    # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
@@ -219,5 +250,45 @@ async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
     )
 
 
+# --------------------------------------------------------------------------------------
+# Lockfile
+# --------------------------------------------------------------------------------------
+
+
+class MyPyLockfileSentinel:
+    pass
+
+
+@rule(
+    desc="Determine if MyPy should use Python 3.8+ (for lockfile usage)",
+    level=LogLevel.DEBUG,
+)
+async def setup_mypy_lockfile(
+    _: MyPyLockfileSentinel,
+    first_party_plugins: MyPyFirstPartyPlugins,
+    mypy: MyPy,
+    python_setup: PythonSetup,
+) -> PythonLockfileRequest:
+    constraints = mypy.interpreter_constraints
+    if mypy.options.is_default("interpreter_constraints"):
+        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        all_transitive_targets = await MultiGet(
+            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+            for tgt in all_build_targets
+            if MyPyFieldSet.is_applicable(tgt)
+        )
+        unique_constraints = {
+            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+            for transitive_targets in all_transitive_targets
+        }
+        code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+            constraints = code_constraints
+
+    return PythonLockfileRequest.from_tool(
+        mypy, constraints, extra_requirements=first_party_plugins.requirement_strings
+    )
+
+
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, MyPyLockfileSentinel))
