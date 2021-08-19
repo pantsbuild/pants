@@ -202,7 +202,7 @@ impl Log for PantsLogger {
         _ if !use_color => format!("[{}]", level).normal().clear(),
         Level::Info => format!("[{}]", level).normal(),
         Level::Error => format!("[{}]", level).red(),
-        Level::Warn => format!("[{}]", level).red(),
+        Level::Warn => format!("[{}]", level).yellow(),
         Level::Debug => format!("[{}]", level).green(),
         Level::Trace => format!("[{}]", level).magenta(),
       };

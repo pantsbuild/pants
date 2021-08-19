@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
@@ -65,7 +66,7 @@ def test_list_normal() -> None:
 
 def test_no_targets_warns() -> None:
     _, stderr = run_goal([])
-    assert "WARNING: No targets" in stderr
+    assert re.search("WARN.* No targets", stderr)
 
 
 def test_list_documented() -> None:
