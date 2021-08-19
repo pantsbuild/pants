@@ -559,10 +559,10 @@ class GlobalOptions(Subsystem):
                 "Normally, Pants will look for literal matches from the start of the log/warning "
                 "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
                 "your string as a regex pattern. For example:\n\n"
-                "  ignore_warnings = [\n"
-                "    \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
-                "    '$regex$:No files\\s*'\n"
-                "  ]"
+                "    ignore_warnings = [\n"
+                "        \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
+                "        '$regex$:No files\\s*'\n"
+                "    ]\n"
             ),
         )
 
@@ -682,7 +682,7 @@ class GlobalOptions(Subsystem):
             # affects fingerprints.
             fingerprint=False,
             help=(
-                "Read additional specs (target addresses, files, and/or globs), one per line,"
+                "Read additional specs (target addresses, files, and/or globs), one per line, "
                 "from these files."
             ),
         )
@@ -764,7 +764,7 @@ class GlobalOptions(Subsystem):
             default=False,
             help="Enable concurrent runs of Pants. Without this enabled, Pants will "
             "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
-            "Enabling this option requires parallel Pants invocations to block on the first",
+            "Enabling this option requires parallel Pants invocations to block on the first.",
         )
 
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -1071,7 +1071,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Path to a PEM file containing CA certificates used for verifying secure "
-                "connections to --remote-execution-address and --remote-store-address.\n\nIf "
+                "connections to `--remote-execution-address` and `--remote-store-address`.\n\nIf "
                 "unspecified, Pants will attempt to auto-discover root CA certificates when TLS "
                 "is enabled with remote execution and caching."
             ),
@@ -1081,7 +1081,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Path to a file containing an oauth token to use for gGRPC connections to "
-                "--remote-execution-address and --remote-store-address.\n\nIf specified, Pants will "
+                "`--remote-execution-address` and `--remote-store-address`.\n\nIf specified, Pants will "
                 "add a header in the format `authorization: Bearer <token>`. You can also manually "
                 "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
                 "use `--remote-auth-plugin` to provide a plugin to dynamically set the relevant "
@@ -1109,7 +1109,7 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-headers` still work.\n\n"
                 "If you return `instance_name`, Pants will replace `--remote-instance-name` "
                 "with this value.\n\n"
-                "If the returned auth state is AuthPluginState.UNAVAILABLE, Pants will disable "
+                "If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable "
                 "remote caching and execution.\n\n"
                 "If Pantsd is in use, `prior_result` will be the previous "
                 "`AuthPluginResult` returned by your plugin, which allows you to reuse the result. "
