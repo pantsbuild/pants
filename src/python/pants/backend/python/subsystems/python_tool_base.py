@@ -6,12 +6,14 @@ from __future__ import annotations
 import importlib.resources
 from typing import ClassVar, Iterable, Sequence, cast
 
+from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -119,7 +121,6 @@ class PythonToolRequirementsBase(Subsystem):
 
     def pex_requirements(
         self,
-        expected_lockfile_hex_digest: str | None,
         *,
         extra_requirements: Iterable[str] = (),
     ) -> PexRequirements:
@@ -128,8 +129,14 @@ class PythonToolRequirementsBase(Subsystem):
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
-        if not self.register_lockfile or self.lockfile == "<none>":
-            return PexRequirements((*self.all_requirements, *extra_requirements))
+
+        requirements = (*self.all_requirements, *extra_requirements)
+
+        if not self.uses_lockfile:
+            return PexRequirements(requirements)
+
+        hex_digest = calculate_invalidation_digest(FrozenOrderedSet(requirements))
+
         if self.lockfile == "<default>":
             assert self.default_lockfile_resource is not None
             return PexRequirements(
@@ -137,14 +144,14 @@ class PythonToolRequirementsBase(Subsystem):
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                lockfile_hex_digest=expected_lockfile_hex_digest,
+                lockfile_hex_digest=hex_digest,
             )
         return PexRequirements(
             file_path=self.lockfile,
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"
             ),
-            lockfile_hex_digest=expected_lockfile_hex_digest,
+            lockfile_hex_digest=hex_digest,
         )
 
     @property
@@ -154,6 +161,10 @@ class PythonToolRequirementsBase(Subsystem):
         This assumes you have set the class property `register_lockfile = True`.
         """
         return cast(str, self.options.experimental_lockfile)
+
+    @property
+    def uses_lockfile(self) -> bool:
+        return self.register_lockfile and self.lockfile != "<none>"
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:

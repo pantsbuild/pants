@@ -4,12 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.lint.flake8.subsystem import (
-    Flake8,
-    Flake8FieldSet,
-    Flake8LockfileSentinel,
-)
+from pants.backend.python.lint.flake8.subsystem import Flake8, Flake8FieldSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -46,17 +41,12 @@ def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
 
 @rule(level=LogLevel.DEBUG)
 async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> LintResult:
-    lockfile_hex_digest = None
-    if flake8.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, Flake8LockfileSentinel())
-        lockfile_hex_digest = lockfile_request.requirements_hex_digest
-
     flake8_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="flake8.pex",
             internal_only=True,
-            requirements=flake8.pex_requirements(lockfile_hex_digest),
+            requirements=flake8.pex_requirements(),
             interpreter_constraints=partition.interpreter_constraints,
             main=flake8.main,
         ),
