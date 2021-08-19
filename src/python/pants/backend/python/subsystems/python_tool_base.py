@@ -87,11 +87,11 @@ class PythonToolRequirementsBase(Subsystem):
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
-                    "Set to the string '<default>' to use a lockfile provided by "
+                    "Set to the string `<default>` to use a lockfile provided by "
                     "Pants, so long as you have not changed the `--version`, "
                     "`--extra-requirements`, and `--interpreter-constraints` options. See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                    "Set to the string '<none>' to opt out of using a lockfile. We do not "
+                    "Set to the string `<none>` to opt out of using a lockfile. We do not "
                     "recommend this, as lockfiles are essential for reproducible builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
                     "build root, then activate the backend_package "

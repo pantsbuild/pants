@@ -74,34 +74,6 @@ def determine_pants_version() -> str:
     return version
 
 
-_markdown_trans = str.maketrans({c: f"\\{c}" for c in "\\`*_"})
-
-
-def markdown_safe(s: str) -> str:
-    """Escapes special characters in s, so it can be used as a literal string in markdown."""
-    return html.escape(s.translate(_markdown_trans), quote=False)
-
-
-_backtick_re = re.compile(r"`([^`]*)`")
-
-
-def html_safe(s: str) -> str:
-    """Escapes special characters in s, so it can be used as a literal string in readme HTML."""
-    return _backtick_re.sub(r"<code>\1</code>", html.escape(s))
-
-
-def description_safe(s: str) -> str:
-    """Escapes special characters in description text.
-
-    Descriptions are generally treated as plain text, not as markdown. But readme.com still renders
-    indented lines as blockquotes, so we must take care not to html-quote inside those.
-    """
-    safe_lines = [line if line.startswith("    ") else html_safe(line) for line in s.splitlines()]
-    safe_lines_str = "\n".join(safe_lines)
-    # Mark as a paragraph to render as plain text, rather than markdown. The spaces matter.
-    return f"<p> {safe_lines_str} </p>"
-
-
 # Code to replace doc urls with appropriate markdown, for rendering on the docsite.
 
 _doc_url_pattern = r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)"
@@ -341,7 +313,7 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
-            escaped_default_str = markdown_safe(default_str)
+            escaped_default_str = html.escape(default_str, quote=False)
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
@@ -363,13 +335,13 @@ class ReferenceGenerator:
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = markdown_safe(str(field["default"]))
+                default_str = html.escape(str(field["default"]))
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
-                field["description"] = description_safe(str(field["description"]))
+                field["description"] = str(field["description"])
             target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
-            target["description"] = description_safe(str(target["description"]))
+            target["description"] = str(target["description"])
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 
