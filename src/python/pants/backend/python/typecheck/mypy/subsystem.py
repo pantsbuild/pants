@@ -8,15 +8,22 @@ from dataclasses import dataclass
 from typing import Iterable, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import Digest, DigestContents, FileContent
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url
+from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -167,13 +174,49 @@ class MyPyConfigFile:
 
 
 @rule
-async def setup_mypy_config(mypy: MyPy, python_setup: PythonSetup) -> MyPyConfigFile:
+async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
     config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
     digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
     python_version_configured = mypy.check_and_warn_if_python_version_configured(
         digest_contents[0] if digest_contents else None
     )
     return MyPyConfigFile(config_files.snapshot.digest, python_version_configured)
+
+
+# --------------------------------------------------------------------------------------
+# First party plugins
+# --------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MyPyFirstPartyPlugins:
+    requirement_strings: FrozenOrderedSet[str]
+    sources_digest: Digest
+    source_roots: tuple[str, ...]
+
+
+@rule("Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
+async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
+    if not mypy.source_plugins:
+        return MyPyFirstPartyPlugins(FrozenOrderedSet(), EMPTY_DIGEST, ())
+
+    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    )
+
+    requirements = PexRequirements.create_from_requirement_fields(
+        plugin_tgt[PythonRequirementsField]
+        for plugin_tgt in transitive_targets.closure
+        if plugin_tgt.has_field(PythonRequirementsField)
+    )
+
+    sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
+    return MyPyFirstPartyPlugins(
+        requirement_strings=requirements.req_strings,
+        sources_digest=sources.source_files.snapshot.digest,
+        source_roots=sources.source_roots,
+    )
 
 
 def rules():

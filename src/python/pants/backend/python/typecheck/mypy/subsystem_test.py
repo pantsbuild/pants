@@ -3,14 +3,19 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy import subsystem
-from pants.backend.python.typecheck.mypy.subsystem import MyPyConfigFile
+from pants.backend.python.typecheck.mypy.subsystem import MyPyConfigFile, MyPyFirstPartyPlugins
+from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -19,8 +24,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *subsystem.rules(),
             *config_files.rules(),
+            *python_sources.rules(),
             QueryRule(MyPyConfigFile, []),
-        ]
+            QueryRule(MyPyFirstPartyPlugins, []),
+        ],
+        target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
@@ -75,3 +83,47 @@ def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> N
         ),
     )
     maybe_assert_configured(has_config=False, args=[])
+
+
+def test_first_party_plugins(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement_library(name='mypy', requirements=['mypy==0.81'])
+                python_requirement_library(name='colors', requirements=['ansicolors'])
+                """
+            ),
+            "mypy-plugins/subdir1/util.py": "",
+            "mypy-plugins/subdir1/BUILD": "python_library(dependencies=['mypy-plugins/subdir2'])",
+            "mypy-plugins/subdir2/another_util.py": "",
+            "mypy-plugins/subdir2/BUILD": "python_library()",
+            "mypy-plugins/plugin.py": "",
+            "mypy-plugins/BUILD": dedent(
+                """\
+                python_library(
+                    dependencies=['//:mypy', '//:colors', "mypy-plugins/subdir1"]
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=mypy-plugins",
+            "--mypy-source-plugins=mypy-plugins/plugin.py",
+        ]
+    )
+    first_party_plugins = rule_runner.request(MyPyFirstPartyPlugins, [])
+    assert first_party_plugins.requirement_strings == FrozenOrderedSet(["ansicolors", "mypy==0.81"])
+    assert (
+        first_party_plugins.sources_digest
+        == rule_runner.make_snapshot(
+            {
+                "mypy-plugins/plugin.py": "",
+                "mypy-plugins/subdir1/util.py": "",
+                "mypy-plugins/subdir2/another_util.py": "",
+            }
+        ).digest
+    )
+    assert first_party_plugins.source_roots == ("mypy-plugins",)
