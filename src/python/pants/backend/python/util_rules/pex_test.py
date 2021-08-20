@@ -547,7 +547,7 @@ def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
 
 def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
-    assert "Invalid lockfile provided." in caplog.text
+    assert "Invalid lockfile provided" in caplog.text
 
 
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
@@ -569,7 +569,7 @@ def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None
 
 def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, False, actual="1bad", expected="900d", behavior="warn")
-    assert "Invalid lockfile provided." in caplog.text
+    assert "Invalid lockfile provided" in caplog.text
 
 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
