@@ -46,27 +46,27 @@ class LockfileMetadata:
             # TODO(#12314): Add a good error.
             raise InvalidLockfileError("")
 
-        def get(key: str) -> Any:
+        def get_or_raise(key: str) -> Any:
             try:
                 return metadata[key]
             except KeyError:
-                # TODO(#12314): Add a good error.
+                # TODO(#12314): Add a good error about the key not being defined.
                 raise InvalidLockfileError("")
 
-        digest = get("requirements_invalidation_digest")
-        if not isinstance(digest, str):
-            # TODO(#12314): Add a good error.
+        requirements_digest = get_or_raise("requirements_invalidation_digest")
+        if not isinstance(requirements_digest, str):
+            # TODO(#12314): Add a good error about invalid data type.
             raise InvalidLockfileError("")
 
         try:
             interpreter_constraints = InterpreterConstraints(
-                get("valid_for_interpreter_constraints")
+                get_or_raise("valid_for_interpreter_constraints")
             )
         except TypeError:
-            # TODO(#12314): Add a good error.
+            # TODO(#12314): Add a good error about invalid data type.
             raise InvalidLockfileError("")
 
-        return LockfileMetadata(digest, interpreter_constraints)
+        return LockfileMetadata(requirements_digest, interpreter_constraints)
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
         metadata_dict = {
