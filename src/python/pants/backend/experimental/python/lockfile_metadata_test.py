@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import Iterable
 
 import pytest
 
@@ -71,15 +72,15 @@ def test_invalidation_digest(requirements, expected) -> None:
     b = "flake8-2020>=1.6.0,<1.7.0"
     c = "flake8"
 
-    def assert_eq(left: list[str], right: list[str]) -> None:
+    def assert_eq(left: Iterable[str], right: Iterable[str]) -> None:
         assert calculate_invalidation_digest(left) == calculate_invalidation_digest(right)
 
-    def assert_neq(left: list[str], right: list[str]) -> None:
+    def assert_neq(left: Iterable[str], right: Iterable[str]) -> None:
         assert calculate_invalidation_digest(left) != calculate_invalidation_digest(right)
 
     for reqs in itertools.permutations([a, b, c]):
-        assert_eq(list(reqs), [a, b, c])
-        assert_neq(list(reqs), [a, b])
+        assert_eq(reqs, [a, b, c])
+        assert_neq(reqs, [a, b])
 
     assert_eq([], [])
     assert_neq([], [a])
