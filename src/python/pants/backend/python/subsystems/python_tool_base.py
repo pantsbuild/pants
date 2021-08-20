@@ -14,6 +14,9 @@ from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 
+DEFAULT_TOOL_LOCKFILE = "<default>"
+NO_TOOL_LOCKFILE = "<none>"
+
 
 class PythonToolRequirementsBase(Subsystem):
     """Base class for subsystems that configure a set of requirements for a python tool."""
@@ -84,15 +87,15 @@ class PythonToolRequirementsBase(Subsystem):
             register(
                 "--experimental-lockfile",
                 type=str,
-                default="<none>",
+                default=NO_TOOL_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
-                    "Set to the string `<default>` to use a lockfile provided by "
+                    f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
                     "Pants, so long as you have not changed the `--version`, "
                     "`--extra-requirements`, and `--interpreter-constraints` options. See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                    "Set to the string `<none>` to opt out of using a lockfile. We do not "
+                    f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We do not "
                     "recommend this, as lockfiles are essential for reproducible builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
                     "build root, then activate the backend_package "
@@ -136,7 +139,7 @@ class PythonToolRequirementsBase(Subsystem):
 
         hex_digest = calculate_invalidation_digest(requirements)
 
-        if self.lockfile == "<default>":
+        if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
             return PexRequirements(
                 file_content=FileContent(
@@ -155,7 +158,7 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def lockfile(self) -> str:
-        """The path to a lockfile or special strings '<none>' and '<default>'.
+        f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
 
         This assumes you have set the class property `register_lockfile = True`.
         """
@@ -163,7 +166,7 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
-        return self.register_lockfile and self.lockfile != "<none>"
+        return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
