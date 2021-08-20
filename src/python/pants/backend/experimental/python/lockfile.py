@@ -13,7 +13,11 @@ from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
     lockfile_content_with_header,
 )
-from pants.backend.python.subsystems.python_tool_base import NO_LOCKFILE, PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    DEFAULT_LOCKFILE,
+    NO_LOCKFILE,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
@@ -285,7 +289,7 @@ async def generate_all_tool_lockfiles(
     results = await MultiGet(
         Get(PythonLockfile, PythonLockfileRequest, req)
         for req in requests
-        if req.dest not in {NO_LOCKFILE, "<default>"}
+        if req.dest not in {NO_LOCKFILE, DEFAULT_LOCKFILE}
     )
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)

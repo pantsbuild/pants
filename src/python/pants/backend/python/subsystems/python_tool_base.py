@@ -15,6 +15,7 @@ from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
+DEFAULT_LOCKFILE = "<default>"
 NO_LOCKFILE = "<none>"
 
 
@@ -139,7 +140,7 @@ class PythonToolRequirementsBase(Subsystem):
 
         hex_digest = calculate_invalidation_digest(FrozenOrderedSet(requirements))
 
-        if self.lockfile == "<default>":
+        if self.lockfile == DEFAULT_LOCKFILE:
             assert self.default_lockfile_resource is not None
             return PexRequirements(
                 file_content=FileContent(
