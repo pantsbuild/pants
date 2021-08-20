@@ -15,6 +15,8 @@ from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
+NO_LOCKFILE = "<none>"
+
 
 class PythonToolRequirementsBase(Subsystem):
     """Base class for subsystems that configure a set of requirements for a python tool."""
@@ -85,7 +87,7 @@ class PythonToolRequirementsBase(Subsystem):
             register(
                 "--experimental-lockfile",
                 type=str,
-                default="<none>",
+                default=NO_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
@@ -164,7 +166,7 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
-        return self.register_lockfile and self.lockfile != "<none>"
+        return self.register_lockfile and self.lockfile != NO_LOCKFILE
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
