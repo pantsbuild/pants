@@ -21,7 +21,7 @@ use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::retry::{retry_call, status_code_is_retryable};
 use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
@@ -1375,7 +1375,7 @@ pub async fn check_action_cache(
           let request = apply_headers(Request::new(request), &context.build_id);
           async move { client.get_action_result(request).await }
         },
-        status_is_retryable,
+        |s| status_code_is_retryable(s.code()),
       )
       .await;
 

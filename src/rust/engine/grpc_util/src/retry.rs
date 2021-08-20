@@ -3,13 +3,20 @@
 
 use std::time::Duration;
 
-use futures::Future;
+use futures::future::BoxFuture;
+use futures::{Future, FutureExt};
 use rand::{thread_rng, Rng};
+use std::marker::PhantomData;
 use tonic::{Code, Status};
+use tower::retry::Policy;
 
-pub fn status_is_retryable(status: &Status) -> bool {
+const INTERVAL_DURATION: Duration = Duration::from_millis(20);
+const MAX_RETRIES: usize = 3;
+const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(5);
+
+pub fn status_code_is_retryable(code: &Code) -> bool {
   matches!(
-    status.code(),
+    code,
     Code::Aborted
       | Code::Cancelled
       | Code::Internal
@@ -17,6 +24,67 @@ pub fn status_is_retryable(status: &Status) -> bool {
       | Code::Unavailable
       | Code::Unknown
   )
+}
+
+pub struct ExponentialBackoffPolicy<'a, Req, Res> {
+  retries_remaining: usize,
+  _marker: PhantomData<&'a (Req, Res)>,
+}
+
+impl<'a, Req, Res> ExponentialBackoffPolicy<'a, Req, Res> {
+  pub fn new() -> Self {
+    ExponentialBackoffPolicy {
+      retries_remaining: MAX_RETRIES,
+      _marker: PhantomData,
+    }
+  }
+}
+
+impl<'a, Req, Res> Policy<Req, Res, Status> for ExponentialBackoffPolicy<'a, Req, Res>
+where
+  Req: Clone + Send + Sync + 'static,
+  Res: Send + Sync + 'static,
+{
+  type Future = BoxFuture<'a, Self>;
+
+  fn retry(&self, req: &Req, result: Result<&Res, &Status>) -> Option<Self::Future> {
+    match result {
+      // Request was successful, so do not retry.
+      Ok(_) => None,
+
+      Err(status) => {
+        let retries_remaining = self.retries_remaining;
+        let code = status.code();
+
+        if status_code_is_retryable(&code) {
+          if retries_remaining == 0 {
+            // No more retries left.
+            None
+          } else {
+            Some(async move {
+              let multiplier =
+                thread_rng().gen_range(0..2_u32.pow((MAX_RETRIES - retries_remaining) as u32) + 1);
+              let sleep_time = INTERVAL_DURATION * multiplier;
+              let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
+              tokio::time::sleep(sleep_time).await;
+
+              ExponentialBackoffPolicy {
+                retries_remaining: self.retries_remaining - 1,
+                _marker: PhantomData,
+              }
+            }.boxed())
+          }
+        } else {
+          // This error is not retryable so do not bother retrying.
+          None
+        }
+      }
+    }
+  }
+
+  fn clone_request(&self, req: &Req) -> Option<Req> {
+    Some(req.clone())
+  }
 }
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
@@ -28,10 +96,6 @@ where
   G: Fn(&E) -> bool,
   Fut: Future<Output = Result<T, E>>,
 {
-  const INTERVAL_DURATION: Duration = Duration::from_millis(20);
-  const MAX_RETRIES: u32 = 3;
-  const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(5);
-
   let mut num_retries = 0;
   let last_error = loop {
     // Delay before the next send attempt if this is a retry.
@@ -57,7 +121,7 @@ where
 
     num_retries += 1;
 
-    if num_retries >= MAX_RETRIES {
+    if num_retries >= MAX_RETRIES as u32 {
       break last_error;
     }
   };

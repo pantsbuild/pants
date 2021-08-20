@@ -21,7 +21,7 @@ tokio = { version = "1.4", features = ["net", "process", "rt-multi-thread", "syn
 tokio-rustls = "0.22"
 tokio-util = { version = "0.6", features = ["codec"] }
 tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
-tower = { version = "0.4", features = ["limit"] }
+tower = { version = "0.4", features = ["limit", "retry"] }
 tower-layer = "0.3"
 tower-service = "0.3"
 webpki = "0.21"

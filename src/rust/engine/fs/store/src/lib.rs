@@ -56,7 +56,7 @@ use double_checked_cell_async::DoubleCheckedCell;
 use fs::{default_cache_path, FileContent, RelativePath};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::retry::{retry_call, status_code_is_retryable};
 use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
@@ -557,7 +557,7 @@ impl Store {
           remote,
           |remote| async move { remote.load_bytes_with(digest, Ok).await },
           |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
+            ByteStoreError::Grpc(status) => status_code_is_retryable(status.code()),
             _ => false,
           },
         )
@@ -846,7 +846,7 @@ impl Store {
           .await
       },
       |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        ByteStoreError::Grpc(status) => status_code_is_retryable(status.code()),
         _ => false,
       },
     )

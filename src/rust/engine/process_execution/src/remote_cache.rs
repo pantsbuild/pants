@@ -11,7 +11,7 @@ use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use grpc_util::retry::status_is_retryable;
+use grpc_util::retry::status_code_is_retryable;
 use grpc_util::{
   headers_to_http_header_map, layered_service, retry::retry_call, status_to_str, LayeredService,
 };
@@ -489,7 +489,7 @@ impl CommandRunner {
             .await
         }
       },
-      status_is_retryable,
+      |s| status_code_is_retryable(s.code()),
     )
     .await
     .map_err(status_to_str)?;

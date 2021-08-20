@@ -41,6 +41,7 @@ use itertools::Itertools;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
+use tower::retry::{Retry, RetryLayer};
 use tower::ServiceBuilder;
 
 pub mod headers;
@@ -49,17 +50,21 @@ pub mod prost;
 pub mod retry;
 pub mod tls;
 
+use crate::retry::ExponentialBackoffPolicy;
+
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<Channel>>;
+pub type LayeredService<'a, Req, Res> =
+  Retry<ExponentialBackoffPolicy<'a, Req, Res>, SetRequestHeaders<ConcurrencyLimit<Channel>>>;
 
-pub fn layered_service(
+pub fn layered_service<'a, Req, Res>(
   channel: Channel,
   concurrency_limit: usize,
   http_headers: HeaderMap,
-) -> LayeredService {
+) -> LayeredService<'a, Req, Res> {
   ServiceBuilder::new()
+    .layer(RetryLayer::new(ExponentialBackoffPolicy::new()))
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .service(channel)

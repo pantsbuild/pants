@@ -12,7 +12,7 @@ use bytes::{Bytes, BytesMut};
 use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
 use futures::StreamExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::retry::{retry_call, status_code_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
@@ -174,7 +174,7 @@ impl ByteStore {
       mmap,
       |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
       |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        ByteStoreError::Grpc(status) => status_code_is_retryable(status.code()),
         _ => false,
       },
     )
@@ -191,7 +191,7 @@ impl ByteStore {
       bytes,
       |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
       |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        ByteStoreError::Grpc(status) => status_code_is_retryable(status.code()),
         _ => false,
       },
     )
@@ -480,12 +480,12 @@ impl ByteStore {
       let store2 = store.clone();
       let client = store2.cas_client.as_ref().clone();
       let response = retry_call(
-        client,
-        move |mut client| {
+          client,
+          move |mut client| {
           let request = request.clone();
           async move { client.find_missing_blobs(request).await }
         },
-        status_is_retryable,
+          |s| status_code_is_retryable(s.code()),
       )
       .await
       .map_err(status_to_str)?;
