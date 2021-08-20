@@ -10,8 +10,8 @@ from textwrap import dedent
 from typing import Iterable
 
 from pants.backend.experimental.python.lockfile_metadata import (
+    LockfileMetadata,
     calculate_invalidation_digest,
-    lockfile_content_with_header,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
@@ -163,16 +163,20 @@ async def generate_lockfile(
         ),
     )
 
-    lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
-    lockfile_with_header = lockfile_content_with_header(
-        python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
-        req.requirements_hex_digest,
-        req.interpreter_constraints,
-        lockfile_digest_contents[0].content,
+    initial_lockfile_digest_contents = await Get(
+        DigestContents, Digest, poetry_export_result.output_digest
     )
-    final_lockfile = await Get(Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)]))
-
-    return PythonLockfile(final_lockfile, req.dest)
+    metadata = LockfileMetadata(req.requirements_hex_digest, req.interpreter_constraints)
+    lockfile_with_header = metadata.add_header_to_lockfile(
+        initial_lockfile_digest_contents[0].content,
+        regenerate_command=(
+            python_setup.lockfile_custom_regeneration_command or req.regenerate_command
+        ),
+    )
+    final_lockfile_digest = await Get(
+        Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)])
+    )
+    return PythonLockfile(final_lockfile_digest, req.dest)
 
 
 # --------------------------------------------------------------------------------------
