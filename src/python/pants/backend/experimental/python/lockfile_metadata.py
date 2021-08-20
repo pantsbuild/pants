@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any, Iterable
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
@@ -14,10 +14,14 @@ BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR RE
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 
+class InvalidLockfileError(Exception):
+    pass
+
+
 @dataclass
 class LockfileMetadata:
-    requirements_invalidation_digest: str | None
-    valid_for_interpreter_constraints: InterpreterConstraints | None
+    requirements_invalidation_digest: str
+    valid_for_interpreter_constraints: InterpreterConstraints
 
     @classmethod
     def from_lockfile(cls, lockfile: bytes) -> LockfileMetadata:
@@ -32,34 +36,47 @@ class LockfileMetadata:
             elif in_metadata_block:
                 metadata_lines.append(line[2:])
 
+        if not metadata_lines:
+            # TODO(#12314): Add a good error.
+            raise InvalidLockfileError("")
+
         try:
             metadata = json.loads(b"\n".join(metadata_lines))
         except json.decoder.JSONDecodeError:
             # TODO(#12314): Add a good error.
-            raise
+            raise InvalidLockfileError("")
 
-        T = TypeVar("T")
-
-        def coerce(t: Callable[[Any], T], key: str) -> T | None:
-            """Gets a value from `metadata`, coercing it to type `t` if not `None`."""
-            v = metadata.get(key, None)
+        def get(key: str) -> Any:
             try:
-                return t(v) if v is not None else None
-            except Exception:
-                # TODO: this should trigger error/warning behavior
-                return None
+                return metadata[key]
+            except KeyError:
+                # TODO(#12314): Add a good error.
+                raise InvalidLockfileError("")
 
-        return LockfileMetadata(
-            requirements_invalidation_digest=coerce(str, "requirements_invalidation_digest"),
-            valid_for_interpreter_constraints=coerce(
-                InterpreterConstraints, "valid_for_interpreter_constraints"
-            ),
-        )
+        digest = get("requirements_invalidation_digest")
+        if not isinstance(digest, str):
+            # TODO(#12314): Add a good error.
+            raise InvalidLockfileError("")
+
+        try:
+            interpreter_constraints = InterpreterConstraints(
+                get("valid_for_interpreter_constraints")
+            )
+        except TypeError:
+            # TODO(#12314): Add a good error.
+            raise InvalidLockfileError("")
+
+        return LockfileMetadata(digest, interpreter_constraints)
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
-        metadata_as_a_comment = "\n".join(f"# {i}" for i in self._to_json().splitlines()).encode(
-            "ascii"
-        )
+        metadata_dict = {
+            "requirements_invalidation_digest": self.requirements_invalidation_digest,
+            "valid_for_interpreter_constraints": [
+                str(ic) for ic in self.valid_for_interpreter_constraints
+            ],
+        }
+        metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
+        metadata_as_a_comment = "\n".join(f"# {l}" for l in metadata_json).encode("ascii")
         header = b"%b\n%b\n%b" % (BEGIN_LOCKFILE_HEADER, metadata_as_a_comment, END_LOCKFILE_HEADER)
 
         regenerate_command_bytes = (
@@ -69,43 +86,20 @@ class LockfileMetadata:
 
         return b"%b\n#\n%b\n\n%b" % (regenerate_command_bytes, header, lockfile)
 
-    def _to_json(self) -> str:
-        """Produces a JSON-encoded dictionary that represents the contents of this metadata."""
-        constraints = self.valid_for_interpreter_constraints
-        metadata = {
-            "requirements_invalidation_digest": self.requirements_invalidation_digest,
-            "valid_for_interpreter_constraints": [str(i) for i in constraints]
-            if constraints
-            else None,
-        }
-        return json.dumps(metadata, ensure_ascii=True, indent=2)
-
     def is_valid_for(
         self,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
     ) -> bool:
-        """Returns True if this `LockfileMetadata` represents a lockfile that can be used in the
-        current execution context.
-
-        A lockfile can be used in the current execution context if `expected_invalidation_digest ==
-        requirements_invalidation_digest`, and if `user_interpreter_constraints` matches only
-        interpreters specified by `valid_for_interpreter_constraints`.
-        """
-
+        """Returns True if the lockfile can be used in the current execution context."""
         if expected_invalidation_digest is None:
             return True
-
-        if self.requirements_invalidation_digest != expected_invalidation_digest:
-            return False
-
-        if self.valid_for_interpreter_constraints is None:
-            # This lockfile matches all interpreter constraints (TODO: check this)
-            return True
-
-        return self.valid_for_interpreter_constraints.contains(
-            user_interpreter_constraints, interpreter_universe
+        return (
+            self.requirements_invalidation_digest == expected_invalidation_digest
+            and self.valid_for_interpreter_constraints.contains(
+                user_interpreter_constraints, interpreter_universe
+            )
         )
 
 
