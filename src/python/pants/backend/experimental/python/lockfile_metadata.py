@@ -114,6 +114,8 @@ def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
     """Returns an invalidation digest for the given requirements."""
     m = hashlib.sha256()
     inputs = {
+        # `FrozenOrderedSet` deduplicates while keeping ordering, which speeds up the sorting if
+        # the input was already sorted.
         "requirements": sorted(FrozenOrderedSet(requirements)),
     }
     m.update(json.dumps(inputs).encode("utf-8"))

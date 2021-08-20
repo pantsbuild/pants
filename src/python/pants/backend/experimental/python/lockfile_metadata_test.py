@@ -57,17 +57,7 @@ dave==3.1.4 \\
     assert line_by_line(result) == line_by_line(expected)
 
 
-@pytest.mark.parametrize(
-    "requirements,expected",
-    [
-        ([], "c8e8d0a6d6ec36bee3942091046d81d86e3b83b143b37a7cc714e2d022bf4f85"),
-        (
-            ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"],
-            "ef417e5ccadca6983fc8ec7df2c8c3e218af029a61752d38bd01926b2adb85b9",
-        ),
-    ],
-)
-def test_invalidation_digest(requirements, expected) -> None:
+def test_invalidation_digest() -> None:
     a = "flake8-pantsbuild>=2.0,<3"
     b = "flake8-2020>=1.6.0,<1.7.0"
     c = "flake8"
