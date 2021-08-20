@@ -29,7 +29,7 @@ from pants.util.logging import LogLevel
 class DebianPackageFieldSet(PackageFieldSet):
     required_fields = (DebianSources, DebianInstallPrefix, DebianPackageDependencies)
 
-    metadata_dir: DebianSources
+    sources_dir: DebianSources
     install_prefix: DebianInstallPrefix
     packages: DebianPackageDependencies
     output_path: OutputPathField
@@ -45,32 +45,23 @@ async def package_debian_package(field_set: DebianPackageFieldSet,
             search_path=["/usr/bin"],
         ),
     )
-    tar_path = await Get(
-        BinaryPaths,
-        BinaryPathRequest(
-            binary_name="tar",
-            search_path=["/usr/bin"],
-        ),
-    )
-
     if not dpkg_deb_path.first_path:
         raise OSError("Could not find the `dpkg-deb` program on search paths ")
-    if not tar_path.first_path:
-        raise EnvironmentError("Could not find the `tar` program on search paths ")
 
     output_filename = field_set.output_path.value_or_default(
 
         file_ending="deb",
     )
 
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.metadata_dir))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources_dir))
 
     result = await Get(
         ProcessResult,
         Process(
             argv=(
-                "/usr/bin/dpkg-deb",
+                dpkg_deb_path.first_path.path,
                 "--build",
+                # TODO: this needs to become the root directory name that we get from sources_dir
                 "sample-debian-package",
             ),
             description="Create a Debian package from the produced packages.",
