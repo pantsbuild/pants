@@ -14,8 +14,8 @@ from pants.backend.experimental.python.lockfile_metadata import (
     lockfile_content_with_header,
 )
 from pants.backend.python.subsystems.python_tool_base import (
-    DEFAULT_LOCKFILE,
-    NO_LOCKFILE,
+    DEFAULT_TOOL_LOCKFILE,
+    NO_TOOL_LOCKFILE,
     PythonToolRequirementsBase,
 )
 from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
@@ -289,7 +289,7 @@ async def generate_all_tool_lockfiles(
     results = await MultiGet(
         Get(PythonLockfile, PythonLockfileRequest, req)
         for req in requests
-        if req.dest not in {NO_LOCKFILE, DEFAULT_LOCKFILE}
+        if req.dest not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}
     )
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
