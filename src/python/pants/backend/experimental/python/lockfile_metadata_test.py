@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
 from pants.backend.experimental.python.lockfile_metadata import (
@@ -10,7 +12,6 @@ from pants.backend.experimental.python.lockfile_metadata import (
     calculate_invalidation_digest,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 def test_metadata_header_round_trip() -> None:
@@ -66,7 +67,23 @@ dave==3.1.4 \\
     ],
 )
 def test_invalidation_digest(requirements, expected) -> None:
-    assert calculate_invalidation_digest(FrozenOrderedSet(requirements)) == expected
+    a = "flake8-pantsbuild>=2.0,<3"
+    b = "flake8-2020>=1.6.0,<1.7.0"
+    c = "flake8"
+
+    def assert_eq(left: list[str], right: list[str]) -> None:
+        assert calculate_invalidation_digest(left) == calculate_invalidation_digest(right)
+
+    def assert_neq(left: list[str], right: list[str]) -> None:
+        assert calculate_invalidation_digest(left) != calculate_invalidation_digest(right)
+
+    for reqs in itertools.permutations([a, b, c]):
+        assert_eq(list(reqs), [a, b, c])
+        assert_neq(list(reqs), [a, b])
+
+    assert_eq([], [])
+    assert_neq([], [a])
+    assert_eq([a, a, a, a], [a])
 
 
 @pytest.mark.parametrize(
