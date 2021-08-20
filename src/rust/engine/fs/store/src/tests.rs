@@ -11,6 +11,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
 use fs::RelativePath;
 use grpc_util::prost::MessageExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;
@@ -100,7 +101,7 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
     .into_with_remote(
       cas_address,
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * MEGABYTES,
       Duration::from_secs(1),
@@ -843,7 +844,7 @@ async fn instance_name_upload() {
     .into_with_remote(
       &cas.address(),
       Some("dark-tower".to_owned()),
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * MEGABYTES,
       Duration::from_secs(1),
@@ -873,7 +874,7 @@ async fn instance_name_download() {
     .into_with_remote(
       &cas.address(),
       Some("dark-tower".to_owned()),
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * MEGABYTES,
       Duration::from_secs(1),
@@ -925,7 +926,7 @@ async fn auth_upload() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       headers,
       10 * MEGABYTES,
       Duration::from_secs(1),
@@ -957,7 +958,7 @@ async fn auth_download() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       headers,
       10 * MEGABYTES,
       Duration::from_secs(1),

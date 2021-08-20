@@ -70,7 +70,7 @@ impl ByteStore {
   pub fn new(
     cas_address: &str,
     instance_name: Option<String>,
-    root_ca_certs: Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     mut headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -80,7 +80,7 @@ impl ByteStore {
     batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
-      Some(grpc_util::create_tls_config(root_ca_certs)?)
+      Some(tls_config.try_into()?)
     } else {
       None
     };
@@ -512,7 +512,7 @@ impl ByteStore {
     }
   }
 
-  pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
+  pub fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
     &self,
     digests: Digests,
   ) -> remexec::FindMissingBlobsRequest {

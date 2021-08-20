@@ -4,10 +4,9 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
-from pants.backend.python.lint.yapf.subsystem import Yapf, YapfLockfileSentinel
+from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -68,17 +67,12 @@ def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tu
 
 @rule(level=LogLevel.DEBUG)
 async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
-    lockfile_hex_digest = None
-    if yapf.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, YapfLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
-
     yapf_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="yapf.pex",
             internal_only=True,
-            requirements=yapf.pex_requirements(lockfile_hex_digest),
+            requirements=yapf.pex_requirements(),
             interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
         ),

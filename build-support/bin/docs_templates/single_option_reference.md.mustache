@@ -4,14 +4,16 @@
   <code>{{env_var}}</code><br>
 </div>
 <div style="padding-left: 2em;">
-  {{#comma_separated_choices}}
-  <span style="color: green">one of: <code>{{comma_separated_choices}}</code></span><br>
-  {{/comma_separated_choices}}
-  <span style="color: green">default: {{{marked_up_default}}}</span>
-  {{! Mark both of these as paragraphs to render as plain text, rather than markdown. }}
-  {{! NB: We assume there's a removal_hint if deprecated_message is set. }}
-  {{#deprecated_message}}<p style="color: darkred">{{deprecated_message}}<br>{{removal_hint}}</p>{{/deprecated_message}}
-  <p>{{help}}</p>
+{{#comma_separated_choices}}
+<span style="color: green">one of: <code>{{comma_separated_choices}}</code></span><br>
+{{/comma_separated_choices}}
+<span style="color: green">default: {{{marked_up_default}}}</span>
+{{#deprecated_message}}<p style="color: darkred">{{deprecated_message}}<br>{{removal_hint}}</p>{{/deprecated_message}}
+<br>
+{{! NB: readme.com is finicky about when it processes markdown mingled with HTML elements.
+    The blank line here appears to ensure it. }}
+
+{{{help}}}
 </div>
 <br>
 

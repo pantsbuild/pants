@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::convert::TryInto;
 use std::ffi::OsString;
 use std::path::Component;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use grpc_util::retry::status_is_retryable;
 use grpc_util::{
   headers_to_http_header_map, layered_service, retry::retry_call, status_to_str, LayeredService,
 };
@@ -27,7 +29,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
-use grpc_util::retry::status_is_retryable;
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -71,7 +72,7 @@ impl CommandRunner {
     concurrency_limit: usize,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
-      Some(grpc_util::create_tls_config(root_ca_certs)?)
+      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
     } else {
       None
     };

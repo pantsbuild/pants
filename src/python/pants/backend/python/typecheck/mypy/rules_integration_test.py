@@ -17,15 +17,15 @@ from pants.backend.python.target_types import PythonLibrary, PythonRequirementLi
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
-    check_and_warn_if_python_version_configured,
     determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent
+from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
@@ -42,6 +42,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *mypy_rules(),
+            *mypy_subystem_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
             *pants_bin.rules(),
             *config_files.rules(),
@@ -216,9 +217,18 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
 
 
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
+    # NB: We install `django-stubs` both with `[mypy].extra_requirements` and a user requirement
+    # (`python_requirement_library`). This awkwardness is because its used both as a plugin and
+    # type stubs.
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='django', requirements=['Django==2.2.5'])",
+            "BUILD": dedent(
+                """\
+                python_requirement_library(
+                    name='django', requirements=['Django==2.2.5', 'django-stubs==1.8.0'],
+                )
+                """
+            ),
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -254,7 +264,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--mypy-extra-requirements=django-stubs==1.5.0", "--mypy-version=mypy==0.770"],
+        extra_args=["--mypy-extra-requirements=django-stubs==1.8.0", "--mypy-version=mypy==0.812"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -685,32 +695,3 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
     assert determine_python_files(["f.json"]) == ()
-
-
-def test_warn_if_python_version_configured(caplog) -> None:
-    def assert_is_configured(*, has_config: bool, args: list[str], warning: str) -> None:
-        config = FileContent("mypy.ini", b"[mypy]\npython_version = 3.6") if has_config else None
-        is_configured = check_and_warn_if_python_version_configured(config=config, args=tuple(args))
-        assert is_configured
-        assert len(caplog.records) == 1
-        assert warning in caplog.text
-        caplog.clear()
-
-    assert_is_configured(has_config=True, args=[], warning="You set `python_version` in mypy.ini")
-    assert_is_configured(
-        has_config=False, args=["--py2"], warning="You set `--py2` in the `--mypy-args` option"
-    )
-    assert_is_configured(
-        has_config=False,
-        args=["--python-version=3.6"],
-        warning="You set `--python-version` in the `--mypy-args` option",
-    )
-    assert_is_configured(
-        has_config=True,
-        args=["--py2", "--python-version=3.6"],
-        warning=(
-            "You set `python_version` in mypy.ini (which is used because of either config "
-            "autodisocvery or the `[mypy].config` option) and you set `--py2` in the `--mypy-args` "
-            "option and you set `--python-version` in the `--mypy-args` option."
-        ),
-    )

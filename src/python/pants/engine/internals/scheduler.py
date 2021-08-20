@@ -56,7 +56,7 @@ from pants.engine.process import (
     MultiPlatformProcess,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, is_union
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
@@ -657,7 +657,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             native_engine.tasks_add_get(tasks, product, subject)
 
         for the_get in rule.input_gets:
-            if union.is_instance(the_get.input_type):
+            if is_union(the_get.input_type):
                 # If the registered subject type is a union, add Get edges to all registered
                 # union members.
                 for union_member in union_membership.get(the_get.input_type):

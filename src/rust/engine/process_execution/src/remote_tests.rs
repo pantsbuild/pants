@@ -7,6 +7,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
 use grpc_util::prost::MessageExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
@@ -865,7 +866,7 @@ async fn sends_headers() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1066,7 +1067,7 @@ async fn ensure_inline_stdio_is_stored() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1448,7 +1449,7 @@ async fn execute_missing_file_uploads_if_known() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1529,7 +1530,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -2276,7 +2277,7 @@ pub(crate) fn make_store(
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),

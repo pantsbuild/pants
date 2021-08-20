@@ -100,9 +100,11 @@ async def infer_go_dependencies(
         if first_party_go_package.module_address != this_go_package.module_address:
             continue
 
-        first_party_import_path_to_address[
-            first_party_go_package.import_path
-        ] = first_party_go_package.address
+        address = first_party_go_package.address
+        if not address:
+            continue
+
+        first_party_import_path_to_address[first_party_go_package.import_path] = address
 
     # Loop through all of the imports of this package and add dependencies on other packages and
     # external modules.

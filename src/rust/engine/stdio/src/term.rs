@@ -29,6 +29,7 @@ impl TermDestination {
     TermWriteDestination,
     TermWriteDestination,
   ) {
+    let stderr_use_color = console.stderr_use_color;
     let term_destination = Arc::new(TermDestination {
       console: Mutex::new(Some(console)),
       destination,
@@ -37,10 +38,12 @@ impl TermDestination {
       TermReadDestination(term_destination.clone()),
       TermWriteDestination {
         destination: term_destination.clone(),
+        use_color: false,
         is_stderr: false,
       },
       TermWriteDestination {
         destination: term_destination,
+        use_color: stderr_use_color,
         is_stderr: true,
       },
     )
@@ -53,6 +56,7 @@ pub struct TermReadDestination(Arc<TermDestination>);
 #[derive(Debug)]
 pub struct TermWriteDestination {
   destination: Arc<TermDestination>,
+  pub use_color: bool,
   is_stderr: bool,
 }
 

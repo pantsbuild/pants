@@ -116,6 +116,7 @@ fs = { path = "fs" }
 futures = "0.3"
 futures-core = "^0.3.0"
 graph = { path = "graph" }
+grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
 indexmap = "1.4"
 itertools = "0.10"
@@ -156,5 +157,5 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [patch.crates-io]
-# TODO: Posted as https://github.com/mitsuhiko/console/pull/93.
-console = { git = "https://github.com/pantsbuild/console", rev = "b6e9aa7ce734517691934d558d79a459609633db" }
+# TODO: Waiting for release after https://github.com/mitsuhiko/console/pull/93.
+console = { git = "https://github.com/mitsuhiko/console", rev = "3232775295149e6f0aace26d4cfe61013ed3e2d8" }

@@ -24,6 +24,7 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
+from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,7 @@ def main() -> None:
             "--backend-packages=+['pants.backend.python.lint.pylint']",
             f"--pylint-version={Pylint.default_version}",
             f"--pylint-extra-requirements={repr(Pylint.default_extra_requirements)}",
+            "--pylint-source-plugins=[]",
             f"--pylint-experimental-lockfile={Pylint.default_lockfile_path}",
             # Yapf.
             "--backend-packages=+['pants.backend.python.lint.yapf']",
@@ -99,6 +101,12 @@ def main() -> None:
             f"--setuptools-version={Setuptools.default_version}",
             f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
             f"--setuptools-experimental-lockfile={Setuptools.default_lockfile_path}",
+            # MyPy.
+            f"--mypy-version={MyPy.default_version}",
+            f"--mypy-extra-requirements={repr(MyPy.default_extra_requirements)}",
+            "--mypy-source-plugins=[]",
+            f"--mypy-interpreter-constraints={repr(MyPy.default_interpreter_constraints)}",
+            f"--mypy-experimental-lockfile={MyPy.default_lockfile_path}",
             # MyPy Protobuf.
             "--backend-packages=+['pants.backend.codegen.protobuf.python']",
             f"--mypy-protobuf-version={PythonProtobufMypyPlugin.default_version}",

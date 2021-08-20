@@ -248,7 +248,7 @@ async fn main() {
       local_only_store.into_with_remote(
         cas_server,
         args.remote_instance_name.clone(),
-        root_ca_certs,
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs),
         headers,
         args.upload_chunk_bytes,
         Duration::from_secs(30),

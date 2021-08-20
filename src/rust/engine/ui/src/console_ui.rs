@@ -81,8 +81,8 @@ impl ConsoleUI {
   /// Setup progress bars, and return them along with a running task that will drive them.
   ///
   fn setup_bars(
+    &self,
     executor: Executor,
-    num_swimlanes: usize,
   ) -> Result<(Vec<ProgressBar>, MultiProgressTask), String> {
     // Stderr is propagated across a channel to remove lock interleavings between stdio and the UI.
     let (stderr_sender, stderr_receiver) = mpsc::sync_channel(0);
@@ -93,13 +93,18 @@ impl ConsoleUI {
         stderr_sender.send(msg.to_owned()).map_err(|_| ())
       }))?;
 
-    let term = console::Term::read_write_pair(term_read, term_stderr_write);
+    let stderr_use_color = term_stderr_write.use_color;
+    let term = console::Term::read_write_pair_with_style(
+      term_read,
+      term_stderr_write,
+      console::Style::new().force_styling(stderr_use_color),
+    );
     // NB: We render more frequently than we receive new data in order to minimize aliasing where a
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::to_term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
 
-    let bars = (0..num_swimlanes)
+    let bars = (0..self.local_parallelism)
       .map(|_n| {
         let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
         multi_progress.add(ProgressBar::new(50).with_style(style))
@@ -189,7 +194,7 @@ impl ConsoleUI {
 
     // Setup bars (which will take ownership of the current Console), and then spawn rendering
     // of the bars into a background task.
-    let (bars, multi_progress_task) = Self::setup_bars(executor, self.local_parallelism)?;
+    let (bars, multi_progress_task) = self.setup_bars(executor)?;
 
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
