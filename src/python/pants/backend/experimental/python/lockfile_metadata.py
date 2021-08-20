@@ -113,7 +113,7 @@ def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
     """Returns an invalidation digest for the given requirements."""
     m = hashlib.sha256()
     inputs = {
-        "requirements": list(requirements),
+        "requirements": sorted(requirements),
     }
     m.update(json.dumps(inputs).encode("utf-8"))
     return m.hexdigest()
