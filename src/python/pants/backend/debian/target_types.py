@@ -13,11 +13,11 @@ from pants.engine.target import (
 from pants.util.docutil import bin_name, doc_url
 
 
-class DebianControlFile(MultipleSourcesField):
+class DebianSources(MultipleSourcesField):
     required = True
-    expected_num_files = 1
     help = (
-        "Path to a Debian control file for the package to be produced.\n\n"
+        "Paths that will be included in the package to be produced."
+        "It is required to include a Debian control file.\n\n"
         "Paths are relative to the BUILD file's directory."
     )
 
@@ -53,7 +53,7 @@ class DebianPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        DebianControlFile,
+        DebianSources,
         DebianSymlinks,
         DebianInstallPrefix,
         DebianPackageDependencies,
