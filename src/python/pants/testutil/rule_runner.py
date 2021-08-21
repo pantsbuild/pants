@@ -135,8 +135,8 @@ class RuleRunner:
                 objects=objects, context_aware_object_factories=context_aware_object_factories
             )
         )
-        build_config_builder.register_rules(all_rules)
-        build_config_builder.register_target_types(target_types or ())
+        build_config_builder.register_rules("_dummy_for_test_", all_rules)
+        build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironment({})
@@ -195,7 +195,7 @@ class RuleRunner:
         return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
-    def target_types(self) -> FrozenOrderedSet[Type[Target]]:
+    def target_types(self) -> Tuple[Type[Target], ...]:
         return self.build_config.target_types
 
     @property

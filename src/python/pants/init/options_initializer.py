@@ -67,7 +67,7 @@ def create_bootstrap_scheduler(
     # To load plugins, we only need access to the Python/PEX rules.
     load_build_configuration_from_source(bc_builder, ["pants.backend.python"])
     # And to plugin-loading-specific rules.
-    bc_builder.register_rules(plugin_resolver_rules())
+    bc_builder.register_rules("_dummy_for_bootstrapping_", plugin_resolver_rules())
     # We allow unrecognized options to defer any option error handling until post-bootstrap.
     bc_builder.allow_unknown_options()
     return BootstrapScheduler(
