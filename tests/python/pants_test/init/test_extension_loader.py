@@ -67,10 +67,7 @@ class DummyObject1:
 
 
 class DummyObject2:
-    # Objects can have a special classmethod `subsystems` to register subsystems.
-    @classmethod
-    def subsystems(cls):
-        return (DummySubsystem,)
+    pass
 
 
 @dataclass(frozen=True)
@@ -158,7 +155,6 @@ class LoaderTest(unittest.TestCase):
             registered_aliases = build_configuration.registered_aliases
             self.assertEqual(DummyObject1, registered_aliases.objects["obj1"])
             self.assertEqual(DummyObject2, registered_aliases.objects["obj2"])
-            self.assertEqual(build_configuration.subsystems, FrozenOrderedSet([DummySubsystem]))
 
     def test_load_invalid_entrypoint(self):
         def build_file_aliases(bad_arg):
@@ -280,7 +276,6 @@ class LoaderTest(unittest.TestCase):
         registered_aliases = build_configuration.registered_aliases
         self.assertEqual(DummyObject1, registered_aliases.objects["FROMPLUGIN1"])
         self.assertEqual(DummyObject2, registered_aliases.objects["FROMPLUGIN2"])
-        self.assertEqual(build_configuration.subsystems, FrozenOrderedSet([DummySubsystem]))
 
     def test_rules(self):
         def backend_rules():

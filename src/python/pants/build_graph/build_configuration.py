@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import typing
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -137,9 +136,6 @@ class BuildConfiguration:
                 )
 
             self._exposed_object_by_alias[alias] = obj
-            # obj doesn't implement any common base class, so we have to test for this attr.
-            if hasattr(obj, "subsystems"):
-                self.register_subsystems(obj.subsystems())
 
         def _register_exposed_context_aware_object_factory(
             self, alias, context_aware_object_factory
@@ -154,13 +150,7 @@ class BuildConfiguration:
                 alias
             ] = context_aware_object_factory
 
-        # NB: We expect the parameter to be Iterable[Type[Subsystem]], but we can't be confident
-        # in this because we pass whatever people put in their `register.py`s to this function;
-        # I.e., this is an impure function that reads from the outside world. So, we use the type
-        # hint `Any` and perform runtime type checking.
-        # TODO: Is this still true? Do we still support a hook for registering subsystems,
-        #  instead of just having them be discovered as rule params?
-        def register_subsystems(self, subsystems: typing.Iterable[Type[Subsystem]] | Any):
+        def register_subsystems(self, subsystems: Iterable[Type[Subsystem]]):
             """Registers the given subsystem types."""
             if not isinstance(subsystems, Iterable):
                 raise TypeError("The subsystems must be an iterable, given {}".format(subsystems))
@@ -202,7 +192,7 @@ class BuildConfiguration:
         # this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_target_types(self, target_types: typing.Iterable[Type[Target]] | Any) -> None:
+        def register_target_types(self, target_types: Iterable[Type[Target]] | Any) -> None:
             """Registers the given target types."""
             if not isinstance(target_types, Iterable):
                 raise TypeError(
