@@ -31,7 +31,7 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 # TODO(#12293): Stabilize network flakiness.
-# pytestmark = pytest.mark.skip
+pytestmark = pytest.mark.skip
 
 
 @pytest.fixture
