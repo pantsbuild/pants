@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Help us make Pants better
+about: Help us find and fix bugs
 title: ''
 labels: bug
 assignees: ''
@@ -17,4 +17,4 @@ Which version of Pants are you using?
 Are you encountering the bug on MacOS, Linux, or both?
 
 **Additional info**
-Add any other information about the problem here, including attachments or links to gists.
+Add any other information about the problem here, such as attachments or links to gists, if relevant.
