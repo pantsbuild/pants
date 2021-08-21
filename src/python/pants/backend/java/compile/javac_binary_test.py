@@ -27,7 +27,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(JavacBinary, ()),
             QueryRule(ProcessResult, (Process,)),
         ],
-        preserve_tmpdirs=True,
     )
 
 
