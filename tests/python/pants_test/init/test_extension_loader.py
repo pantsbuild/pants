@@ -31,6 +31,7 @@ from pants.init.extension_loader import (
     load_plugins,
 )
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -138,7 +139,7 @@ class LoaderTest(unittest.TestCase):
         registered_aliases = build_configuration.registered_aliases
         self.assertEqual(0, len(registered_aliases.objects))
         self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
-        self.assertEqual(build_configuration.subsystems, FrozenOrderedSet())
+        self.assertEqual(build_configuration.subsystem_to_providers, FrozenDict())
         self.assertEqual(0, len(build_configuration.rules))
         self.assertEqual(0, len(build_configuration.target_types))
 
