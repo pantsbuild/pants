@@ -302,9 +302,7 @@ class LoaderTest(unittest.TestCase):
 
         with self.create_register(target_types=target_types) as backend_package:
             load_backend(self.bc_builder, backend_package)
-            assert self.bc_builder.create().target_types == FrozenOrderedSet(
-                [DummyTarget, DummyTarget2]
-            )
+            assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2)
 
         class PluginTarget(Target):
             alias = "plugin_tgt"
@@ -317,9 +315,7 @@ class LoaderTest(unittest.TestCase):
             self.get_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets)
         )
         self.load_plugins(["new-targets"])
-        assert self.bc_builder.create().target_types == FrozenOrderedSet(
-            [DummyTarget, DummyTarget2, PluginTarget]
-        )
+        assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2, PluginTarget)
 
     def test_backend_plugin_ordering(self):
         def reg_alias():
