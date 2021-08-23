@@ -17,7 +17,10 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import LockfileMetadata
+from pants.backend.experimental.python.lockfile_metadata import (
+    InvalidLockfileReason,
+    LockfileMetadata,
+)
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -502,21 +505,39 @@ async def build_pex(
 def _validate_metadata(
     metadata: LockfileMetadata, request: PexRequest, python_setup: PythonSetup
 ) -> None:
-    if metadata.is_valid_for(
+    validation = metadata.is_valid_for(
         request.requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
-    ):
-        return None
-
-    message = (
-        f"Invalid lockfile for PEX request `{request.output_filename}`."
-        "\n\n"
-        "If your requirements or your project's interpreter constraints have changed since the "
-        "lockfile was generated, you can follow the instructions in the header of the lockfile to "
-        "regenerate it. Otherwise, ensure your interpreter constraints setting is compatible with "
-        "the constraints specified in the lockfile."
     )
+
+    if validation:
+        return
+
+    message_parts = [
+        f"Invalid lockfile for PEX request `{request.output_filename}`.",
+        "\n",
+    ]
+
+    if InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH in validation.failure_reasons:
+        message_parts.append(
+            "The requirements set for this PEX request are different to the requirements set when "
+            "the lockfile was generated. To fix this, you will need to regenerate the lockfile. "
+        )
+
+    if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+        message_parts.append(
+            "The lockfile was generated under different interpreter constraints to the constraints "
+            "that are set. If you have overridden your project's interpreter constraints, you can "
+            "update them to specify a subset of the interpreters specified in the lockfile. If "
+            "not, you will need to regenerate your lockfile. "
+        )
+
+    message_parts.append(
+        "To regenerate the lockfile, follow the instructions in the header of the lockfile."
+    )
+
+    message = "\n".join(message_parts)
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
