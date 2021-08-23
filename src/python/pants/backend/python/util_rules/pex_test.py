@@ -550,6 +550,30 @@ def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> 
     assert "Invalid lockfile for PEX request" in caplog.text
 
 
+def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
+    assert "requirements set for this" in caplog.text
+    assert "different interpreter constraints" not in caplog.text
+
+
+def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(
+        rule_runner, True, actual="900d", expected="900d", behavior="warn", invalid_constraints=True
+    )
+    assert "requirements set for this" not in caplog.text
+    assert "different interpreter constraints" in caplog.text
+
+
+def test_warn_on_mismatched_requirements_and_interpreter_constraints(
+    rule_runner: RuleRunner, caplog
+) -> None:
+    _run_pex_for_lockfile_test(
+        rule_runner, True, actual="900d", expected="1bad", behavior="warn", invalid_constraints=True
+    )
+    assert "requirements set for this" in caplog.text
+    assert "different interpreter constraints" in caplog.text
+
+
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="ignore")
     assert not caplog.text.strip()
@@ -577,14 +601,20 @@ def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, capl
     assert not caplog.text.strip()
 
 
-def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior):
-    constraints = "CPython>=3.9"
+def _run_pex_for_lockfile_test(
+    rule_runner, use_file, actual, expected, behavior, invalid_constraints=False
+):
+    actual_constraints = "CPython>=3.6,<3.10"
+    expected_constraints = actual_constraints
+    if invalid_constraints:
+        expected_constraints = "CPython>=3.9"
+
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {{
 #   "requirements_invalidation_digest": "{actual}",
 #   "valid_for_interpreter_constraints": [
-#     "{ constraints }"
+#     "{ actual_constraints }"
 #   ]
 # }}
 # --- END PANTS LOCKFILE METADATA ---
@@ -599,6 +629,7 @@ ansicolors==1.1.8
 
     create_pex_and_get_all_data(
         rule_runner,
+        interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=PexRequirements(
             **file_args,
             file_path_description_of_origin="iceland",
