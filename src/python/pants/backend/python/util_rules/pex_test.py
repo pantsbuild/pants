@@ -541,25 +541,26 @@ def test_build_pex_description() -> None:
 def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
         _run_pex_for_lockfile_test(
-            rule_runner, True, actual="1bad", expected="900d", behavior="error"
+            rule_runner,
+            True,
+            behavior="error",
+            invalid_reqs=True,
         )
 
 
 def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, True, behavior="warn", invalid_reqs=True)
     assert "Invalid lockfile for PEX request" in caplog.text
 
 
 def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, True, behavior="warn", invalid_reqs=True)
     assert "requirements set for this" in caplog.text
     assert "different interpreter constraints" not in caplog.text
 
 
 def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, True, actual="900d", expected="900d", behavior="warn", invalid_constraints=True
-    )
+    _run_pex_for_lockfile_test(rule_runner, True, behavior="warn", invalid_constraints=True)
     assert "requirements set for this" not in caplog.text
     assert "different interpreter constraints" in caplog.text
 
@@ -568,42 +569,49 @@ def test_warn_on_mismatched_requirements_and_interpreter_constraints(
     rule_runner: RuleRunner, caplog
 ) -> None:
     _run_pex_for_lockfile_test(
-        rule_runner, True, actual="900d", expected="1bad", behavior="warn", invalid_constraints=True
+        rule_runner, True, behavior="warn", invalid_reqs=True, invalid_constraints=True
     )
     assert "requirements set for this" in caplog.text
     assert "different interpreter constraints" in caplog.text
 
 
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="ignore")
+    _run_pex_for_lockfile_test(rule_runner, True, behavior="ignore", invalid_reqs=True)
     assert not caplog.text.strip()
 
 
 def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="900d", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, True, behavior="warn")
     assert not caplog.text.strip()
 
 
 def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(
-            rule_runner, False, actual="1bad", expected="900d", behavior="error"
-        )
+        _run_pex_for_lockfile_test(rule_runner, False, behavior="error", invalid_reqs=True)
 
 
 def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, False, actual="1bad", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, False, behavior="warn", invalid_reqs=True)
     assert "Invalid lockfile for PEX request" in caplog.text
 
 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, False, actual="900d", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, False, behavior="warn")
     assert not caplog.text.strip()
 
 
 def _run_pex_for_lockfile_test(
-    rule_runner, use_file, actual, expected, behavior, invalid_constraints=False
+    rule_runner,
+    use_file,
+    behavior,
+    invalid_reqs=False,
+    invalid_constraints=False,
 ):
+    actual_digest = "900d"
+    expected_digest = actual_digest
+    if invalid_reqs:
+        expected_digest = "baad"
+
     actual_constraints = "CPython>=3.6,<3.10"
     expected_constraints = actual_constraints
     if invalid_constraints:
@@ -612,7 +620,7 @@ def _run_pex_for_lockfile_test(
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {{
-#   "requirements_invalidation_digest": "{actual}",
+#   "requirements_invalidation_digest": "{actual_digest}",
 #   "valid_for_interpreter_constraints": [
 #     "{ actual_constraints }"
 #   ]
@@ -633,7 +641,7 @@ ansicolors==1.1.8
         requirements=PexRequirements(
             **file_args,
             file_path_description_of_origin="iceland",
-            lockfile_hex_digest=expected,
+            lockfile_hex_digest=expected_digest,
         ),
         additional_pants_args=(
             "--python-setup-experimental-lockfile=lockfile.txt",
