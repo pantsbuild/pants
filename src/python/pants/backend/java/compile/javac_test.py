@@ -30,9 +30,6 @@ from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-# TODO(#12293): Stabilize network flakiness.
-pytestmark = pytest.mark.skip
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -50,6 +47,9 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
         target_types=[JvmDependencyLockfile, JavaLibrary],
+        # TODO(#12293): Remove this nonhermetic hack once Coursier JVM boostrapping flakiness
+        # is properly fixed in CI.
+        bootstrap_args=["--javac-jdk=system"],
     )
 
 
@@ -136,6 +136,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
