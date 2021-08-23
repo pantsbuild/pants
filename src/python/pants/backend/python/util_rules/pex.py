@@ -524,6 +524,11 @@ def _validate_metadata(
             "The requirements set for this PEX request are different to the requirements set when "
             "the lockfile was generated. To fix this, you will need to regenerate the lockfile. "
         )
+        message_parts.append(
+            f"(Expected requirements digest: {request.requirements.lockfile_hex_digest}, "
+            "actual: {metadata.requirements_invalidation_digest})"
+        )
+        message_parts.append("\n")
 
     if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
         message_parts.append(
@@ -537,7 +542,7 @@ def _validate_metadata(
         "To regenerate the lockfile, follow the instructions in the header of the lockfile."
     )
 
-    message = "\n".join(message_parts)
+    message = "\n".join(message_parts).strip()
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
