@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.util.ordered_set import FrozenOrderedSet
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
@@ -107,7 +108,9 @@ def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
     """Returns an invalidation digest for the given requirements."""
     m = hashlib.sha256()
     inputs = {
-        "requirements": list(requirements),
+        # `FrozenOrderedSet` deduplicates while keeping ordering, which speeds up the sorting if
+        # the input was already sorted.
+        "requirements": sorted(FrozenOrderedSet(requirements)),
     }
     m.update(json.dumps(inputs).encode("utf-8"))
     return m.hexdigest()
