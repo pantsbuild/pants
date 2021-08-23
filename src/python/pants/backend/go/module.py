@@ -265,20 +265,18 @@ async def download_external_module(
         ),
     )
 
-    source_digest_stripped = await Get(Digest, RemovePrefix(source_digest, source_path))
-
-    source_snapshot = await Get(Snapshot, Digest, source_digest_stripped)
-    if "go.mod" not in source_snapshot.files:
+    source_snapshot_stripped = await Get(Snapshot, RemovePrefix(source_digest, source_path))
+    if "go.mod" not in source_snapshot_stripped.files:
         # There was no go.mod in the downloaded source. Use the generated go.mod from the go tooling which
         # was returned in the module metadata.
-        go_mod_absoloute_path = metadata.get("GoMod")
-        if not go_mod_absoloute_path:
+        go_mod_absolute_path = metadata.get("GoMod")
+        if not go_mod_absolute_path:
             raise ValueError(
                 f"No go.mod was provided in download of Go external module {request.path}@{request.version}, "
                 "and the module metadata did not identify a generated go.mod file to use instead."
             )
-        gopath_index = go_mod_absoloute_path.index("gopath/")
-        go_mod_path = go_mod_absoloute_path[gopath_index:]
+        gopath_index = go_mod_absolute_path.index("gopath/")
+        go_mod_path = go_mod_absolute_path[gopath_index:]
         go_mod_digest = await Get(
             Digest,
             DigestSubset(
@@ -294,7 +292,7 @@ async def download_external_module(
             Digest, RemovePrefix(go_mod_digest, os.path.dirname(go_mod_path))
         )
 
-        # There should now be one file in the digest. Create a diges where that file is named go.mod
+        # There should now be one file in the digest. Create a digest where that file is named go.mod
         # and then merge it into the sources.
         contents = await Get(DigestContents, Digest, go_mod_digest_stripped)
         assert len(contents) == 1
@@ -305,17 +303,16 @@ async def download_external_module(
                     FileContent(
                         path="go.mod",
                         content=contents[0].content,
-                        is_executable=False,
                     )
                 ]
             ),
         )
         source_digest_final = await Get(
-            Digest, MergeDigests([go_mod_only_digest, source_digest_stripped])
+            Digest, MergeDigests([go_mod_only_digest, source_snapshot_stripped.digest])
         )
     else:
         # If the module download has a go.mod, then just use the sources as is.
-        source_digest_final = source_digest_stripped
+        source_digest_final = source_snapshot_stripped.digest
 
     return DownloadedExternalModule(
         path=request.path, version=request.version, digest=source_digest_final
