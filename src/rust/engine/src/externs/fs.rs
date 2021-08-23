@@ -41,8 +41,10 @@ use cpython::{
   exc, py_class, CompareOp, PyErr, PyObject, PyResult, PyString, PyTuple, Python, PythonObject,
   ToPyObject,
 };
+use either::Either;
 use fs::PathStat;
 use hashing::{Digest, Fingerprint};
+use itertools::Itertools;
 use store::Snapshot;
 
 ///
@@ -164,5 +166,20 @@ py_class!(pub class PySnapshot |py| {
 
     def __hash__(&self) -> PyResult<u64> {
       Ok(self.snapshot(py).digest.hash.prefix_hash())
+    }
+
+    def __repr__(&self) -> PyResult<String> {
+      let (dirs, files): (Vec<_>, Vec<_>) = self.snapshot(py).path_stats.iter().partition_map(|ps| match ps {
+        PathStat::Dir { path, .. } => Either::Left(path.to_string_lossy()),
+        PathStat::File { path, .. } => Either::Right(path.to_string_lossy()),
+      });
+
+      Ok(format!(
+        "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
+        self.snapshot(py).digest.hash.to_hex(),
+        self.snapshot(py).digest.size_bytes,
+        dirs.join(","),
+        files.join(",")
+      ))
     }
 });
