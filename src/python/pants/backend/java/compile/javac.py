@@ -5,14 +5,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from itertools import chain
 
 from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.target_types import JavaSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Sources, Target, Targets
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Sources, Targets
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
@@ -20,32 +22,14 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspathRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
-class JavacSubsystem(Subsystem):
-    options_scope = "javac"
-    help = "The javac Java source compiler."
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--jdk",
-            default="adopt:1.11",
-            advanced=True,
-            help="The JDK to use for invoking javac."
-            " This string will be passed directly to Coursier's `--jvm` parameter."
-            " Run `cs java --available` to see a list of available JVM versions on your platform.",
-        )
-
-
 @dataclass(frozen=True)
 class CompileJavaSourceRequest:
-    target: Target
+    component: CoarsenedTarget
 
 
 @dataclass(frozen=True)
@@ -60,26 +44,53 @@ async def compile_java_source(
     javac_binary: JavacBinary,
     request: CompileJavaSourceRequest,
 ) -> CompiledClassfiles:
-    sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            (request.target.get(Sources),),
-            for_sources_types=(JavaSources,),
-            enable_codegen=True,
+    component_members_with_sources = tuple(
+        t for t in request.component.members if t.has_field(Sources)
+    )
+    component_members_and_source_files = zip(
+        component_members_with_sources,
+        await MultiGet(
+            Get(
+                SourceFiles,
+                SourceFilesRequest(
+                    (t.get(Sources),),
+                    for_sources_types=(JavaSources,),
+                    enable_codegen=True,
+                ),
+            )
+            for t in component_members_with_sources
         ),
     )
-    if sources.snapshot.digest == EMPTY_DIGEST:
+
+    component_members_and_java_source_files = [
+        (target, sources)
+        for target, sources in component_members_and_source_files
+        if sources.snapshot.digest != EMPTY_DIGEST
+    ]
+
+    if not component_members_and_java_source_files:
         return CompiledClassfiles(digest=EMPTY_DIGEST)
 
-    lockfile, direct_deps = await MultiGet(
-        Get(CoursierResolvedLockfile, CoursierLockfileForTargetRequest(Targets((request.target,)))),
-        Get(Targets, DependenciesRequest(request.target.get(Dependencies))),
+    # Target coarsening currently doesn't perform dep expansion, which matters for targets
+    # with multiple sources that expand to individual source subtargets.
+    # We expand the dependencies explicitly here before coarsening, but ideally this could
+    # be done somehow during coarsening.
+    # TODO: Should component dependencies be filtered out here if they were only brought in by component members which were
+    #   filtered out above (due to having no JavaSources to contribute)?  If so, that will likely required extending
+    #   the CoarsenedTargets API to include more complete dependency information, or to support such filtering directly.
+    expanded_direct_deps = await Get(Targets, Addresses(request.component.dependencies))
+    coarsened_direct_deps = await Get(
+        CoarsenedTargets, Addresses(t.address for t in expanded_direct_deps)
     )
 
+    lockfile = await Get(
+        CoursierResolvedLockfile,
+        CoursierLockfileForTargetRequest(Targets(request.component.members)),
+    )
     direct_dependency_classfiles = await MultiGet(
-        Get(CompiledClassfiles, CompileJavaSourceRequest(target=target)) for target in direct_deps
+        Get(CompiledClassfiles, CompileJavaSourceRequest(component=coarsened_dep))
+        for coarsened_dep in coarsened_direct_deps
     )
-
     materialized_classpath, merged_direct_dependency_classfiles_digest = await MultiGet(
         Get(
             MaterializedClasspath,
@@ -105,10 +116,13 @@ async def compile_java_source(
         Digest,
         MergeDigests(
             (
-                sources.snapshot.digest,
                 prefixed_direct_dependency_classfiles_digest,
                 materialized_classpath.digest,
                 javac_binary.digest,
+                *(
+                    sources.snapshot.digest
+                    for _, sources in component_members_and_java_source_files
+                ),
             )
         ),
     )
@@ -123,11 +137,16 @@ async def compile_java_source(
                 classpath_arg,
                 "-d",
                 "classfiles",
-                *sources.files,
+                *sorted(
+                    chain.from_iterable(
+                        sources.snapshot.files
+                        for _, sources in component_members_and_java_source_files
+                    )
+                ),
             ],
             input_digest=merged_digest,
             output_directories=("classfiles",),
-            description=f"Compile {request.target.address.spec} with javac",
+            description=f"Compile {request.component.members} with javac",
             level=LogLevel.DEBUG,
         ),
     )
