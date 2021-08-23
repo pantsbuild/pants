@@ -15,6 +15,7 @@ from typing import Iterable, Iterator, List, Mapping, Tuple
 
 import packaging.specifiers
 import packaging.version
+import pydot  # type: ignore[import]
 from pkg_resources import Requirement
 
 from pants.backend.experimental.python.lockfile_metadata import LockfileMetadata
@@ -43,7 +44,6 @@ from pants.engine.fs import (
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.platform import Platform
 from pants.engine.process import (
@@ -54,7 +54,7 @@ from pants.engine.process import (
     ProcessResult,
     SequentialProcesses,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import InvalidLockfileBehavior, PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -1001,15 +1001,24 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
 class ResolvedDistributions:
     """A set of resolved wheel files which can be used as the input to `--find-links`.
 
-    TODO: This class effectively represents a frozen resolve. It's likely that it should eventually
-    carry along an associated resolve graph and/or lockfile to allow for filtering its Digest to
-    the subset relevant to a particular consumer before materializing it for consumption.
+    This class represents a frozen resolve from which subsets can be selected using the attached
+    internal dependency graph.
+
+    TODO: The wheels inside this resolve are converted into single-entry PEX files on demand
+    and composed using the PEX_PATH. This happens in a separate step from the resolve, because
+    although creating a single entry PEX takes 1.19s on average from a repository.pex, and 1.45s on
+    average from loose wheels, that's made up for by being able to construct them incrementally on
+    demand for only the relevant portion of the resolve.
     """
 
     name: str
     digest: Digest
+    # A common path prefix for all distributions.
     base_path: str
-    distribution_paths: Tuple[str, ...]
+    # From requirement name to requirement path within base_path.
+    distributions: FrozenDict[str, str]
+    # The dependency graph of the distributions.
+    graph: FrozenDict[str, tuple[str, ...]]
 
 
 # TODO: Some of the arguments to PexRequest are unused in this case. Might want an explicit request
@@ -1022,12 +1031,12 @@ async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributi
     build_pex_process = await Get(BuildPexProcess, PexRequest, request)
     python = build_pex_process.python
 
-    wheels_path = "__wheels"
+    wheels_path = "__distributions"
+    graph_path = "__graph.dot"
+    info_path = "__info.txt"
 
     # TODO: The SequentialProcesses constructor could directly take types which are convertible
     # into Process using a union/Protocol: for now, we await inline for clarity.
-    # TODO: This is still capturing the PEX as an output_file: should clarify semantics of
-    # `SequentialProcesses` around filtering.
     result = await Get(
         ProcessResult,
         SequentialProcesses(
@@ -1039,10 +1048,24 @@ async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributi
                             Process,
                             PexProcess(
                                 Pex(EMPTY_DIGEST, request.output_filename, python),
-                                argv=["repository", "extract", "-f", wheels_path],
+                                argv=["repository", "-o", info_path, "extract", "-f", wheels_path],
+                                extra_env={"PEX_TOOLS": "1"},
+                                description=f"Extract distributions from {request.output_filename}",
+                            ),
+                        )
+                    }
+                ),
+                MultiPlatformProcess(
+                    {
+                        platform: await Get(
+                            Process,
+                            PexProcess(
+                                Pex(EMPTY_DIGEST, request.output_filename, python),
+                                argv=["graph", "-o", graph_path],
                                 extra_env={"PEX_TOOLS": "1"},
                                 output_directories=[wheels_path],
-                                description=f"Extract distributions from {request.output_filename}",
+                                output_files=[info_path, graph_path],
+                                description=f"Report dependency graph of {request.output_filename}",
                             ),
                         )
                     }
@@ -1054,11 +1077,33 @@ async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributi
         ),
     )
 
-    wheels = await Get(
-        Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{wheels_path}/**"]))
+    wheels_digest, graph_contents, info_contents = await MultiGet(
+        Get(Digest, DigestSubset(result.output_digest, PathGlobs([f"{wheels_path}/**"]))),
+        Get(DigestContents, DigestSubset(result.output_digest, PathGlobs([graph_path]))),
+        Get(DigestContents, DigestSubset(result.output_digest, PathGlobs([info_path]))),
     )
 
-    return ResolvedDistributions(request.output_filename, wheels.digest, wheels_path, wheels.files)
+    # Parse requirement name to distributions info.
+    distributions = FrozenDict(
+        {
+            parts[0]: os.path.join(wheels_path, os.path.basename(parts[-1][:-5]))
+            for line in info_contents[0].content.decode("utf-8").splitlines()
+            for parts in line.split(" ")
+        }
+    )
+
+    # And reconstitute the dependency graph from DOT.
+    graph_dot = pydot.graph_from_dot_data(graph_contents[0].content.decode("utf-8"))[0]
+    graph: dict[str, list[str]] = {node.get_name(): [] for node in graph_dot.get_nodes()}
+    for edge in graph_dot.get_edges():
+        graph[edge.get_source()].append(edge.get_destination())
+    frozen_graph = FrozenDict(
+        {source: tuple(destinations) for source, destinations in graph.items()}
+    )
+
+    return ResolvedDistributions(
+        request.output_filename, wheels_digest, wheels_path, distributions, frozen_graph
+    )
 
 
 def rules():
