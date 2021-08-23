@@ -499,7 +499,9 @@ async def build_pex(
     )
 
 
-def _validate_metadata(metadata: LockfileMetadata, request: PexRequest, python_setup: PythonSetup):
+def _validate_metadata(
+    metadata: LockfileMetadata, request: PexRequest, python_setup: PythonSetup
+) -> None:
     if metadata.is_valid_for(
         request.requirements.lockfile_hex_digest,
         request.interpreter_constraints,
@@ -507,18 +509,19 @@ def _validate_metadata(metadata: LockfileMetadata, request: PexRequest, python_s
     ):
         return None
 
-    message_1 = f"Invalid lockfile for PEX request `{request.output_filename}`. "
-    message_2 = (
-        "If your requirements or interpreter constraints have changed, follow the "
-        "instructions in the header of the lockfile to regenerate it. Otherwise, ensure your interpreter "
-        "constraints are compatible with the constraints specified in the lockfile."
+    message = (
+        f"Invalid lockfile for PEX request `{request.output_filename}`."
+        "\n\n"
+        "If your requirements or your project's interpreter constraints have changed since the "
+        "lockfile was generated, you can follow the instructions in the header of the lockfile to "
+        "regenerate it. Otherwise, ensure your interpreter constraints setting is compatible with "
+        "the constraints specified in the lockfile."
     )
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-        logger.error("%s %s", message_1, message_2)
-        raise ValueError(message_1)
+        raise ValueError(message)
     elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-        logger.warning("%s %s", message_1, message_2)
+        logger.warning("%s", message)
 
 
 def _build_pex_description(request: PexRequest) -> str:
