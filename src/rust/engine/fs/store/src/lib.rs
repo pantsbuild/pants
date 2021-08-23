@@ -321,7 +321,7 @@ impl Store {
     self,
     cas_address: &str,
     instance_name: Option<String>,
-    root_ca_certs: Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -335,7 +335,7 @@ impl Store {
       remote: Some(RemoteStore::new(remote::ByteStore::new(
         cas_address,
         instance_name,
-        root_ca_certs,
+        tls_config,
         headers,
         chunk_size_bytes,
         upload_timeout,

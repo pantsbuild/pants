@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: 3567a42e809ee8c4becc5fd60848669ffae40303dbef3d8a16eee390bdd9724d
+# {
+#   "requirements_invalidation_digest": "23784defa8a8af4e6b967ac8d508ec84daecc4bef7dfa71266172736ba4d84e6",
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.6.2"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 appdirs==1.4.4; python_full_version >= "3.6.2" \
@@ -21,9 +26,9 @@ colorama==0.4.4; python_version >= "3.6" and python_full_version >= "3.6.2" and 
 dataclasses==0.8; python_version >= "3.6" and python_version < "3.7" and python_full_version >= "3.6.2" \
     --hash=sha256:0201d89fa866f68c8ebd9d08ee6ff50c0b255f8ec63a71c16fda7af82bb887bf \
     --hash=sha256:8479067f342acf957dc82ec415d355ab5edb7e7646b90dc6e2fd1d96ad084c97
-importlib-metadata==4.6.3; python_version >= "3.6" and python_full_version >= "3.6.2" and python_version < "3.8" \
-    --hash=sha256:51c6635429c77cf1ae634c997ff9e53ca3438b495f10a55ba28594dd69764a8b \
-    --hash=sha256:0645585859e9a6689c523927a5032f2ba5919f1f7d0e84bd4533312320de1ff9
+importlib-metadata==4.6.4; python_version >= "3.6" and python_full_version >= "3.6.2" and python_version < "3.8" \
+    --hash=sha256:ed5157fef23a4bc4594615a0dd8eba94b2bb36bf2a343fa3d8bb2fa0a62a99d5 \
+    --hash=sha256:7b30a78db2922d78a6f47fb30683156a14f3c6aa5cc23f77cc8967e9ab2d002f
 mypy-extensions==0.4.3; python_full_version >= "3.6.2" \
     --hash=sha256:090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d \
     --hash=sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8

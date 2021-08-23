@@ -39,6 +39,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use clap::{value_t, App, Arg};
 use futures::future::FutureExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -756,7 +757,7 @@ async fn main() {
       .into_with_remote(
         address,
         args.value_of("remote-instance-name").map(str::to_owned),
-        root_ca_certs,
+        tls::Config::new_without_mtls(root_ca_certs),
         headers,
         4 * 1024 * 1024,
         std::time::Duration::from_secs(5 * 60),

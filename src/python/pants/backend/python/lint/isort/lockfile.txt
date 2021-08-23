@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: a049aba24b8fd338775fc1f46144ba7abeebe7dc2914997b2adc28cc316abf2f
+# {
+#   "requirements_invalidation_digest": "0d840cfa3a4384e6371948ed8e5a6e1e3d5e2aa4e8f75ebb6739201415caecab",
+#   "valid_for_interpreter_constraints": [
+#     "CPython<4,>=3.6"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.6" and python_version < "4.0" and python_full_version >= "3.5.0" \

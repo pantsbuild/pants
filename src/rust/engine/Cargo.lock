@@ -202,6 +202,7 @@ dependencies = [
  "errno",
  "fuse",
  "futures",
+ "grpc_util",
  "hashing",
  "libc",
  "log 0.4.14",
@@ -369,8 +370,8 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.14.0"
-source = "git+https://github.com/pantsbuild/console?rev=b6e9aa7ce734517691934d558d79a459609633db#b6e9aa7ce734517691934d558d79a459609633db"
+version = "0.14.1"
+source = "git+https://github.com/mitsuhiko/console?rev=3232775295149e6f0aace26d4cfe61013ed3e2d8#3232775295149e6f0aace26d4cfe61013ed3e2d8"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -664,12 +665,14 @@ dependencies = [
  "cpython",
  "crossbeam-channel 0.4.4",
  "double-checked-cell-async",
+ "either",
  "env_logger",
  "fnv",
  "fs",
  "futures",
  "futures-core",
  "graph",
+ "grpc_util",
  "hashing",
  "indexmap",
  "itertools 0.10.1",
@@ -710,8 +713,10 @@ dependencies = [
 name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
+ "either",
  "fs",
  "hashing",
+ "itertools 0.10.1",
  "mock",
  "nailgun",
  "parking_lot",
@@ -1090,7 +1095,9 @@ dependencies = [
  "prost-build",
  "prost-types",
  "rand 0.8.2",
+ "rustls",
  "rustls-native-certs",
+ "rustls-pemfile",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -1099,6 +1106,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
+ "webpki",
 ]
 
 [[package]]
@@ -1538,6 +1546,7 @@ dependencies = [
 name = "logging"
 version = "0.0.1"
 dependencies = [
+ "arc-swap",
  "cargo_metadata",
  "chrono",
  "colored",
@@ -2243,6 +2252,7 @@ dependencies = [
  "env_logger",
  "fs",
  "futures",
+ "grpc_util",
  "hashing",
  "log 0.4.14",
  "process_execution",
@@ -2763,6 +2773,15 @@ dependencies = [
  "rustls",
  "schannel",
  "security-framework",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
+dependencies = [
+ "base64",
 ]
 
 [[package]]
@@ -3567,6 +3586,7 @@ dependencies = [
  "futures",
  "indexmap",
  "indicatif",
+ "logging",
  "stdio",
  "task_executor",
  "uuid",

@@ -4,14 +4,18 @@
 from __future__ import annotations
 
 import importlib.resources
-from typing import ClassVar, Sequence, cast
+from typing import ClassVar, Iterable, Sequence, cast
 
+from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+
+DEFAULT_TOOL_LOCKFILE = "<default>"
+NO_TOOL_LOCKFILE = "<none>"
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -83,15 +87,15 @@ class PythonToolRequirementsBase(Subsystem):
             register(
                 "--experimental-lockfile",
                 type=str,
-                default="<none>",
+                default=NO_TOOL_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
-                    "Set to the string '<default>' to use a lockfile provided by "
+                    f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
                     "Pants, so long as you have not changed the `--version`, "
                     "`--extra-requirements`, and `--interpreter-constraints` options. See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                    "Set to the string '<none>' to opt out of using a lockfile. We do not "
+                    f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We do not "
                     "recommend this, as lockfiles are essential for reproducible builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
                     "build root, then activate the backend_package "
@@ -117,38 +121,52 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return (self.version, *self.extra_requirements)
 
-    def pex_requirements(self, expected_lockfile_hex_digest: str | None = None) -> PexRequirements:
+    def pex_requirements(
+        self,
+        *,
+        extra_requirements: Iterable[str] = (),
+    ) -> PexRequirements:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
-        if not self.register_lockfile or self.lockfile == "<none>":
-            return PexRequirements(self.all_requirements)
-        if self.lockfile == "<default>":
+
+        requirements = (*self.all_requirements, *extra_requirements)
+
+        if not self.uses_lockfile:
+            return PexRequirements(requirements)
+
+        hex_digest = calculate_invalidation_digest(requirements)
+
+        if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
             return PexRequirements(
                 file_content=FileContent(
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                lockfile_hex_digest=expected_lockfile_hex_digest,
+                lockfile_hex_digest=hex_digest,
             )
         return PexRequirements(
             file_path=self.lockfile,
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"
             ),
-            lockfile_hex_digest=expected_lockfile_hex_digest,
+            lockfile_hex_digest=hex_digest,
         )
 
     @property
     def lockfile(self) -> str:
-        """The path to a lockfile or special strings '<none>' and '<default>'.
+        f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
 
         This assumes you have set the class property `register_lockfile = True`.
         """
         return cast(str, self.options.experimental_lockfile)
+
+    @property
+    def uses_lockfile(self) -> bool:
+        return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:

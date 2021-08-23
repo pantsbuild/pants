@@ -14,9 +14,6 @@ from pants.engine.process import rules as process_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-# TODO(#12293): Stabilize network flakiness.
-pytestmark = pytest.mark.skip
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -55,6 +52,19 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
     )
 
 
+def test_java_binary_system_version(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--javac-jdk=system"])
+    assert "javac" in run_javac_version(rule_runner)
+
+
+def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
+    expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        run_javac_version(rule_runner)
+
+
+@pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert "javac 11.0" in run_javac_version(rule_runner)

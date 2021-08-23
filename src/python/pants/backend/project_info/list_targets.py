@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from typing import Dict, cast
 
 from pants.engine.addresses import Address, Addresses
@@ -8,6 +9,8 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTargets
+
+logger = logging.getLogger(__name__)
 
 
 class ListSubsystem(LineOriented, GoalSubsystem):
@@ -48,7 +51,7 @@ async def list_targets(
     addresses: Addresses, list_subsystem: ListSubsystem, console: Console
 ) -> List:
     if not addresses:
-        console.print_stderr(f"WARNING: No targets were matched in goal `{list_subsystem.name}`.")
+        logger.warning(f"No targets were matched in goal `{list_subsystem.name}`.")
         return List(exit_code=0)
 
     if list_subsystem.provides and list_subsystem.documented:

@@ -7,12 +7,17 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
+from typing import Iterable
 
 from pants.backend.experimental.python.lockfile_metadata import (
+    LockfileMetadata,
     calculate_invalidation_digest,
-    lockfile_content_with_header,
 )
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    DEFAULT_TOOL_LOCKFILE,
+    NO_TOOL_LOCKFILE,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
@@ -50,15 +55,12 @@ class PoetrySubsystem(PythonToolRequirementsBase):
     default_version = "poetry==1.1.7"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9"]
-
-    # TODO(#12314): add lockfile support, but that has to be manually added rather than having Pants
-    #  auto-generate it to workaround chicken-and-egg.
+    default_interpreter_constraints = ["CPython>=3.6"]
 
 
 # We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed
 # in Poetry 1.2. See https://github.com/python-poetry/poetry/issues/1584.
-# TODO(#12314): only use this custom launcher if using Poetry 1.1. (Ban 1.0 and earlier, probably).
+# WONTFIX(#12314): only use this custom launcher if using Poetry 1.1..
 POETRY_LAUNCHER = FileContent(
     "__pants_poetry_launcher.py",
     dedent(
@@ -92,6 +94,8 @@ class PythonLockfileRequest:
         cls,
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
+        *,
+        extra_requirements: Iterable[str] = (),
     ) -> PythonLockfileRequest:
         """Create a request for a dedicated lockfile for the tool.
 
@@ -100,7 +104,7 @@ class PythonLockfileRequest:
         `interpreter_constraints`.
         """
         return cls(
-            requirements=FrozenOrderedSet(subsystem.all_requirements),
+            requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
             interpreter_constraints=(
                 interpreter_constraints
                 if interpreter_constraints is not None
@@ -112,13 +116,9 @@ class PythonLockfileRequest:
         )
 
     @property
-    def hex_digest(self) -> str:
-        """Produces a hex digest of this lockfile's inputs, which should uniquely specify the
-        resolution of this lockfile request.
-
-        Inputs are definted as requirements and interpreter constraints.
-        """
-        return calculate_invalidation_digest(self.requirements, self.interpreter_constraints)
+    def requirements_hex_digest(self) -> str:
+        """Produces a hex digest of the requirements input for this lockfile."""
+        return calculate_invalidation_digest(self.requirements)
 
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
@@ -143,8 +143,8 @@ async def generate_lockfile(
         ),
     )
 
-    # TODO(#12314): Wire up Poetry to named_caches.
-    # TODO(#12314): Wire up all the pip options like indexes.
+    # WONTFIX(#12314): Wire up Poetry to named_caches.
+    # WONTFIX(#12314): Wire up all the pip options like indexes.
     poetry_lock_result = await Get(
         ProcessResult,
         VenvPexProcess(
@@ -167,15 +167,20 @@ async def generate_lockfile(
         ),
     )
 
-    lockfile_digest_contents = await Get(DigestContents, Digest, poetry_export_result.output_digest)
-    lockfile_with_header = lockfile_content_with_header(
-        python_setup.lockfile_custom_regeneration_command or req.regenerate_command,
-        req.hex_digest,
-        lockfile_digest_contents[0].content,
+    initial_lockfile_digest_contents = await Get(
+        DigestContents, Digest, poetry_export_result.output_digest
     )
-    final_lockfile = await Get(Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)]))
-
-    return PythonLockfile(final_lockfile, req.dest)
+    metadata = LockfileMetadata(req.requirements_hex_digest, req.interpreter_constraints)
+    lockfile_with_header = metadata.add_header_to_lockfile(
+        initial_lockfile_digest_contents[0].content,
+        regenerate_command=(
+            python_setup.lockfile_custom_regeneration_command or req.regenerate_command
+        ),
+    )
+    final_lockfile_digest = await Get(
+        Digest, CreateDigest([FileContent(req.dest, lockfile_with_header)])
+    )
+    return PythonLockfile(final_lockfile_digest, req.dest)
 
 
 # --------------------------------------------------------------------------------------
@@ -207,35 +212,15 @@ async def lockfile_goal(
         return LockGoal(exit_code=1)
 
     # TODO(#12314): Looking at the transitive closure to generate a single lockfile will not work
-    #  when we have multiple lockfiles supported, via per-tool lockfiles and multiple user lockfiles.
-    #  Ideally, `./pants lock ::` would mean "regenerate all unique lockfiles", whereas now it
-    #  means "generate a single lockfile based on this transitive closure."
+    #  when we have multiple user lockfiles supported. Ideally, `./pants lock ::` would mean
+    #  "regenerate all unique lockfiles", whereas now it means "generate a single lockfile based
+    #  on this transitive closure."
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
 
-    # TODO(#12314): Likely include "dev dependencies" like MyPy and Pytest, which must not have
-    #  conflicting versions with user requirements. This is a simpler alternative to shading, which
-    #  is likely out of scope for the project. See https://github.com/pantsbuild/pants/issues/9206.
-    #
-    #  We may want to redesign how you set the version and requirements for subsystems in the
-    #  process. Perhaps they should be directly a python_requirement_library, and you use a target
-    #  address? Pytest is a particularly weird case because it's often both a tool you run _and_
-    #  something you import.
-    #
-    #  Make sure to not break https://github.com/pantsbuild/pants/issues/10819.
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
         # NB: By looking at the dependencies, rather than the closure, we only generate for
         # requirements that are actually used in the project.
-        #
-        # TODO(#12314): It's not totally clear to me if that is desirable. Consider requirements like
-        #  pydevd-pycharm. Should that be in the lockfile? I think this needs to be the case when
-        #  we have multiple lockfiles, though: we shouldn't look at the universe in that case,
-        #  only the relevant subset of requirements.
-        #
-        #  Note that the current generate_lockfile.sh script in our docs also mixes in
-        #  `requirements.txt`, but not inlined python_requirement_library targets if they're not
-        #  in use. We don't have a way to emulate those semantics because at this point, all we
-        #  have is `python_requirement_library` targets without knowing the source.
         for tgt in transitive_targets.dependencies
         if tgt.has_field(PythonRequirementsField)
     )
@@ -251,9 +236,7 @@ async def lockfile_goal(
         PythonLockfile,
         PythonLockfileRequest(
             reqs.req_strings,
-            # TODO(#12314): Figure out which interpreter constraints to use. Likely get it from the
-            #  transitive closure. When we're doing a single global lockfile, it's fine to do that,
-            #  but we need to figure out how this will work with multiple resolves.
+            # TODO(#12314): Use interpreter constraints from the transitive closure.
             InterpreterConstraints(python_setup.interpreter_constraints),
             dest=python_setup.lockfile,
             description=(
@@ -310,7 +293,7 @@ async def generate_all_tool_lockfiles(
     results = await MultiGet(
         Get(PythonLockfile, PythonLockfileRequest, req)
         for req in requests
-        if req.dest not in {"<none>", "<default>"}
+        if req.dest not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}
     )
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)

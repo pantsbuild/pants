@@ -3,7 +3,12 @@
 #    build-support/bin/generate_all_lockfiles.sh
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# invalidation digest: daab248d3d4a91fafc4a04497ef6c6d6402c41d74fba2ee72a48d938fb81702f
+# {
+#   "requirements_invalidation_digest": "a5ec2e69360b67f3262d8ecc191c0227f09216343e97e8c9e2a34ce567b07c29",
+#   "valid_for_interpreter_constraints": [
+#     "CPython<3.10,>=3.7"
+#   ]
+# }
 # --- END PANTS LOCKFILE METADATA ---
 
 setuptools==57.4.0; python_version >= "3.6" \

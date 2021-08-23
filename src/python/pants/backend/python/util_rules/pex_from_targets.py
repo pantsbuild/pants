@@ -12,7 +12,6 @@ from typing import Iterable, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import (
     MainSpecification,
     PythonRequirementsField,
@@ -290,9 +289,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             "`[python-setup].requirement_constraints` must also be set."
         )
     elif python_setup.lockfile and requirements:
-        # TODO(#12314): This does not handle the case where requirements are disjoint to the
-        #  lockfile. We should likely regenerate the lockfile (or warn/error), as the inputs have
-        #  changed.
+        # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles are supported.
         repository_pex = await Get(
             Pex,
             PexRequest(
@@ -303,9 +300,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     file_path=python_setup.lockfile,
                     file_path_description_of_origin=(
                         "the option `[python-setup].experimental_lockfile`"
-                    ),
-                    lockfile_hex_digest=calculate_invalidation_digest(
-                        requirements.req_strings, interpreter_constraints
                     ),
                 ),
                 interpreter_constraints=interpreter_constraints,

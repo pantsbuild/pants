@@ -17,7 +17,7 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import read_lockfile_metadata
+from pants.backend.experimental.python.lockfile_metadata import LockfileMetadata
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -434,37 +434,36 @@ async def build_pex(
             description_of_origin=request.requirements.file_path_description_of_origin,
         )
 
-        # use contents to invalidate here
-        requirements_file_digest_contents = await Get(
-            DigestContents,
-            PathGlobs,
-            globs,
-        )
-        metadata = read_lockfile_metadata(requirements_file_digest_contents[0].content)
-        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+        requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
+        metadata = LockfileMetadata.from_lockfile(requirements_file_digest_contents[0].content)
+        if not metadata.is_valid_for(
+            request.requirements.lockfile_hex_digest,
+            request.interpreter_constraints,
+            python_setup.interpreter_universe,
+        ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
+                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
 
-        requirements_file_digest = await Get(
-            Digest,
-            PathGlobs,
-            globs,
-        )
+        requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
     elif request.requirements.file_content:
-        content = request.requirements.file_content
-        argv.extend(["--requirement", content.path])
+        file_content = request.requirements.file_content
+        argv.extend(["--requirement", file_content.path])
 
-        metadata = read_lockfile_metadata(content.content)
-        if metadata.invalidation_digest != request.requirements.lockfile_hex_digest:
+        metadata = LockfileMetadata.from_lockfile(file_content.content)
+        if not metadata.is_valid_for(
+            request.requirements.lockfile_hex_digest,
+            request.interpreter_constraints,
+            python_setup.interpreter_universe,
+        ):
             if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO: Improve message]")
+                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
             elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO: Improve message]")
+                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
 
-        requirements_file_digest = await Get(Digest, CreateDigest([content]))
+        requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
         argv.extend(request.requirements.req_strings)
 

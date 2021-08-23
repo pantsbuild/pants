@@ -99,6 +99,9 @@ experimental_lockfile = "<default>"
 [setuptools]
 experimental_lockfile = "3rdparty/python/lockfiles/setuptools.txt"
 
+[mypy]
+experimental_lockfile = "<default>"
+
 [shellcheck]
 args = ["--external-sources"]
 

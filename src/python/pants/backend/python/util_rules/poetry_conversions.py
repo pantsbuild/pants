@@ -32,8 +32,7 @@ def create_pyproject_toml_as_dict(
     python_constraint = {"python": interpreter_constraints.to_poetry_constraint()}
     project_name_to_poetry_deps = defaultdict(list)
     for raw_req in raw_requirements:
-        # TODO(#12314): add error handling. Probably better is for the function to expect already
-        #  parsed Requirement objects.
+        # WONTFIX(#12314): add error handling.
         req = Requirement.parse(raw_req)
         poetry_dep = PoetryDependency.from_requirement(req)
         project_name_to_poetry_deps[req.project_name].append(poetry_dep)

@@ -4,9 +4,8 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.lint.black.subsystem import Black, BlackLockfileSentinel
+from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
@@ -89,17 +88,12 @@ async def setup_black(
         else black.interpreter_constraints
     )
 
-    lockfile_hex_digest = None
-    if black.lockfile != "<none>":
-        lockfile_request = await Get(PythonLockfileRequest, BlackLockfileSentinel())
-        lockfile_hex_digest = lockfile_request.hex_digest
-
     black_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
-            requirements=black.pex_requirements(lockfile_hex_digest),
+            requirements=black.pex_requirements(),
             interpreter_constraints=tool_interpreter_constraints,
             main=black.main,
         ),

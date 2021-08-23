@@ -29,7 +29,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
 )
-from pants.engine.unions import union
+from pants.engine.unions import is_union
 from pants.util.meta import frozen_after_init
 
 _Output = TypeVar("_Output")
@@ -202,7 +202,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         # If the input_type is not annotated with `@union`, then we validate that the input is
         # exactly the same type as the input_type. (Why not check unions? We don't have access to
         # `UnionMembership` to know if it's a valid union member. The engine will check that.)
-        if not union.is_instance(self.input_type) and type(input_) != self.input_type:
+        if not is_union(self.input_type) and type(input_) != self.input_type:
             # We can assume we're using the longhand form because the shorthand form guarantees
             # that the `input_type` is the same as `input`.
             raise TypeError(
