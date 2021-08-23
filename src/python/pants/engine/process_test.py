@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 import pytest
 
@@ -262,11 +263,19 @@ def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 
 
-# NB: The two tests correspond to `which` being discoverable or not.
-@pytest.mark.parametrize("extra_search_path", ([], ["/bin", "/usr/bin"]))
-def test_find_binary_non_existent(extra_search_path: list[str], rule_runner: RuleRunner) -> None:
+def which_binary_path() -> str:
+    path = shutil.which("which")
+    if not path:
+        raise EnvironmentError("`which` not discoverable on your $PATH.")
+    return os.path.dirname(path)
+
+
+@pytest.mark.parametrize("which_path", (None, which_binary_path()))
+def test_find_binary_non_existent(rule_runner: RuleRunner, which_path: str | None) -> None:
     with temporary_dir() as tmpdir:
-        search_path = [tmpdir, *extra_search_path]
+        search_path = [tmpdir]
+        if which_path:
+            search_path.append(which_path)
         binary_paths = rule_runner.request(
             BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=search_path)]
         )
