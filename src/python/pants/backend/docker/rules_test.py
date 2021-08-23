@@ -6,19 +6,15 @@ from os import path
 
 import pytest
 
-from pants.backend.docker.rules import (
-    DockerBinary,
-    DockerBinaryRequest,
+from pants.backend.docker.rules import DockerFieldSet, build_docker_image
+from pants.backend.docker.rules_binary import DockerBinary, DockerBinaryRequest
+from pants.backend.docker.rules_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerFieldSet,
-    DockerPackages,
-    build_docker_image,
     create_docker_build_context,
-    get_packages,
 )
 from pants.backend.docker.target_types import DockerImage
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -27,7 +23,6 @@ from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     AddPrefix,
     Digest,
-    DigestSubset,
     MergeDigests,
     Snapshot,
 )
@@ -40,6 +35,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.engine.unions import UnionMembership
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -166,8 +162,9 @@ def test_build_docker_image_rule(target_values, expected_features):
 
 
 def test_create_docker_build_context():
+    tgt = DockerImage(address=Address("src/test", target_name="image"), unhydrated_values={})
     request = DockerBuildContextRequest(
-        address=Address("docker/test", target_name="image"), context_root=".", targets=[]
+        address=Address("src/test", target_name="image"), context_root=".", targets=Targets([tgt])
     )
 
     result = run_rule_with_mocks(
@@ -185,12 +182,17 @@ def test_create_docker_build_context():
             MockGet(
                 output_type=Targets,
                 input_type=DependenciesRequest,
-                mock=lambda _: Targets(),
+                mock=lambda _: Targets([]),
             ),
             MockGet(
-                output_type=DockerPackages,
-                input_type=Targets,
-                mock=lambda _: DockerPackages(),
+                output_type=FieldSetsPerTarget,
+                input_type=FieldSetsPerTargetRequest,
+                mock=lambda request: FieldSetsPerTarget([[DockerFieldSet.create(tgt)]]),
+            ),
+            MockGet(
+                output_type=BuiltPackage,
+                input_type=PackageFieldSet,
+                mock=lambda _: BuiltPackage(EMPTY_DIGEST, []),
             ),
             MockGet(
                 output_type=Digest,
@@ -203,34 +205,9 @@ def test_create_docker_build_context():
                 mock=lambda _: EMPTY_DIGEST,
             ),
         ],
+        # need AddPrefix here, since UnionMembership.is_member() throws when called with non
+        # registered types
+        union_membership=UnionMembership({PackageFieldSet: [DockerFieldSet], AddPrefix: []}),
     )
 
     assert result.digest == EMPTY_DIGEST
-
-
-def test_get_packages() -> None:
-    targets = Targets([DockerImage(address=Address("src", target_name="t"), unhydrated_values={})])
-    artifacts = (BuiltPackageArtifact(None, ()),)
-    result = run_rule_with_mocks(
-        get_packages,
-        rule_args=[targets],
-        mock_gets=[
-            MockGet(
-                output_type=FieldSetsPerTarget,
-                input_type=FieldSetsPerTargetRequest,
-                mock=lambda request: FieldSetsPerTarget(
-                    [[DockerFieldSet.create(request.targets[0])]]
-                ),
-            ),
-            MockGet(
-                output_type=BuiltPackage,
-                input_type=DockerFieldSet,
-                mock=lambda _: BuiltPackage(EMPTY_DIGEST, artifacts),
-            ),
-            MockGet(output_type=Digest, input_type=DigestSubset, mock=lambda _: EMPTY_DIGEST),
-            MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
-        ],
-    )
-
-    assert len(result.built) == 1
-    assert result.built[0].artifacts == artifacts
