@@ -285,18 +285,20 @@ async def _setup_constraints_repository_pex(
     if not python_setup.resolve_all_constraints or request.platforms:
         return _ConstraintsRepositoryPex(None)
 
+    constraints_path = python_setup.requirement_constraints
+    assert constraints_path is not None
+
     constraints_file_contents = await Get(
         DigestContents,
         PathGlobs(
-            [python_setup.requirement_constraints],
+            [constraints_path],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `[python-setup].requirement_constraints`",
         ),
     )
     constraints_file_reqs = set(
         parse_requirements_file(
-            constraints_file_contents[0].content.decode(),
-            rel_path=python_setup.requirement_constraints,
+            constraints_file_contents[0].content.decode(), rel_path=constraints_path
         )
     )
 
@@ -323,7 +325,7 @@ async def _setup_constraints_repository_pex(
     unconstrained_projects = name_req_projects - constraint_file_projects
     if unconstrained_projects:
         logger.warning(
-            f"The constraints file {python_setup.requirement_constraints} does not contain "
+            f"The constraints file {constraints_path} does not contain "
             f"entries for the following requirements: {', '.join(unconstrained_projects)}.\n\n"
             f"Ignoring `[python_setup].resolve_all_constraints` option."
         )
@@ -341,7 +343,7 @@ async def _setup_constraints_repository_pex(
     repository_pex = await Get(
         Pex,
         PexRequest(
-            description=f"Resolving {python_setup.requirement_constraints}",
+            description=f"Resolving {constraints_path}",
             output_filename="repository.pex",
             internal_only=request.internal_only,
             requirements=PexRequirements(all_constraints),
