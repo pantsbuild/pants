@@ -273,6 +273,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         repository_pex=repository_pex,
         additional_args=request.additional_args,
         description=description,
+        apply_requirement_constraints=True,
     )
 
 
@@ -350,6 +351,7 @@ async def _setup_constraints_repository_pex(
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_args,
+            apply_requirement_constraints=True,
         ),
     )
     return _ConstraintsRepositoryPex(repository_pex)

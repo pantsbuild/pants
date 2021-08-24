@@ -174,7 +174,7 @@ class PexRequest(EngineAwareParameter):
         repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
-        apply_requirement_constraints: bool = True,
+        apply_requirement_constraints: bool = False,
         description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
