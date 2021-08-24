@@ -120,6 +120,8 @@ async def pants_setup_kwargs(
             "Documentation": "https://www.pantsbuild.org/",
             "Source": "https://github.com/pantsbuild/pants",
             "Tracker": "https://github.com/pantsbuild/pants/issues",
+            "Changelog": "https://www.pantsbuild.org/docs/changelog",
+            "Twitter": "https://twitter.com/pantsbuild",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,
