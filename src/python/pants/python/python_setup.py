@@ -287,5 +287,5 @@ def get_pyenv_root(env: Environment) -> str | None:
         return from_env
     home_from_env = env.get("HOME")
     if home_from_env:
-        return os.path.join(home_from_env, ".cache")
+        return os.path.join(home_from_env, ".pyenv")
     return None
