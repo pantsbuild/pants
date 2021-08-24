@@ -80,11 +80,15 @@ class PythonSetup(Subsystem):
             type=file_option,
             mutually_exclusive_group="lockfile",
             help=(
-                "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use.\n\nSee "
-                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and pip."
-                "\n\nMutually exclusive with `--requirement-constraints-target`."
+                "When resolving third-party requirements for your own code (vs. tools you run), "
+                "use this constraints file to determine which versions to use.\n\n"
+                "This only applies when resolving user requirements, rather than tools you run "
+                "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
+                "`[black].lockfile`.\n\n"
+                "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
+                "information on the format of constraint files and how constraints are applied in "
+                "Pex and pip.\n\n"
+                "Mutually exclusive with `[python-setup].experimental_lockfile`."
             ),
         )
         register(
@@ -118,7 +122,8 @@ class PythonSetup(Subsystem):
                 "multiple lockfiles. This option's behavior may change without the normal "
                 "deprecation cycle.\n\n"
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants lock ::`."
+                "and run `./pants lock ::`.\n\n"
+                "Mutually exclusive with `[python-setup].requirement_constraints`."
             ),
         )
         # TODO(#12293): It's plausible this option might not exist once we figure out the semantics
