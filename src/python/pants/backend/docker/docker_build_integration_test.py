@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.docker.rules import DockerFieldSet
+from pants.backend.docker.docker_build import DockerFieldSet
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImage
 from pants.core.goals.package import BuiltPackage
