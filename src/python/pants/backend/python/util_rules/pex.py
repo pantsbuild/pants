@@ -82,25 +82,25 @@ class LockfileContent:
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
     apply_constraints: bool
-    repository_pex: Pex | None
+    resolved_dists: ResolvedDistributions | None
 
     def __init__(
         self,
         req_strings: Iterable[str] = (),
         *,
         apply_constraints: bool = False,
-        repository_pex: Pex | None = None,
+        resolved_dists: ResolvedDistributions | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
         :param apply_constraints: Whether to apply any configured
             requirement_constraints while building this PEX.
-        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
-            `--pex-repository` option.
+        :param resolved_dists: An optional ResolvedDistributions instance containing the
+            closed universe of wheels that this PEX should be built from..
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.apply_constraints = apply_constraints
-        self.repository_pex = repository_pex
+        self.resolved_dists = resolved_dists
 
     @classmethod
     def create_from_requirement_fields(
@@ -316,13 +316,13 @@ async def build_pex(
     """Returns a PEX with the given settings."""
     argv = ["--output-file", request.output_filename, *request.additional_args]
 
-    repository_pex = (
-        request.requirements.repository_pex
+    resolved_dists = (
+        request.requirements.resolved_dists
         if isinstance(request.requirements, PexRequirements)
         else None
     )
-    if repository_pex:
-        argv.extend(["--pex-repository", repository_pex.name])
+    if resolved_dists:
+        argv.extend(["--pex-repository", resolved_dists.pex.name])
     else:
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
@@ -390,7 +390,7 @@ async def build_pex(
     )
 
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
-    repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
+    resolved_dists_digest = resolved_dists.pex.digest if resolved_dists else EMPTY_DIGEST
     constraint_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
 
@@ -443,7 +443,7 @@ async def build_pex(
                 additional_inputs_digest,
                 constraint_file_digest,
                 requirements_file_digest,
-                repository_pex_digest,
+                resolved_dists_digest,
                 *(pex.digest for pex in request.pex_path),
             )
         ),
@@ -548,8 +548,8 @@ def _build_pex_description(request: PexRequest) -> str:
     else:
         if not request.requirements.req_strings:
             return f"Building {request.output_filename}"
-        elif request.requirements.repository_pex:
-            repo_pex = request.requirements.repository_pex.name
+        elif request.requirements.resolved_dists:
+            repo_pex = request.requirements.resolved_dists.pex.name
             return (
                 f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
                 f"to build {request.output_filename} from {repo_pex}: "
@@ -1018,6 +1018,29 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
         ),
     )
     return parse_repository_info(process_result.stdout.decode())
+
+
+@dataclass(frozen=True)
+class ResolvedDistributions:
+    """A 'repository' pex, containing the entire contents of the resolve for multiple libraries.
+
+    Generally constructed from a lockfile.
+    """
+
+    pex: Pex
+
+
+@rule
+async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributions:
+    # Build the repository PEX.
+    request = dataclasses.replace(
+        request, additional_args=[*request.additional_args, "--include-tools"]
+    )
+    pex = await Get(Pex, PexRequest, request)
+
+    # TODO: extract the graph.
+
+    return ResolvedDistributions(pex)
 
 
 def rules():
