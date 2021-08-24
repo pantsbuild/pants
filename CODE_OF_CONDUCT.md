@@ -91,4 +91,4 @@ conducts and diversity statements as our inspiration:
 * [Ubuntu](https://www.ubuntu.com/about/about-ubuntu/conduct)
 * [Contributor Covenant](https://contributor-covenant.org/)
 * [Geek Feminism](https://geekfeminism.org/about/code-of-conduct/)
-* [Citizen Code of Conduct](https://citizencodeofconduct.org/)
+* [Citizen Code of Conduct](http://citizencodeofconduct.org/)
