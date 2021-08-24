@@ -122,9 +122,9 @@ pluggy==0.13.1; python_version >= "3.6" and python_full_version < "3.0.0" or pyt
 pprintpp==0.4.0; python_version >= "3.6" \
     --hash=sha256:b6b4dcdd0c0c0d75e4d7b2f21a9e933e5b2ce62b26e1a54537f9651ae5a5c01d \
     --hash=sha256:ea826108e2c7f49dc6d66c752973c3fc9749142a798d6b254e1e301cfdbc6403
-prompt-toolkit==3.0.19; python_full_version >= "3.6.1" and python_version >= "3.7" \
-    --hash=sha256:7089d8d2938043508aa9420ec18ce0922885304cddae87fb96eebca942299f88 \
-    --hash=sha256:08360ee3a3148bdb5163621709ee322ec34fc4375099afa4bbf751e9b7b7fa4f
+prompt-toolkit==3.0.20; python_full_version >= "3.6.2" and python_version >= "3.7" \
+    --hash=sha256:6076e46efae19b1e0ca1ec003ed37a933dc94b4d20f486235d436e64771dcd5c \
+    --hash=sha256:eb71d5a6b72ce6db177af4a7d4d7085b99756bf656d98ffcc4fecd36850eea6c
 ptyprocess==0.7.0; sys_platform != "win32" and python_version >= "3.7" \
     --hash=sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35 \
     --hash=sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220
@@ -164,7 +164,7 @@ typing-extensions==3.10.0.0; python_version < "3.8" and python_version >= "3.6" 
     --hash=sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497 \
     --hash=sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84 \
     --hash=sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342
-wcwidth==0.2.5; python_full_version >= "3.6.1" and python_version >= "3.7" \
+wcwidth==0.2.5; python_full_version >= "3.6.2" and python_version >= "3.7" \
     --hash=sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784 \
     --hash=sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83
 zipp==3.5.0; python_version < "3.8" and python_version >= "3.6" \
