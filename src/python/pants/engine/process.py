@@ -515,9 +515,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
     # Some subtle notes with this script:
     #
-    #  - The backslash after the `"""` ensures that the shebang is at the the backslash after the
-    #       """ marker ensures that the shebang is at the start of the script file. Many OSs will
-    #       not see the shebang if there is intervening whitespace.
+    #  - The backslash after the `"""` ensures that the shebang is at the start of the script file.
+    #       Many OSs will not see the shebang if there is intervening whitespace.
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
     #  - We do not use `set -e` like normal because it causes the line
