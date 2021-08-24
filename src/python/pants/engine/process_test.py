@@ -267,17 +267,16 @@ def which_binary_path() -> str:
     path = shutil.which("which")
     if not path:
         raise EnvironmentError("`which` not discoverable on your $PATH.")
-    return os.path.dirname(path)
+    return path
 
 
 @pytest.mark.parametrize("which_path", (None, which_binary_path()))
 def test_find_binary_non_existent(rule_runner: RuleRunner, which_path: str | None) -> None:
     with temporary_dir() as tmpdir:
-        search_path = [tmpdir]
         if which_path:
-            search_path.append(which_path)
+            os.symlink(which_path, os.path.join(tmpdir, "which"))
         binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=search_path)]
+            BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=[tmpdir])]
         )
         assert binary_paths.first_path is None
 
