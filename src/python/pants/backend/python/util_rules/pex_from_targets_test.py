@@ -3,20 +3,25 @@
 
 from __future__ import annotations
 
-import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Dict, Iterable, List, cast
+from typing import Iterable
 
 import pytest
 from _pytest.tmpdir import TempPathFactory
 
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import (
+    PexPlatforms,
+    PexRequest,
+    PexRequirements,
+    ResolvedDistributions,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -105,25 +110,16 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     return find_links
 
 
-def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
-    rule_runner.scheduler.write_digest(pex.digest)
-    completed_process = subprocess.run(
-        args=[
-            sys.executable,
-            "-m",
-            "pex.tools",
-            pex.name,
-            "info",
-        ],
-        cwd=rule_runner.build_root,
-        stdout=subprocess.PIPE,
-        check=True,
-    )
-    return cast(Dict[str, Any], json.loads(completed_process.stdout))
-
-
-def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
-    return cast(List[str], info(rule_runner, pex)["requirements"])
+def assert_requirements(
+    expected_req_regexes: Iterable[str], resolved_dists: ResolvedDistributions
+) -> None:
+    for regex_str in expected_req_regexes:
+        regex = re.compile(regex_str)
+        for path in resolved_dists.distribution_paths:
+            if regex.search(path):
+                break
+        else:
+            raise AssertionError(f"No match found for {regex_str} in {resolved_dists}")
 
 
 def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
@@ -228,11 +224,11 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
     assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
-    assert pex_req2_reqs.repository_pex is not None
-    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
-    repository_pex = pex_req2_reqs.repository_pex
-    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
-        rule_runner, repository_pex
+    resolved_dists = pex_req2_reqs.resolved_dists
+    assert resolved_dists is not None
+    assert_requirements(
+        ["Foo_Bar-1.0.0", "Bar-5.5.5", "baz-2.2.2", "foorl", "QUX-3.4.5"],
+        resolved_dists,
     )
 
     pex_req2_direct = get_pex_request(
@@ -244,8 +240,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req2_reqs = pex_req2_direct.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
     assert list(pex_req2_reqs.req_strings) == ["baz", url_req]
-    assert pex_req2_reqs.repository_pex == repository_pex
-    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
+    assert pex_req2_reqs.resolved_dists == resolved_dists
 
     pex_req3_direct = get_pex_request(
         "constraints1.txt",
@@ -255,9 +250,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     pex_req3_reqs = pex_req3_direct.requirements
     assert isinstance(pex_req3_reqs, PexRequirements)
     assert list(pex_req3_reqs.req_strings) == ["baz", url_req]
-    assert pex_req3_reqs.repository_pex is not None
-    assert pex_req3_reqs.repository_pex != repository_pex
-    assert info(rule_runner, pex_req3_reqs.repository_pex)["strip_pex_env"]
+    assert pex_req3_reqs.resolved_dists is not None
+    assert pex_req3_reqs.resolved_dists != resolved_dists
 
     with pytest.raises(ExecutionError) as err:
         get_pex_request(None, resolve_all_constraints=True)
