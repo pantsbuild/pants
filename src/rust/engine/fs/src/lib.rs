@@ -310,6 +310,20 @@ impl GitignoreStyleExcludes {
       ::ignore::Match::Ignore(_) => true,
     }
   }
+
+  pub fn has_ignored_paths(&self, path: &Path) -> bool {
+    match path.to_str() {
+      None => return false,
+      Some(s) => {
+        for pattern in self.exclude_patterns().iter() {
+          if pattern.starts_with(s) {
+            return true;
+          }
+        }
+        return false;
+      }
+    }
+  }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]

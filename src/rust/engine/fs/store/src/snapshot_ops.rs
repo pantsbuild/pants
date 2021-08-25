@@ -425,17 +425,19 @@ impl IntermediateGlobbedFilesAndDirectories {
             if (*wildcard == *DOUBLE_STAR_GLOB) || (*wildcard == *SINGLE_STAR_GLOB) {
               // Here we short-circuit all cases which would swallow up a directory without
               // subsetting it or needing to perform any further recursive work.
+              let has_ignores = exclude.has_ignored_paths(&directory_path);
+
               let short_circuit: bool = match &remainder[..] {
-                [] => true,
+                [] => !has_ignores,
                 // NB: Very often, /**/* is seen ending zsh-style globs, which means the same as
                 // ending in /**. Because we want to *avoid* recursing and just use the subdirectory
                 // as-is for /**/* and /**, we `continue` here in both cases.
-                [single_glob] if *single_glob == *SINGLE_STAR_GLOB => true,
-                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => true,
+                [single_glob] if *single_glob == *SINGLE_STAR_GLOB => !has_ignores,
+                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => !has_ignores,
                 [double_glob, single_glob]
                   if *double_glob == *DOUBLE_STAR_GLOB && *single_glob == *SINGLE_STAR_GLOB =>
                 {
-                  true
+                  !has_ignores
                 }
                 _ => false,
               };
