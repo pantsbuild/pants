@@ -416,7 +416,7 @@ async def build_pex(
 
         requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
         metadata = LockfileMetadata.from_lockfile(requirements_file_digest_contents[0].content)
-        _validate_metadata(metadata, request, python_setup)
+        _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
@@ -425,7 +425,7 @@ async def build_pex(
         argv.extend(["--requirement", file_content.path])
 
         metadata = LockfileMetadata.from_lockfile(file_content.content)
-        _validate_metadata(metadata, request, python_setup)
+        _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
@@ -480,10 +480,14 @@ async def build_pex(
 
 
 def _validate_metadata(
-    metadata: LockfileMetadata, request: PexRequest, python_setup: PythonSetup
+    metadata: LockfileMetadata,
+    request: PexRequest,
+    requirements: (Lockfile | LockfileContent),
+    python_setup: PythonSetup,
 ) -> None:
+
     validation = metadata.is_valid_for(
-        request.requirements.lockfile_hex_digest,
+        requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
     )
@@ -502,7 +506,7 @@ def _validate_metadata(
             "the lockfile was generated. To fix this, you will need to regenerate the lockfile. "
         )
         message_parts.append(
-            f"(Expected requirements digest: {request.requirements.lockfile_hex_digest}, "
+            f"(Expected requirements digest: {requirements.lockfile_hex_digest}, "
             "actual: {metadata.requirements_invalidation_digest})"
         )
         message_parts.append("\n")
