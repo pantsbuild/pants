@@ -94,7 +94,7 @@ async def create_pex_binary_run_request(
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
-        "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
+        "PEX_PATH": ":".join(in_chroot(p.name) for p in Pex.pex_path_closure([requirements])),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 

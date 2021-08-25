@@ -216,7 +216,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex],
+            pex_path=Pex.pex_path_closure([pytest_pex, requirements_pex]),
         ),
     )
     config_files_get = Get(

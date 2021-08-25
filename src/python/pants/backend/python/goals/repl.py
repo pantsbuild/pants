@@ -106,7 +106,9 @@ async def create_ipython_repl_request(
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
-        "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
+        "PEX_PATH": ":".join(
+            repl.in_chroot(p.name) for p in Pex.pex_path_closure([requirements_pex])
+        ),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 

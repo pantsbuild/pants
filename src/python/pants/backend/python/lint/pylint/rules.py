@@ -128,7 +128,7 @@ async def pylint_lint_partition(
                 interpreter_constraints=partition.interpreter_constraints,
                 main=pylint.main,
                 internal_only=True,
-                pex_path=[pylint_pex, requirements_pex],
+                pex_path=Pex.pex_path_closure([pylint_pex, requirements_pex]),
             ),
         ),
         Get(

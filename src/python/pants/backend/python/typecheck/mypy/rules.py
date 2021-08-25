@@ -172,7 +172,7 @@ async def mypy_typecheck_partition(
         PexRequest(
             output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=[requirements_pex],
+            pex_path=Pex.pex_path_closure([requirements_pex]),
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
