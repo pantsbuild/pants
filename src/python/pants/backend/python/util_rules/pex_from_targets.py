@@ -222,10 +222,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_requirements=request.additional_requirements,
     )
 
-    repository_pex: Pex | None = None
     description = request.description
 
     if requirements:
+        repository_pex: Pex | None = None
         if python_setup.requirement_constraints:
             maybe_constraints_repository_pex = await Get(
                 _ConstraintsRepositoryPex,
@@ -268,6 +268,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     additional_args=request.additional_args,
                 ),
             )
+        requirements = dataclasses.replace(requirements, repository_pex=repository_pex)
 
     return PexRequest(
         output_filename=request.output_filename,
@@ -278,7 +279,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         main=request.main,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
-        repository_pex=repository_pex,
         additional_args=request.additional_args,
         description=description,
     )

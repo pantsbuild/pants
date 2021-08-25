@@ -78,9 +78,18 @@ class LockfileContent:
 @dataclass(unsafe_hash=True)
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
+    repository_pex: Pex | None
 
-    def __init__(self, req_strings: Iterable[str] = ()) -> None:
+    def __init__(
+        self, req_strings: Iterable[str] = (), *, repository_pex: Pex | None = None
+    ) -> None:
+        """
+        :param req_strings: The requirement strings to resolve.
+        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
+            `--pex-repository` option.
+        """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
+        self.repository_pex = repository_pex
 
     @classmethod
     def create_from_requirement_fields(
@@ -122,7 +131,6 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
-    repository_pex: Pex | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
     apply_requirement_constraints: bool
@@ -140,7 +148,6 @@ class PexRequest(EngineAwareParameter):
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
-        repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         apply_requirement_constraints: bool = True,
@@ -166,8 +173,6 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
-        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
-            `--pex-repository` option.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
         :param apply_requirement_constraints: Whether to apply any configured
@@ -184,7 +189,6 @@ class PexRequest(EngineAwareParameter):
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.main = main
-        self.repository_pex = repository_pex
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.apply_requirement_constraints = apply_requirement_constraints
@@ -303,8 +307,13 @@ async def build_pex(
     """Returns a PEX with the given settings."""
     argv = ["--output-file", request.output_filename, *request.additional_args]
 
-    if request.repository_pex:
-        argv.extend(["--pex-repository", request.repository_pex.name])
+    repository_pex = (
+        request.requirements.repository_pex
+        if isinstance(request.requirements, PexRequirements)
+        else None
+    )
+    if repository_pex:
+        argv.extend(["--pex-repository", repository_pex.name])
     else:
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
@@ -376,9 +385,7 @@ async def build_pex(
     )
 
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
-    repository_pex_digest = (
-        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
-    )
+    repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
 
     constraint_file_digest = EMPTY_DIGEST
     if (
@@ -488,36 +495,26 @@ async def build_pex(
 def _build_pex_description(request: PexRequest) -> str:
     if request.description:
         return request.description
-    if not request.requirements:
-        return f"Building {request.output_filename}"
-
-    if request.repository_pex:
-        repo_pex = request.repository_pex.name
-        if isinstance(request.requirements, PexRequirements):
-            return (
-                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"to build {request.output_filename} from {repo_pex}: "
-                f"{', '.join(request.requirements.req_strings)}"
-            )
-        reqs_file = (
-            request.requirements.file_content.path
-            if isinstance(request.requirements, LockfileContent)
-            else request.requirements.file_path
-        )
-        return (
-            f"Extracting all requirements in {reqs_file} from {repo_pex} to build "
-            f"{request.output_filename}"
-        )
 
     if isinstance(request.requirements, Lockfile):
         desc_suffix = f"from {request.requirements.file_path}"
     elif isinstance(request.requirements, LockfileContent):
         desc_suffix = f"from {request.requirements.file_content.path}"
     else:
-        desc_suffix = (
-            f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-            f"{', '.join(request.requirements.req_strings)}"
-        )
+        if not request.requirements.req_strings:
+            return f"Building {request.output_filename}"
+        elif request.requirements.repository_pex:
+            repo_pex = request.requirements.repository_pex.name
+            return (
+                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
+                f"to build {request.output_filename} from {repo_pex}: "
+                f"{', '.join(request.requirements.req_strings)}"
+            )
+        else:
+            desc_suffix = (
+                f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
+                f"{', '.join(request.requirements.req_strings)}"
+            )
     return f"Building {request.output_filename} {desc_suffix}"
 
 
