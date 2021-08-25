@@ -136,7 +136,7 @@ def create_pex_and_get_all_data(
             Process,
             [
                 PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=()),
                     argv=["-m", "pex.tools", pex.name, "info"],
                     input_digest=pex.digest,
                     extra_env=dict(PEX_INTERPRETER="1"),

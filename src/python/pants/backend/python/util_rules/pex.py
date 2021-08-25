@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import shlex
+from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
@@ -60,8 +61,8 @@ from pants.python.python_setup import InvalidLockfileBehavior, PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import path_safe, pluralize
 
 
 @dataclass(frozen=True)
@@ -233,6 +234,20 @@ class Pex:
     digest: Digest
     name: str
     python: PythonExecutable | None
+    pex_path: Tuple[Pex, ...]
+
+    @classmethod
+    def pex_path_closure(self, pexes: Iterable[Pex]) -> OrderedSet[Pex]:
+        """Return all distinct Pex files in the transitive pex_path of the given Pexes."""
+        output: OrderedSet[Pex] = OrderedSet()
+        to_visit = deque(pexes)
+        while to_visit:
+            pex = to_visit.popleft()
+            if pex in output:
+                continue
+            output.add(pex)
+            to_visit.extend(pex.pex_path)
+        return output
 
 
 logger = logging.getLogger(__name__)
@@ -303,7 +318,8 @@ class BuildPexProcess:
     """
 
     process: MultiPlatformProcess
-    python: PythonExecutable | None = None
+    python: PythonExecutable | None
+    pex_path: Tuple[Pex, ...]
 
 
 @dataclass(frozen=True)
@@ -312,9 +328,12 @@ class BuildPexResult:
     pex_filename: str
     digest: Digest
     python: PythonExecutable | None
+    pex_path: Tuple[Pex, ...]
 
     def create_pex(self) -> Pex:
-        return Pex(digest=self.digest, name=self.pex_filename, python=self.python)
+        return Pex(
+            digest=self.digest, name=self.pex_filename, python=self.python, pex_path=self.pex_path
+        )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -349,6 +368,7 @@ async def prepare_pex_cli_process(
         )
 
     python: PythonExecutable | None = None
+    pex_path = list(request.pex_path)
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -386,12 +406,6 @@ async def prepare_pex_cli_process(
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
-
-    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
-    #  requirements, which could lead to problems. Support shading python binaries.
-    #  See: https://github.com/pantsbuild/pants/issues/9206
-    if request.pex_path:
-        argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
@@ -446,6 +460,10 @@ async def prepare_pex_cli_process(
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
+        assert isinstance(request.requirements, PexRequirements)
+        req_strings = request.requirements.req_strings
+
+        # If constraints should be applied and are set, capture them.
         if (
             request.requirements.apply_constraints
             and python_setup.requirement_constraints is not None
@@ -459,7 +477,37 @@ async def prepare_pex_cli_process(
                     description_of_origin="the option `[python-setup].requirement_constraints`",
                 ),
             )
-        argv.extend(request.requirements.req_strings)
+
+        # If there is more than one requirement and we're resolving from ResolvedDistributions,
+        # recurse to create individual PEX files from each requirement, and then compose them
+        # using the PEX_PATH. This is much friendlier to the cache, because unlike a monolithic
+        # PEX, per-requirement PEX files can be deduped in the CAS across many consumers.
+        if resolved_dists and len(req_strings) > 1:
+            single_entry_pexes = await MultiGet(
+                Get(
+                    Pex,
+                    PexRequest,
+                    dataclasses.replace(
+                        request,
+                        requirements=dataclasses.replace(
+                            request.requirements, req_strings=(req_string,)
+                        ),
+                        output_filename=f"__reqs/{path_safe(req_string)}.pex",
+                        # TODO: Should pass --no-transitive to avoid creating overlapping single-entry pexes.
+                        # additional_args=(*request.additional_args, "--no-transitive")
+                    ),
+                )
+                for req_string in req_strings
+            )
+            pex_path.extend(single_entry_pexes)
+        else:
+            argv.extend(req_strings)
+
+    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
+    #  requirements, which could lead to problems. Support shading python binaries.
+    #  See: https://github.com/pantsbuild/pants/issues/9206
+    if pex_path:
+        argv.extend(["--pex-path", ":".join(pex.name for pex in Pex.pex_path_closure(pex_path))])
 
     merged_digest = await Get(
         Digest,
@@ -470,7 +518,7 @@ async def prepare_pex_cli_process(
                 constraint_file_digest,
                 requirements_file_digest,
                 resolved_dists_digest,
-                *(pex.digest for pex in request.pex_path),
+                *(pex.digest for pex in pex_path),
             )
         ),
     )
@@ -485,7 +533,7 @@ async def prepare_pex_cli_process(
             output_files=[request.output_filename],
         ),
     )
-    return BuildPexProcess(process, python)
+    return BuildPexProcess(process, python, tuple(pex_path))
 
 
 @rule(level=LogLevel.DEBUG)
@@ -500,9 +548,12 @@ async def build_pex(request: PexRequest, pex_runtime_env: PexRuntimeEnvironment)
 
     digest = (
         await Get(
-            Digest, MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
+            Digest,
+            MergeDigests(
+                (result.output_digest, *(pex.digest for pex in build_pex_process.pex_path))
+            ),
         )
-        if request.pex_path
+        if build_pex_process.pex_path
         else result.output_digest
     )
 
@@ -511,6 +562,7 @@ async def build_pex(request: PexRequest, pex_runtime_env: PexRuntimeEnvironment)
         pex_filename=request.output_filename,
         digest=digest,
         python=build_pex_process.python,
+        pex_path=build_pex_process.pex_path,
     )
 
 
@@ -986,7 +1038,9 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
     process_result = await Get(
         ProcessResult,
         PexProcess(
-            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+            pex=Pex(
+                digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=pex.pex_path
+            ),
             argv=[pex.name, "repository", "info", "-v"],
             input_digest=pex.digest,
             extra_env={"PEX_MODULE": "pex.tools"},
@@ -1047,7 +1101,7 @@ async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributi
                         platform: await Get(
                             Process,
                             PexProcess(
-                                Pex(EMPTY_DIGEST, request.output_filename, python),
+                                Pex(EMPTY_DIGEST, request.output_filename, python, pex_path=()),
                                 argv=["repository", "-o", info_path, "extract", "-f", wheels_path],
                                 extra_env={"PEX_TOOLS": "1"},
                                 description=f"Extract distributions from {request.output_filename}",
@@ -1060,7 +1114,7 @@ async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributi
                         platform: await Get(
                             Process,
                             PexProcess(
-                                Pex(EMPTY_DIGEST, request.output_filename, python),
+                                Pex(EMPTY_DIGEST, request.output_filename, python, pex_path=()),
                                 argv=["graph", "-o", graph_path],
                                 extra_env={"PEX_TOOLS": "1"},
                                 output_directories=[wheels_path],
