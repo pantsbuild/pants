@@ -363,7 +363,7 @@ def test_streaming_output_success() -> None:
 
 def test_streaming_output_failure() -> None:
     assert_failure_streamed = partial(
-        assert_streaming_output, exit_code=1, expected_level=LogLevel.WARN
+        assert_streaming_output, exit_code=1, expected_level=LogLevel.ERROR
     )
     message = dedent(
         """\

@@ -103,7 +103,7 @@ class EnrichedLintResults(LintResults, EngineAwareReturnType):
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
-        return LogLevel.WARN if self.exit_code != 0 else LogLevel.INFO
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
 
     def message(self) -> Optional[str]:
         if self.skipped:

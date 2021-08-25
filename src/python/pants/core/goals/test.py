@@ -121,7 +121,7 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
-        return LogLevel.INFO if self.exit_code == 0 else LogLevel.WARN
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
