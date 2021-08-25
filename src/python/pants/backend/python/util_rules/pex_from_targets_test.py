@@ -214,24 +214,23 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
     )
-    assert pex_req1.repository_pex is None
+
     pex_req1_direct = get_pex_request(
         "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
     )
     assert pex_req1_direct.requirements == PexRequirements(["baz", url_req])
-    assert pex_req1_direct.repository_pex is None
 
     pex_req2 = get_pex_request(
         "constraints1.txt",
         resolve_all_constraints=True,
         additional_args=additional_args,
     )
-    assert pex_req2.requirements == PexRequirements(
-        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req]
-    )
-    assert pex_req2.repository_pex is not None
-    assert not info(rule_runner, pex_req2.repository_pex)["strip_pex_env"]
-    repository_pex = pex_req2.repository_pex
+    pex_req2_reqs = pex_req2.requirements
+    assert isinstance(pex_req2_reqs, PexRequirements)
+    assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
+    assert pex_req2_reqs.repository_pex is not None
+    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
+    repository_pex = pex_req2_reqs.repository_pex
     assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
@@ -242,19 +241,23 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         direct_deps_only=True,
         additional_args=additional_args,
     )
-    assert pex_req2_direct.requirements == PexRequirements(["baz", url_req])
-    assert pex_req2_direct.repository_pex == repository_pex
-    assert not info(rule_runner, pex_req2.repository_pex)["strip_pex_env"]
+    pex_req2_reqs = pex_req2_direct.requirements
+    assert isinstance(pex_req2_reqs, PexRequirements)
+    assert list(pex_req2_reqs.req_strings) == ["baz", url_req]
+    assert pex_req2_reqs.repository_pex == repository_pex
+    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
 
     pex_req3_direct = get_pex_request(
         "constraints1.txt",
         resolve_all_constraints=True,
         direct_deps_only=True,
     )
-    assert pex_req3_direct.requirements == PexRequirements(["baz", url_req])
-    assert pex_req3_direct.repository_pex is not None
-    assert pex_req3_direct.repository_pex != repository_pex
-    assert info(rule_runner, pex_req3_direct.repository_pex)["strip_pex_env"]
+    pex_req3_reqs = pex_req3_direct.requirements
+    assert isinstance(pex_req3_reqs, PexRequirements)
+    assert list(pex_req3_reqs.req_strings) == ["baz", url_req]
+    assert pex_req3_reqs.repository_pex is not None
+    assert pex_req3_reqs.repository_pex != repository_pex
+    assert info(rule_runner, pex_req3_reqs.repository_pex)["strip_pex_env"]
 
     with pytest.raises(ExecutionError) as err:
         get_pex_request(None, resolve_all_constraints=True)
@@ -296,5 +299,4 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.repository_pex is None
     assert result.requirements == PexRequirements(["foo"])
