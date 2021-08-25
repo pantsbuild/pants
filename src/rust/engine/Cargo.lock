@@ -665,6 +665,7 @@ dependencies = [
  "cpython",
  "crossbeam-channel 0.4.4",
  "double-checked-cell-async",
+ "either",
  "env_logger",
  "fnv",
  "fs",
@@ -712,8 +713,10 @@ dependencies = [
 name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
+ "either",
  "fs",
  "hashing",
+ "itertools 0.10.1",
  "mock",
  "nailgun",
  "parking_lot",

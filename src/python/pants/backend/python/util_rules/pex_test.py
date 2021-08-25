@@ -19,6 +19,8 @@ from pkg_resources import Requirement
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
+    Lockfile,
+    LockfileContent,
     Pex,
     PexDistributionInfo,
     PexPlatforms,
@@ -84,7 +86,7 @@ def create_pex_and_get_all_data(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements = PexRequirements(),
+    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
@@ -105,6 +107,7 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
+        apply_requirement_constraints=True,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -163,7 +166,7 @@ def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements = PexRequirements(),
+    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
@@ -474,36 +477,34 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_build_pex_description() -> None:
     def assert_description(
-        requirements: PexRequirements,
+        requirements: PexRequirements | Lockfile | LockfileContent,
         *,
-        use_repo_pex: bool = False,
         description: str | None = None,
         expected: str,
     ) -> None:
-        repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None) if use_repo_pex else None
         request = PexRequest(
             output_filename="new.pex",
             internal_only=True,
             requirements=requirements,
             description=description,
-            repository_pex=repo_pex,
         )
         assert _build_pex_description(request) == expected
 
+    repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
+
     assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(), description="Custom!", use_repo_pex=True, expected="Custom!"
+        PexRequirements(repository_pex=repo_pex), description="Custom!", expected="Custom!"
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(), use_repo_pex=True, expected="Building new.pex")
+    assert_description(PexRequirements(repository_pex=repo_pex), expected="Building new.pex")
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
-        PexRequirements(["req"]),
-        use_repo_pex=True,
+        PexRequirements(["req"], repository_pex=repo_pex),
         expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
@@ -512,29 +513,20 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"]),
-        use_repo_pex=True,
+        PexRequirements(["req1", "req2"], repository_pex=repo_pex),
         expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 
     assert_description(
-        PexRequirements(file_content=FileContent("lock.txt", b"")),
+        LockfileContent(file_content=FileContent("lock.txt", b""), lockfile_hex_digest=None),
         expected="Building new.pex from lock.txt",
-    )
-    assert_description(
-        PexRequirements(file_content=FileContent("lock.txt", b"")),
-        use_repo_pex=True,
-        expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
     )
 
     assert_description(
-        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
+        Lockfile(
+            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+        ),
         expected="Building new.pex from lock.txt",
-    )
-    assert_description(
-        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
-        use_repo_pex=True,
-        expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
     )
 
 
@@ -629,20 +621,21 @@ def _run_pex_for_lockfile_test(
 ansicolors==1.1.8
 """
     if use_file:
-        rule_runner.write_files({"lockfile.txt": lockfile})
-        file_args = {"file_path": "lockfile.txt"}
+        file_path = "lockfile.txt"
+        rule_runner.write_files({file_path: lockfile})
+        requirements = Lockfile(
+            file_path=file_path,
+            file_path_description_of_origin="iceland",
+            lockfile_hex_digest=expected_digest,
+        )
     else:
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
-        file_args = {"file_content": content}
+        requirements = LockfileContent(file_content=content, lockfile_hex_digest=expected_digest)
 
     create_pex_and_get_all_data(
         rule_runner,
         interpreter_constraints=InterpreterConstraints([expected_constraints]),
-        requirements=PexRequirements(
-            **file_args,
-            file_path_description_of_origin="iceland",
-            lockfile_hex_digest=expected_digest,
-        ),
+        requirements=requirements,
         additional_pants_args=(
             "--python-setup-experimental-lockfile=lockfile.txt",
             f"--python-setup-invalid-lockfile-behavior={behavior}",
