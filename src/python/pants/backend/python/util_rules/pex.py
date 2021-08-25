@@ -61,46 +61,26 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
+@dataclass(frozen=True)
+class Lockfile:
+    file_path: str
+    file_path_description_of_origin: str
+    lockfile_hex_digest: str | None
+
+
+@dataclass(frozen=True)
+class LockfileContent:
+    file_content: FileContent
+    lockfile_hex_digest: str | None
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
-    file_content: FileContent | None
-    file_path: str | None
-    file_path_description_of_origin: str | None
-    lockfile_hex_digest: str | None
 
-    def __init__(
-        self,
-        req_strings: Iterable[str] = (),
-        *,
-        file_content: FileContent | None = None,
-        file_path: str | None = None,
-        file_path_description_of_origin: str | None = None,
-        lockfile_hex_digest: str | None = None,
-    ) -> None:
+    def __init__(self, req_strings: Iterable[str] = ()) -> None:
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
-        self.file_content = file_content
-        self.file_path = file_path
-        self.file_path_description_of_origin = file_path_description_of_origin
-        self.lockfile_hex_digest = lockfile_hex_digest
-
-        if self.file_path and not self.file_path_description_of_origin:
-            raise ValueError(
-                "You must specify `file_path_description_of_origin` if `file_path` is set."
-            )
-        if self.req_strings and self.file_path:
-            raise ValueError(
-                "You should only specify `req_strings` or `file_path`, but both were set."
-            )
-        if self.req_strings and self.file_content:
-            raise ValueError(
-                "You should only specify `req_strings` or `file_content`, but both were set."
-            )
-        if self.file_path and self.file_content:
-            raise ValueError(
-                "You should only specify `file_content` or `file_path`, but both were set."
-            )
 
     @classmethod
     def create_from_requirement_fields(
@@ -112,19 +92,8 @@ class PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
 
-    def __repr__(self) -> str:
-        if self.file_content:
-            return f"PexRequirements(file_content=FileContent({self.file_content.path}, ...))"
-        if self.file_path:
-            return f"PexRequirements(file_path={self.file_path})"
-        return f"PexRequirements({list(self.req_strings)!r})"
-
     def __bool__(self) -> bool:
-        return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
-
-    @property
-    def is_lockfile(self) -> bool:
-        return self.lockfile_hex_digest is not None
+        return bool(self.req_strings)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -147,7 +116,7 @@ class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     python: PythonExecutable | None
-    requirements: PexRequirements
+    requirements: PexRequirements | Lockfile | LockfileContent
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
@@ -165,7 +134,7 @@ class PexRequest(EngineAwareParameter):
         output_filename: str,
         internal_only: bool,
         python: PythonExecutable | None = None,
-        requirements: PexRequirements = PexRequirements(),
+        requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
@@ -187,7 +156,7 @@ class PexRequest(EngineAwareParameter):
             that results in faster build time but compatibility with fewer interpreters at runtime.
         :param python: A particular PythonExecutable to use, which must match any relevant
             interpreter_constraints.
-        :param requirements: The requirements to install.
+        :param requirements: The requirements that the PEX should contain.
         :param interpreter_constraints: Any constraints on which Python versions may be used.
         :param platforms: Which platforms should be supported. Setting this value will cause
             interpreter constraints to not be used because platforms already constrain the valid
@@ -351,7 +320,8 @@ async def build_pex(
             ]
         )
 
-    if request.requirements.is_lockfile:
+    is_lockfile = isinstance(request.requirements, (Lockfile, LockfileContent))
+    if is_lockfile:
         argv.append("--no-transitive")
 
     python: PythonExecutable | None = None
@@ -412,7 +382,7 @@ async def build_pex(
 
     constraint_file_digest = EMPTY_DIGEST
     if (
-        not request.requirements.is_lockfile and request.apply_requirement_constraints
+        not is_lockfile and request.apply_requirement_constraints
     ) and python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])
         constraint_file_digest = await Get(
@@ -425,7 +395,7 @@ async def build_pex(
         )
 
     requirements_file_digest = EMPTY_DIGEST
-    if request.requirements.file_path:
+    if isinstance(request.requirements, Lockfile):
         argv.extend(["--requirement", request.requirements.file_path])
 
         globs = PathGlobs(
@@ -448,7 +418,7 @@ async def build_pex(
 
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
-    elif request.requirements.file_content:
+    elif isinstance(request.requirements, LockfileContent):
         file_content = request.requirements.file_content
         argv.extend(["--requirement", file_content.path])
 
@@ -523,7 +493,7 @@ def _build_pex_description(request: PexRequest) -> str:
 
     if request.repository_pex:
         repo_pex = request.repository_pex.name
-        if request.requirements.req_strings:
+        if isinstance(request.requirements, PexRequirements):
             return (
                 f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
                 f"to build {request.output_filename} from {repo_pex}: "
@@ -531,18 +501,17 @@ def _build_pex_description(request: PexRequest) -> str:
             )
         reqs_file = (
             request.requirements.file_content.path
-            if request.requirements.file_content
+            if isinstance(request.requirements, LockfileContent)
             else request.requirements.file_path
         )
-        assert reqs_file is not None
         return (
             f"Extracting all requirements in {reqs_file} from {repo_pex} to build "
             f"{request.output_filename}"
         )
 
-    if request.requirements.file_path:
+    if isinstance(request.requirements, Lockfile):
         desc_suffix = f"from {request.requirements.file_path}"
-    elif request.requirements.file_content:
+    elif isinstance(request.requirements, LockfileContent):
         desc_suffix = f"from {request.requirements.file_content.path}"
     else:
         desc_suffix = (

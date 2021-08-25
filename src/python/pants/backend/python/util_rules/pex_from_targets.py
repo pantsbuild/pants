@@ -18,7 +18,13 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import (
+    Lockfile,
+    Pex,
+    PexPlatforms,
+    PexRequest,
+    PexRequirements,
+)
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -242,18 +248,20 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 "`[python-setup].requirement_constraints` must also be set."
             )
         elif python_setup.lockfile:
-            # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles are supported.
             repository_pex = await Get(
                 Pex,
                 PexRequest(
                     description=f"Resolving {python_setup.lockfile}",
                     output_filename="lockfile.pex",
                     internal_only=request.internal_only,
-                    requirements=PexRequirements(
+                    requirements=Lockfile(
                         file_path=python_setup.lockfile,
                         file_path_description_of_origin=(
                             "the option `[python-setup].experimental_lockfile`"
                         ),
+                        # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
+                        # are supported.
+                        lockfile_hex_digest=None,
                     ),
                     interpreter_constraints=interpreter_constraints,
                     platforms=request.platforms,

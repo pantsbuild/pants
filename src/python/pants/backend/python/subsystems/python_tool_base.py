@@ -9,7 +9,7 @@ from typing import ClassVar, Iterable, Sequence, cast
 from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex import Lockfile, LockfileContent, PexRequirements
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
@@ -125,7 +125,7 @@ class PythonToolRequirementsBase(Subsystem):
         self,
         *,
         extra_requirements: Iterable[str] = (),
-    ) -> PexRequirements:
+    ) -> PexRequirements | Lockfile | LockfileContent:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
@@ -141,14 +141,14 @@ class PythonToolRequirementsBase(Subsystem):
 
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            return PexRequirements(
+            return LockfileContent(
                 file_content=FileContent(
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
             )
-        return PexRequirements(
+        return Lockfile(
             file_path=self.lockfile,
             file_path_description_of_origin=(
                 f"the option `[{self.options_scope}].experimental_lockfile`"

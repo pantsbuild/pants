@@ -19,6 +19,8 @@ from pkg_resources import Requirement
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
+    Lockfile,
+    LockfileContent,
     Pex,
     PexDistributionInfo,
     PexPlatforms,
@@ -474,7 +476,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_build_pex_description() -> None:
     def assert_description(
-        requirements: PexRequirements,
+        requirements: PexRequirements | Lockfile | LockfileContent,
         *,
         use_repo_pex: bool = False,
         description: str | None = None,
@@ -518,21 +520,25 @@ def test_build_pex_description() -> None:
     )
 
     assert_description(
-        PexRequirements(file_content=FileContent("lock.txt", b"")),
+        LockfileContent(file_content=FileContent("lock.txt", b""), lockfile_hex_digest=None),
         expected="Building new.pex from lock.txt",
     )
     assert_description(
-        PexRequirements(file_content=FileContent("lock.txt", b"")),
+        LockfileContent(file_content=FileContent("lock.txt", b""), lockfile_hex_digest=None),
         use_repo_pex=True,
         expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
     )
 
     assert_description(
-        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
+        Lockfile(
+            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+        ),
         expected="Building new.pex from lock.txt",
     )
     assert_description(
-        PexRequirements(file_path="lock.txt", file_path_description_of_origin="foo"),
+        Lockfile(
+            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+        ),
         use_repo_pex=True,
         expected="Extracting all requirements in lock.txt from repo.pex to build new.pex",
     )
