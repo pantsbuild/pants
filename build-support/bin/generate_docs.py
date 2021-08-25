@@ -102,16 +102,13 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run_pants_help_all() -> Dict:
-    deactivated_backends = [
-        "internal_plugins.releases",
-        "toolchain.pants.auth",
-        "toolchain.pants.buildsense",
-        "toolchain.pants.common",
-    ]
+    deactivated_backends = ["internal_plugins.releases"]
     activated_backends = ["pants.backend.python.lint.bandit", "pants.backend.python.lint.pylint"]
+    deactivated_plugins = ["toolchain.pants.plugin==0.13.1"]
     argv = [
         "./pants",
         "--concurrent",
+        f"--plugins=-[{', '.join(map(repr, deactivated_plugins))}]",
         f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
         f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
         "--no-verify-config",
