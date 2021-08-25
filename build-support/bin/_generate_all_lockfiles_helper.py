@@ -43,7 +43,7 @@ def main() -> None:
             # restore it here so that the lockfile gets generated properly.
             "--python-setup-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
             "lock",
-            "tool-lock",
+            "user-lock",
             "::",
         ],
         check=True,
@@ -129,7 +129,7 @@ def main() -> None:
             f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
             f"--coverage-py-experimental-lockfile={CoverageSubsystem.default_lockfile_path}",
             # Run the goal.
-            "tool-lock",
+            "lock",
         ],
         check=True,
     )
