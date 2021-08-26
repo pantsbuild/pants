@@ -112,7 +112,7 @@ class PythonLockfileRequest:
             ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
-            regenerate_command="./pants tool-lock",
+            regenerate_command="./pants generate-lockfiles",
         )
 
     @property
@@ -188,35 +188,32 @@ async def generate_lockfile(
 # --------------------------------------------------------------------------------------
 
 
-class LockSubsystem(GoalSubsystem):
-    name = "lock"
-    help = "Generate a lockfile."
+# TODO(#12314): Unify with the `generate-lockfiles` goal. Stop looking at specs and instead have
+#  an option like `--lock-resolves` with a list of named resolves (including tools).
+class GenerateUserLockfileSubsystem(GoalSubsystem):
+    name = "generate-user-lockfile"
+    help = "Generate a lockfile for Python user requirements (experimental)."
 
 
-class LockGoal(Goal):
-    subsystem_cls = LockSubsystem
+class GenerateUserLockfileGoal(Goal):
+    subsystem_cls = GenerateUserLockfileSubsystem
 
 
 @goal_rule
-async def lockfile_goal(
+async def generate_user_lockfile_goal(
     addresses: Addresses,
     python_setup: PythonSetup,
     workspace: Workspace,
-) -> LockGoal:
+) -> GenerateUserLockfileGoal:
     if python_setup.lockfile is None:
         logger.warning(
-            "You ran `./pants lock`, but `[python-setup].experimental_lockfile` is not set. Please "
-            "set this option to the path where you'd like the lockfile for your code's "
-            "dependencies to live."
+            "You ran `./pants generate-user-lockfile`, but `[python-setup].experimental_lockfile` "
+            "is not set. Please set this option to the path where you'd like the lockfile for "
+            "your code's dependencies to live."
         )
-        return LockGoal(exit_code=1)
+        return GenerateUserLockfileGoal(exit_code=1)
 
-    # TODO(#12314): Looking at the transitive closure to generate a single lockfile will not work
-    #  when we have multiple user lockfiles supported. Ideally, `./pants lock ::` would mean
-    #  "regenerate all unique lockfiles", whereas now it means "generate a single lockfile based
-    #  on this transitive closure."
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
         # NB: By looking at the dependencies, rather than the closure, we only generate for
@@ -230,7 +227,7 @@ async def lockfile_goal(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
         )
-        return LockGoal(exit_code=0)
+        return GenerateUserLockfileGoal(exit_code=0)
 
     result = await Get(
         PythonLockfile,
@@ -251,7 +248,7 @@ async def lockfile_goal(
     workspace.write_digest(result.digest)
     logger.info(f"Wrote lockfile to {result.path}")
 
-    return LockGoal(exit_code=0)
+    return GenerateUserLockfileGoal(exit_code=0)
 
 
 # --------------------------------------------------------------------------------------
@@ -264,31 +261,26 @@ class PythonToolLockfileSentinel:
     pass
 
 
-# TODO(#12314): Unify this goal with `lock` once we figure out how to unify the semantics,
-#  particularly w/ CLI specs. This is a separate goal only to facilitate progress.
-class ToolLockSubsystem(GoalSubsystem):
-    name = "tool-lock"
-    help = "Generate a lockfile for a Python tool."
+class GenerateLockfilesSubsystem(GoalSubsystem):
+    name = "generate-lockfiles"
+    help = "Generate lockfiles for Python third-party dependencies."
     required_union_implementations = (PythonToolLockfileSentinel,)
 
 
-class ToolLockGoal(Goal):
-    subsystem_cls = ToolLockSubsystem
+class GenerateLockfilesGoal(Goal):
+    subsystem_cls = GenerateLockfilesSubsystem
 
 
 @goal_rule
-async def generate_all_tool_lockfiles(
-    workspace: Workspace,
-    union_membership: UnionMembership,
-) -> ToolLockGoal:
-    # TODO(#12314): Add logic to inspect the Specs and generate for only relevant lockfiles. For
-    #  now, we generate for all tools.
+async def generate_lockfiles_goal(
+    workspace: Workspace, union_membership: UnionMembership
+) -> GenerateLockfilesGoal:
     requests = await MultiGet(
         Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
         for sentinel in union_membership.get(PythonToolLockfileSentinel)
     )
     if not requests:
-        return ToolLockGoal(exit_code=0)
+        return GenerateLockfilesGoal(exit_code=0)
 
     results = await MultiGet(
         Get(PythonLockfile, PythonLockfileRequest, req)
@@ -300,7 +292,7 @@ async def generate_all_tool_lockfiles(
     for result in results:
         logger.info(f"Wrote lockfile to {result.path}")
 
-    return ToolLockGoal(exit_code=0)
+    return GenerateLockfilesGoal(exit_code=0)
 
 
 def rules():

@@ -42,8 +42,8 @@ def main() -> None:
             # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
             # restore it here so that the lockfile gets generated properly.
             "--python-setup-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
-            "lock",
-            "tool-lock",
+            "generate-lockfiles",
+            "generate-user-lockfile",
             "::",
         ],
         check=True,
@@ -129,7 +129,7 @@ def main() -> None:
             f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
             f"--coverage-py-experimental-lockfile={CoverageSubsystem.default_lockfile_path}",
             # Run the goal.
-            "tool-lock",
+            "generate-lockfiles",
         ],
         check=True,
     )
