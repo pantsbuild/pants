@@ -82,7 +82,7 @@ class MypyProtobufLockfileSentinel:
 
 
 @rule
-def setup_bandit_lockfile(
+def setup_mypy_protobuf_lockfile(
     _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
 ) -> PythonLockfileRequest:
     return PythonLockfileRequest.from_tool(mypy_protobuf)

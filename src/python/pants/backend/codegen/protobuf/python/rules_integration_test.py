@@ -1,12 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 from typing import List, Optional
 
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
@@ -18,6 +21,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.source.source_root import NoSourceRootError
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GRPC_PROTO_STANZA = """
@@ -65,11 +69,13 @@ def assert_files_generated(
     expected_files: List[str],
     source_roots: List[str],
     mypy: bool = False,
+    extra_args: list[str] | None = None,
     mypy_plugin_version: Optional[str] = None,
 ) -> None:
     options = [
         "--backend-packages=pants.backend.codegen.protobuf.python",
         f"--source-root-patterns={repr(source_roots)}",
+        *(extra_args or ()),
     ]
     if mypy:
         options.append("--python-protobuf-mypy-plugin")
@@ -228,7 +234,11 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
     assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)
 
 
-def test_mypy_plugin(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonProtobufMypyPlugin.default_interpreter_constraints),
+)
+def test_mypy_plugin(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
@@ -251,7 +261,10 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         "src/protobuf/dir1",
         source_roots=["src/protobuf"],
-        mypy=True,
+        extra_args=[
+            "--python-protobuf-mypy-plugin",
+            f"--mypy-protobuf-interpreter-constraints=['=={major_minor_interpreter}.*']",
+        ],
         expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2.pyi"],
     )
 

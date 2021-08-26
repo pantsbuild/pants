@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from typing import Iterable, List
 
 import pytest
 from pkg_resources import Requirement
@@ -19,6 +19,7 @@ from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -303,42 +304,41 @@ def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
     assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
 
 
-_ALL_PATCHES = set(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+_ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
 
 
-def patches(major, minor, unqualified_patches):
-    return {(major, minor, patch) for patch in unqualified_patches}
+def patches(
+    major: int, minor: int, unqualified_patches: Iterable[int]
+) -> list[tuple[int, int, int]]:
+    return [(major, minor, patch) for patch in unqualified_patches]
 
 
 @pytest.mark.parametrize(
     "constraints,expected",
     (
-        (["==2.7.15"], {(2, 7, 15)}),
+        (["==2.7.15"], [(2, 7, 15)]),
         (["==2.7.*"], patches(2, 7, _ALL_PATCHES)),
-        (["==3.6.15", "==3.7.15"], {(3, 6, 15), (3, 7, 15)}),
-        (["==3.6.*", "==3.7.*"], patches(3, 6, _ALL_PATCHES) | patches(3, 7, _ALL_PATCHES)),
+        (["==3.6.15", "==3.7.15"], [(3, 6, 15), (3, 7, 15)]),
+        (["==3.6.*", "==3.7.*"], patches(3, 6, _ALL_PATCHES) + patches(3, 7, _ALL_PATCHES)),
         (
             ["==2.7.1", ">=3.6.15"],
             (
-                patches(2, 7, {1})
-                | patches(3, 6, set(range(15, _EXPECTED_LAST_PATCH_VERSION + 1)))
-                | patches(3, 7, _ALL_PATCHES)
-                | patches(3, 8, _ALL_PATCHES)
-                | patches(3, 9, _ALL_PATCHES)
+                [(2, 7, 1)]
+                + patches(3, 6, range(15, _EXPECTED_LAST_PATCH_VERSION + 1))
+                + patches(3, 7, _ALL_PATCHES)
+                + patches(3, 8, _ALL_PATCHES)
+                + patches(3, 9, _ALL_PATCHES)
             ),
         ),
-        ([], set()),
+        ([], []),
     ),
 )
 def test_enumerate_python_versions(
-    constraints: list[str], expected: set[tuple[int, int, int]]
+    constraints: list[str], expected: list[tuple[int, int, int]]
 ) -> None:
-    assert (
-        InterpreterConstraints(constraints).enumerate_python_versions(
-            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
-        )
-        == expected
-    )
+    assert InterpreterConstraints(constraints).enumerate_python_versions(
+        ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
+    ) == FrozenOrderedSet(expected)
 
 
 def test_enumerate_python_versions_none_matching() -> None:
@@ -409,3 +409,17 @@ def test_constraints_are_correctly_sorted_at_construction() -> None:
     a_str = [str(i) for i in a]
     b = InterpreterConstraints(a_str)
     assert a == b
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        (["==2.7.*"], ["2.7"]),
+        ([">=3.7"], ["3.7", "3.8", "3.9", "3.10"]),
+        (["==2.7", "==3.6.5"], ["2.7", "3.6"]),
+    ),
+)
+def test_partition_into_major_minor_versions(constraints: list[str], expected: list[str]) -> None:
+    assert InterpreterConstraints(constraints).partition_into_major_minor_versions(
+        ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ) == tuple(expected)

@@ -5,8 +5,12 @@ import sqlite3
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
+
+from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 
 SOURCES = {
     # Only `lib.py` will actually be tested, but we still expect `random.py` t`o show up in
@@ -108,7 +112,7 @@ SOURCES = {
 }
 
 
-def run_coverage(tmpdir: str, *more_args: str) -> PantsResult:
+def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
     command = [
         "--backend-packages=pants.backend.python",
         "test",
@@ -118,7 +122,7 @@ def run_coverage(tmpdir: str, *more_args: str) -> PantsResult:
         f"{tmpdir}/tests/python/project_test:arithmetic",
         f"{tmpdir}/tests/python/project_test/no_src",
         f"--source-root-patterns=['/{tmpdir}/src/python', '{tmpdir}/tests/python', '{tmpdir}/foo']",
-        *more_args,
+        *extra_args,
     ]
     result = run_pants(command)
     result.assert_success()
@@ -129,9 +133,15 @@ def run_coverage(tmpdir: str, *more_args: str) -> PantsResult:
     return result
 
 
-def test_coverage() -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(CoverageSubsystem.default_interpreter_constraints),
+)
+def test_coverage(major_minor_interpreter: str) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
-        result = run_coverage(tmpdir)
+        result = run_coverage(
+            tmpdir, f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}']"
+        )
     assert (
         dedent(
             f"""\
