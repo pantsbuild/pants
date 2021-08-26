@@ -390,7 +390,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 native_binaries_download(),
                 {
                     "name": "Run Python tests",
-                    "run": "./pants --tag=+platform_specific_behavior test ::\n",
+                    "run": (
+                        "./pants --tag=+platform_specific_behavior test :: "
+                        "-- -m platform_specific_behavior\n"
+                    ),
                 },
                 upload_log_artifacts(name="python-test-macos"),
             ],

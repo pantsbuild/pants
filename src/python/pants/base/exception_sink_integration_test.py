@@ -17,6 +17,8 @@ from pants.testutil.pants_integration_test import run_pants_with_workdir
 from pants.util.dirutil import read_file
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
+pytestmark = pytest.mark.platform_specific_behavior
+
 
 def lifecycle_stub_cmdline() -> List[str]:
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
