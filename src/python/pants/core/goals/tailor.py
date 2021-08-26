@@ -210,8 +210,8 @@ class PutativeTarget:
                 return f'"{v}"'
             if isinstance(v, tuple):
                 val_parts = [f"\n{indent*2}{fmt_val(x)}" for x in v]
-                val_str = ",".join(val_parts)
-                return f"[{val_str},\n{indent}]"
+                val_str = ",".join(val_parts) + ("," if v else "")
+                return f"[{val_str}\n{indent}]"
             return repr(v)
 
         if self.kwargs:
