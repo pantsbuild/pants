@@ -74,6 +74,22 @@ class Console:
         self.stdout.flush()
         self.stderr.flush()
 
+    def sigil_succeeded(self) -> str:
+        """Sigil for a successful item."""
+        return self.green("✓")
+
+    def sigil_succeeded_with_edits(self) -> str:
+        """Sigil for a successful item which caused an edit to the workspace."""
+        return self.yellow("+")
+
+    def sigil_failed(self) -> str:
+        """Sigil for a failed item."""
+        return self.red("𐄂")
+
+    def sigil_skipped(self) -> str:
+        """Sigil for a skipped item."""
+        return self.yellow("-")
+
     @property
     def use_colors(self):
         return self._use_colors

@@ -261,13 +261,13 @@ async def lint(
         console.print_stderr("")
     for results in all_results:
         if results.skipped:
-            sigil = console.yellow("-")
+            sigil = console.sigil_skipped()
             status = "skipped"
         elif results.exit_code == 0:
-            sigil = console.green("✓")
+            sigil = console.sigil_succeeded()
             status = "succeeded"
         else:
-            sigil = console.red("𐄂")
+            sigil = console.sigil_failed()
             status = "failed"
             exit_code = results.exit_code
         console.print_stderr(f"{sigil} {results.linter_name} {status}.")

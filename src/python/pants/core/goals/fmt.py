@@ -279,13 +279,13 @@ async def fmt(
 
     for formatter, results in sorted(formatter_to_results.items()):
         if any(result.did_change for result in results):
-            sigil = console.yellow("𐄂")
+            sigil = console.sigil_succeeded_with_edits()
             status = "made changes"
         elif all(result.skipped for result in results):
-            sigil = console.yellow("-")
+            sigil = console.sigil_skipped()
             status = "skipped"
         else:
-            sigil = console.green("✓")
+            sigil = console.sigil_succeeded()
             status = "made no changes"
         console.print_stderr(f"{sigil} {formatter} {status}.")
 
