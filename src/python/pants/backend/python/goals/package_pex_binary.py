@@ -88,7 +88,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         if self._execution_mode is PexExecutionMode.UNZIP:
             args.append("--unzip")
         if self._execution_mode is PexExecutionMode.VENV:
-            args.append("--venv")
+            args.extend(("--venv", "prepend"))
         if self.include_tools.value is True:
             args.append("--include-tools")
         return tuple(args)
