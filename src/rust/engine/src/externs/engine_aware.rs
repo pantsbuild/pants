@@ -10,20 +10,10 @@ use crate::Types;
 use cpython::{PyDict, PyString, Python};
 use workunit_store::{ArtifactOutput, Level};
 
-// TODO all `retrieve` implementations should add a check that the `Value` actually subclasses
-// `EngineAware`
-
-pub trait EngineAwareInformation {
-  type MaybeOutput;
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput>;
-}
-
 pub struct EngineAwareLevel {}
 
-impl EngineAwareInformation for EngineAwareLevel {
-  type MaybeOutput = Level;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<Level> {
+impl EngineAwareLevel {
+  pub fn retrieve(value: &Value) -> Option<Level> {
     let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
     externs::val_to_log_level(&new_level_val).ok()
@@ -32,10 +22,8 @@ impl EngineAwareInformation for EngineAwareLevel {
 
 pub struct Message {}
 
-impl EngineAwareInformation for Message {
-  type MaybeOutput = String;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<String> {
+impl Message {
+  pub fn retrieve(value: &Value) -> Option<String> {
     let msg_val = externs::call_method(value, "message", &[]).ok()?;
     let msg_val = externs::check_for_python_none(msg_val)?;
     Some(externs::val_to_str(&msg_val))
@@ -44,10 +32,8 @@ impl EngineAwareInformation for Message {
 
 pub struct Metadata;
 
-impl EngineAwareInformation for Metadata {
-  type MaybeOutput = Vec<(String, Value)>;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+impl Metadata {
+  pub fn retrieve(value: &Value) -> Option<Vec<(String, Value)>> {
     let metadata_val = match externs::call_method(value, "metadata", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -84,10 +70,8 @@ impl EngineAwareInformation for Metadata {
 
 pub struct Artifacts {}
 
-impl EngineAwareInformation for Artifacts {
-  type MaybeOutput = Vec<(String, ArtifactOutput)>;
-
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+impl Artifacts {
+  pub fn retrieve(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
     let artifacts_val = match externs::call_method(value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -145,10 +129,8 @@ impl EngineAwareInformation for Artifacts {
 
 pub struct DebugHint {}
 
-impl EngineAwareInformation for DebugHint {
-  type MaybeOutput = String;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<String> {
+impl DebugHint {
+  pub fn retrieve(value: &Value) -> Option<String> {
     externs::call_method(value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
