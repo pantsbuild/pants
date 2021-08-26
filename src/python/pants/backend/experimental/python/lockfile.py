@@ -272,7 +272,9 @@ class GenerateLockfilesGoal(Goal):
 
 
 @goal_rule
-async def generate_lockfiles_goal(workspace: Workspace, union_membership: UnionMembership) -> GenerateLockfilesGoal:
+async def generate_lockfiles_goal(
+    workspace: Workspace, union_membership: UnionMembership
+) -> GenerateLockfilesGoal:
     requests = await MultiGet(
         Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
         for sentinel in union_membership.get(PythonToolLockfileSentinel)
