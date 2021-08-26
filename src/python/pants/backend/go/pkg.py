@@ -76,6 +76,24 @@ class ResolvedGoPackage:
     # non-.go source files ignored due to build constraints. Obtained from `IgnoredOtherFiles` key in package metadata.
     ignored_other_files: Tuple[str, ...]
 
+    # .c source files
+    c_files: Tuple[str, ...]
+
+    # .cc, .cxx and .cpp source files
+    cxx_files: Tuple[str, ...]
+
+    # .m source files
+    m_files: Tuple[str, ...]
+
+    # .h, .hh, .hpp and .hxx source files
+    h_files: Tuple[str, ...]
+
+    # .s source files
+    s_files: Tuple[str, ...]
+
+    # .syso object files to add to archive
+    syso_files: Tuple[str, ...]
+
     # _test.go files in package. Obtained from `TestGoFiles` key in package metadata.
     test_go_files: Tuple[str, ...]
 
@@ -109,15 +127,9 @@ class ResolvedGoPackage:
         # Raise an exception if any unsupported source file keys are present in the metadata.
         for key in (
             "CompiledGoFiles",
-            "CFiles",
-            "CXXFiles",
-            "MFiles",
-            "HFiles",
             "FFiles",
-            "SFiles",
             "SwigFiles",
             "SwigCXXFiles",
-            "SysoFiles",
         ):
             files = metadata.get(key, [])
             if files:
@@ -140,6 +152,12 @@ class ResolvedGoPackage:
             cgo_files=tuple(metadata.get("CgoFiles", [])),
             ignored_go_files=tuple(metadata.get("IgnoredGoFiles", [])),
             ignored_other_files=tuple(metadata.get("IgnoredOtherFiles", [])),
+            c_files=tuple(metadata.get("CFiles", [])),
+            cxx_files=tuple(metadata.get("CXXFiles", [])),
+            m_files=tuple(metadata.get("MFiles", [])),
+            h_files=tuple(metadata.get("HFiles", [])),
+            s_files=tuple(metadata.get("SFiles", [])),
+            syso_files=tuple(metadata.get("SysoFiles", [])),
             test_go_files=tuple(metadata.get("TestGoFiles", [])),
             xtest_go_files=tuple(metadata.get("XTestGoFiles", [])),
         )
