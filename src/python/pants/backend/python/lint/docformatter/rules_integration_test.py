@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
+from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.docformatter.subsystem import rules as docformatter_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
@@ -16,6 +17,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -68,10 +70,18 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(files)])
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(Docformatter.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_docformatter(rule_runner, [tgt])
+    lint_results, fmt_result = run_docformatter(
+        rule_runner,
+        [tgt],
+        extra_args=[f"--docformatter-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""

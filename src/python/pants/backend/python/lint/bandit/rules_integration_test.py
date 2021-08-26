@@ -18,7 +18,11 @@ from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -67,10 +71,18 @@ def assert_success(
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
 
 
 def test_failing(rule_runner: RuleRunner) -> None:

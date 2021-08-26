@@ -36,7 +36,11 @@ from pants.engine.process import InteractiveRunner
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
@@ -104,17 +108,25 @@ def run_pytest(
     return test_result
 
 
-def test_passing_test(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt)
+    result = run_pytest(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_failing_test(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(

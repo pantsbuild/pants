@@ -16,7 +16,11 @@ from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -71,13 +75,21 @@ def assert_success(
     assert result[0].exit_code == 0
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
 
 
-def test_failing_source(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt])

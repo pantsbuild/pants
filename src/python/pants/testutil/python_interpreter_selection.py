@@ -1,9 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import subprocess
+from typing import Iterable
 from unittest import skipIf
+
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
 PY_2 = "2"
 PY_3 = "3"
@@ -103,3 +108,15 @@ def skip_unless_python27_and_python36_present(func):
 def skip_unless_python36_and_python37_present(func):
     """A test skip decorator that only runs a test method if python3.6 and python3.7 are present."""
     return skip_unless_all_pythons_present(PY_36, PY_37)(func)
+
+
+def all_major_minor_python_versions(constraints: Iterable[str]) -> tuple[str, ...]:
+    """All major.minor Python versions used by the interpreter constraints.
+
+    This is intended to be used with `@pytest.mark.parametrize()` to run a test with every relevant
+    Python interpreter.
+    """
+    return InterpreterConstraints(constraints).partition_into_major_minor_versions(
+        # Please update this when new stable Python versions are released to CI.
+        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
+    )

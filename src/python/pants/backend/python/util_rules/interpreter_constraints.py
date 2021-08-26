@@ -17,7 +17,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
@@ -264,7 +264,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
     def enumerate_python_versions(
         self, interpreter_universe: Iterable[str]
-    ) -> set[tuple[int, int, int]]:
+    ) -> FrozenOrderedSet[tuple[int, int, int]]:
         """Return a set of all plausible (major, minor, patch) tuples for all Python 2.7/3.x in the
         specified interpreter universe that matches this set of interpreter constraints.
 
@@ -275,7 +275,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
           public several times.
         """
         if not self:
-            return set()
+            return FrozenOrderedSet()
 
         minors = []
         for major_minor in interpreter_universe:
@@ -299,7 +299,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                     "true."
                 )
 
-        valid_patches = set(
+        valid_patches = FrozenOrderedSet(
             (major, minor, patch)
             for (major, minor) in sorted(minors)
             for patch in self._valid_patch_versions(major, minor)
@@ -317,15 +317,24 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         return valid_patches
 
-    def contains(self, other: InterpreterConstraints, universe: Iterable[str]) -> bool:
+    def contains(self, other: InterpreterConstraints, interpreter_universe: Iterable[str]) -> bool:
         """Returns True if the `InterpreterConstraints` specified in `other` is a subset of these
         `InterpreterConstraints`.
 
         This is restricted to the set of minor Python versions specified in `universe`.
         """
-        this = self.enumerate_python_versions(universe)
-        that = other.enumerate_python_versions(universe)
+        this = self.enumerate_python_versions(interpreter_universe)
+        that = other.enumerate_python_versions(interpreter_universe)
         return this.issuperset(that)
+
+    def partition_into_major_minor_versions(
+        self, interpreter_universe: Iterable[str]
+    ) -> tuple[str, ...]:
+        """Return all the valid major.minor versions, e.g. `('2.7', '3.6')`."""
+        result: OrderedSet[str] = OrderedSet()
+        for major, minor, _ in self.enumerate_python_versions(interpreter_universe):
+            result.add(f"{major}.{minor}")
+        return tuple(result)
 
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
