@@ -133,6 +133,7 @@ def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
     return result
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
     all_major_minor_python_versions(CoverageSubsystem.default_interpreter_constraints),

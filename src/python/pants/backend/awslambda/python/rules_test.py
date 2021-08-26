@@ -63,6 +63,7 @@ def create_python_awslambda(
     return relpath, digest_contents[0].content
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
