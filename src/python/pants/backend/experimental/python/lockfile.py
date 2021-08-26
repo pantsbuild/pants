@@ -112,7 +112,7 @@ class PythonLockfileRequest:
             ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
-            regenerate_command="./pants lock",
+            regenerate_command="./pants generate-lockfiles",
         )
 
     @property
@@ -188,30 +188,30 @@ async def generate_lockfile(
 # --------------------------------------------------------------------------------------
 
 
-# TODO(#12314): Unify with the `lock` goal. Stop looking at specs and instead have an option like
-#  `--lock-resolves` with a list of named resolves (including tools).
-class UserLockSubsystem(GoalSubsystem):
-    name = "user-lock"
+# TODO(#12314): Unify with the `generate-lockfiles` goal. Stop looking at specs and instead have
+#  an option like `--lock-resolves` with a list of named resolves (including tools).
+class GenerateUserLockfileSubsystem(GoalSubsystem):
+    name = "generate-user-lockfile"
     help = "Generate a lockfile for Python user requirements (experimental)."
 
 
-class UserLockGoal(Goal):
-    subsystem_cls = UserLockSubsystem
+class GenerateUserLockfileGoal(Goal):
+    subsystem_cls = GenerateUserLockfileSubsystem
 
 
 @goal_rule
-async def user_lock_goal(
+async def generate_user_lockfile_goal(
     addresses: Addresses,
     python_setup: PythonSetup,
     workspace: Workspace,
-) -> UserLockGoal:
+) -> GenerateUserLockfileGoal:
     if python_setup.lockfile is None:
         logger.warning(
-            "You ran `./pants user-lock`, but `[python-setup].experimental_lockfile` is not set. "
-            "Please set this option to the path where you'd like the lockfile for your code's "
-            "dependencies to live."
+            "You ran `./pants generate-user-lockfile`, but `[python-setup].experimental_lockfile` "
+            "is not set. Please set this option to the path where you'd like the lockfile for "
+            "your code's dependencies to live."
         )
-        return UserLockGoal(exit_code=1)
+        return GenerateUserLockfileGoal(exit_code=1)
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
     reqs = PexRequirements.create_from_requirement_fields(
@@ -227,7 +227,7 @@ async def user_lock_goal(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
         )
-        return UserLockGoal(exit_code=0)
+        return GenerateUserLockfileGoal(exit_code=0)
 
     result = await Get(
         PythonLockfile,
@@ -248,7 +248,7 @@ async def user_lock_goal(
     workspace.write_digest(result.digest)
     logger.info(f"Wrote lockfile to {result.path}")
 
-    return UserLockGoal(exit_code=0)
+    return GenerateUserLockfileGoal(exit_code=0)
 
 
 # --------------------------------------------------------------------------------------
@@ -261,24 +261,24 @@ class PythonToolLockfileSentinel:
     pass
 
 
-class LockGoalSubsystem(GoalSubsystem):
-    name = "lock"
+class GenerateLockfilesSubsystem(GoalSubsystem):
+    name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
     required_union_implementations = (PythonToolLockfileSentinel,)
 
 
-class LockGoal(Goal):
-    subsystem_cls = LockGoalSubsystem
+class GenerateLockfilesGoal(Goal):
+    subsystem_cls = GenerateLockfilesSubsystem
 
 
 @goal_rule
-async def lock_goal(workspace: Workspace, union_membership: UnionMembership) -> LockGoal:
+async def generate_lockfiles_goal(workspace: Workspace, union_membership: UnionMembership) -> GenerateLockfilesGoal:
     requests = await MultiGet(
         Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
         for sentinel in union_membership.get(PythonToolLockfileSentinel)
     )
     if not requests:
-        return LockGoal(exit_code=0)
+        return GenerateLockfilesGoal(exit_code=0)
 
     results = await MultiGet(
         Get(PythonLockfile, PythonLockfileRequest, req)
@@ -290,7 +290,7 @@ async def lock_goal(workspace: Workspace, union_membership: UnionMembership) -> 
     for result in results:
         logger.info(f"Wrote lockfile to {result.path}")
 
-    return LockGoal(exit_code=0)
+    return GenerateLockfilesGoal(exit_code=0)
 
 
 def rules():
