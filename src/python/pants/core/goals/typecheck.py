@@ -97,7 +97,7 @@ class EnrichedTypecheckResults(TypecheckResults, EngineAwareReturnType):
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
-        return LogLevel.WARN if self.exit_code != 0 else LogLevel.INFO
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
 
     def message(self) -> Optional[str]:
         if self.skipped:
@@ -199,13 +199,13 @@ async def typecheck(
         console.print_stderr("")
     for results in sorted(all_results, key=lambda results: results.typechecker_name):
         if results.skipped:
-            sigil = console.yellow("-")
+            sigil = console.sigil_skipped()
             status = "skipped"
         elif results.exit_code == 0:
-            sigil = console.green("✓")
+            sigil = console.sigil_succeeded()
             status = "succeeded"
         else:
-            sigil = console.red("𐄂")
+            sigil = console.sigil_failed()
             status = "failed"
             exit_code = results.exit_code
         console.print_stderr(f"{sigil} {results.typechecker_name} {status}.")

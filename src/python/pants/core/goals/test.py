@@ -121,7 +121,7 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
-        return LogLevel.INFO if self.exit_code == 0 else LogLevel.WARN
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
@@ -391,10 +391,10 @@ async def run_tests(
         console.print_stderr("")
     for result in sorted(results):
         if result.exit_code == 0:
-            sigil = console.green("✓")
+            sigil = console.sigil_succeeded()
             status = "succeeded"
         else:
-            sigil = console.red("𐄂")
+            sigil = console.sigil_failed()
             status = "failed"
             exit_code = result.exit_code
         console.print_stderr(f"{sigil} {result.address} {status}.")

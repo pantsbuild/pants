@@ -220,7 +220,7 @@ def test_streaming_output_failure() -> None:
     results = EnrichedTypecheckResults(
         [TypecheckResult(18, "stdout", "stderr")], typechecker_name="typechecker"
     )
-    assert results.level() == LogLevel.WARN
+    assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
         typechecker failed (exit code 18).
@@ -239,7 +239,7 @@ def test_streaming_output_partitions() -> None:
         ],
         typechecker_name="typechecker",
     )
-    assert results.level() == LogLevel.WARN
+    assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
         typechecker failed (exit code 21).
