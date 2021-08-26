@@ -513,10 +513,12 @@ def _validate_metadata(
 
     if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
         message_parts.append(
-            "The lockfile was generated under different interpreter constraints to the constraints "
-            "that are set. If you have overridden your project's interpreter constraints, you can "
-            "update them to specify a subset of the interpreters specified in the lockfile. If "
-            "not, you will need to regenerate your lockfile. "
+            "The lockfile was generated under interpreter constraints "
+            f"({ metadata.valid_for_interpreter_constraints }) that are incompatible with the "
+            f"constraints set in the project ({request.interpreter_constraints }). If you have "
+            "overridden your project's interpreter constraints, you can update them to specify a "
+            "subset of the interpreters specified in the lockfile. If  not, you will need to "
+            "regenerate your lockfile. "
         )
 
     message_parts.append(

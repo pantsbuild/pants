@@ -548,7 +548,7 @@ def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> 
 def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn", invalid_reqs=True)
     assert "requirements set for this" in caplog.text
-    assert "different interpreter constraints" not in caplog.text
+    assert "generated under interpreter constraints" not in caplog.text
 
 
 def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
@@ -556,7 +556,7 @@ def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplo
         rule_runner, use_file=True, behavior="warn", invalid_constraints=True
     )
     assert "requirements set for this" not in caplog.text
-    assert "different interpreter constraints" in caplog.text
+    assert "generated under interpreter constraints" in caplog.text
 
 
 def test_warn_on_mismatched_requirements_and_interpreter_constraints(
@@ -566,7 +566,7 @@ def test_warn_on_mismatched_requirements_and_interpreter_constraints(
         rule_runner, use_file=True, behavior="warn", invalid_reqs=True, invalid_constraints=True
     )
     assert "requirements set for this" in caplog.text
-    assert "different interpreter constraints" in caplog.text
+    assert "generated under interpreter constraints" in caplog.text
 
 
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
