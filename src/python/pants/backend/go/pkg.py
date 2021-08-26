@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Tuple
 
 import ijson
 
@@ -56,49 +55,49 @@ class ResolvedGoPackage:
     package_name: str
 
     # Import paths used by this package. Obtained from `Imports` key in package metadata.
-    imports: Tuple[str, ...]
+    imports: tuple[str, ...]
 
     # Imports from test files. Obtained from `TestImports` key in package metadata.
-    test_imports: Tuple[str, ...]
+    test_imports: tuple[str, ...]
 
     # Explicit and transitive import paths required to build the code. Obtained from `Deps` key in package metadata.
-    dependency_import_paths: Tuple[str, ...]
+    dependency_import_paths: tuple[str, ...]
 
     # .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles). Obtained from `GoFiles` key in package metadata.
-    go_files: Tuple[str, ...]
+    go_files: tuple[str, ...]
 
     # .go source files that import "C". Obtained from `CgoFiles` key in package metadata.
-    cgo_files: Tuple[str, ...]
+    cgo_files: tuple[str, ...]
 
     # .go source files ignored due to build constraints. Obtained from `IgnoredGoFiles` key in package metadata.
-    ignored_go_files: Tuple[str, ...]
+    ignored_go_files: tuple[str, ...]
 
     # non-.go source files ignored due to build constraints. Obtained from `IgnoredOtherFiles` key in package metadata.
-    ignored_other_files: Tuple[str, ...]
+    ignored_other_files: tuple[str, ...]
 
     # .c source files
-    c_files: Tuple[str, ...]
+    c_files: tuple[str, ...]
 
     # .cc, .cxx and .cpp source files
-    cxx_files: Tuple[str, ...]
+    cxx_files: tuple[str, ...]
 
     # .m source files
-    m_files: Tuple[str, ...]
+    m_files: tuple[str, ...]
 
     # .h, .hh, .hpp and .hxx source files
-    h_files: Tuple[str, ...]
+    h_files: tuple[str, ...]
 
     # .s source files
-    s_files: Tuple[str, ...]
+    s_files: tuple[str, ...]
 
     # .syso object files to add to archive
-    syso_files: Tuple[str, ...]
+    syso_files: tuple[str, ...]
 
     # _test.go files in package. Obtained from `TestGoFiles` key in package metadata.
-    test_go_files: Tuple[str, ...]
+    test_go_files: tuple[str, ...]
 
     # _test.go files outside package. Obtained from `XTestGoFiles` key in package metadata.
-    xtest_go_files: Tuple[str, ...]
+    xtest_go_files: tuple[str, ...]
 
     @classmethod
     def from_metadata(
