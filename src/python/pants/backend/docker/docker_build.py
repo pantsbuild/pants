@@ -4,7 +4,6 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Tuple, cast
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
@@ -14,7 +13,6 @@ from pants.backend.docker.target_types import (
     DockerImageVersion,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -31,13 +29,14 @@ class DockerFieldSet(PackageFieldSet):
     sources: DockerImageSources
 
     @property
-    def dockerfile_source(self) -> str:
+    def dockerfile_relpath(self) -> str:
         # DockerImageSources.expected_num_files==1 ensures this is non-empty
-        return cast(Tuple[str], self.sources.value)[0]
+        assert self.sources.value
+        return self.sources.value[0]
 
     @property
     def dockerfile_path(self) -> str:
-        return os.path.join(self.address.spec_path, self.dockerfile_source)
+        return os.path.join(self.address.spec_path, self.dockerfile_relpath)
 
     @property
     def context_root(self) -> str:
@@ -65,16 +64,6 @@ async def build_docker_image(
             DockerBuildContext, DockerBuildContextRequest(field_set.address, field_set.context_root)
         ),
     )
-
-    # tmp debug
-    snapshot = await Get(Snapshot, Digest, context.digest)
-    files = "\n".join(snapshot.files)
-    logger.debug(
-        f"Docker build context [context_root: {field_set.context_root}] "
-        f"for {field_set.image_tag!r}:\n"
-        f"{files}"
-    )
-    # end tmp debug
 
     result = await Get(
         ProcessResult,

@@ -8,7 +8,7 @@ from pants.backend.docker.docker_build import DockerFieldSet, build_docker_image
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
 from pants.backend.docker.target_types import DockerImage
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 
@@ -83,11 +83,6 @@ def test_build_docker_image_rule(target_values, expected_features):
                 output_type=DockerBuildContext,
                 input_type=DockerBuildContextRequest,
                 mock=build_context_mock,
-            ),
-            MockGet(
-                output_type=Snapshot,
-                input_type=Digest,
-                mock=lambda _: EMPTY_SNAPSHOT,
             ),
             MockGet(
                 output_type=ProcessResult,
