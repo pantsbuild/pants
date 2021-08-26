@@ -134,7 +134,7 @@ class LockfileMetadataValidation:
 
     failure_reasons: set[InvalidLockfileReason]
 
-    def __init__(self, failure_reasons: Iterable[InvalidLockfileReason] = set()):
+    def __init__(self, failure_reasons: Iterable[InvalidLockfileReason] = ()):
         self.failure_reasons = set(failure_reasons)
 
     def __bool__(self):
