@@ -6,23 +6,25 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
 from typing import Iterable
 
-from pants.backend.experimental.python.lockfile_metadata import (
-    LockfileMetadata,
-    calculate_invalidation_digest,
+from pants.backend.python.subsystems.poetry import (
+    POETRY_LAUNCHER,
+    PoetrySubsystem,
+    create_pyproject_toml,
 )
 from pants.backend.python.subsystems.python_tool_base import (
     DEFAULT_TOOL_LOCKFILE,
     NO_TOOL_LOCKFILE,
     PythonToolRequirementsBase,
 )
-from pants.backend.python.target_types import EntryPoint, PythonRequirementsField
+from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.poetry_conversions import create_pyproject_toml
-from pants.engine.addresses import Addresses
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileMetadata,
+    calculate_invalidation_digest,
+)
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -34,45 +36,16 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------------------
 # Generic lockfile generation
 # --------------------------------------------------------------------------------------
-
-
-class PoetrySubsystem(PythonToolRequirementsBase):
-    options_scope = "poetry"
-    help = "Used to generate lockfiles for third-party Python dependencies."
-
-    default_version = "poetry==1.1.7"
-
-    register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
-
-
-# We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed
-# in Poetry 1.2. See https://github.com/python-poetry/poetry/issues/1584.
-# WONTFIX(#12314): only use this custom launcher if using Poetry 1.1..
-POETRY_LAUNCHER = FileContent(
-    "__pants_poetry_launcher.py",
-    dedent(
-        """\
-        from poetry.console import main
-        from poetry.puzzle.provider import Provider
-
-        Provider.UNSAFE_PACKAGES = set()
-        main()
-        """
-    ).encode(),
-)
 
 
 @dataclass(frozen=True)
@@ -184,75 +157,7 @@ async def generate_lockfile(
 
 
 # --------------------------------------------------------------------------------------
-# User lockfiles
-# --------------------------------------------------------------------------------------
-
-
-# TODO(#12314): Unify with the `generate-lockfiles` goal. Stop looking at specs and instead have
-#  an option like `--lock-resolves` with a list of named resolves (including tools).
-class GenerateUserLockfileSubsystem(GoalSubsystem):
-    name = "generate-user-lockfile"
-    help = "Generate a lockfile for Python user requirements (experimental)."
-
-
-class GenerateUserLockfileGoal(Goal):
-    subsystem_cls = GenerateUserLockfileSubsystem
-
-
-@goal_rule
-async def generate_user_lockfile_goal(
-    addresses: Addresses,
-    python_setup: PythonSetup,
-    workspace: Workspace,
-) -> GenerateUserLockfileGoal:
-    if python_setup.lockfile is None:
-        logger.warning(
-            "You ran `./pants generate-user-lockfile`, but `[python-setup].experimental_lockfile` "
-            "is not set. Please set this option to the path where you'd like the lockfile for "
-            "your code's dependencies to live."
-        )
-        return GenerateUserLockfileGoal(exit_code=1)
-
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    reqs = PexRequirements.create_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        # NB: By looking at the dependencies, rather than the closure, we only generate for
-        # requirements that are actually used in the project.
-        for tgt in transitive_targets.dependencies
-        if tgt.has_field(PythonRequirementsField)
-    )
-
-    if not reqs:
-        logger.warning(
-            "No third-party requirements found for the transitive closure, so a lockfile will not "
-            "be generated."
-        )
-        return GenerateUserLockfileGoal(exit_code=0)
-
-    result = await Get(
-        PythonLockfile,
-        PythonLockfileRequest(
-            reqs.req_strings,
-            # TODO(#12314): Use interpreter constraints from the transitive closure.
-            InterpreterConstraints(python_setup.interpreter_constraints),
-            dest=python_setup.lockfile,
-            description=(
-                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirement')}: "
-                f"{', '.join(reqs.req_strings)}"
-            ),
-            # TODO(12382): Make this command actually accurate once we figure out the semantics
-            #  for user lockfiles. This is currently misleading.
-            regenerate_command="./pants lock ::",
-        ),
-    )
-    workspace.write_digest(result.digest)
-    logger.info(f"Wrote lockfile to {result.path}")
-
-    return GenerateUserLockfileGoal(exit_code=0)
-
-
-# --------------------------------------------------------------------------------------
-# Tool lockfiles
+# Lock goal
 # --------------------------------------------------------------------------------------
 
 

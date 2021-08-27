@@ -6,10 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript

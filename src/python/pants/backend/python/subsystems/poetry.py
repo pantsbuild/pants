@@ -5,12 +5,51 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import Any, Iterable, Sequence
 
 import toml
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.engine.fs import FileContent
+
+# ----------------------------------------------------------------------------------------
+# Subsystem
+# ----------------------------------------------------------------------------------------
+
+
+class PoetrySubsystem(PythonToolRequirementsBase):
+    options_scope = "poetry"
+    help = "Used to generate lockfiles for third-party Python dependencies."
+
+    default_version = "poetry==1.1.7"
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+
+# We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed
+# in Poetry 1.2. See https://github.com/python-poetry/poetry/issues/1584.
+# WONTFIX(#12314): only use this custom launcher if using Poetry 1.1..
+POETRY_LAUNCHER = FileContent(
+    "__pants_poetry_launcher.py",
+    dedent(
+        """\
+        from poetry.console import main
+        from poetry.puzzle.provider import Provider
+
+        Provider.UNSAFE_PACKAGES = set()
+        main()
+        """
+    ).encode(),
+)
+
+
+# ----------------------------------------------------------------------------------------
+# Parsing
+# ----------------------------------------------------------------------------------------
 
 _HEADER = {
     "name": "pants-lockfile-generation",

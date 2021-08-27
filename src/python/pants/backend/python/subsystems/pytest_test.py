@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.pytest import PyTest, PytestLockfileSentinel
 from pants.backend.python.subsystems.pytest import rules as subsystem_rules
 from pants.backend.python.target_types import PythonLibrary, PythonTests

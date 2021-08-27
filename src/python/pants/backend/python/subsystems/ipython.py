@@ -5,10 +5,7 @@ from __future__ import annotations
 
 import itertools
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints

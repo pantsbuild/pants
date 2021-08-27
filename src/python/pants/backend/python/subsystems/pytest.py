@@ -12,10 +12,7 @@ from typing import Iterable, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,

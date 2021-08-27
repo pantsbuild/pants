@@ -8,11 +8,11 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.experimental.python.lockfile_metadata import (
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
     calculate_invalidation_digest,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
 
 def test_metadata_header_round_trip() -> None:

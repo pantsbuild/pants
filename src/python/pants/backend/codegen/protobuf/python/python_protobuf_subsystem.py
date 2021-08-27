@@ -4,10 +4,7 @@
 from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
