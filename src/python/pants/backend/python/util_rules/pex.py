@@ -150,6 +150,7 @@ class PexRequest(EngineAwareParameter):
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
+    options_scope_name: str | None = None
 
     def __init__(
         self,
@@ -166,6 +167,7 @@ class PexRequest(EngineAwareParameter):
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
+        options_scope_name: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
 
@@ -191,6 +193,8 @@ class PexRequest(EngineAwareParameter):
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
+        :param options_scope_name: The name for the options scope for the tool, if this request
+            corresponds to a tool. This is used for making more pleasant error messages.
         """
         self.output_filename = output_filename
         self.internal_only = internal_only
@@ -204,6 +208,7 @@ class PexRequest(EngineAwareParameter):
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.description = description
+        self.options_scope_name = options_scope_name
         self.__post_init__()
 
     def __post_init__(self):
