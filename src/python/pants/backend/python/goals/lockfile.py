@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, cast
 
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
@@ -37,11 +37,60 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, union
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
+
+
+@union
+class PythonToolLockfileSentinel:
+    pass
+
+
+class GenerateLockfilesSubsystem(GoalSubsystem):
+    name = "generate-lockfiles"
+    help = "Generate lockfiles for Python third-party dependencies."
+    required_union_implementations = (PythonToolLockfileSentinel,)
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--resolve",
+            type=list,
+            member_type=str,
+            advanced=False,
+            help=(
+                "Only generate lockfiles for the specified resolve(s).\n\n"
+                "For now, resolves are the options scope for each Python tool that supports "
+                "lockfiles, such as `black`, `pytest`, and `mypy-protobuf`. For example, you can "
+                "run `./pants generate-lockfiles --resolve=black --resolve=pytest` to only "
+                "generate the lockfile for those two tools.\n\n"
+                "If you specify an invalid resolve name, like 'fake', Pants will output all "
+                "possible values.\n\n"
+                "If not specified, will generate for all resolves."
+            ),
+        )
+        register(
+            "--custom-command",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "If set, lockfile headers will say to run this command to regenerate the lockfile, "
+                "rather than running `./pants generate-lockfiles --resolve=<name>` like normal."
+            ),
+        )
+
+    @property
+    def resolve_names(self) -> tuple[str, ...]:
+        return tuple(self.options.resolve)
+
+    @property
+    def custom_command(self) -> str | None:
+        return cast("str | None", self.options.custom_command)
+
 
 # --------------------------------------------------------------------------------------
 # Generic lockfile generation
@@ -98,7 +147,9 @@ class PythonLockfileRequest:
 
 @rule(desc="Generate lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: PythonLockfileRequest, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
+    req: PythonLockfileRequest,
+    poetry_subsystem: PoetrySubsystem,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
 ) -> PythonLockfile:
     pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
     pyproject_toml_digest, launcher_digest = await MultiGet(
@@ -162,7 +213,7 @@ async def generate_lockfile(
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
-            python_setup.lockfile_custom_regeneration_command
+            generate_lockfiles_subsystem.custom_command
             or req._regenerate_command
             or f"./pants generate-lockfiles --resolve={req.resolve_name}"
         ),
@@ -176,41 +227,6 @@ async def generate_lockfile(
 # --------------------------------------------------------------------------------------
 # Lock goal
 # --------------------------------------------------------------------------------------
-
-
-@union
-class PythonToolLockfileSentinel:
-    pass
-
-
-class GenerateLockfilesSubsystem(GoalSubsystem):
-    name = "generate-lockfiles"
-    help = "Generate lockfiles for Python third-party dependencies."
-    required_union_implementations = (PythonToolLockfileSentinel,)
-
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--resolve",
-            type=list,
-            member_type=str,
-            advanced=False,
-            help=(
-                "Only generate lockfiles for the specified resolve(s).\n\n"
-                "For now, resolves are the options scope for each Python tool that supports "
-                "lockfiles, such as `black`, `pytest`, and `mypy-protobuf`. For example, you can "
-                "run `./pants generate-lockfiles --resolve=black --resolve=pytest` to only "
-                "generate the lockfile for those two tools.\n\n"
-                "If you specify an invalid resolve name, like 'fake', Pants will output all "
-                "possible values.\n\n"
-                "If not specified, will generate for all resolves."
-            ),
-        )
-
-    @property
-    def resolve_names(self) -> tuple[str, ...]:
-        return tuple(self.options.resolves)
 
 
 class GenerateLockfilesGoal(Goal):
