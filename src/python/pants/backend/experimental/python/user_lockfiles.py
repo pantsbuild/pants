@@ -20,10 +20,10 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-# TODO(#12314): Unify with the `generate-lockfiles` goal. Stop looking at specs and instead have
-#  an option like `--lock-resolves` with a list of named resolves (including tools).
+# TODO(#12314): Unify with the `gen-lockfiles` goal by using its `--resolves` option for named
+#  resolves, rather than taking CLI specs.
 class GenerateUserLockfileSubsystem(GoalSubsystem):
-    name = "generate-user-lockfile"
+    name = "gen-user-lockfile"
     help = "Generate a lockfile for Python user requirements (experimental)."
 
 
@@ -39,7 +39,7 @@ async def generate_user_lockfile_goal(
 ) -> GenerateUserLockfileGoal:
     if python_setup.lockfile is None:
         logger.warning(
-            "You ran `./pants generate-user-lockfile`, but `[python-setup].experimental_lockfile` "
+            "You ran `./pants gen-user-lockfile`, but `[python-setup].experimental_lockfile` "
             "is not set. Please set this option to the path where you'd like the lockfile for "
             "your code's dependencies to live."
         )
@@ -74,7 +74,7 @@ async def generate_user_lockfile_goal(
             ),
             # TODO(12382): Make this command actually accurate once we figure out the semantics
             #  for user lockfiles. This is currently misleading.
-            regenerate_command="./pants generate-user-lockfile ::",
+            regenerate_command="./pants gen-user-lockfile ::",
         ),
     )
     workspace.write_digest(result.digest)

@@ -85,7 +85,7 @@ class PythonLockfileRequest:
             ),
             dest=subsystem.lockfile,
             description=f"Generate lockfile for {subsystem.options_scope}",
-            regenerate_command="./pants generate-lockfiles",
+            regenerate_command="./pants gen-lockfiles",
         )
 
     @property
@@ -167,7 +167,7 @@ class PythonToolLockfileSentinel:
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
-    name = "generate-lockfiles"
+    name = "gen-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
     required_union_implementations = (PythonToolLockfileSentinel,)
 

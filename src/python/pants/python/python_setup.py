@@ -123,7 +123,7 @@ class PythonSetup(Subsystem):
                 "multiple lockfiles. This option's behavior may change without the normal "
                 "deprecation cycle.\n\n"
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants generate-user-lockfile ::`.\n\n"
+                "and run `./pants gen-user-lockfile ::`.\n\n"
                 "Mutually exclusive with `[python-setup].requirement_constraints`."
             ),
         )
@@ -138,7 +138,7 @@ class PythonSetup(Subsystem):
             default=None,
             help=(
                 "If set, Pants will instruct your users to run a custom command to regenerate "
-                "lockfiles, rather than running `./pants generate-lockfiles` like normal."
+                "lockfiles, rather than running `./pants gen-lockfiles` like normal."
                 "\n\nThis option is experimental and it may change at any time without the normal "
                 "deprecation cycle."
             ),
