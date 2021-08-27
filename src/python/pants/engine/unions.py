@@ -3,47 +3,18 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Iterable, Mapping, Protocol, Type, TypeVar, runtime_checkable
+from typing import Any, DefaultDict, Iterable, Mapping, Type, TypeVar
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class UnionBaseMetaclass(type):
-    # This trick with UnionBase just shows that it does NOT work well.
-    """Turn UnionBase derived classes into runtime checkable Protocol classes.
-
-    This trick fools mypy into not seeing the resulting class as being a Protocol, however.
-    """
-
-    def __new__(meta_cls, name, bases, namespace):
-        if name == "UnionBase":
-            cls = type.__new__(meta_cls, name, bases, namespace)
-        else:
-            meta_cls = type(Protocol)
-            if Protocol not in bases:
-                bases = (*bases, Protocol)
-
-            cls = runtime_checkable(
-                meta_cls.__new__(
-                    meta_cls,
-                    name,
-                    tuple(base for base in bases if base.__name__ != "UnionBase"),
-                    namespace,
-                )
-            )
-        return cls
-
-
-class UnionBase(metaclass=UnionBaseMetaclass):
-    """We require runtime checkable Protocol classes.
-
-    Deriving from this class make the user code cleaner, but does not work as regular Protocol
-    classes, as mypy fails to detect them as such.
-    """
+class UnionBase(ABC):
+    """Abstract base class for Unions."""
 
 
 @decorated_type_checkable
@@ -67,8 +38,21 @@ def union(cls):
 
 
 def is_union(input_type: type) -> bool:
-    """Return whether or not a type has been annotated with `@union`."""
-    return union.is_instance(input_type)
+    """Return whether or not a type has been annotated with `@union`, or derives from the UnionBase
+    ABC."""
+    return union.is_instance(input_type) or issubclass(input_type, UnionBase)
+
+
+def is_union_member(member, base: type) -> bool:
+    """Return whether or not a type is a union member for a given union base."""
+    if union.is_instance(base):
+        # we have no way of knowing this for old style unions
+        return True
+
+    if issubclass(base, UnionBase):
+        return issubclass(member, base)
+
+    return False
 
 
 @dataclass(frozen=True)
@@ -80,38 +64,30 @@ class UnionRule:
     union_member: Type
 
     def __post_init__(self) -> None:
-        if getattr(self.union_base, "_is_protocol", False):
-            self.__check_union_protocol()
-        else:
-            self.__check_decorated_union()
-
-    def __check_union_protocol(self):
-        if not getattr(self.union_base, "_is_runtime_protocol", False):
-            raise ValueError(
-                "The first argument, {self.union_base}, must either be decorated "
-                "with @typing.runtime_checkable in order to check the Union Protocol, "
-                "or derive from pants.engine.unions.UnionBase."
-            )
-
-        if not issubclass(self.union_member, self.union_base):
-            raise ValueError(
-                f"The second argument, {self.union_member}, must satisfy the "
-                f"union Protocol {self.union_base}."
-            )
-
-    def __check_decorated_union(self):
-        if union.is_instance(self.union_base):
+        if is_union_member(self.union_member, self.union_base):
             return
 
-        msg = (
-            f"The first argument must be a class annotated with @union "
-            f"(from pants.engine.unions), but was {self.union_base}."
-        )
-        if union.is_instance(self.union_member):
-            msg += (
-                "\n\nHowever, the second argument was annotated with `@union`. Did you "
-                "switch the first and second arguments to `UnionRule()`?"
+        if is_union(self.union_base):
+            msg = (
+                f"The second argument, the union member {self.union_member}, must "
+                f"inherit from the first argument, the union base {self.union_base}."
             )
+            if is_union_member(self.union_base, self.union_member):
+                msg += (
+                    "\n\nHowever, the first argument inherits from the second. "
+                    "You have switched the first and second arguments to `UnionRule()`."
+                )
+        else:
+            msg = (
+                f"The first argument must be a class either annotated with @union or inheriting "
+                f"from UnionBase (from pants.engine.unions), but was {self.union_base}."
+            )
+            if union.is_instance(self.union_member):
+                msg += (
+                    "\n\nHowever, the second argument was annotated with `@union`. Did you "
+                    "switch the first and second arguments to `UnionRule()`?"
+                )
+
         raise ValueError(msg)
 
 
