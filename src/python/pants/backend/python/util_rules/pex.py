@@ -17,7 +17,10 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import LockfileMetadata
+from pants.backend.experimental.python.lockfile_metadata import (
+    InvalidLockfileReason,
+    LockfileMetadata,
+)
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -413,15 +416,7 @@ async def build_pex(
 
         requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
         metadata = LockfileMetadata.from_lockfile(requirements_file_digest_contents[0].content)
-        if not metadata.is_valid_for(
-            request.requirements.lockfile_hex_digest,
-            request.interpreter_constraints,
-            python_setup.interpreter_universe,
-        ):
-            if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
-            elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
+        _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
@@ -430,15 +425,7 @@ async def build_pex(
         argv.extend(["--requirement", file_content.path])
 
         metadata = LockfileMetadata.from_lockfile(file_content.content)
-        if not metadata.is_valid_for(
-            request.requirements.lockfile_hex_digest,
-            request.interpreter_constraints,
-            python_setup.interpreter_universe,
-        ):
-            if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-                raise ValueError("Invalid lockfile provided. [TODO(#12314): Improve message]")
-            elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
-                logger.warning("%s", "Invalid lockfile provided. [TODO(#12314): Improve message]")
+        _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
@@ -490,6 +477,60 @@ async def build_pex(
     return BuildPexResult(
         result=result, pex_filename=request.output_filename, digest=digest, python=python
     )
+
+
+def _validate_metadata(
+    metadata: LockfileMetadata,
+    request: PexRequest,
+    requirements: (Lockfile | LockfileContent),
+    python_setup: PythonSetup,
+) -> None:
+
+    validation = metadata.is_valid_for(
+        requirements.lockfile_hex_digest,
+        request.interpreter_constraints,
+        python_setup.interpreter_universe,
+    )
+
+    if validation:
+        return
+
+    message_parts = [
+        f"Invalid lockfile for PEX request `{request.output_filename}`.",
+        "\n",
+    ]
+
+    if InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH in validation.failure_reasons:
+        message_parts.append(
+            "The requirements set for this PEX request are different to the requirements set when "
+            "the lockfile was generated. To fix this, you will need to regenerate the lockfile. "
+        )
+        message_parts.append(
+            f"(Expected requirements digest: {requirements.lockfile_hex_digest}, "
+            "actual: {metadata.requirements_invalidation_digest})"
+        )
+        message_parts.append("\n")
+
+    if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+        message_parts.append(
+            "The lockfile was generated under interpreter constraints "
+            f"({ metadata.valid_for_interpreter_constraints }) that are incompatible with the "
+            f"constraints set in the project ({request.interpreter_constraints }). If you have "
+            "overridden your project's interpreter constraints, you can update them to specify a "
+            "subset of the interpreters specified in the lockfile. If  not, you will need to "
+            "regenerate your lockfile. "
+        )
+
+    message_parts.append(
+        "To regenerate the lockfile, follow the instructions in the header of the lockfile."
+    )
+
+    message = "\n".join(message_parts).strip()
+
+    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
+        raise ValueError(message)
+    elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
+        logger.warning("%s", message)
 
 
 def _build_pex_description(request: PexRequest) -> str:

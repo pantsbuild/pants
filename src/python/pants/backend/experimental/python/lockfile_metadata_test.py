@@ -124,10 +124,12 @@ def test_invalidation_digest() -> None:
 def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
     m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
     assert (
-        m.is_valid_for(
-            user_digest,
-            InterpreterConstraints(user_ic),
-            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+        bool(
+            m.is_valid_for(
+                user_digest,
+                InterpreterConstraints(user_ic),
+                ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            )
         )
         == matches
     )
