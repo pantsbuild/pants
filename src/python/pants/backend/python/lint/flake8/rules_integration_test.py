@@ -122,21 +122,23 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    extra_args = ["--flake8-lockfile=<none>"]
+
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_flake8(rule_runner, [py2_tgt])
+    py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 1
     assert "f.py:1:8: E999 SyntaxError" in py2_result[0].stdout
 
     py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_flake8(rule_runner, [py3_tgt])
+    py3_result = run_flake8(rule_runner, [py3_tgt], extra_args=extra_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
     assert py3_result[0].stdout.strip() == ""
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py2
     # to still fail, but Py3 should pass.
-    combined_result = run_flake8(rule_runner, [py2_tgt, py3_tgt])
+    combined_result = run_flake8(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
     batched_py3_result, batched_py2_result = sorted(
         combined_result, key=lambda result: result.exit_code

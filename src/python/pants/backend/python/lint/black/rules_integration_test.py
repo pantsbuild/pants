@@ -99,10 +99,13 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    interpreter_constraint = (
+        ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
+    )
     lint_results, fmt_result = run_black(
         rule_runner,
         [tgt],
-        extra_args=[f"--black-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[f"--black-interpreter-constraints=['{interpreter_constraint}']"],
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
