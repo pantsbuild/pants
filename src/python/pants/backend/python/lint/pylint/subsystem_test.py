@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,

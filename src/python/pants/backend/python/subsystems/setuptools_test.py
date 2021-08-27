@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setuptools import SetuptoolsLockfileSentinel

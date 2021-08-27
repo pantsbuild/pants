@@ -8,10 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField, PythonSources
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField

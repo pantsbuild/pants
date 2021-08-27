@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.flake8 import skip_field
 from pants.backend.python.lint.flake8.subsystem import Flake8LockfileSentinel
 from pants.backend.python.lint.flake8.subsystem import rules as subsystem_rules

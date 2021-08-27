@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (

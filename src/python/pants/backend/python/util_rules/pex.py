@@ -17,15 +17,15 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile_metadata import (
-    InvalidLockfileReason,
-    LockfileMetadata,
-)
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
+    InvalidLockfileReason,
+    LockfileMetadata,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
