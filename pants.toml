@@ -73,7 +73,6 @@ root_patterns = [
 
 [python-setup]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
-experimental_lockfile_custom_regeneration_command = "build-support/bin/generate_all_lockfiles.sh"
 interpreter_constraints = [">=3.7,<3.10"]
 
 [ipython]
@@ -185,6 +184,9 @@ lockfile = "3rdparty/python/lockfiles/coverage_py.txt"
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[generate-lockfiles]
+custom_regen_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [toolchain-setup]
 repo = "pants"
