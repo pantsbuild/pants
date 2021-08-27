@@ -30,6 +30,7 @@ from pants.backend.python.util_rules.pex_environment import (
     PexRuntimeEnvironment,
     PythonExecutable,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -39,7 +40,6 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
-    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
 )

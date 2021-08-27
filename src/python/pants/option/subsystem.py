@@ -12,7 +12,7 @@ from typing import Any, ClassVar, Optional, Type, TypeVar
 from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.scope import Scope, ScopedOptions, ScopeInfo
+from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -36,7 +36,7 @@ class Subsystem(metaclass=ABCMeta):
     deprecated_options_scope: Optional[str] = None
     deprecated_options_scope_removal_version: Optional[str] = None
 
-    _scope_name_component_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
+    _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @classmethod
     def signature(cls):
@@ -49,7 +49,7 @@ class Subsystem(metaclass=ABCMeta):
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
         # visualize functions in error messages and the rule graph.
-        snake_scope = cls.options_scope.replace("-", "_")
+        snake_scope = normalize_scope(cls.options_scope)
         name = f"construct_scope_{snake_scope}"
         partial_construct_subsystem.__name__ = name
         partial_construct_subsystem.__module__ = cls.__module__
@@ -65,15 +65,15 @@ class Subsystem(metaclass=ABCMeta):
         )
 
     @classmethod
-    def is_valid_scope_name_component(cls, s: str) -> bool:
-        return s == "" or cls._scope_name_component_re.match(s) is not None
+    def is_valid_scope_name(cls, s: str) -> bool:
+        return s == "" or cls._scope_name_re.match(s) is not None
 
     @classmethod
     def validate_scope(cls) -> None:
         options_scope = getattr(cls, "options_scope", None)
         if options_scope is None:
             raise OptionsError(f"{cls.__name__} must set options_scope.")
-        if not cls.is_valid_scope_name_component(options_scope):
+        if not cls.is_valid_scope_name(options_scope):
             raise OptionsError(
                 f'Options scope "{options_scope}" is not valid:\nReplace in code with a new '
                 "scope name consisting of only lower-case letters, digits, underscores, "

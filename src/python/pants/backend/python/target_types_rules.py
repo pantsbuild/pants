@@ -31,8 +31,9 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,

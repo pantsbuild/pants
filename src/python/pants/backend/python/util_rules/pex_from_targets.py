@@ -31,8 +31,9 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,

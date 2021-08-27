@@ -261,7 +261,7 @@ def test_get_all_help_info():
 
     options = Options.create(
         env={},
-        config=Config.load_file_contents(""),
+        config=Config.load([]),
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants"],
         bootstrap_option_values=None,

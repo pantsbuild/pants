@@ -10,6 +10,7 @@ import ijson
 
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import GoModuleSources
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -32,7 +33,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)

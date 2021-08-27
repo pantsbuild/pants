@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shlex
 import unittest.mock
 from contextlib import contextmanager
@@ -47,7 +46,6 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.contextutil import temporary_file, temporary_file_path
-from pants.util.dirutil import safe_mkdtemp
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
@@ -79,9 +77,7 @@ def create_options(
 ) -> Options:
     options = Options.create(
         env=env or {},
-        config=Config.load_file_contents(
-            [FileContent("pants.toml", toml.dumps(config or {}).encode())]
-        ),
+        config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
         known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
         args=["./pants", *(args or ())],
     )
@@ -511,9 +507,7 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
 class OptionsTest(unittest.TestCase):
     @staticmethod
     def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
-        with open(os.path.join(safe_mkdtemp(), "test_config.toml"), "w") as fp:
-            toml.dump(config or {}, fp)
-        return Config.load(config_paths=[fp.name])
+        return Config.load([FileContent("test_config.toml", toml.dumps(config or {}).encode())])
 
     def _parse(
         self,
