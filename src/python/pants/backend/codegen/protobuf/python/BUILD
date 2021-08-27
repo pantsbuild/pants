@@ -1,7 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library()
+python_library(dependencies=[":lockfile"])
+resources(name="lockfile", sources=["mypy_protobuf_lockfile.txt"])
 
 python_tests(
     name="python_protobuf_module_mapper_test", sources=["python_protobuf_module_mapper_test.py"]
