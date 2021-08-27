@@ -228,7 +228,6 @@ async def generate_lockfiles_goal(
         for req in determine_resolves_to_generate(
             all_requests, generate_lockfiles_subsystem.resolve_names
         )
-        if req.lockfile_dest not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}
     )
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
@@ -245,9 +244,13 @@ class UnrecognizedResolveNamesError(Exception):
 def determine_resolves_to_generate(
     all_tool_lockfile_requests: Sequence[PythonLockfileRequest],
     requested_resolve_names: Sequence[str],
-) -> Sequence[PythonLockfileRequest]:
+) -> list[PythonLockfileRequest]:
     if not requested_resolve_names:
-        return all_tool_lockfile_requests
+        return [
+            req
+            for req in all_tool_lockfile_requests
+            if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE)
+        ]
 
     resolve_names_to_requests = {
         request.resolve_name: request for request in all_tool_lockfile_requests
@@ -258,7 +261,18 @@ def determine_resolves_to_generate(
     for resolve_name in requested_resolve_names:
         request = resolve_names_to_requests.get(resolve_name)
         if request:
-            specified_requests.append(request)
+            if request.lockfile_dest in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
+                logger.warning(
+                    f"You requested to generate a lockfile for {request.resolve_name} because "
+                    "you included it in `--generate-lockfile-resolves`, but "
+                    f"`[{request.resolve_name}].lockfile` is set to `{request.lockfile_dest}` "
+                    "so a lockfile will not be generated.\n\n"
+                    f"If you would like to generate a lockfile for {request.resolve_name}, please "
+                    f"set `[{request.resolve_name}].lockfile` to the path where it should be "
+                    "generated and run again. "
+                )
+            else:
+                specified_requests.append(request)
         else:
             unrecognized_resolve_names.append(resolve_name)
 
@@ -268,7 +282,7 @@ def determine_resolves_to_generate(
             unrecognized_str = unrecognized_resolve_names[0]
             name_description = "name"
         else:
-            unrecognized_str = sorted(unrecognized_resolve_names)
+            unrecognized_str = str(sorted(unrecognized_resolve_names))
             name_description = "names"
         raise UnrecognizedResolveNamesError(
             f"Unrecognized resolve {name_description} from the option "
