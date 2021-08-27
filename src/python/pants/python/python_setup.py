@@ -149,11 +149,8 @@ class PythonSetup(Subsystem):
             type=InvalidLockfileBehavior,
             default=InvalidLockfileBehavior.error,
             help=(
-                "The behavior when a lockfile has invalid requirements or interpreter constraints "
-                "from what the current build is using.\n\n"
-                "(When a lockfile is invalid, you either need to regenerate the lockfile with "
-                "`./pants generate-lockfiles` or change your requirements and interpreter "
-                "constraints to be compatible.)\n\n"
+                "The behavior when a lockfile has requirements or interpreter constraints that are "
+                "not compatible with what the current build is using.\n\n"
                 "We recommend keeping the default of `error` for CI builds."
             ),
         )
