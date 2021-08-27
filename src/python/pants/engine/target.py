@@ -1276,11 +1276,27 @@ class DictStringToStringSequenceField(Field):
 
 
 class Sources(StringSequenceField, AsyncFieldMixin):
+    """The Sources field represents a collection of source files.
+
+    Subclasses may set the following class properties:
+    - `expected_file_extensions` -- A tuple of strings containing the expected file extensions for source
+       files. The default is no expected file extensions.
+    - `expected_num_files` -- An integer or range stating the expected total number of source files. The default
+      is no limit on the number of source files.
+    - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files referenced
+      by this field.
+    - `indivisible` -- The Target API by default will split targets into per-file subtargets for each source
+      file. Set this property to `True` to opt-out of that spliting by marking the source files as "indivisible"
+      such that the Target API will never split targets containing this field into per-file subtargets.
+    """
+
     alias = "sources"
+
     expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
     indivisible: ClassVar[bool] = False
+
     help = (
         "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
         "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
