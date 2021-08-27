@@ -153,7 +153,7 @@ async def generate_lockfile(
         regenerate_command=(
             python_setup.lockfile_custom_regeneration_command
             or req._regenerate_command
-            or f"./pants generate-lockfiles --resolves={req.resolve_name}"
+            or f"./pants generate-lockfiles --resolve={req.resolve_name}"
         ),
     )
     final_lockfile_digest = await Get(
@@ -181,21 +181,18 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--resolves",
+            "--resolve",
             type=list,
             member_type=str,
+            advanced=False,
             help=(
-                "Only generate lockfiles for the specified resolves.\n\n"
+                "Only generate lockfiles for the specified resolve(s).\n\n"
                 "For now, resolves are the options scope for each Python tool that supports "
                 "lockfiles, such as `black`, `pytest`, and `mypy-protobuf`. For example, you can "
-                "set `--resolve=['black', 'pytest']` to only generate the lockfile for those two "
-                "tools.\n\n"
+                "run `./pants generate-lockfiles --resolve=black --resolve=pytest` to only "
+                "generate the lockfile for those two tools.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
                 "possible values.\n\n"
-                "(In Pants 2.8+, you will also be able to define resolves for your own code. "
-                "This means that you will be able to have multiple lockfiles for your project and "
-                "to give a name to each, such as {'py2': '3rdparty/py2_lockfile.txt', "
-                "'data-science': '3rdparty/data_science_lockfile.txt'}.)\n\n"
                 "If not specified, will generate for all resolves."
             ),
         )
@@ -264,12 +261,12 @@ def determine_resolves_to_generate(
             if request.lockfile_dest in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
                 logger.warning(
                     f"You requested to generate a lockfile for {request.resolve_name} because "
-                    "you included it in `--generate-lockfile-resolves`, but "
+                    "you included it in `--generate-lockfiles-resolve`, but "
                     f"`[{request.resolve_name}].lockfile` is set to `{request.lockfile_dest}` "
                     "so a lockfile will not be generated.\n\n"
                     f"If you would like to generate a lockfile for {request.resolve_name}, please "
                     f"set `[{request.resolve_name}].lockfile` to the path where it should be "
-                    "generated and run again. "
+                    "generated and run again."
                 )
             else:
                 specified_requests.append(request)
@@ -286,7 +283,7 @@ def determine_resolves_to_generate(
             name_description = "names"
         raise UnrecognizedResolveNamesError(
             f"Unrecognized resolve {name_description} from the option "
-            f"`[generate-lockfiles].resolves`: {unrecognized_str}\n\n"
+            f"`--generate-lockfiles-resolve`: {unrecognized_str}\n\n"
             f"All valid resolve names: {sorted(resolve_names_to_requests.keys())}"
         )
 

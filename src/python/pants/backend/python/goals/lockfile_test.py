@@ -47,14 +47,14 @@ def test_determine_resolves_to_generate(caplog) -> None:
     with pytest.raises(UnrecognizedResolveNamesError) as exc:
         assert_chosen(["fake"], [])
     assert (
-        "Unrecognized resolve name from the option `[generate-lockfiles].resolves`: fake\n\n"
+        "Unrecognized resolve name from the option `--generate-lockfiles-resolve`: fake\n\n"
         "All valid resolve names: ['default', 'none', 'tool1', 'tool2', 'tool3']"
     ) in str(exc.value)
 
     with pytest.raises(UnrecognizedResolveNamesError) as exc:
         assert_chosen(["fake1", "fake2"], [])
     assert (
-        "Unrecognized resolve names from the option `[generate-lockfiles].resolves`: "
+        "Unrecognized resolve names from the option `--generate-lockfiles-resolve`: "
         "['fake1', 'fake2']"
     ) in str(exc.value)
 
