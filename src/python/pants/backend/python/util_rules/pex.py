@@ -507,7 +507,7 @@ def _validate_metadata(
         )
         message_parts.append(
             f"(Expected requirements digest: {requirements.lockfile_hex_digest}, "
-            "actual: {metadata.requirements_invalidation_digest})"
+            f"actual: {metadata.requirements_invalidation_digest})"
         )
         message_parts.append("\n")
 
