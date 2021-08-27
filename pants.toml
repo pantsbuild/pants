@@ -186,7 +186,7 @@ lockfile = "3rdparty/python/lockfiles/coverage_py.txt"
 config = "@build-support/regexes/config.yaml"
 
 [generate-lockfiles]
-custom_regen_command = "build-support/bin/generate_all_lockfiles.sh"
+custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [toolchain-setup]
 repo = "pants"

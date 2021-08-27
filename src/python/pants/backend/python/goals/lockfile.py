@@ -73,7 +73,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             ),
         )
         register(
-            "--custom-regen-command",
+            "--custom-command",
             advanced=True,
             type=str,
             default=None,
@@ -88,8 +88,8 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         return tuple(self.options.resolve)
 
     @property
-    def custom_regen_command(self) -> str | None:
-        return cast("str | None", self.options.custom_regen_command)
+    def custom_command(self) -> str | None:
+        return cast("str | None", self.options.custom_command)
 
 
 # --------------------------------------------------------------------------------------
@@ -213,7 +213,7 @@ async def generate_lockfile(
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
-            generate_lockfiles_subsystem.custom_regen_command
+            generate_lockfiles_subsystem.custom_command
             or req._regenerate_command
             or f"./pants generate-lockfiles --resolve={req.resolve_name}"
         ),
