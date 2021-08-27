@@ -92,6 +92,7 @@ async def package_python_awslambda(
         requirements=lambdex.pex_requirements(),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
+        options_scope_name=lambdex.options_scope,
     )
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(

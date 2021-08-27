@@ -50,6 +50,7 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
             requirements=bandit.pex_requirements(),
             interpreter_constraints=partition.interpreter_constraints,
             main=bandit.main,
+            options_scope_name=bandit.options_scope,
         ),
     )
 

@@ -85,6 +85,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
             requirements=isort.pex_requirements(),
             interpreter_constraints=isort.interpreter_constraints,
             main=isort.main,
+            options_scope_name=isort.options_scope,
         ),
     )
     source_files_get = Get(

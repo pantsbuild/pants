@@ -337,6 +337,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
             requirements=coverage.pex_requirements(),
             interpreter_constraints=coverage.interpreter_constraints,
             main=coverage.main,
+            options_scope_name=coverage.options_scope,
         ),
     )
     return CoverageSetup(pex)

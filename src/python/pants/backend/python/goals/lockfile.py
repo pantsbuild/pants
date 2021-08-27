@@ -173,6 +173,7 @@ async def generate_lockfile(
             interpreter_constraints=poetry_subsystem.interpreter_constraints,
             main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
             sources=launcher_digest,
+            options_scope_name=poetry_subsystem.options_scope,
         ),
     )
 

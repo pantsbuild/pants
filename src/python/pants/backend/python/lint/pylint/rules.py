@@ -109,6 +109,7 @@ async def pylint_lint_partition(
                 extra_requirements=first_party_plugins.requirement_strings,
             ),
             interpreter_constraints=partition.interpreter_constraints,
+            options_scope_name=pylint.options_scope,
         ),
     )
 

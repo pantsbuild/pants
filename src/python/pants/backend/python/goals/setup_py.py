@@ -422,6 +422,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             internal_only=True,
             requirements=setuptools.pex_requirements(),
             interpreter_constraints=req.interpreter_constraints,
+            options_scope_name=setuptools.options_scope,
         ),
     )
 

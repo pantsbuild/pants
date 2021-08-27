@@ -49,6 +49,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
             requirements=flake8.pex_requirements(),
             interpreter_constraints=partition.interpreter_constraints,
             main=flake8.main,
+            options_scope_name=flake8.options_scope,
         ),
     )
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
