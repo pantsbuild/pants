@@ -13,6 +13,8 @@ python_tests(
 
 python_tests(name="coverage_py_test", sources=["coverage_py_test.py"], timeout=20)
 
+python_tests(name="lockfile_test", sources=["lockfile_test.py"])
+
 python_tests(
     name="package_pex_binary_integration",
     sources=["package_pex_binary_integration_test.py"],

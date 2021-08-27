@@ -67,14 +67,15 @@ async def generate_user_lockfile_goal(
             reqs.req_strings,
             # TODO(#12314): Use interpreter constraints from the transitive closure.
             InterpreterConstraints(python_setup.interpreter_constraints),
-            dest=python_setup.lockfile,
-            description=(
+            resolve_name="not yet implemented",
+            lockfile_dest=python_setup.lockfile,
+            _description=(
                 f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirement')}: "
                 f"{', '.join(reqs.req_strings)}"
             ),
             # TODO(12382): Make this command actually accurate once we figure out the semantics
             #  for user lockfiles. This is currently misleading.
-            regenerate_command="./pants generate-user-lockfile ::",
+            _regenerate_command="./pants generate-user-lockfile ::",
         ),
     )
     workspace.write_digest(result.digest)
