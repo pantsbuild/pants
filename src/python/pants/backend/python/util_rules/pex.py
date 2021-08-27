@@ -323,14 +323,67 @@ class BuildPexResult:
         )
 
 
+@dataclass(frozen=True)
+class BuildPexComponentResult:
+    """A wrapper around BuildPexResult to enable iterativately building a PEX from multiple PEXes.
+
+    TODO: The `BuildPexResult` rule is not able to recurse on itself due to a bad @rule graph
+    interplay with the mypy+protobuf rules (which request a PEX during the generation of sources).
+    So instead, this rule adjusts the PexRequest and requests the dependencies first. See if this
+    trampoline can be removed once https://github.com/pantsbuild/pants/issues/11269 is fixed.
+    """
+
+    result: BuildPexResult
+
+
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
+    request: PexRequest,
+) -> BuildPexResult:
+    # If there are requirements and we're resolving from ResolvedDistributions, request
+    # individual PEX files for each requirement, and then compose them using the
+    # PEX_PATH. This is much friendlier to the cache, because unlike a monolithic PEX,
+    # per-requirement PEX files can be deduped in the CAS across many consumers.
+    #
+    # TODO: Note that due to https://github.com/pantsbuild/pex/issues/1423, the PEX files
+    # resolved here are each transitive, meaning that when the root requirements have
+    # overlapping transitive dependencies, the PEXes will contain redundant-but-identical
+    # content. This is still much less redundant than a direct subset though:
+    #  see https://github.com/pantsbuild/pants/issues/12688
+    reqs = request.requirements
+    if isinstance(reqs, PexRequirements) and reqs.resolved_dists and reqs.req_strings:
+        partial_results = await MultiGet(
+            Get(
+                BuildPexComponentResult,
+                PexRequest,
+                dataclasses.replace(
+                    request,
+                    requirements=dataclasses.replace(
+                        request.requirements, req_strings=(req_string,)
+                    ),
+                    output_filename=f"__reqs/{path_safe(req_string)}.pex",
+                ),
+            )
+            for req_string in reqs.req_strings
+        )
+        request = dataclasses.replace(
+            request,
+            requirements=dataclasses.replace(request.requirements, req_strings=()),
+            pex_path=request.pex_path + tuple(p.result.create_pex() for p in partial_results),
+        )
+
+    partial = await Get(BuildPexComponentResult, PexRequest, request)
+    return partial.result
+
+
+@rule(level=LogLevel.DEBUG)
+async def build_pex_component(
     request: PexRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
-) -> BuildPexResult:
+) -> BuildPexComponentResult:
     """Returns a PEX with the given settings."""
     argv = ["--output-file", request.output_filename, *request.additional_args]
 
@@ -434,7 +487,6 @@ async def build_pex(
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
         assert isinstance(request.requirements, PexRequirements)
-        req_strings = request.requirements.req_strings
 
         # If constraints should be applied and are set, capture them.
         if (
@@ -451,34 +503,7 @@ async def build_pex(
                 ),
             )
 
-        # If there is more than one requirement and we're resolving from ResolvedDistributions,
-        # recurse to create individual PEX files from each requirement, and then compose them
-        # using the PEX_PATH. This is much friendlier to the cache, because unlike a monolithic
-        # PEX, per-requirement PEX files can be deduped in the CAS across many consumers.
-        #
-        # TODO: Note that due to https://github.com/pantsbuild/pex/issues/1423, the PEX files
-        # resolved here are each transitive, meaning that when the root requirements have
-        # overlapping transitive dependencies, the PEXes will contain redundant-but-identical
-        # content. This is still much less redundant than a direct subset though:
-        #  see https://github.com/pantsbuild/pants/issues/12688
-        if resolved_dists and len(req_strings) > 1:
-            single_entry_pexes = await MultiGet(
-                Get(
-                    Pex,
-                    PexRequest,
-                    dataclasses.replace(
-                        request,
-                        requirements=dataclasses.replace(
-                            request.requirements, req_strings=(req_string,)
-                        ),
-                        output_filename=f"__reqs/{path_safe(req_string)}.pex",
-                    ),
-                )
-                for req_string in req_strings
-            )
-            pex_path.extend(single_entry_pexes)
-        else:
-            argv.extend(req_strings)
+        argv.extend(request.requirements.req_strings)
 
     # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
     #  requirements, which could lead to problems. Support shading python binaries.
@@ -530,12 +555,14 @@ async def build_pex(
         else result.output_digest
     )
 
-    return BuildPexResult(
-        result=result,
-        pex_filename=request.output_filename,
-        digest=digest,
-        python=python,
-        pex_path=tuple(pex_path),
+    return BuildPexComponentResult(
+        BuildPexResult(
+            result=result,
+            pex_filename=request.output_filename,
+            digest=digest,
+            python=python,
+            pex_path=tuple(pex_path),
+        )
     )
 
 
