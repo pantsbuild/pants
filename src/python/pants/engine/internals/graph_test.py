@@ -308,6 +308,35 @@ def test_transitive_targets_tolerates_subtarget_cycles(
     ]
 
 
+def test_unexpanded_transitive_targets(
+    transitive_targets_rule_runner: RuleRunner,
+) -> None:
+    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='dep', sources=['dep.txt'])
+            target(name='t1', sources=['t1.txt'], dependencies=[':dep'])
+            target(name='t2', sources=['t2.txt'], dependencies=[':t1'])
+            """
+        ),
+    )
+    result = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [TransitiveTargetsRequest([Address("", target_name="t2")], expand_targets=False)],
+    )
+    assert len(result.roots) == 1
+    assert result.roots[0].address == Address("", target_name="t2")
+    assert [tgt.address for tgt in result.dependencies] == [
+        Address("", target_name="t1"),
+        Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", target_name="dep"),
+        Address("", relative_file_path="t1.txt", target_name="t1"),
+        Address("", relative_file_path="dep.txt", target_name="dep"),
+    ]
+
+
 def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     """CoarsenedTargets should "coarsen" a cycle into a single CoarsenedTarget instance.
 
