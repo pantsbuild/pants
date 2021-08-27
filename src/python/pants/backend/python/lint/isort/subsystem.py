@@ -21,7 +21,6 @@ class Isort(PythonToolBase):
     help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
 
     default_version = "isort[pyproject,colors]>=5.5.1,<5.6"
-    default_extra_requirements = ["setuptools"]
     default_main = ConsoleScript("isort")
 
     register_interpreter_constraints = True
