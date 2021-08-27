@@ -147,11 +147,11 @@ class PythonSetup(Subsystem):
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
-            default=InvalidLockfileBehavior.ignore,
+            default=InvalidLockfileBehavior.error,
             help=(
-                "Set the behavior when Pants encounters a lockfile that was generated with different "
-                "requirements or interpreter constraints than those currently specified.\n\n"
-                "We strongly recommend setting to `error` in CI or release builds."
+                "The behavior when a lockfile has requirements or interpreter constraints that are "
+                "not compatible with what the current build is using.\n\n"
+                "We recommend keeping the default of `error` for CI builds."
             ),
         )
         register(
