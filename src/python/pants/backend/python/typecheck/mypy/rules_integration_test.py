@@ -104,6 +104,7 @@ def assert_success(
     assert result[0].report == EMPTY_DIGEST
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
     all_major_minor_python_versions(MyPy.default_interpreter_constraints),

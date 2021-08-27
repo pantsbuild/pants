@@ -80,6 +80,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(files)])
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
     all_major_minor_python_versions(Yapf.default_interpreter_constraints),

@@ -234,6 +234,7 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
     assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
     all_major_minor_python_versions(PythonProtobufMypyPlugin.default_interpreter_constraints),
