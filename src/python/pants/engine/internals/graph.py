@@ -320,7 +320,9 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
 async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
 
-    dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    dependency_mapping = await Get(
+        _DependencyMapping, _DependencyMappingRequest(request, request.expand_targets)
+    )
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()

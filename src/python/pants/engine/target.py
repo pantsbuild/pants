@@ -651,12 +651,18 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     include_special_cased_deps: bool
+    expand_targets: bool
 
     def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+        self,
+        roots: Iterable[Address],
+        *,
+        include_special_cased_deps: bool = False,
+        expand_targets: bool = True,
     ) -> None:
         self.roots = tuple(roots)
         self.include_special_cased_deps = include_special_cased_deps
+        self.expand_targets = expand_targets
 
 
 @frozen_after_init
