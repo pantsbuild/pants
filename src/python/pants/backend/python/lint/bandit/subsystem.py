@@ -48,8 +48,7 @@ class Bandit(PythonToolBase):
     default_version = "bandit>=1.7.0,<1.8"
     default_extra_requirements = [
         "setuptools<45; python_full_version == '2.7.*'",
-        "setuptools; python_version > '2.7'",
-        "stevedore<3",  # stevedore 3.0 breaks Bandit.
+        "setuptools; python_version >= '3.5'",
     ]
     default_main = ConsoleScript("bandit")
 
