@@ -4,7 +4,7 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "requirements_invalidation_digest": "91dc76503980fccbc9c1c91f4551db29273838cad28af5234ffcff6687ea7ff0",
+#   "requirements_invalidation_digest": "f2e4cbc0fd5ee18d6993d689a40be090b961fd7269c8d3c8b72416048e61fd58",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.6"
 #   ]
@@ -20,9 +20,9 @@ colorama==0.4.4; python_version >= "3.5" and python_full_version < "3.0.0" and p
 gitdb==4.0.7; python_version >= "3.6" \
     --hash=sha256:6c4cc71933456991da20917998acbe6cf4fb41eeaab7d6d67fbc05ecd4c865b0 \
     --hash=sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005
-gitpython==3.1.20; python_version >= "3.6" \
-    --hash=sha256:b1e1c269deab1b08ce65403cf14e10d2ef1f6c89e33ea7c5e5bb0222ea593b8a \
-    --hash=sha256:df0e072a200703a65387b0cfdf0466e3bab729c0458cf6b7349d0e9877636519
+gitpython==3.1.18; python_version >= "3.6" \
+    --hash=sha256:fce760879cd2aebd2991b3542876dc5c4a909b30c9d69dfc488e504a8db37ee8 \
+    --hash=sha256:b838a895977b45ab6f0cc926a9045c8d1c44e2b653c1fcc39fe91f42c6e8f05b
 importlib-metadata==4.7.1; python_version < "3.8" and python_version >= "3.6" \
     --hash=sha256:9e04bf59076a15a9b6dd9c27806e8fcdf15280ba529c6a8cc3f4d5b4875bdd61 \
     --hash=sha256:c4eb3dec5f697682e383a39701a7de11cd5c02daf8dd93534b69e3e6473f6b1b
