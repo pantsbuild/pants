@@ -34,7 +34,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, union
 from pants.python.python_setup import PythonSetup
@@ -126,6 +126,17 @@ async def generate_lockfile(
             input_digest=pyproject_toml_digest,
             output_files=("poetry.lock", "pyproject.toml"),
             description=req.description,
+            # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+            # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
+            # necessary so that our invalidation is resilient to deleting LMDB or running on a
+            # new machine.
+            #
+            # We disable caching with LMDB so that when you generate a lockfile, you always get
+            # the most up-to-date snapshot of the world. This is generally desirable and also
+            # necessary to avoid an awkward edge case where different developers generate different
+            # lockfiles even when generating at the same time. See
+            # https://github.com/pantsbuild/pants/issues/12591.
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
     poetry_export_result = await Get(
