@@ -149,6 +149,7 @@ class PythonToolRequirementsBase(Subsystem):
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
+                is_default_lockfile=True,
             )
         return Lockfile(
             file_path=self.lockfile,

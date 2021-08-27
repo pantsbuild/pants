@@ -76,6 +76,7 @@ class Lockfile:
 class LockfileContent:
     file_content: FileContent
     lockfile_hex_digest: str | None
+    is_default_lockfile: bool
 
 
 @frozen_after_init

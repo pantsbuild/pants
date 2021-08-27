@@ -526,7 +526,11 @@ def test_build_pex_description() -> None:
     )
 
     assert_description(
-        LockfileContent(file_content=FileContent("lock.txt", b""), lockfile_hex_digest=None),
+        LockfileContent(
+            file_content=FileContent("lock.txt", b""),
+            lockfile_hex_digest=None,
+            is_default_lockfile=False,
+        ),
         expected="Building new.pex from lock.txt",
     )
 
@@ -643,7 +647,9 @@ ansicolors==1.1.8
         )
     else:
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
-        requirements = LockfileContent(file_content=content, lockfile_hex_digest=expected_digest)
+        requirements = LockfileContent(
+            file_content=content, lockfile_hex_digest=expected_digest, is_default_lockfile=False
+        )
 
     create_pex_and_get_all_data(
         rule_runner,
