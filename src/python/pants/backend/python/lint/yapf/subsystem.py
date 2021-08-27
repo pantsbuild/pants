@@ -21,7 +21,7 @@ class Yapf(PythonToolBase):
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_version = "yapf==0.31.0"
-    default_extra_requirements = ["setuptools", "toml"]
+    default_extra_requirements = ["toml"]
     default_main = ConsoleScript("yapf")
 
     register_interpreter_constraints = True

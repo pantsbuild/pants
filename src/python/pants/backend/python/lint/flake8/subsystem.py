@@ -44,10 +44,6 @@ class Flake8(PythonToolBase):
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
     default_version = "flake8>=3.9.2,<4.0"
-    default_extra_requirements = [
-        "setuptools<45; python_full_version == '2.7.*'",
-        "setuptools; python_version > '2.7'",
-    ]
     default_main = ConsoleScript("flake8")
 
     register_lockfile = True

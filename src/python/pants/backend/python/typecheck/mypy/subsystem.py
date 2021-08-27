@@ -62,6 +62,7 @@ class MyPy(PythonToolBase):
 
     default_version = "mypy==0.910"
     default_main = ConsoleScript("mypy")
+
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
