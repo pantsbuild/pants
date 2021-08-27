@@ -87,7 +87,7 @@ class PythonToolRequirementsBase(Subsystem):
             register(
                 "--lockfile",
                 type=str,
-                default=NO_TOOL_LOCKFILE,
+                default=DEFAULT_TOOL_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"

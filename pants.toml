@@ -76,15 +76,8 @@ experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 experimental_lockfile_custom_regeneration_command = "build-support/bin/generate_all_lockfiles.sh"
 interpreter_constraints = [">=3.7,<3.10"]
 
-[ipython]
-lockfile = "<default>"
-
-[black]
-lockfile = "<default>"
-
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
-lockfile = "<default>"
 
 [flake8]
 config = "build-support/flake8/.flake8"
@@ -93,15 +86,6 @@ extra_requirements.add = [
   "flake8-2020>=1.6.0,<1.7.0"
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
-
-[isort]
-lockfile = "<default>"
-
-[setuptools]
-lockfile = "3rdparty/python/lockfiles/setuptools.txt"
-
-[mypy]
-lockfile = "<default>"
 
 [shellcheck]
 args = ["--external-sources"]
@@ -181,7 +165,6 @@ extra_env_vars = [
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
-lockfile = "3rdparty/python/lockfiles/coverage_py.txt"
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
