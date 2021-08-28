@@ -35,7 +35,7 @@ class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
     @classmethod

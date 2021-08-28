@@ -99,7 +99,7 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=5.0.3,<5.1"
+    default_version = "coverage[toml]>=5.5,<5.6"
     default_main = ConsoleScript("coverage")
 
     register_interpreter_constraints = True
@@ -152,9 +152,7 @@ class CoverageSubsystem(PythonToolBase):
                 "Path to an INI or TOML config file understood by coverage.py "
                 "(https://coverage.readthedocs.io/en/stable/config.html).\n\n"
                 f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location.\n\n"
-                "To use a TOML config file, you should add the `toml` library to "
-                "`[pytest].pytest_plugins`."
+                f"this option if the config is located in a non-standard location."
             ),
         )
         register(
