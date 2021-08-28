@@ -216,8 +216,8 @@ class CoverageSubsystem(PythonToolBase):
         return cast(bool, self.options.global_report)
 
 
-class CoveragePyLockfileSentinel:
-    pass
+class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = CoverageSubsystem.options_scope
 
 
 @rule

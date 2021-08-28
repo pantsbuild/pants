@@ -229,8 +229,8 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel:
-    pass
+class PylintLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Pylint.options_scope
 
 
 @rule(
@@ -246,6 +246,9 @@ async def setup_pylint_lockfile(
     pylint: Pylint,
     python_setup: PythonSetup,
 ) -> PythonLockfileRequest:
+    if not pylint.uses_lockfile:
+        return PythonLockfileRequest.from_tool(pylint)
+
     # While Pylint will run in partitions, we need a single lockfile that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
     #

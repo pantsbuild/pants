@@ -119,8 +119,8 @@ class Flake8(PythonToolBase):
         )
 
 
-class Flake8LockfileSentinel:
-    pass
+class Flake8LockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Flake8.options_scope
 
 
 @rule(
@@ -133,6 +133,9 @@ class Flake8LockfileSentinel:
 async def setup_flake8_lockfile(
     _: Flake8LockfileSentinel, flake8: Flake8, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not flake8.uses_lockfile:
+        return PythonLockfileRequest.from_tool(flake8)
+
     # While Flake8 will run in partitions, we need a single lockfile that works with every
     # partition.
     #

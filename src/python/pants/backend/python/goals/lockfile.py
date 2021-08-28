@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Sequence, cast
+from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 @union
 class PythonToolLockfileSentinel:
-    pass
+    options_scope: ClassVar[str]
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -128,6 +128,13 @@ class PythonLockfileRequest:
         rather than the option `--interpreter-constraints`, you must pass the arg
         `interpreter_constraints`.
         """
+        if not subsystem.uses_lockfile:
+            return cls(
+                FrozenOrderedSet(),
+                InterpreterConstraints(),
+                resolve_name=subsystem.options_scope,
+                lockfile_dest=subsystem.lockfile,
+            )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
             interpreter_constraints=(

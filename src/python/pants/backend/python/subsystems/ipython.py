@@ -47,8 +47,8 @@ class IPython(PythonToolBase):
         )
 
 
-class IPythonLockfileSentinel:
-    pass
+class IPythonLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = IPython.options_scope
 
 
 @rule(
@@ -61,6 +61,9 @@ class IPythonLockfileSentinel:
 async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not ipython.uses_lockfile:
+        return PythonLockfileRequest.from_tool(ipython)
+
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
     # `./pants repl py2::` and then `./pants repl py3::`. Still, even with those subsets possible,

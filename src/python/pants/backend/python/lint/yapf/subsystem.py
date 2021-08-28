@@ -116,8 +116,8 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel:
-    pass
+class YapfLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Yapf.options_scope
 
 
 @rule
