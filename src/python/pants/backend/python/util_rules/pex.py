@@ -236,21 +236,21 @@ class Pex:
     python: PythonExecutable | None
     pex_path: Tuple[Pex, ...]
 
-    @classmethod
-    def pex_path_closure(cls, pexes: Iterable[Pex]) -> OrderedSet[Pex]:
-        """Return all distinct Pex files in the transitive pex_path of the given Pexes."""
-        output: OrderedSet[Pex] = OrderedSet()
-        to_visit = deque(pexes)
-        while to_visit:
-            pex = to_visit.popleft()
-            if pex in output:
-                continue
-            output.add(pex)
-            to_visit.extend(pex.pex_path)
-        return output
-
 
 logger = logging.getLogger(__name__)
+
+
+def pex_path_closure(pexes: Iterable[Pex]) -> OrderedSet[Pex]:
+    """Return all distinct Pex files in the transitive pex_path of the given Pexes."""
+    output: OrderedSet[Pex] = OrderedSet()
+    to_visit = deque(pexes)
+    while to_visit:
+        pex = to_visit.popleft()
+        if pex in output:
+            continue
+        output.add(pex)
+        to_visit.extend(pex.pex_path)
+    return output
 
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
@@ -351,7 +351,12 @@ async def build_pex(
     # content. This is still much less redundant than a direct subset though:
     #  see https://github.com/pantsbuild/pants/issues/12688
     reqs = request.requirements
-    if isinstance(reqs, PexRequirements) and reqs.resolved_dists and reqs.req_strings:
+    if (
+        request.internal_only
+        and isinstance(reqs, PexRequirements)
+        and reqs.resolved_dists
+        and reqs.req_strings
+    ):
         partial_results = await MultiGet(
             Get(
                 BuildPexComponentResult,
@@ -509,7 +514,7 @@ async def build_pex_component(
     #  requirements, which could lead to problems. Support shading python binaries.
     #  See: https://github.com/pantsbuild/pants/issues/9206
     if pex_path:
-        argv.extend(["--pex-path", ":".join(pex.name for pex in Pex.pex_path_closure(pex_path))])
+        argv.extend(["--pex-path", ":".join(pex.name for pex in pex_path_closure(pex_path))])
 
     merged_digest = await Get(
         Digest,

@@ -16,12 +16,7 @@ from _pytest.tmpdir import TempPathFactory
 
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import (
-    PexPlatforms,
-    PexRequest,
-    PexRequirements,
-    ResolvedDistributions,
-)
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -36,6 +31,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_from_targets.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
+            QueryRule(Pex, (PexFromTargetsRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
@@ -110,14 +106,14 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     return find_links
 
 
-def info(rule_runner: RuleRunner, resolved_dists: ResolvedDistributions) -> Dict[str, Any]:
-    rule_runner.scheduler.write_digest(resolved_dists.pex.digest)
+def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
+    rule_runner.scheduler.write_digest(pex.digest)
     completed_process = subprocess.run(
         args=[
             sys.executable,
             "-m",
             "pex.tools",
-            resolved_dists.pex.name,
+            pex.name,
             "info",
         ],
         cwd=rule_runner.build_root,
@@ -127,8 +123,8 @@ def info(rule_runner: RuleRunner, resolved_dists: ResolvedDistributions) -> Dict
     return cast(Dict[str, Any], json.loads(completed_process.stdout))
 
 
-def requirements(rule_runner: RuleRunner, resolved_dists: ResolvedDistributions) -> List[str]:
-    return cast(List[str], info(rule_runner, resolved_dists)["requirements"])
+def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
+    return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
 def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
@@ -234,10 +230,10 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert isinstance(pex_req2_reqs, PexRequirements)
     assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
     assert pex_req2_reqs.resolved_dists is not None
-    assert not info(rule_runner, pex_req2_reqs.resolved_dists)["strip_pex_env"]
+    assert not info(rule_runner, pex_req2_reqs.resolved_dists.pex)["strip_pex_env"]
     resolved_dists = pex_req2_reqs.resolved_dists
     assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
-        rule_runner, resolved_dists
+        rule_runner, resolved_dists.pex
     )
 
     pex_req2_direct = get_pex_request(
@@ -250,7 +246,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert isinstance(pex_req2_reqs, PexRequirements)
     assert list(pex_req2_reqs.req_strings) == ["baz", url_req]
     assert pex_req2_reqs.resolved_dists == resolved_dists
-    assert not info(rule_runner, pex_req2_reqs.resolved_dists)["strip_pex_env"]
+    assert not info(rule_runner, pex_req2_reqs.resolved_dists.pex)["strip_pex_env"]
 
     pex_req3_direct = get_pex_request(
         "constraints1.txt",
@@ -262,7 +258,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert list(pex_req3_reqs.req_strings) == ["baz", url_req]
     assert pex_req3_reqs.resolved_dists is not None
     assert pex_req3_reqs.resolved_dists != resolved_dists
-    assert info(rule_runner, pex_req3_reqs.resolved_dists)["strip_pex_env"]
+    assert info(rule_runner, pex_req3_reqs.resolved_dists.pex)["strip_pex_env"]
 
     with pytest.raises(ExecutionError) as err:
         get_pex_request(None, resolve_all_constraints=True)
@@ -305,3 +301,53 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(PexRequest, [request])
 
     assert result.requirements == PexRequirements(["foo"], apply_constraints=True)
+
+
+@pytest.mark.parametrize("internal_only", [True, False])
+def test_component_pexes(rule_runner: RuleRunner, internal_only: bool) -> None:
+    """An internal-only PexFromTargetsRequest with a lockfile produces component PEXes."""
+
+    rule_runner.write_files(
+        {
+            "constraints.txt": dedent(
+                """
+                certifi==2021.5.30
+                charset_normalizer==2.0.4
+                idna==3.2
+                requests==2.26.0
+                urllib3==1.26.6
+                """
+            ),
+            "BUILD": dedent(
+                """
+            python_requirement_library(name="requests",requirements=["requests"])
+            python_library(name="lib",sources=[],dependencies=[":requests"])
+            """
+            ),
+        }
+    )
+    request = PexFromTargetsRequest(
+        [Address("", target_name="lib")],
+        output_filename="demo.pex",
+        internal_only=internal_only,
+    )
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-setup-requirement-constraints=constraints.txt",
+            "--python-setup-resolve-all-constraints",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    pex_info = info(rule_runner, rule_runner.request(Pex, [request]))
+
+    if internal_only:
+        # Should have a pex-path containing the root requirement.
+        assert pex_info["requirements"] == []
+        assert pex_info["distributions"] == {}
+        assert pex_info["pex_path"] == "__reqs/requests.pex"
+    else:
+        # Should have a root requirement, and five distributions.
+        assert pex_info["requirements"] == ["requests"]
+        assert len(pex_info["distributions"]) == 5
+        assert pex_info["pex_path"] is None

@@ -9,7 +9,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest, pex_path_closure
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -94,7 +94,7 @@ async def create_pex_binary_run_request(
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
-        "PEX_PATH": ":".join(in_chroot(p.name) for p in Pex.pex_path_closure([requirements])),
+        "PEX_PATH": ":".join(in_chroot(p.name) for p in pex_path_closure([requirements])),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 

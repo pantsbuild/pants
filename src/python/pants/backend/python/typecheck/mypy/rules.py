@@ -15,7 +15,13 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    pex_path_closure,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -172,7 +178,7 @@ async def mypy_typecheck_partition(
         PexRequest(
             output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=Pex.pex_path_closure([requirements_pex]),
+            pex_path=pex_path_closure([requirements_pex]),
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
