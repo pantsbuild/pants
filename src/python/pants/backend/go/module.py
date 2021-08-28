@@ -114,8 +114,8 @@ async def resolve_go_module(
     module_metadata = json.loads(parse_result.stdout)
     module_path = module_metadata["Module"]["Path"]
     minimum_go_version = module_metadata.get(
-        "Go", "1,16"
-    )  # TODO: Figure out better default if missing.
+        "Go", "1.16"
+    )  # TODO: Figure out better default if missing. Use the SDKs version versus this hard-code.
 
     # Resolve the dependencies in the go.mod.
     list_modules_result = await Get(
