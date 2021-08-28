@@ -15,7 +15,6 @@ from pants.backend.go.target_types import GoModuleSources
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -34,7 +33,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, Targets
+from pants.engine.target import Target, Targets, WrappedTarget
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -95,12 +94,8 @@ def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
 async def resolve_go_module(
     request: ResolveGoModuleRequest,
 ) -> ResolvedGoModule:
-    targets = await Get(Targets, Addresses([request.address]))
-    if not targets:
-        raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
-    elif len(targets) > 1:
-        raise AssertionError(f"Address `{request.address}` resolved to multiple targets.")
-    target = targets[0]
+    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    target = wrapped_target.target
 
     sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
     flattened_sources_snapshot = await Get(

@@ -27,7 +27,6 @@ from pants.backend.go.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (
     AddPrefix,
@@ -44,7 +43,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, Targets
+from pants.engine.target import Target, Targets, WrappedTarget
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -219,18 +218,11 @@ def is_third_party_package_target(tgt: Target) -> bool:
 async def resolve_go_package(
     request: ResolveGoPackageRequest,
 ) -> ResolvedGoPackage:
-    # TODO: Use MultiGet where applicable.
-
-    targets = await Get(Targets, Addresses([request.address]))
-    if not targets:
-        raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
-    elif len(targets) > 1:
-        raise AssertionError(f"Address `{request.address}` resolved to multiple targets.")
-    target = targets[0]
-
-    owning_go_module_result = await Get(
-        ResolvedOwningGoModule, FindNearestGoModuleRequest(request.address.spec_path)
+    wrapped_target, owning_go_module_result = await MultiGet(
+        Get(WrappedTarget, Address, request.address),
+        Get(ResolvedOwningGoModule, FindNearestGoModuleRequest(request.address.spec_path)),
     )
+    target = wrapped_target.target
 
     if not owning_go_module_result.module_address:
         raise ValueError(f"The go_package at address {request.address} has no owning go_module.")
@@ -294,14 +286,8 @@ async def resolve_go_package(
 async def resolve_external_go_package(
     request: ResolveExternalGoPackageRequest,
 ) -> ResolvedGoPackage:
-    # TODO: Use MultiGet where applicable.
-
-    targets = await Get(Targets, Addresses([request.address]))
-    if not targets:
-        raise AssertionError(f"Address `{request.address}` did not resolve to any targets.")
-    elif len(targets) > 1:
-        raise AssertionError(f"Address `{request.address}` resolved to multiple targets.")
-    target = targets[0]
+    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    target = wrapped_target.target
 
     import_path = target[GoImportPath].value
     if not import_path:
