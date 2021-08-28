@@ -127,6 +127,8 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     )
     py2_args = [
         "--bandit-version=bandit>=1.6.2,<1.7",
+        "--bandit-extra-requirements=['setuptools']",
+        "--bandit-lockfile=<none>",
     ]
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=py2_args)

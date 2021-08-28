@@ -47,8 +47,11 @@ class Bandit(PythonToolBase):
     # remove `setuptools` from `default_extra_requirements`.
     default_version = "bandit>=1.7.0,<1.8"
     default_extra_requirements = [
-        "setuptools<45; python_full_version == '2.7.*'",
-        "setuptools; python_version >= '3.5'",
+        "setuptools",
+        # GitPython 3.1.20 was yanked because it breaks Python 3.8+, but Poetry's lockfile
+        # generation still tries to use it. Upgrade this to the newest version once released or
+        # when switching away from Poetry.
+        "GitPython==3.1.18",
     ]
     default_main = ConsoleScript("bandit")
 
