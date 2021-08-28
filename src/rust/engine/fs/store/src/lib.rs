@@ -52,7 +52,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use bytes::Bytes;
 use double_checked_cell_async::DoubleCheckedCell;
-use fs::{default_cache_path, FileContent, RelativePath};
+use fs::{default_cache_path, FileContent, FileEntry, RelativePath};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -1073,6 +1073,47 @@ impl Store {
                   })
               };
               res.boxed()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .boxed()
+      })
+      .map(|file_contents_per_directory| {
+        file_contents_per_directory.map(|xs| {
+          let mut vec = xs
+            .into_iter()
+            .flat_map(|x| x.into_iter())
+            .collect::<Vec<_>>();
+          vec.sort_by(|l, r| l.path.cmp(&r.path));
+          vec
+        })
+      })
+      .boxed()
+  }
+
+  ///
+  /// Returns indirect references to files in a Digest sorted by their path.
+  ///
+  pub fn entries_for_directory(
+    &self,
+    digest: Digest,
+  ) -> BoxFuture<'static, Result<Vec<FileEntry>, String>> {
+    self
+      .walk(digest, move |_, path_so_far, _, directory| {
+        future::try_join_all(
+          directory
+            .files
+            .iter()
+            .map(|file_node| {
+              let path = path_so_far.join(file_node.name.clone());
+              let is_executable = file_node.is_executable;
+              let file_node_digest = try_future!(require_digest(file_node.digest.as_ref()));
+              future::ready(Ok(FileEntry {
+                path,
+                digest: file_node_digest,
+                is_executable,
+              }))
+              .boxed()
             })
             .collect::<Vec<_>>(),
         )

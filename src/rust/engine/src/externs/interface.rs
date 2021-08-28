@@ -442,7 +442,9 @@ py_class!(class PyTypes |py| {
       snapshot: PyType,
       paths: PyType,
       file_content: PyType,
+      file_entry: PyType,
       digest_contents: PyType,
+      digest_entries: PyType,
       path_globs: PyType,
       merge_digests: PyType,
       add_prefix: PyType,
@@ -466,7 +468,9 @@ py_class!(class PyTypes |py| {
         snapshot: externs::type_for(snapshot),
         paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
+        file_entry: externs::type_for(file_entry),
         digest_contents: externs::type_for(digest_contents),
+        digest_entries: externs::type_for(digest_entries),
         path_globs: externs::type_for(path_globs),
         merge_digests: externs::type_for(merge_digests),
         add_prefix: externs::type_for(add_prefix),
@@ -1017,7 +1021,9 @@ async fn workunit_to_py_value(
   for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
-      ArtifactOutput::FileDigest(digest) => crate::nodes::Snapshot::store_file_digest(core, digest),
+      ArtifactOutput::FileDigest(digest) => {
+        crate::nodes::Snapshot::store_file_digest(&core.types, digest)
+      }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
@@ -1066,14 +1072,14 @@ async fn workunit_to_py_value(
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(core, stdout_digest),
+      crate::nodes::Snapshot::store_file_digest(&core.types, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(core, stderr_digest),
+      crate::nodes::Snapshot::store_file_digest(&core.types, stderr_digest),
     ));
   }
 

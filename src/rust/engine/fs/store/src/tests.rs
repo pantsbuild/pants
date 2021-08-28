@@ -9,6 +9,7 @@ use testutil::data::{TestData, TestDirectory};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
+use fs::{FileEntry, RelativePath};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -1216,6 +1217,94 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   assert!(
     success,
     "FileContents did not match: Left: {:?}, Right: {:?}",
+    left, right
+  );
+}
+
+#[tokio::test]
+async fn entries_for_directory() {
+  let roland = TestData::roland();
+  let catnip = TestData::catnip();
+  let testdir = TestDirectory::containing_roland();
+  let recursive_testdir = TestDirectory::recursive();
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  store
+    .record_directory(&recursive_testdir.directory(), false)
+    .await
+    .expect("Error saving recursive Directory");
+  store
+    .record_directory(&testdir.directory(), false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(roland.bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(catnip.bytes(), false)
+    .await
+    .expect("Error saving catnip file bytes");
+
+  let file_entries = store
+    .entries_for_directory(recursive_testdir.digest())
+    .await
+    .expect("Getting FileContents");
+
+  assert_same_file_entries(
+    file_entries,
+    vec![
+      FileEntry {
+        path: PathBuf::from("cats").join("roland.ext"),
+        digest: roland.digest(),
+        is_executable: false,
+      },
+      FileEntry {
+        path: PathBuf::from("treats.ext"),
+        digest: catnip.digest(),
+        is_executable: false,
+      },
+    ],
+  );
+}
+
+fn assert_same_file_entries(left: Vec<FileEntry>, right: Vec<FileEntry>) {
+  assert_eq!(
+    left.len(),
+    right.len(),
+    "FileEntry vectors did not match, different lengths: left: {:?} right: {:?}",
+    left,
+    right
+  );
+
+  let mut success = true;
+  for (index, (l, r)) in left.iter().zip(right.iter()).enumerate() {
+    if l.path != r.path {
+      success = false;
+      eprintln!(
+        "Paths did not match for index {}: {:?}, {:?}",
+        index, l.path, r.path
+      );
+    }
+    if l.digest != r.digest {
+      success = false;
+      eprintln!(
+        "Digest did not match for index {}: {:?}, {:?}",
+        index, l.digest, r.digest
+      );
+    }
+    if l.is_executable != r.is_executable {
+      success = false;
+      eprintln!(
+        "Executable bit did not match for index {}: {:?}, {:?}",
+        index, l.is_executable, r.is_executable
+      );
+    }
+  }
+  assert!(
+    success,
+    "FileEntry vectors did not match: Left: {:?}, Right: {:?}",
     left, right
   );
 }

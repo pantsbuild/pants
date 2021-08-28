@@ -25,8 +25,9 @@ use crate::Types;
 use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
-  self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, Vfs,
+  self, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
+  GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
+  Vfs,
 };
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
@@ -35,7 +36,7 @@ use process_execution::{
 
 use bytes::Bytes;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
@@ -725,9 +726,18 @@ impl Snapshot {
       .map_err(|e| format!("{:?}", e))
   }
 
-  pub fn store_file_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
+  pub fn lift_file_digest(item: &PyObject) -> Result<hashing::Digest, String> {
+    let fingerprint = externs::getattr_as_string(item, "fingerprint");
+    let serialized_bytes_length = externs::getattr::<usize>(item, "serialized_bytes_length")?;
+    Ok(hashing::Digest::new(
+      Fingerprint::from_hex_string(&fingerprint)?,
+      serialized_bytes_length,
+    ))
+  }
+
+  pub fn store_file_digest(types: &crate::types::Types, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
-      core.types.file_digest,
+      types.file_digest,
       &[
         externs::store_utf8(&item.hash.to_hex()),
         externs::store_i64(item.size_bytes as i64),
@@ -760,6 +770,17 @@ impl Snapshot {
     ))
   }
 
+  fn store_file_entry(types: &crate::types::Types, item: &FileEntry) -> Result<Value, String> {
+    Ok(externs::unsafe_call(
+      types.file_entry,
+      &[
+        Self::store_path(&item.path)?,
+        Self::store_file_digest(types, &item.digest),
+        externs::store_bool(item.is_executable),
+      ],
+    ))
+  }
+
   pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
     let entries = item
       .iter()
@@ -767,6 +788,17 @@ impl Snapshot {
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_contents,
+      &[externs::store_tuple(entries)],
+    ))
+  }
+
+  pub fn store_digest_entries(context: &Context, item: &[FileEntry]) -> Result<Value, String> {
+    let entries = item
+      .iter()
+      .map(|e| Self::store_file_entry(&context.core.types, e))
+      .collect::<Result<Vec<_>, _>>()?;
+    Ok(externs::unsafe_call(
+      context.core.types.digest_entries,
       &[externs::store_tuple(entries)],
     ))
   }

@@ -72,6 +72,19 @@ class FileContent:
 
 
 @dataclass(frozen=True)
+class FileEntry:
+    """An indirect reference to the content of a file by digest.
+
+    This can be used to create a new Digest with `Get(Digest, CreateDigest)`. You can also get back
+    a list of `FileEntry` objects by using `Get(DigestEntries, Digest)`.
+    """
+
+    path: str
+    file_digest: FileDigest
+    is_executable: bool = False
+
+
+@dataclass(frozen=True)
 class Directory:
     """The path to a directory.
 
@@ -88,7 +101,11 @@ class DigestContents(Collection[FileContent]):
     """The file contents of a Digest."""
 
 
-class CreateDigest(Collection[Union[FileContent, Directory]]):
+class DigestEntries(Collection[FileEntry]):
+    """The indirect file contents of a Digest."""
+
+
+class CreateDigest(Collection[Union[FileContent, FileEntry, Directory]]):
     """A request to create a Digest with the input FileContent and/or Directory values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
