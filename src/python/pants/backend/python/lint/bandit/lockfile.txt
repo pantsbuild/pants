@@ -4,7 +4,7 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "requirements_invalidation_digest": "f2e4cbc0fd5ee18d6993d689a40be090b961fd7269c8d3c8b72416048e61fd58",
+#   "requirements_invalidation_digest": "b18a9f4d6a8cb4aafb414e9c8108d39dca053f8910ac801c147a932cd37e0040",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.6"
 #   ]
@@ -59,9 +59,7 @@ pyyaml==5.4.1; python_version >= "3.5" and python_full_version < "3.0.0" or pyth
     --hash=sha256:49d4cdd9065b9b6e206d0595fee27a96b5dd22618e7520c33204a4a3239d5b10 \
     --hash=sha256:c20cfa2d49991c8b4147af39859b167664f2ad4561704ee74c1de03318e898db \
     --hash=sha256:607774cbba28732bfa802b54baa7484215f530991055bb562efbed5b2f20a45e
-setuptools==44.1.1; python_full_version == "2.7.*" or python_version >= "3.5" \
-    --hash=sha256:27a714c09253134e60a6fa68130f78c7037e5562c4f21f8f318f2ae900d152d5 \
-    --hash=sha256:c67aa55db532a0dadc4d2e20ba9961cbd3ccc84d544e9029699822542b5a476b \
+setuptools==57.4.0; python_version >= "3.6" \
     --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
     --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465
 six==1.16.0; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.5" \
