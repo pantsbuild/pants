@@ -110,8 +110,8 @@ class Bandit(PythonToolBase):
         )
 
 
-class BanditLockfileSentinel:
-    pass
+class BanditLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Bandit.options_scope
 
 
 @rule(
@@ -124,6 +124,9 @@ class BanditLockfileSentinel:
 async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not bandit.uses_lockfile:
+        return PythonLockfileRequest.from_tool(bandit)
+
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
     #

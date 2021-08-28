@@ -124,8 +124,8 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel:
-    pass
+class IsortLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Isort.options_scope
 
 
 @rule

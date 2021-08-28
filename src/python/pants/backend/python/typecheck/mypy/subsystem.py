@@ -252,8 +252,8 @@ async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class MyPyLockfileSentinel:
-    pass
+class MyPyLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = MyPy.options_scope
 
 
 @rule(
@@ -266,6 +266,9 @@ async def setup_mypy_lockfile(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> PythonLockfileRequest:
+    if not mypy.uses_lockfile:
+        return PythonLockfileRequest.from_tool(mypy)
+
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
         all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))

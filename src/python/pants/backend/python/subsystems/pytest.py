@@ -238,8 +238,8 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel:
-    pass
+class PytestLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = PyTest.options_scope
 
 
 @rule(
@@ -252,6 +252,9 @@ class PytestLockfileSentinel:
 async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not pytest.uses_lockfile:
+        return PythonLockfileRequest.from_tool(pytest)
+
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
     #
