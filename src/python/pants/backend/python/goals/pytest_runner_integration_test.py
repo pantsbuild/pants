@@ -322,6 +322,8 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
         extra_args=[
             "--pytest-args='--html=extra-output/report.html'",
             "--pytest-extra-requirements=pytest-html==3.1",
+            # pytest-html requires setuptools to be installed because it does not use PEP 517.
+            "--pytest-extra-requirements=setuptools",
             "--pytest-lockfile=<none>",
         ],
     )
