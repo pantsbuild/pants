@@ -35,7 +35,7 @@ class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
     @classmethod
@@ -125,22 +125,6 @@ class PythonSetup(Subsystem):
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
                 "and run `./pants generate-user-lockfile ::`.\n\n"
                 "Mutually exclusive with `[python-setup].requirement_constraints`."
-            ),
-        )
-        # TODO(#12293): It's plausible this option might not exist once we figure out the semantics
-        #  for lockfile generation. One tricky edge is that the command to regenerate stale
-        #  lockfiles might need to consume this. In the meantime to figuring this all out, this is
-        #  helpful for internal pantsbuild/pants use.
-        register(
-            "--experimental-lockfile-custom-regeneration-command",
-            advanced=True,
-            type=str,
-            default=None,
-            help=(
-                "If set, Pants will instruct your users to run a custom command to regenerate "
-                "lockfiles, rather than running `./pants generate-lockfiles` like normal."
-                "\n\nThis option is experimental and it may change at any time without the normal "
-                "deprecation cycle."
             ),
         )
         register(
@@ -239,10 +223,6 @@ class PythonSetup(Subsystem):
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
         return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
-
-    @property
-    def lockfile_custom_regeneration_command(self) -> str | None:
-        return cast("str | None", self.options.experimental_lockfile_custom_regeneration_command)
 
     @property
     def resolve_all_constraints(self) -> bool:

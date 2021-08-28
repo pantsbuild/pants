@@ -127,6 +127,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     )
     extra_args = [
         "--bandit-version=bandit>=1.6.2,<1.7",
+        "--bandit-extra-requirements=['setuptools']",
         "--bandit-lockfile=<none>",
     ]
 
