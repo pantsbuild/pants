@@ -187,7 +187,12 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
-        rule_runner, [tgt], extra_args=["--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3"]
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3",
+            "--flake8-lockfile=<none>",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1

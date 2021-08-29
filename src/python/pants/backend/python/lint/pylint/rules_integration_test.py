@@ -134,12 +134,13 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         }
     )
 
-    py2_args = [
+    extra_args = [
         "--pylint-version=pylint<2",
         "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
+        "--pylint-lockfile=<none>",
     ]
     py2_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py2", relative_file_path="f.py"))
-    py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=py2_args)
+    py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 2
     assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
@@ -150,7 +151,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert py3_result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
 
-    combined_result = run_pylint(rule_runner, [py2_tgt, py3_tgt], extra_args=py2_args)
+    combined_result = run_pylint(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
     batched_py3_result, batched_py2_result = sorted(
         combined_result, key=lambda result: result.exit_code
@@ -304,6 +305,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         extra_args=[
             "--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2",
             "--pylint-args='--load-plugins=pylint_unittest'",
+            "--pylint-lockfile=<none>",
         ],
     )
     assert len(result) == 1
@@ -390,7 +392,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             extra_args=[
                 "--pylint-source-plugins=['pants-plugins/plugins']",
                 f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
-                "--pylint-config=pylintrc",
+                "--pylint-lockfile=<none>",
             ],
         )
         assert len(res) == 1

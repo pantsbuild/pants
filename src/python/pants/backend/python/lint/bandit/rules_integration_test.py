@@ -195,7 +195,11 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_bandit(rule_runner, [tgt], extra_args=["--bandit-extra-requirements=bandit-aws"])
+    result = run_bandit(
+        rule_runner,
+        [tgt],
+        extra_args=["--bandit-extra-requirements=bandit-aws", "--bandit-lockfile=<none>"],
+    )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Issue: [C100:hardcoded_aws_key]" in result[0].stdout
