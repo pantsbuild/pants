@@ -9,8 +9,8 @@ from typing import Dict
 
 import pytest
 
+from pants.engine.fs import FileContent
 from pants.option.config import Config, TomlSerializer
-from pants.util.contextutil import temporary_file
 from pants.util.ordered_set import OrderedSet
 
 
@@ -115,18 +115,14 @@ FILE_2 = ConfigFile(
 
 
 def _setup_config() -> Config:
-    with temporary_file(binary_mode=False, suffix=".toml") as config1, temporary_file(
-        binary_mode=False, suffix=".toml"
-    ) as config2:
-        config1.write(FILE_1.content)
-        config1.close()
-        config2.write(FILE_2.content)
-        config2.close()
-        parsed_config = Config.load(
-            config_paths=[config1.name, config2.name],
-            seed_values={"buildroot": "fake_buildroot"},
-        )
-        assert [config1.name, config2.name] == parsed_config.sources()
+    parsed_config = Config.load(
+        file_contents=[
+            FileContent("file1.toml", FILE_1.content.encode()),
+            FileContent("file2.toml", FILE_2.content.encode()),
+        ],
+        seed_values={"buildroot": "fake_buildroot"},
+    )
+    assert ["file1.toml", "file2.toml"] == parsed_config.sources()
     return parsed_config
 
 

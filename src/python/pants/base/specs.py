@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple
 
 from pants.base.exceptions import ResolveError
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
-from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.meta import frozen_after_init

@@ -5,20 +5,17 @@ from __future__ import annotations
 
 import configparser
 import getpass
-import io
 import itertools
 import os
 import re
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from hashlib import sha1
-from pathlib import PurePath
-from typing import Any, ClassVar, Dict, List, Mapping, Sequence, Tuple, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Union, cast
 
 import toml
-from typing_extensions import Literal
+from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import deprecated_conditional
@@ -29,6 +26,22 @@ from pants.util.ordered_set import OrderedSet
 # A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
 # pants_distdir.
 SeedValues = Dict[str, Value]
+
+
+class ConfigSource(Protocol):
+    """A protocol that matches pants.engine.fs.FileContent.
+
+    Also matches the ad-hoc FileContent-like class we use during options bootstrapping, where we
+    cannot use pants.engine.fs.FileContent itself due to circular imports.
+    """
+
+    @property
+    def path(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def content(self) -> bytes:
+        raise NotImplementedError()
 
 
 class Config(ABC):
@@ -48,82 +61,35 @@ class Config(ABC):
         pass
 
     @classmethod
-    def load_file_contents(
-        cls,
-        file_contents,
-        *,
-        seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        """Loads config from the given string payloads, with later payloads taking precedence over
-        earlier ones.
-
-        A handful of seed values will be set to act as if specified in the loaded config file's
-        DEFAULT section, and be available for use in substitutions.  The caller may override some of
-        these seed values.
-        """
-
-        @contextmanager
-        def opener(file_content):
-            with io.BytesIO(file_content.content) as fh:
-                yield fh
-
-        return cls._meta_load(opener, file_contents, seed_values=seed_values)
-
-    @classmethod
     def load(
         cls,
-        config_paths: List[str],
+        file_contents: Iterable[ConfigSource],
         *,
         seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        """Loads config from the given paths, with later paths taking precedence over earlier ones.
+    ) -> Config:
+        """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
         A handful of seed values will be set to act as if specified in the loaded config file's
         DEFAULT section, and be available for use in substitutions.  The caller may override some of
         these seed values.
         """
-
-        @contextmanager
-        def opener(f):
-            with open(f, "rb") as fh:
-                yield fh
-
-        return cls._meta_load(opener, config_paths, seed_values=seed_values)
-
-    @classmethod
-    def _meta_load(
-        cls,
-        open_ctx,
-        config_items: Sequence,
-        *,
-        seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        if not config_items:
-            return _EmptyConfig()
-
         single_file_configs = []
-        for config_item in config_items:
-            config_path = config_item.path if hasattr(config_item, "path") else config_item
-            with open_ctx(config_item) as config_file:
-                content_bytes = config_file.read()
-            content_digest = sha1(content_bytes).hexdigest()
-            content = content_bytes.decode()
+        for file_content in file_contents:
+            content_digest = sha1(file_content.content).hexdigest()
             normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
-            if PurePath(config_path).suffix == ".toml":
-                config_values = cls._parse_toml(content, normalized_seed_values)
-            else:
-                try:
-                    config_values = cls._parse_toml(content, normalized_seed_values)
-                except Exception as e:
-                    raise cls.ConfigError(
-                        f"Unsuffixed Config path {config_path} could not be parsed "
-                        f"as TOML:\n  {e}"
-                    )
+            try:
+                config_values = cls._parse_toml(
+                    file_content.content.decode(), normalized_seed_values
+                )
+            except Exception as e:
+                raise cls.ConfigError(
+                    f"Config file {file_content.path} could not be parsed as TOML:\n  {e}"
+                )
 
             single_file_configs.append(
                 _SingleFileConfig(
-                    config_path=config_path,
+                    config_path=file_content.path,
                     content_digest=content_digest,
                     values=config_values,
                 ),
@@ -176,14 +142,11 @@ class Config(ABC):
         is looked up in the DEFAULT section.  If there is still no definition found, the default
         value supplied is returned.
         """
-        return self._getinstance(section, option, type_, default)
-
-    def _getinstance(self, section, option, type_, default=None):
         if not self.has_option(section, option):
             return default
 
         raw_value = self.get_value(section, option)
-        if type_ == str or issubclass(type_, str):
+        if issubclass(type_, str):
             return raw_value
 
         key = f"{section}.{option}"
@@ -250,8 +213,8 @@ class _ConfigValues:
             return "add" in option_value or "remove" in option_value
         return True
 
-    @staticmethod
-    def _section_explicitly_defined(section_values: Dict) -> bool:
+    @classmethod
+    def _section_explicitly_defined(cls, section_values: Dict) -> bool:
         """Determine if the section is truly a defined section, meaning that the user explicitly
         wrote the section in their config file.
 
@@ -261,7 +224,7 @@ class _ConfigValues:
         """
         # TODO: Once we properly ban scopes with dots in them, we can get rid of this check.
         at_least_one_option_defined = any(
-            _ConfigValues._is_an_option(section_value) for section_value in section_values.values()
+            cls._is_an_option(section_value) for section_value in section_values.values()
         )
         # We also check if the section was explicitly defined but has no options. We can be
         # confident that this is not a parent scope (e.g. `cache` when `cache.java` is really what
@@ -475,35 +438,6 @@ class _ConfigValues:
             option: self._stringify_val_without_interpolation(option_val)
             for option, option_val in self.values["DEFAULT"].items()
         }
-
-
-@dataclass(frozen=True)
-class _EmptyConfig(Config):
-    """A dummy config with no data at all."""
-
-    def sources(self) -> List[str]:
-        return []
-
-    def configs(self) -> List["_SingleFileConfig"]:
-        return []
-
-    def sections(self) -> List[str]:
-        return []
-
-    def has_section(self, section: str) -> Literal[False]:
-        return False
-
-    def has_option(self, section: str, option: str) -> Literal[False]:
-        return False
-
-    def get_value(self, section: str, option: str) -> None:
-        return None
-
-    def get_source_for_option(self, section: str, option: str) -> None:
-        return None
-
-    def __repr__(self) -> str:
-        return "EmptyConfig()"
 
 
 @dataclass(frozen=True, eq=False)

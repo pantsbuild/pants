@@ -160,7 +160,7 @@ class OptionsBootstrapper:
 
             config_file_paths = cls.get_config_file_paths(env=env, args=args)
             config_files_products = [filecontent_for(p) for p in config_file_paths]
-            pre_bootstrap_config = Config.load_file_contents(config_files_products)
+            pre_bootstrap_config = Config.load(config_files_products)
 
             initial_bootstrap_options = cls.parse_bootstrap_options(
                 env, bargs, pre_bootstrap_config
@@ -179,7 +179,7 @@ class OptionsBootstrapper:
                 full_config_paths.extend(existing_rcfiles)
 
             full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-            post_bootstrap_config = Config.load_file_contents(
+            post_bootstrap_config = Config.load(
                 full_config_files_products,
                 seed_values=bootstrap_option_values.as_dict(),
             )

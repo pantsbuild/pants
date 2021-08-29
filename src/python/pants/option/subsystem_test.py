@@ -36,10 +36,10 @@ def test_scope_existence() -> None:
 
 def test_is_valid_scope_name_component() -> None:
     def check_true(s: str) -> None:
-        assert Subsystem.is_valid_scope_name_component(s)
+        assert Subsystem.is_valid_scope_name(s)
 
     def check_false(s: str) -> None:
-        assert not Subsystem.is_valid_scope_name_component(s)
+        assert not Subsystem.is_valid_scope_name(s)
 
     check_true("")
     check_true("foo")

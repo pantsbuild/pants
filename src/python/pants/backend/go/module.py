@@ -21,6 +21,7 @@ from pants.engine.fs import (
     DigestContents,
     DigestSubset,
     FileContent,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -32,7 +33,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
