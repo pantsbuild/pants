@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import List, Optional
+from typing import List
 
 import pytest
 
