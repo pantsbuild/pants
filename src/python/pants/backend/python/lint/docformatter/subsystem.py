@@ -58,8 +58,8 @@ class Docformatter(PythonToolBase):
         return tuple(self.options.args)
 
 
-class DocformatterLockfileSentinel:
-    pass
+class DocformatterLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Docformatter.options_scope
 
 
 @rule

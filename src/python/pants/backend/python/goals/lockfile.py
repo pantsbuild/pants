@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Sequence, cast
+from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 @union
 class PythonToolLockfileSentinel:
-    pass
+    options_scope: ClassVar[str]
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -128,6 +128,13 @@ class PythonLockfileRequest:
         rather than the option `--interpreter-constraints`, you must pass the arg
         `interpreter_constraints`.
         """
+        if not subsystem.uses_lockfile:
+            return cls(
+                FrozenOrderedSet(),
+                InterpreterConstraints(),
+                resolve_name=subsystem.options_scope,
+                lockfile_dest=subsystem.lockfile,
+            )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
             interpreter_constraints=(
@@ -239,20 +246,21 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
 ) -> GenerateLockfilesGoal:
-    # TODO(#12314): this factoring requires that `PythonLockfileRequest`s need to be calculated
-    #  for tools even if the user does not want to generate a lockfile for that tool. That code
-    #  can be quite slow when it requires computing interpreter constraints.
-    all_requests = await MultiGet(
+    specified_tool_requests = await MultiGet(
         Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
-        for sentinel in union_membership.get(PythonToolLockfileSentinel)
-    )
-
-    results = await MultiGet(
-        Get(PythonLockfile, PythonLockfileRequest, req)
-        for req in determine_resolves_to_generate(
-            all_requests, generate_lockfiles_subsystem.resolve_names
+        for sentinel in determine_tool_sentinels_to_generate(
+            union_membership[PythonToolLockfileSentinel],
+            generate_lockfiles_subsystem.resolve_names,
         )
     )
+    results = await MultiGet(
+        Get(PythonLockfile, PythonLockfileRequest, req)
+        for req in filter_tool_lockfile_requests(
+            specified_tool_requests,
+            resolve_specified=bool(generate_lockfiles_subsystem.resolve_names),
+        )
+    )
+
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
     for result in results:
@@ -265,38 +273,22 @@ class UnrecognizedResolveNamesError(Exception):
     pass
 
 
-def determine_resolves_to_generate(
-    all_tool_lockfile_requests: Sequence[PythonLockfileRequest],
+def determine_tool_sentinels_to_generate(
+    all_tool_sentinels: Iterable[type[PythonToolLockfileSentinel]],
     requested_resolve_names: Sequence[str],
-) -> list[PythonLockfileRequest]:
+) -> list[type[PythonToolLockfileSentinel]]:
     if not requested_resolve_names:
-        return [
-            req
-            for req in all_tool_lockfile_requests
-            if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE)
-        ]
+        return list(all_tool_sentinels)
 
-    resolve_names_to_requests = {
-        request.resolve_name: request for request in all_tool_lockfile_requests
+    resolve_names_to_sentinels = {
+        sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
     }
-
-    specified_requests = []
+    specified_sentinels = []
     unrecognized_resolve_names = []
     for resolve_name in requested_resolve_names:
-        request = resolve_names_to_requests.get(resolve_name)
-        if request:
-            if request.lockfile_dest in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
-                logger.warning(
-                    f"You requested to generate a lockfile for {request.resolve_name} because "
-                    "you included it in `--generate-lockfiles-resolve`, but "
-                    f"`[{request.resolve_name}].lockfile` is set to `{request.lockfile_dest}` "
-                    "so a lockfile will not be generated.\n\n"
-                    f"If you would like to generate a lockfile for {request.resolve_name}, please "
-                    f"set `[{request.resolve_name}].lockfile` to the path where it should be "
-                    "generated and run again."
-                )
-            else:
-                specified_requests.append(request)
+        sentinel = resolve_names_to_sentinels.get(resolve_name)
+        if sentinel:
+            specified_sentinels.append(sentinel)
         else:
             unrecognized_resolve_names.append(resolve_name)
 
@@ -311,10 +303,33 @@ def determine_resolves_to_generate(
         raise UnrecognizedResolveNamesError(
             f"Unrecognized resolve {name_description} from the option "
             f"`--generate-lockfiles-resolve`: {unrecognized_str}\n\n"
-            f"All valid resolve names: {sorted(resolve_names_to_requests.keys())}"
+            f"All valid resolve names: {sorted(resolve_names_to_sentinels.keys())}"
         )
 
-    return specified_requests
+    return specified_sentinels
+
+
+def filter_tool_lockfile_requests(
+    specified_requests: Sequence[PythonLockfileRequest], *, resolve_specified: bool
+) -> list[PythonLockfileRequest]:
+    result = []
+    for req in specified_requests:
+        if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
+            result.append(req)
+            continue
+        if resolve_specified:
+            resolve = req.resolve_name
+            logger.warning(
+                f"You requested to generate a lockfile for {resolve} because "
+                "you included it in `--generate-lockfiles-resolve`, but "
+                f"`[{resolve}].lockfile` is set to `{req.lockfile_dest}` "
+                "so a lockfile will not be generated.\n\n"
+                f"If you would like to generate a lockfile for {resolve}, please "
+                f"set `[{resolve}].lockfile` to the path where it should be "
+                "generated and run again."
+            )
+
+    return result
 
 
 def rules():

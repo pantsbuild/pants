@@ -108,11 +108,11 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         expected_ics: list[str],
         *,
         extra_expected_requirements: list[str] | None = None,
-        args: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> None:
         rule_runner.write_files({"project/BUILD": build_file})
         rule_runner.set_options(
-            args or [],
+            ["--pylint-lockfile=lockfile.txt", *(extra_args or [])],
             env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [PylintLockfileSentinel()])
@@ -231,7 +231,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             """
         ),
         ["==2.7.*,==3.6.*"],
-        args=["--pylint-source-plugins=project:plugin"],
+        extra_args=["--pylint-source-plugins=project:plugin"],
     )
     assert_lockfile_request(
         dedent(
@@ -260,6 +260,6 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             """
         ),
         ["==2.7.*,==3.6.*", "==3.6.*"],
-        args=["--pylint-source-plugins=project"],
+        extra_args=["--pylint-source-plugins=project"],
         extra_expected_requirements=["ansicolors"],
     )

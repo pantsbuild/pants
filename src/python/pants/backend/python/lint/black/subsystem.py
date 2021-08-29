@@ -106,8 +106,8 @@ class Black(PythonToolBase):
         )
 
 
-class BlackLockfileSentinel:
-    pass
+class BlackLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Black.options_scope
 
 
 @rule(
@@ -117,6 +117,9 @@ class BlackLockfileSentinel:
 async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not black.uses_lockfile:
+        return PythonLockfileRequest.from_tool(black)
+
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
         all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
