@@ -41,7 +41,6 @@ workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]
 criterion = "0.3"
-maplit = "*"
 mock = { path = "../../testutil/mock" }
 num_cpus = "1"
 testutil = { path = "../../testutil" }

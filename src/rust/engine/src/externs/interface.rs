@@ -1703,10 +1703,8 @@ fn single_file_digests_to_bytes(
         store
           .load_file_bytes_with(digest, externs::store_bytes)
           .await
-          .and_then(|maybe_bytes: Option<(Value, _)>| {
-            maybe_bytes
-              .map(|bytes_tuple| bytes_tuple.0)
-              .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
+          .and_then(|maybe_bytes| {
+            maybe_bytes.ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
           })
       }
     });

@@ -162,23 +162,19 @@ fn multi_platform_process_request_to_process_result(
       .await
       .map_err(|s| throw(&s))?;
 
-    let stdout_bytes = maybe_stdout
-      .map(|(bytes, _load_metadata)| bytes)
-      .ok_or_else(|| {
-        throw(&format!(
-          "Bytes from stdout Digest {:?} not found in store",
-          result.stdout_digest
-        ))
-      })?;
+    let stdout_bytes = maybe_stdout.ok_or_else(|| {
+      throw(&format!(
+        "Bytes from stdout Digest {:?} not found in store",
+        result.stdout_digest
+      ))
+    })?;
 
-    let stderr_bytes = maybe_stderr
-      .map(|(bytes, _load_metadata)| bytes)
-      .ok_or_else(|| {
-        throw(&format!(
-          "Bytes from stderr Digest {:?} not found in store",
-          result.stderr_digest
-        ))
-      })?;
+    let stderr_bytes = maybe_stderr.ok_or_else(|| {
+      throw(&format!(
+        "Bytes from stderr Digest {:?} not found in store",
+        result.stderr_digest
+      ))
+    })?;
 
     let platform_name: String = result.platform.into();
     Ok(externs::unsafe_call(

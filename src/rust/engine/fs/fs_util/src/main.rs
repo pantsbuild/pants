@@ -417,14 +417,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let write_result = store
             .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
             .await?;
-          write_result
-            .ok_or_else(|| {
-              ExitError(
-                format!("File with digest {:?} not found", digest),
-                ExitCode::NotFound,
-              )
-            })
-            .map(|((), _metadata)| ())
+          write_result.ok_or_else(|| {
+            ExitError(
+              format!("File with digest {:?} not found", digest),
+              ExitCode::NotFound,
+            )
+          })
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -565,11 +563,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| d.to_bytes().to_vec())
+            maybe_directory.map(|d| d.to_bytes().to_vec())
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
-            maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
+            maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
             let maybe_v = expand_files(store, digest).await?;
@@ -624,9 +622,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|(dir, _metadata)| dir.to_bytes())
+          maybe_dir.map(|dir| dir.to_bytes())
         }
-        Some((bytes, _metadata)) => Some(bytes),
+        Some(bytes) => Some(bytes),
       };
       match v {
         Some(bytes) => {
@@ -684,7 +682,7 @@ fn expand_files_helper(
   async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
-      Some((dir, _metadata)) => {
+      Some(dir) => {
         {
           let mut files_unlocked = files.lock();
           for file in &dir.files {

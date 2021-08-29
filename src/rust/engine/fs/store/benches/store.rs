@@ -157,7 +157,7 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
   let num_files: usize = 4000;
   let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 
-  let (directory, _metadata) = executor
+  let directory = executor
     .block_on(store.load_directory(digest))
     .unwrap()
     .unwrap();

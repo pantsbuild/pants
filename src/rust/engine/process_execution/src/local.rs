@@ -454,17 +454,27 @@ pub trait CapturedWorkdir {
       .local_paths(&req.append_only_caches)
       .collect::<Vec<_>>();
 
+    // Capture argv0 as the executable path so that we can test whether we have created it in the
+    // sandbox.
+    let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
+      if let Some(working_directory) = &req.working_directory {
+        working_directory.join(relative_path)
+      } else {
+        relative_path
+      }
+    });
+
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
     // non-determinism when paths overlap.
-    let sandbox = store
+    store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .await?;
     let workdir_path2 = workdir_path.clone();
     let output_file_paths = req.output_files.clone();
     let output_dir_paths = req.output_directories.clone();
     let maybe_jdk_home = req.jdk_home.clone();
-    executor
+    let exclusive_spawn = executor
       .spawn_blocking(move || {
         if let Some(jdk_home) = maybe_jdk_home {
           symlink(jdk_home, workdir_path2.join(".jdk"))
@@ -509,23 +519,20 @@ pub trait CapturedWorkdir {
           })?;
         }
 
-        let res: Result<_, String> = Ok(());
+        let exe_was_materialized = maybe_executable_path
+          .as_ref()
+          .map_or(false, |p| workdir_path2.join(&p).exists());
+        if exe_was_materialized {
+          debug!(
+            "Obtaining exclusive spawn lock for process since \
+                 we materialized its executable {:?}.",
+            maybe_executable_path
+          );
+        }
+        let res: Result<_, String> = Ok(exe_was_materialized);
         res
       })
       .await?;
-
-    let exclusive_spawn = RelativePath::new(&req.argv[0]).map_or(false, |relative_path| {
-      let executable_path = if let Some(working_directory) = &req.working_directory {
-        working_directory.join(relative_path)
-      } else {
-        relative_path
-      };
-      let exe_was_materialized = sandbox.contains_file(&executable_path);
-      if exe_was_materialized {
-        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable_path);
-      }
-      exe_was_materialized
-    });
 
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
