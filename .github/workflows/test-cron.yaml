@@ -504,7 +504,7 @@ jobs:
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test ::
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
         '
     - if: always()

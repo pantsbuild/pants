@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path, PurePath
+from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
@@ -454,7 +455,9 @@ def run_rule_with_mocks(
 
     if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
         raise ValueError(
-            f"Rule expected to receive Get providers for {task_rule.input_gets}; got: {mock_gets}"
+            f"Rule expected to receive Get providers for:\n"
+            f"{pformat(task_rule.input_gets)}\ngot:\n"
+            f"{pformat(mock_gets)}"
         )
 
     res = rule(*(rule_args or ()))

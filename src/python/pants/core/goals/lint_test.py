@@ -249,7 +249,7 @@ def test_streaming_output_success() -> None:
 
 def test_streaming_output_failure() -> None:
     results = EnrichedLintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
-    assert results.level() == LogLevel.WARN
+    assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
         linter failed (exit code 18).
@@ -268,7 +268,7 @@ def test_streaming_output_partitions() -> None:
         ],
         linter_name="linter",
     )
-    assert results.level() == LogLevel.WARN
+    assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
         linter failed (exit code 21).

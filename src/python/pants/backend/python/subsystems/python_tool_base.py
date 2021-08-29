@@ -6,9 +6,9 @@ from __future__ import annotations
 import importlib.resources
 from typing import ClassVar, Iterable, Sequence, cast
 
-from pants.backend.experimental.python.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.util_rules.pex import Lockfile, LockfileContent, PexRequirements
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
@@ -85,23 +85,25 @@ class PythonToolRequirementsBase(Subsystem):
             )
         if cls.register_lockfile:
             register(
-                "--experimental-lockfile",
+                "--lockfile",
                 type=str,
-                default=NO_TOOL_LOCKFILE,
+                default=DEFAULT_TOOL_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
                     f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
-                    "Pants, so long as you have not changed the `--version`, "
-                    "`--extra-requirements`, and `--interpreter-constraints` options. See "
+                    "Pants, so long as you have not changed the `--version` and "
+                    "`--extra-requirements` options, and the tool's interpreter constraints are "
+                    "compatible with the default. Pants will error or warn if the lockfile is not "
+                    "compatible (controlled by `[python-setup].invalid_lockfile_behavior`). See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                    f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We do not "
-                    "recommend this, as lockfiles are essential for reproducible builds.\n\n"
+                    f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We "
+                    f"do not recommend this, though, as lockfiles are essential for reproducible "
+                    f"builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
-                    "build root, then activate the backend_package "
-                    "`pants.backend.experimental.python` and run `./pants tool-lock`.\n\n"
-                    "This option is experimental and will likely change. It does not follow the "
-                    "normal deprecation cycle."
+                    f"build root, then run `./pants generate-lockfiles "
+                    f"--resolve={cls.options_scope}`.\n\n"
+                    ""
                 ),
             )
 
@@ -150,9 +152,7 @@ class PythonToolRequirementsBase(Subsystem):
             )
         return Lockfile(
             file_path=self.lockfile,
-            file_path_description_of_origin=(
-                f"the option `[{self.options_scope}].experimental_lockfile`"
-            ),
+            file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
             lockfile_hex_digest=hex_digest,
         )
 
@@ -162,7 +162,7 @@ class PythonToolRequirementsBase(Subsystem):
 
         This assumes you have set the class property `register_lockfile = True`.
         """
-        return cast(str, self.options.experimental_lockfile)
+        return cast(str, self.options.lockfile)
 
     @property
     def uses_lockfile(self) -> bool:

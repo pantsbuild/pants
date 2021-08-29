@@ -8,11 +8,11 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.experimental.python.lockfile_metadata import (
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
     calculate_invalidation_digest,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
 
 def test_metadata_header_round_trip() -> None:
@@ -124,10 +124,12 @@ def test_invalidation_digest() -> None:
 def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
     m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
     assert (
-        m.is_valid_for(
-            user_digest,
-            InterpreterConstraints(user_ic),
-            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+        bool(
+            m.is_valid_for(
+                user_digest,
+                InterpreterConstraints(user_ic),
+                ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            )
         )
         == matches
     )

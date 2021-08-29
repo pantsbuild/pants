@@ -28,6 +28,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
     PexResolveInfo,
+    ResolvedDistributions,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -67,11 +68,12 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *pex_rules(),
             QueryRule(Pex, (PexRequest,)),
             QueryRule(VenvPex, (PexRequest,)),
+            QueryRule(ResolvedDistributions, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
@@ -80,6 +82,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(PexPEX, ()),
         ],
     )
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    return rule_runner
 
 
 def create_pex_and_get_all_data(
@@ -107,7 +114,6 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
-        apply_requirement_constraints=True,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -122,7 +128,7 @@ def create_pex_and_get_all_data(
             Process,
             [
                 PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=()),
                     argv=["-m", "pex.tools", pex.name, "info"],
                     input_digest=pex.digest,
                     extra_env=dict(PEX_INTERPRETER="1"),
@@ -360,7 +366,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps)
+        rule_runner, requirements=PexRequirements(direct_deps, apply_constraints=False)
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -375,7 +381,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps),
+        requirements=PexRequirements(direct_deps, apply_constraints=True),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -460,7 +466,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     venv_pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"]),
+        requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
@@ -490,21 +496,23 @@ def test_build_pex_description() -> None:
         )
         assert _build_pex_description(request) == expected
 
-    repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
+    resolved_dists = ResolvedDistributions(
+        Pex(digest=EMPTY_DIGEST, name="repo.pex", python=None, pex_path=())
+    )
 
     assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(repository_pex=repo_pex), description="Custom!", expected="Custom!"
+        PexRequirements(resolved_dists=resolved_dists), description="Custom!", expected="Custom!"
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(repository_pex=repo_pex), expected="Building new.pex")
+    assert_description(PexRequirements(resolved_dists=resolved_dists), expected="Building new.pex")
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
-        PexRequirements(["req"], repository_pex=repo_pex),
+        PexRequirements(["req"], resolved_dists=resolved_dists),
         expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
@@ -513,7 +521,7 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"], repository_pex=repo_pex),
+        PexRequirements(["req1", "req2"], resolved_dists=resolved_dists),
         expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 
@@ -533,69 +541,113 @@ def test_build_pex_description() -> None:
 def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
         _run_pex_for_lockfile_test(
-            rule_runner, True, actual="1bad", expected="900d", behavior="error"
+            rule_runner,
+            use_file=True,
+            behavior="error",
+            invalid_reqs=True,
         )
 
 
 def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="warn")
-    assert "Invalid lockfile provided." in caplog.text
+    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn", invalid_reqs=True)
+    assert "Invalid lockfile for PEX request" in caplog.text
+
+
+def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn", invalid_reqs=True)
+    assert "requirements set for this" in caplog.text
+    assert "generated under interpreter constraints" not in caplog.text
+
+
+def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
+    _run_pex_for_lockfile_test(
+        rule_runner, use_file=True, behavior="warn", invalid_constraints=True
+    )
+    assert "requirements set for this" not in caplog.text
+    assert "generated under interpreter constraints" in caplog.text
+
+
+def test_warn_on_mismatched_requirements_and_interpreter_constraints(
+    rule_runner: RuleRunner, caplog
+) -> None:
+    _run_pex_for_lockfile_test(
+        rule_runner, use_file=True, behavior="warn", invalid_reqs=True, invalid_constraints=True
+    )
+    assert "requirements set for this" in caplog.text
+    assert "generated under interpreter constraints" in caplog.text
 
 
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="1bad", expected="900d", behavior="ignore")
+    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="ignore", invalid_reqs=True)
     assert not caplog.text.strip()
 
 
 def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, True, actual="900d", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn")
     assert not caplog.text.strip()
 
 
 def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(
-            rule_runner, False, actual="1bad", expected="900d", behavior="error"
-        )
+        _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="error", invalid_reqs=True)
 
 
 def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, False, actual="1bad", expected="900d", behavior="warn")
-    assert "Invalid lockfile provided." in caplog.text
+    _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="warn", invalid_reqs=True)
+    assert "Invalid lockfile for PEX request" in caplog.text
 
 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, False, actual="900d", expected="900d", behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="warn")
     assert not caplog.text.strip()
 
 
-def _run_pex_for_lockfile_test(rule_runner, use_file, actual, expected, behavior):
-    constraints = "CPython>=3.9"
+def _run_pex_for_lockfile_test(
+    rule_runner,
+    *,
+    use_file,
+    behavior,
+    invalid_reqs=False,
+    invalid_constraints=False,
+) -> None:
+    actual_digest = "900d"
+    expected_digest = actual_digest
+    if invalid_reqs:
+        expected_digest = "baad"
+
+    actual_constraints = "CPython>=3.6,<3.10"
+    expected_constraints = actual_constraints
+    if invalid_constraints:
+        expected_constraints = "CPython>=3.9"
+
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {{
-#   "requirements_invalidation_digest": "{actual}",
+#   "requirements_invalidation_digest": "{actual_digest}",
 #   "valid_for_interpreter_constraints": [
-#     "{ constraints }"
+#     "{ actual_constraints }"
 #   ]
 # }}
 # --- END PANTS LOCKFILE METADATA ---
 ansicolors==1.1.8
 """
+    requirements: Lockfile | LockfileContent
+
     if use_file:
         file_path = "lockfile.txt"
         rule_runner.write_files({file_path: lockfile})
         requirements = Lockfile(
             file_path=file_path,
             file_path_description_of_origin="iceland",
-            lockfile_hex_digest=expected,
+            lockfile_hex_digest=expected_digest,
         )
     else:
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
-        requirements = LockfileContent(file_content=content, lockfile_hex_digest=expected)
+        requirements = LockfileContent(file_content=content, lockfile_hex_digest=expected_digest)
 
     create_pex_and_get_all_data(
         rule_runner,
+        interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=requirements,
         additional_pants_args=(
             "--python-setup-experimental-lockfile=lockfile.txt",

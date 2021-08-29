@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
@@ -146,11 +146,11 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         expected_ics: list[str],
         *,
         extra_expected_requirements: list[str] | None = None,
-        args: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> None:
         rule_runner.write_files({"project/BUILD": build_file})
         rule_runner.set_options(
-            args or [],
+            ["--mypy-lockfile=lockfile.txt", *(extra_args or [])],
             env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [MyPyLockfileSentinel()])
@@ -244,6 +244,6 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             """
         ),
         MyPy.default_interpreter_constraints,
-        args=["--mypy-source-plugins=project"],
+        extra_args=["--mypy-source-plugins=project"],
         extra_expected_requirements=["ansicolors"],
     )

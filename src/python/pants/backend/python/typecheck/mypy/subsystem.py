@@ -8,10 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField, PythonSources
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
@@ -65,6 +62,7 @@ class MyPy(PythonToolBase):
 
     default_version = "mypy==0.910"
     default_main = ConsoleScript("mypy")
+
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
@@ -254,8 +252,8 @@ async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class MyPyLockfileSentinel:
-    pass
+class MyPyLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = MyPy.options_scope
 
 
 @rule(
@@ -268,6 +266,9 @@ async def setup_mypy_lockfile(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> PythonLockfileRequest:
+    if not mypy.uses_lockfile:
+        return PythonLockfileRequest.from_tool(mypy)
+
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
         all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))

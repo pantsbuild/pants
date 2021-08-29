@@ -6,10 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -24,7 +21,7 @@ class Yapf(PythonToolBase):
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_version = "yapf==0.31.0"
-    default_extra_requirements = ["setuptools", "toml"]
+    default_extra_requirements = ["toml"]
     default_main = ConsoleScript("yapf")
 
     register_interpreter_constraints = True
@@ -119,8 +116,8 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel:
-    pass
+class YapfLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Yapf.options_scope
 
 
 @rule

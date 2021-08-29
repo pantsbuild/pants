@@ -274,7 +274,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         assert stderr == dedent(
             """\
 
-            𐄂 FortranConditionallyDidChange made changes.
+            + FortranConditionallyDidChange made changes.
             ✓ SmalltalkDidNotChange made no changes.
             - SmalltalkSkipped skipped.
             """

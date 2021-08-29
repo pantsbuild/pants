@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Iterable
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -92,16 +93,23 @@ class LockfileMetadata:
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-    ) -> bool:
-        """Returns True if the lockfile can be used in the current execution context."""
+    ) -> LockfileMetadataValidation:
+        """Returns Truthy if this `LockfileMetadata` can be used in the current execution
+        context."""
+        failure_reasons: set[InvalidLockfileReason] = set()
+
         if expected_invalidation_digest is None:
-            return True
-        return (
-            self.requirements_invalidation_digest == expected_invalidation_digest
-            and self.valid_for_interpreter_constraints.contains(
-                user_interpreter_constraints, interpreter_universe
-            )
-        )
+            return LockfileMetadataValidation(failure_reasons)
+
+        if self.requirements_invalidation_digest != expected_invalidation_digest:
+            failure_reasons.add(InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH)
+
+        if not self.valid_for_interpreter_constraints.contains(
+            user_interpreter_constraints, interpreter_universe
+        ):
+            failure_reasons.add(InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH)
+
+        return LockfileMetadataValidation(failure_reasons)
 
 
 def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
@@ -114,3 +122,20 @@ def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
     }
     m.update(json.dumps(inputs).encode("utf-8"))
     return m.hexdigest()
+
+
+class InvalidLockfileReason(Enum):
+    INVALIDATION_DIGEST_MISMATCH = "invalidation_digest_mismatch"
+    INTERPRETER_CONSTRAINTS_MISMATCH = "interpreter_constraints_mismatch"
+
+
+class LockfileMetadataValidation:
+    """Boolean-like value which additionally carries reasons why a validation failed."""
+
+    failure_reasons: set[InvalidLockfileReason]
+
+    def __init__(self, failure_reasons: Iterable[InvalidLockfileReason] = ()):
+        self.failure_reasons = set(failure_reasons)
+
+    def __bool__(self):
+        return not self.failure_reasons

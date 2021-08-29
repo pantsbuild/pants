@@ -101,12 +101,23 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 async def generate_subtargets(address: Address) -> Subtargets:
     if address.is_file_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
+
     wrapped_build_target = await Get(WrappedTarget, Address, address)
     build_target = wrapped_build_target.target
 
-    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
-        # If a target type does not support dependencies, we do not split it, as that would prevent
-        # the BUILD target from depending on its splits.
+    supports_subtargets = True
+    if build_target.has_field(Sources):
+        sources_field = build_target.get(Sources)
+        supports_subtargets = not sources_field.indivisible
+    else:
+        supports_subtargets = False
+
+    if not build_target.has_field(Dependencies):
+        supports_subtargets = False
+
+    if not supports_subtargets:
+        # If a target type does not support dependencies or has no Sources field (or the Sources field is
+        # indivisible), we do not split it, as that would prevent the BUILD target from depending on its splits.
         return Subtargets(build_target, ())
 
     # Generate a subtarget per source.

@@ -16,7 +16,11 @@ from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -71,13 +75,22 @@ def assert_success(
     assert result[0].exit_code == 0
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
 
 
-def test_failing_source(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt])
@@ -121,12 +134,13 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         }
     )
 
-    py2_args = [
+    extra_args = [
         "--pylint-version=pylint<2",
         "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
+        "--pylint-lockfile=<none>",
     ]
     py2_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py2", relative_file_path="f.py"))
-    py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=py2_args)
+    py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 2
     assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
@@ -137,7 +151,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert py3_result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
 
-    combined_result = run_pylint(rule_runner, [py2_tgt, py3_tgt], extra_args=py2_args)
+    combined_result = run_pylint(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
     batched_py3_result, batched_py2_result = sorted(
         combined_result, key=lambda result: result.exit_code
@@ -291,6 +305,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         extra_args=[
             "--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2",
             "--pylint-args='--load-plugins=pylint_unittest'",
+            "--pylint-lockfile=<none>",
         ],
     )
     assert len(result) == 1
@@ -377,7 +392,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             extra_args=[
                 "--pylint-source-plugins=['pants-plugins/plugins']",
                 f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
-                "--pylint-config=pylintrc",
+                "--pylint-lockfile=<none>",
             ],
         )
         assert len(res) == 1

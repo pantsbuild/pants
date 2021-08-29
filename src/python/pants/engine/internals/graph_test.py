@@ -94,6 +94,15 @@ class MockTarget(Target):
     core_fields = (MockDependencies, Sources, SpecialCasedDeps1, SpecialCasedDeps2)
 
 
+class IndivisibleSources(Sources):
+    indivisible = True
+
+
+class IndivisibleMockTarget(Target):
+    alias = "indivisible_target"
+    core_fields = (MockDependencies, IndivisibleSources, SpecialCasedDeps1, SpecialCasedDeps2)
+
+
 @pytest.fixture
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -102,7 +111,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(Targets, (DependenciesRequest,)),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
         ],
-        target_types=[MockTarget],
+        target_types=[MockTarget, IndivisibleMockTarget],
     )
 
 
@@ -305,6 +314,34 @@ def test_transitive_targets_tolerates_subtarget_cycles(
         Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+    ]
+
+
+def test_target_with_indivisible_sources(
+    transitive_targets_rule_runner: RuleRunner,
+) -> None:
+    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='dep', sources=['dep.txt'])
+            indivisible_target(name='t1', sources=['t1.txt'], dependencies=[':dep'])
+            target(name='t2', sources=['t2.txt'], dependencies=[':t1'])
+            """
+        ),
+    )
+    result = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [TransitiveTargetsRequest([Address("", target_name="t2")])],
+    )
+    assert len(result.roots) == 1
+    assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
+    assert [tgt.address for tgt in result.dependencies] == [
+        Address(
+            "", target_name="t1"
+        ),  # note: t1 is indivisible and is _not_ replaced with file subtargets
+        Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
 

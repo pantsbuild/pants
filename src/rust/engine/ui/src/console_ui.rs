@@ -37,7 +37,7 @@ use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 use task_executor::Executor;
-use workunit_store::{format_workunit_duration, WorkunitStore};
+use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
@@ -129,18 +129,19 @@ impl ConsoleUI {
     Ok((bars, multi_progress_task))
   }
 
-  fn get_label_from_heavy_hitters<'a>(
-    tasks_to_display: impl Iterator<Item = (&'a String, &'a Option<Duration>)>,
-  ) -> Vec<String> {
+  fn get_label_from_heavy_hitters(
+    tasks_to_display: &IndexMap<SpanId, (String, Option<Duration>)>,
+    index: usize,
+  ) -> Option<String> {
     tasks_to_display
-      .map(|(label, maybe_duration)| {
+      .get_index(index)
+      .map(|(_, (label, maybe_duration))| {
         let duration_label = match maybe_duration {
           None => "(Waiting) ".to_string(),
           Some(duration) => format_workunit_duration(*duration),
         };
         format!("{}{}", duration_label, label)
       })
-      .collect()
   }
 
   ///
@@ -172,10 +173,9 @@ impl ConsoleUI {
       }
     }
 
-    let swimlane_labels: Vec<String> = Self::get_label_from_heavy_hitters(tasks_to_display.iter());
     for (n, pbar) in instance.bars.iter().enumerate() {
-      match swimlane_labels.get(n) {
-        Some(label) => pbar.set_message(label),
+      match Self::get_label_from_heavy_hitters(tasks_to_display, n) {
+        Some(ref label) => pbar.set_message(label),
         None => pbar.set_message(""),
       }
     }
@@ -230,7 +230,7 @@ type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send
 
 /// The state for one run of the ConsoleUI.
 struct Instance {
-  tasks_to_display: IndexMap<String, Option<Duration>>,
+  tasks_to_display: IndexMap<SpanId, (String, Option<Duration>)>,
   multi_progress_task: MultiProgressTask,
   bars: Vec<ProgressBar>,
 }

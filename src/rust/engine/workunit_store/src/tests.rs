@@ -7,7 +7,10 @@ use crate::{SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 #[test]
 fn heavy_hitters_basic() {
   let ws = create_store(vec![], vec![wu_root(0), wu(1, 0)], vec![]);
-  assert_eq!(vec!["1"], ws.heavy_hitters(1).keys().collect::<Vec<_>>());
+  assert_eq!(
+    vec![SpanId(1)],
+    ws.heavy_hitters(1).keys().cloned().collect::<Vec<_>>()
+  );
 }
 
 #[test]

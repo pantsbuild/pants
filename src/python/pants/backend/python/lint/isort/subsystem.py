@@ -6,10 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -24,7 +21,6 @@ class Isort(PythonToolBase):
     help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
 
     default_version = "isort[pyproject,colors]>=5.5.1,<5.6"
-    default_extra_requirements = ["setuptools"]
     default_main = ConsoleScript("isort")
 
     register_interpreter_constraints = True
@@ -128,8 +124,8 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel:
-    pass
+class IsortLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Isort.options_scope
 
 
 @rule

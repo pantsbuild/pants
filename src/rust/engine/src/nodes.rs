@@ -18,7 +18,7 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::externs::engine_aware::{self, EngineAwareInformation};
+use crate::externs::engine_aware;
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
@@ -1173,12 +1173,11 @@ impl WrappedNode for Task {
     if result_type == product {
       let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
         (
-          engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
-          engine_aware::Message::retrieve(&context.core.types, &result_val),
+          engine_aware::EngineAwareLevel::retrieve(&result_val),
+          engine_aware::Message::retrieve(&result_val),
           engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
             .unwrap_or_else(Vec::new),
-          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
-            .unwrap_or_else(Vec::new),
+          engine_aware::Metadata::retrieve(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new(), Vec::new())
@@ -1388,7 +1387,7 @@ impl Node for NodeKey {
             let py = gil.python();
             let python_type = value.get_type(py);
             if python_type.is_subtype_of(py, &engine_aware_param_ty) {
-              engine_aware::DebugHint::retrieve(&context.core.types, &value)
+              engine_aware::DebugHint::retrieve(&value)
             } else {
               None
             }
@@ -1549,11 +1548,17 @@ impl Display for NodeKey {
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {
-        // TODO(#7907) we probably want to include some kind of representation of
-        // the Params of an @rule when we stringify the @rule. But we need to make
-        // sure we don't naively dump the string representation of a Key, which
-        // could get gigantic.
-        write!(f, "@rule({})", task.task.display_info.name)
+        let params = task
+          .params
+          .keys()
+          .filter_map(|k| engine_aware::DebugHint::retrieve(&externs::val_for(k)))
+          .collect::<Vec<_>>();
+        write!(
+          f,
+          "@rule({}({}))",
+          task.task.display_info.name,
+          params.join(", ")
+        )
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
@@ -1574,8 +1579,17 @@ impl NodeError for Failure {
       path[path_len - 1] += " <-"
     }
     throw(&format!(
-      "Dependency graph contained a cycle:\n  {}",
-      path.join("\n  ")
+      "The dependency graph contained a cycle:\
+      \n\n  \
+      {}\
+      \n\n\
+      If the dependencies in the above path are for your BUILD targets, you may need to use more \
+      granular targets or replace BUILD target dependencies with file dependencies. If they are \
+      not for your BUILD targets, then please file a Github issue!\
+      \n\n\
+      See {} for more information.",
+      path.join("\n  "),
+      externs::doc_url("targets#dependencies-and-dependency-inference")
     ))
   }
 }
