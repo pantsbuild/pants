@@ -4,8 +4,7 @@
 from packaging.version import Version
 
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.fs import DigestContents, PathGlobs
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule

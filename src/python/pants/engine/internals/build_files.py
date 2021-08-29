@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import DigestContents, PathGlobs, Paths
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor

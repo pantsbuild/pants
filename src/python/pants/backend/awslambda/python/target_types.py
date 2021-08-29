@@ -8,10 +8,9 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, Paths
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,

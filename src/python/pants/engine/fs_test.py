@@ -16,7 +16,6 @@ from typing import Callable, Iterable, List, Optional, Set
 
 import pytest
 
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -30,6 +29,7 @@ from pants.engine.fs import (
     DownloadFile,
     FileContent,
     FileDigest,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,

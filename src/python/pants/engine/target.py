@@ -32,11 +32,16 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import GlobExpansionConjunction, PathGlobs, Paths, Snapshot
+from pants.engine.fs import (
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+    Snapshot,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
