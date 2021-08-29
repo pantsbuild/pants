@@ -125,26 +125,27 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    py2_args = [
+    extra_args = [
         "--bandit-version=bandit>=1.6.2,<1.7",
         "--bandit-extra-requirements=['setuptools']",
         "--bandit-lockfile=<none>",
     ]
+
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=py2_args)
+    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 0
     assert "f.py (syntax error while parsing AST from file)" in py2_result[0].stdout
 
     py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=py2_args)
+    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=extra_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
     assert "No issues identified." in py3_result[0].stdout
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py2
     # to still fail, but Py3 should pass.
-    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=py2_args)
+    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
 
     batched_py2_result, batched_py3_result = sorted(
@@ -194,7 +195,11 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_bandit(rule_runner, [tgt], extra_args=["--bandit-extra-requirements=bandit-aws"])
+    result = run_bandit(
+        rule_runner,
+        [tgt],
+        extra_args=["--bandit-extra-requirements=bandit-aws", "--bandit-lockfile=<none>"],
+    )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Issue: [C100:hardcoded_aws_key]" in result[0].stdout

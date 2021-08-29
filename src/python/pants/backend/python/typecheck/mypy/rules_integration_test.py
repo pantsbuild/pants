@@ -274,7 +274,11 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--mypy-extra-requirements=django-stubs==1.8.0", "--mypy-version=mypy==0.812"],
+        extra_args=[
+            "--mypy-extra-requirements=django-stubs==1.8.0",
+            "--mypy-version=mypy==0.812",
+            "--mypy-lockfile=<none>",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -531,7 +535,9 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782"])
+    assert_success(
+        rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782", "--mypy-lockfile=<none>"]
+    )
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
@@ -623,6 +629,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             [tgt],
             extra_args=[
                 "--mypy-source-plugins=['pants-plugins/plugins']",
+                "--mypy-lockfile=<none>",
                 "--source-root-patterns=['pants-plugins', 'src/py']",
             ],
         )
