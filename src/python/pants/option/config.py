@@ -490,7 +490,7 @@ class TomlSerializer:
           "o2": "hello",
           "o3": [0, 1, 2],
         },
-        "cache.java": {
+        "some-subsystem": {
           "dict_option": {
             "a": 0,
             "b": 0,
@@ -501,53 +501,26 @@ class TomlSerializer:
 
     parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]
 
-    def normalize(self) -> Dict:
-        result: Dict = {}
-        for section, section_values in self.parsed.items():
-            # With TOML, we store dict values as strings to avoid ambiguity between sections/option
-            # scopes vs. dict values.
-            def normalize_section_value(option, option_value) -> Tuple[str, Any]:
-                option_value = str(option_value) if isinstance(option_value, dict) else option_value
-                if option.endswith(".add"):
-                    option = option.rsplit(".", 1)[0]
-                    option_value = f"+{option_value!r}"
-                elif option.endswith(".remove"):
-                    option = option.rsplit(".", 1)[0]
-                    option_value = f"-{option_value!r}"
-                return option, option_value
+    def normalize(self) -> dict:
+        def normalize_section_value(option, option_value) -> Tuple[str, Any]:
+            # With TOML, we store dict values as strings (for now).
+            if isinstance(option_value, dict):
+                option_value = str(option_value)
+            if option.endswith(".add"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"+{option_value!r}"
+            elif option.endswith(".remove"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"-{option_value!r}"
+            return option, option_value
 
-            section_values = dict(
+        return {
+            section: dict(
                 normalize_section_value(option, option_value)
                 for option, option_value in section_values.items()
             )
-
-            def add_section_values(
-                section_component: str,
-                seen_section_components: List[str],
-                remaining_section_components: List[str],
-            ) -> None:
-                current_scope = result
-                for seen in seen_section_components:
-                    current_scope = current_scope[seen]
-                if not remaining_section_components:
-                    current_scope[section_component] = section_values
-                    return
-                child_section_component = remaining_section_components[0]
-                current_scope[section_component] = {child_section_component: {}}
-                add_section_values(
-                    section_component=child_section_component,
-                    seen_section_components=[*seen_section_components, section_component],
-                    remaining_section_components=remaining_section_components[1:],
-                )
-
-            section_components = section.split(".")
-            add_section_values(
-                section_component=section_components[0],
-                seen_section_components=[],
-                remaining_section_components=section_components[1:],
-            )
-
-        return result
+            for section, section_values in self.parsed.items()
+        }
 
     def serialize(self) -> str:
         toml_values = self.normalize()

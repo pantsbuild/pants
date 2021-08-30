@@ -249,24 +249,16 @@ def test_toml_serializer() -> None:
             "listy": ["a", "b", "c"],
             "map": {"a": 0, "b": 1},
         },
-        "cache.java": {"o": ""},
-        "inception.nested.nested-again.one-more": {"o": ""},
+        "some-subsystem": {"o": ""},
     }
     assert TomlSerializer(original_values).normalize() == {
         "GLOBAL": {**original_values["GLOBAL"], "map": "{'a': 0, 'b': 1}"},
-        "cache": {"java": {"o": ""}},
-        "inception": {"nested": {"nested-again": {"one-more": {"o": ""}}}},
+        "some-subsystem": {"o": ""},
     }
 
 
-def test_toml_serializer_add_remove() -> None:
-    original_values: Dict = {
-        "GLOBAL": {
-            "backend_packages.add": ["added"],
-        },
-    }
+def test_toml_serializer_list_add_remove() -> None:
+    original_values = {"GLOBAL": {"backend_packages.add": ["added"]}}
     assert TomlSerializer(original_values).normalize() == {
-        "GLOBAL": {
-            "backend_packages": "+['added']",
-        },
+        "GLOBAL": {"backend_packages": "+['added']"}
     }
