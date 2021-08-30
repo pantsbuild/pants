@@ -45,17 +45,6 @@ FILE_1 = ConfigFile(
         [b]
         preempt = true
 
-        [b.nested]
-        dict = '''
-        {
-          "a": 1,
-          "b": "%(answer)s",
-          "c": ["%(answer)s", "%(answer)s"],
-        }'''
-
-        [b.nested.nested-again]
-        movie = "inception"
-
         [c]
         name = "overridden_from_default"
         interpolated_from_section = "%(name)s is interpolated"
@@ -73,8 +62,6 @@ FILE_1 = ConfigFile(
     expected_options={
         "a": {"list": '["1", "2", "3", "42"]', "list2": "+[7, 8, 9]", "list3": '-["x", "y", "z"]'},
         "b": {"preempt": "True"},
-        "b.nested": {"dict": '{\n  "a": 1,\n  "b": "42",\n  "c": ["42", "42"],\n}'},
-        "b.nested.nested-again": {"movie": "inception"},
         "c": {
             "name": "overridden_from_default",
             "interpolated_from_section": "overridden_from_default is interpolated",
@@ -98,9 +85,6 @@ FILE_2 = ConfigFile(
         list.remove = [8, 9]
 
         [empty_section]
-
-        [p.child]
-        no_values_in_parent = true
         """
     ),
     default_values={},
@@ -109,7 +93,6 @@ FILE_2 = ConfigFile(
         "b": {"preempt": "False"},
         "d": {"list": "+[0, 1],-[8, 9]"},
         "empty_section": {},
-        "p.child": {"no_values_in_parent": "True"},
     },
 )
 
@@ -139,15 +122,12 @@ class ConfigTest(unittest.TestCase):
         }
 
     def test_sections(self) -> None:
-        expected_sections = list(
-            OrderedSet([*FILE_2.expected_options.keys(), *FILE_1.expected_options.keys()])
+        expected_sections = OrderedSet(
+            [*FILE_2.expected_options.keys(), *FILE_1.expected_options.keys()]
         )
-        assert self.config.sections() == expected_sections
+        assert self.config.sections() == list(expected_sections)
         for section in expected_sections:
             assert self.config.has_section(section) is True
-        # We should only look at explicitly defined sections. For example, if `cache.java` is
-        # defined but `cache` is not, then `cache` should not be included in the sections.
-        assert self.config.has_section("p") is False
 
     def test_has_option(self) -> None:
         # Check has all DEFAULT values
