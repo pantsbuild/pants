@@ -14,7 +14,7 @@ into that block instead of its current content. Be sure to check that the page r
 and be prepared to revert (via the "Page history" link) if necessary.
 
 NOTE: Please consider adding your company/organization to this list! If you wish to do so then
-  thank you, and please follow the guidance at https://pantsbuild.org/register. 
+  thank you, and please follow the guidance at https://pantsbuild.org/register.
 """
 
 # Note: To create an image URL, temporarily add an image block to some page on readme.com (such
