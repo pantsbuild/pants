@@ -597,8 +597,15 @@ def _validate_metadata(
     def message_parts() -> Iterable[str]:
 
         tool_name = request.options_scope_name
-        uses_source_plugins = tool_name in ["todo", "fixme"]
-        uses_project_interpreter_constraints = tool_name in ["also", "todo", "fixme"]
+        uses_source_plugins = tool_name in ["mypy", "pylint"]
+        uses_project_interpreter_constraints = tool_name in [
+            "bandit",
+            "flake8",
+            "pylint",
+            "setuptools",
+            "ipython",
+            "pytest",
+        ]
 
         yield "You are using "
 
@@ -608,12 +615,12 @@ def _validate_metadata(
                 yield "the `<default>` lockfile provided by Pants "
                 is_default = True
             else:
-                yield "(TODO) A `LockfileContent` object of some description "
+                yield "a lockfile that was generated programmatically "
         else:
             yield f"the lockfile at {requirements.file_path} "
 
         yield (
-            f"to install the tool {tool_name}, but it is not compatible with your "
+            f"to install the tool `{tool_name}`, but it is not compatible with your "
             "configuration: "
             "\n\n"
         )
@@ -625,7 +632,7 @@ def _validate_metadata(
             )
 
             if uses_source_plugins:
-                yield f"`[[{tool_name}].source_plugins`, "
+                yield f"`[{tool_name}].source_plugins`, "
 
             yield (
                 f"and `[{tool_name}].extra_requirements`, or by using a new "
@@ -635,18 +642,18 @@ def _validate_metadata(
 
         if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
             yield (
-                f"- You have set interpreter constraints ({request.interpreter_constraints}) that "
+                f"- You have set interpreter constraints (`{request.interpreter_constraints}`) that "
                 "are not compatible with those used to generate the lockfile "
-                f"({metadata.valid_for_interpreter_constraints}). "
+                f"(`{metadata.valid_for_interpreter_constraints}`). "
             )
-            if uses_project_interpreter_constraints:
+            if not uses_project_interpreter_constraints:
                 yield (
                     f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
                     "or by using a new custom lockfile. "
                 )
             else:
                 yield (
-                    f"{tool_name} determines its interpreter constraints based on your code's own "
+                    f"`{tool_name}` determines its interpreter constraints based on your code's own "
                     "constraints. To fix this error, you can either change your code's constraints "
                     f"(see {doc_url('python-interpreter-compatibility')}) or by generating a new "
                     "custom lockfile. "
