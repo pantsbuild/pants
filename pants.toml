@@ -20,6 +20,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
+  # NOTE: Keep this version in sync with `generate_docs.py`!
   "toolchain.pants.plugin==0.13.1",
 ]
 
@@ -72,18 +73,10 @@ root_patterns = [
 
 [python-setup]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
-experimental_lockfile_custom_regeneration_command = "build-support/bin/generate_all_lockfiles.sh"
 interpreter_constraints = [">=3.7,<3.10"]
-
-[ipython]
-experimental_lockfile = "<default>"
-
-[black]
-experimental_lockfile = "<default>"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
-experimental_lockfile = "<default>"
 
 [flake8]
 config = "build-support/flake8/.flake8"
@@ -91,16 +84,7 @@ extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0"
 ]
-experimental_lockfile = "3rdparty/python/lockfiles/flake8.txt"
-
-[isort]
-experimental_lockfile = "<default>"
-
-[setuptools]
-experimental_lockfile = "3rdparty/python/lockfiles/setuptools.txt"
-
-[mypy]
-experimental_lockfile = "<default>"
+lockfile = "3rdparty/python/lockfiles/flake8.txt"
 
 [shellcheck]
 args = ["--external-sources"]
@@ -163,7 +147,7 @@ extra_requirements.add = [
   "pytest-icdiff",
   "pygments",
 ]
-experimental_lockfile = "3rdparty/python/lockfiles/pytest.txt"
+lockfile = "3rdparty/python/lockfiles/pytest.txt"
 timeout_default = 60
 
 [test]
@@ -180,10 +164,12 @@ extra_env_vars = [
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
-experimental_lockfile = "3rdparty/python/lockfiles/coverage_py.txt"
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[generate-lockfiles]
+custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [toolchain-setup]
 repo = "pants"

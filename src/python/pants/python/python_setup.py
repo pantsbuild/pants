@@ -35,7 +35,8 @@ class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<4"]
+    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
     @classmethod
     def register_options(cls, register):
@@ -58,7 +59,7 @@ class PythonSetup(Subsystem):
             "--interpreter-versions-universe",
             advanced=True,
             type=list,
-            default=["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            default=cls.default_interpreter_universe,
             help=(
                 "All known Python major/minor interpreter versions that may be used by either "
                 "your code or tools used by your code.\n\n"
@@ -80,11 +81,15 @@ class PythonSetup(Subsystem):
             type=file_option,
             mutually_exclusive_group="lockfile",
             help=(
-                "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use.\n\nSee "
-                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and pip."
-                "\n\nMutually exclusive with `--requirement-constraints-target`."
+                "When resolving third-party requirements for your own code (vs. tools you run), "
+                "use this constraints file to determine which versions to use.\n\n"
+                "This only applies when resolving user requirements, rather than tools you run "
+                "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
+                "`[black].lockfile`.\n\n"
+                "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
+                "information on the format of constraint files and how constraints are applied in "
+                "Pex and pip.\n\n"
+                "Mutually exclusive with `[python-setup].experimental_lockfile`."
             ),
         )
         register(
@@ -118,34 +123,19 @@ class PythonSetup(Subsystem):
                 "multiple lockfiles. This option's behavior may change without the normal "
                 "deprecation cycle.\n\n"
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants lock ::`."
-            ),
-        )
-        # TODO(#12293): It's plausible this option might not exist once we figure out the semantics
-        #  for lockfile generation. One tricky edge is that the command to regenerate stale
-        #  lockfiles might need to consume this. In the meantime to figuring this all out, this is
-        #  helpful for internal pantsbuild/pants use.
-        register(
-            "--experimental-lockfile-custom-regeneration-command",
-            advanced=True,
-            type=str,
-            default=None,
-            help=(
-                "If set, Pants will instruct your users to run a custom command to regenerate "
-                "lockfiles, rather than running `./pants lock` and `./pants tool-lock` like normal."
-                "\n\nThis option is experimental and it may change at any time without the normal "
-                "deprecation cycle."
+                "and run `./pants generate-user-lockfile ::`.\n\n"
+                "Mutually exclusive with `[python-setup].requirement_constraints`."
             ),
         )
         register(
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
-            default=InvalidLockfileBehavior.ignore,
+            default=InvalidLockfileBehavior.error,
             help=(
-                "Set the behavior when Pants encounters a lockfile that was generated with different "
-                "requirements or interpreter constraints than those currently specified.\n\n"
-                "We strongly recommend setting to `error` in CI or release builds."
+                "The behavior when a lockfile has requirements or interpreter constraints that are "
+                "not compatible with what the current build is using.\n\n"
+                "We recommend keeping the default of `error` for CI builds."
             ),
         )
         register(
@@ -233,10 +223,6 @@ class PythonSetup(Subsystem):
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
         return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
-
-    @property
-    def lockfile_custom_regeneration_command(self) -> str | None:
-        return cast("str | None", self.options.experimental_lockfile_custom_regeneration_command)
 
     @property
     def resolve_all_constraints(self) -> bool:

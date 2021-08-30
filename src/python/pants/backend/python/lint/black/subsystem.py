@@ -6,10 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -30,7 +27,6 @@ class Black(PythonToolBase):
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_version = "black==21.5b2"
-    default_extra_requirements = ["setuptools"]
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
@@ -110,8 +106,8 @@ class Black(PythonToolBase):
         )
 
 
-class BlackLockfileSentinel:
-    pass
+class BlackLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Black.options_scope
 
 
 @rule(
@@ -121,6 +117,9 @@ class BlackLockfileSentinel:
 async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not black.uses_lockfile:
+        return PythonLockfileRequest.from_tool(black)
+
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
         all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))

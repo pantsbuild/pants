@@ -420,7 +420,7 @@ impl HeavyHittersData {
     }
   }
 
-  fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
+  fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, Option<Duration>)> {
     self.refresh_store();
 
     let now = SystemTime::now();
@@ -456,7 +456,7 @@ impl HeavyHittersData {
         if let Some(effective_name) = workunit.metadata.desc.as_ref() {
           let maybe_duration = Self::duration_for(now, workunit);
 
-          res.insert(effective_name.to_string(), maybe_duration);
+          res.insert(span_id, (effective_name.to_string(), maybe_duration));
           if res.len() >= k {
             break;
           }
@@ -583,7 +583,7 @@ impl WorkunitStore {
   ///
   /// Find the longest running leaf workunits, and return their first visible parents.
   ///
-  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, Option<Duration>)> {
     self.heavy_hitters_data.heavy_hitters(k)
   }
 

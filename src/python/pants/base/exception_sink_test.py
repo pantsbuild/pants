@@ -12,6 +12,8 @@ from pants.engine.platform import Platform
 from pants.util.contextutil import temporary_dir
 from pants.util.enums import match
 
+pytestmark = pytest.mark.platform_specific_behavior
+
 
 def _gen_sink_subclass():
     # Avoid modifying global state by generating a subclass.

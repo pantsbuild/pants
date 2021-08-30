@@ -89,13 +89,13 @@ def load_plugins(
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
         if "target_types" in entries:
             target_types = entries["target_types"].load()()
-            build_configuration.register_target_types(target_types)
+            build_configuration.register_target_types(req.key, target_types)
         if "build_file_aliases" in entries:
             aliases = entries["build_file_aliases"].load()()
             build_configuration.register_aliases(aliases)
         if "rules" in entries:
             rules = entries["rules"].load()()
-            build_configuration.register_rules(rules)
+            build_configuration.register_rules(req.key, rules)
         loaded[dist.as_requirement().key] = dist
 
 
@@ -142,10 +142,10 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
 
     target_types = invoke_entrypoint("target_types")
     if target_types:
-        build_configuration.register_target_types(target_types)
+        build_configuration.register_target_types(backend_package, target_types)
     build_file_aliases = invoke_entrypoint("build_file_aliases")
     if build_file_aliases:
         build_configuration.register_aliases(build_file_aliases)
     rules = invoke_entrypoint("rules")
     if rules:
-        build_configuration.register_rules(rules)
+        build_configuration.register_rules(backend_package, rules)

@@ -12,10 +12,7 @@ from typing import Iterable, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -71,10 +68,8 @@ class PyTest(PythonToolBase):
     # This should be kept in sync with `requirements.txt`.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement_library` to override the version.
-    default_version = "pytest>=6.0.1,<6.3"
-    # TODO: When updating pytest-cov to 2.12+, update the help message for
-    #  `[coverage-py].config` to not mention installing TOML.
-    default_extra_requirements = ["pytest-cov>=2.10.1,<2.12"]
+    default_version = "pytest>=6.2.4,<6.3"
+    default_extra_requirements = ["pytest-cov>=2.12.1,<2.13"]
 
     default_main = ConsoleScript("pytest")
 
@@ -243,8 +238,8 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel:
-    pass
+class PytestLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = PyTest.options_scope
 
 
 @rule(
@@ -257,6 +252,9 @@ class PytestLockfileSentinel:
 async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not pytest.uses_lockfile:
+        return PythonLockfileRequest.from_tool(pytest)
+
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
     #

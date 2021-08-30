@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path, PurePath
+from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
@@ -135,8 +136,8 @@ class RuleRunner:
                 objects=objects, context_aware_object_factories=context_aware_object_factories
             )
         )
-        build_config_builder.register_rules(all_rules)
-        build_config_builder.register_target_types(target_types or ())
+        build_config_builder.register_rules("_dummy_for_test_", all_rules)
+        build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironment({})
@@ -195,7 +196,7 @@ class RuleRunner:
         return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
-    def target_types(self) -> FrozenOrderedSet[Type[Target]]:
+    def target_types(self) -> Tuple[Type[Target], ...]:
         return self.build_config.target_types
 
     @property
@@ -454,7 +455,9 @@ def run_rule_with_mocks(
 
     if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
         raise ValueError(
-            f"Rule expected to receive Get providers for {task_rule.input_gets}; got: {mock_gets}"
+            f"Rule expected to receive Get providers for:\n"
+            f"{pformat(task_rule.input_gets)}\ngot:\n"
+            f"{pformat(mock_gets)}"
         )
 
     res = rule(*(rule_args or ()))

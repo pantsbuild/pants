@@ -8,12 +8,12 @@ from typing import Any
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.poetry_conversions import (
+from pants.backend.python.subsystems.poetry import (
     _HEADER,
     PoetryDependency,
     create_pyproject_toml_as_dict,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
 
 def test_create_pyproject_toml() -> None:

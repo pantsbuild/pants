@@ -87,3 +87,25 @@ def test_download_external_module(rule_runner: RuleRunner) -> None:
             found_uuid_go_file = True
             break
     assert found_uuid_go_file
+
+
+def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None:
+    downloaded_module = rule_runner.request(
+        DownloadedExternalModule,
+        [
+            DownloadExternalModuleRequest(
+                path="cloud.google.com/go",
+                version="v0.26.0",
+            )
+        ],
+    )
+    assert downloaded_module.path == "cloud.google.com/go"
+    assert downloaded_module.version == "v0.26.0"
+
+    digest_contents = rule_runner.request(DigestContents, [downloaded_module.digest])
+    found_go_mod = False
+    for file_content in digest_contents:
+        if file_content.path == "go.mod":
+            found_go_mod = True
+            break
+    assert found_go_mod

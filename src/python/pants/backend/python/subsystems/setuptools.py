@@ -4,10 +4,7 @@
 import itertools
 from dataclasses import dataclass
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -41,8 +38,8 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel:
-    pass
+class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Setuptools.options_scope
 
 
 @rule(
@@ -52,6 +49,9 @@ class SetuptoolsLockfileSentinel:
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not setuptools.uses_lockfile:
+        return PythonLockfileRequest.from_tool(setuptools)
+
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     transitive_targets_per_python_dist = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))

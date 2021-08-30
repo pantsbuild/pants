@@ -10,7 +10,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest, pex_path_closure
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -109,12 +109,9 @@ async def create_pex_binary_run_request(
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
         "PEX_PATH": os.pathsep.join(
-            [
-                in_chroot(requirements_pex_request.output_filename),
-                in_chroot(local_dists.pex.name),
-            ],
+            in_chroot(p.name) for p in (*pex_path_closure([requirements]), local_dists.pex)
         ),
-        "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)

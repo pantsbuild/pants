@@ -477,7 +477,6 @@ class BashBinary(BinaryPath):
 
 @dataclass(frozen=True)
 class BashBinaryRequest:
-    rationale: str
     search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
 
 
@@ -491,14 +490,14 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale=bash_request.rationale)
+        raise BinaryNotFoundError(request)
     return BashBinary(first_path.path, first_path.fingerprint)
 
 
 @rule
 async def get_bash() -> BashBinary:
     # Expose bash to external consumers.
-    return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
+    return await Get(BashBinary, BashBinaryRequest())
 
 
 @rule
@@ -511,19 +510,29 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await Get(
-            BashBinary, BashBinaryRequest(rationale="use it to locate other executables")
-        )
+        bash = await Get(BashBinary, BashBinaryRequest())
         shebang = f"#!{bash.path}"
 
-    # Note: the backslash after the """ marker ensures that the shebang is at the start of the
-    # script file. Many OSs will not see the shebang if there is intervening whitespace.
+    # Some subtle notes with this script:
+    #
+    #  - The backslash after the `"""` ensures that the shebang is at the start of the script file.
+    #       Many OSs will not see the shebang if there is intervening whitespace.
+    #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
+    #      can catch bugs in the script itself, given an earlier silent failure.
+    #  - We do not use `set -e` like normal because it causes the line
+    #      `command which -a <bin> || true` to fail the script when using Bash 3, which macOS
+    #      uses by default.
+    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
+    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
+    #      processes since all known remoting configurations include a static container image as
+    #      part of their cache key which automatically avoids this problem. See #10769 for a
+    #      solution that is less of a tradeoff.
     script_path = "./find_binary.sh"
     script_content = dedent(
         f"""\
         {shebang}
 
-        set -euox pipefail
+        set -uox pipefail
 
         if command -v which > /dev/null; then
             command which -a $1 || true
@@ -540,10 +549,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         ProcessResult,
-        # We use a volatile process to force re-run since any binary found on the host system today
-        # could be gone tomorrow. Ideally we'd only do this for local processes since all known
-        # remoting configurations include a static container image as part of their cache key which
-        # automatically avoids this problem. See #10769 for a solution that is less of a tradeoff.
         Process(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,

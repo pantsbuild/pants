@@ -6,7 +6,7 @@
 # {
 #   "requirements_invalidation_digest": "fe82372002915f2550a0b25fea5b6f360c639252ad607a978e7e2f6cbd94c99a",
 #   "valid_for_interpreter_constraints": [
-#     "CPython>=3.6"
+#     "CPython<4,>=3.6"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---

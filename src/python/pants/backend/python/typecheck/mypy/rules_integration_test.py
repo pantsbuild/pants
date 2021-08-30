@@ -29,6 +29,7 @@ from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
     skip_unless_python27_present,
     skip_unless_python38_present,
@@ -103,10 +104,19 @@ def assert_success(
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(MyPy.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=[f"--mypy-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
@@ -264,7 +274,11 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--mypy-extra-requirements=django-stubs==1.8.0", "--mypy-version=mypy==0.812"],
+        extra_args=[
+            "--mypy-extra-requirements=django-stubs==1.8.0",
+            "--mypy-version=mypy==0.812",
+            "--mypy-lockfile=<none>",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -521,7 +535,9 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782"])
+    assert_success(
+        rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782", "--mypy-lockfile=<none>"]
+    )
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
@@ -613,6 +629,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             [tgt],
             extra_args=[
                 "--mypy-source-plugins=['pants-plugins/plugins']",
+                "--mypy-lockfile=<none>",
                 "--source-root-patterns=['pants-plugins', 'src/py']",
             ],
         )

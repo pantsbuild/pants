@@ -24,6 +24,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import resolve_conflicting_options
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
@@ -50,18 +51,6 @@ LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
 
 MEGABYTES = 1_000_000
 GIGABYTES = 1_000 * MEGABYTES
-
-
-class GlobMatchErrorBehavior(Enum):
-    """Describe the action to perform when matching globs in BUILD files to source files.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
 
 class FilesNotFoundBehavior(Enum):

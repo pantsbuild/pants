@@ -14,7 +14,13 @@ from pants.backend.python.goals.coverage_py import (
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    pex_path_closure,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -225,7 +231,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=pex_path_closure([pytest_pex, requirements_pex, local_dists.pex]),
         ),
     )
     config_files_get = Get(

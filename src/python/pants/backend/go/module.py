@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -15,9 +16,13 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
     DigestContents,
     DigestSubset,
+    FileContent,
+    GlobMatchErrorBehavior,
+    MergeDigests,
     PathGlobs,
     RemovePrefix,
     Snapshot,
@@ -28,7 +33,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Target, UnexpandedTargets
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -256,15 +260,62 @@ async def download_external_module(
             PathGlobs(
                 [f"{source_path}/**"],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the DownloadExternalModuleRequest for {request.path}@{request.version}{request.path}@{request.version}",
+                description_of_origin=f"the DownloadExternalModuleRequest for {request.path}@{request.version}",
             ),
         ),
     )
 
-    source_digest_stripped = await Get(Digest, RemovePrefix(source_digest, source_path))
+    source_snapshot_stripped = await Get(Snapshot, RemovePrefix(source_digest, source_path))
+    if "go.mod" not in source_snapshot_stripped.files:
+        # There was no go.mod in the downloaded source. Use the generated go.mod from the go tooling which
+        # was returned in the module metadata.
+        go_mod_absolute_path = metadata.get("GoMod")
+        if not go_mod_absolute_path:
+            raise ValueError(
+                f"No go.mod was provided in download of Go external module {request.path}@{request.version}, "
+                "and the module metadata did not identify a generated go.mod file to use instead."
+            )
+        gopath_index = go_mod_absolute_path.index("gopath/")
+        go_mod_path = go_mod_absolute_path[gopath_index:]
+        go_mod_digest = await Get(
+            Digest,
+            DigestSubset(
+                result.output_digest,
+                PathGlobs(
+                    [f"{go_mod_path}"],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=f"the DownloadExternalModuleRequest for {request.path}@{request.version}",
+                ),
+            ),
+        )
+        go_mod_digest_stripped = await Get(
+            Digest, RemovePrefix(go_mod_digest, os.path.dirname(go_mod_path))
+        )
+
+        # There should now be one file in the digest. Create a digest where that file is named go.mod
+        # and then merge it into the sources.
+        contents = await Get(DigestContents, Digest, go_mod_digest_stripped)
+        assert len(contents) == 1
+        go_mod_only_digest = await Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(
+                        path="go.mod",
+                        content=contents[0].content,
+                    )
+                ]
+            ),
+        )
+        source_digest_final = await Get(
+            Digest, MergeDigests([go_mod_only_digest, source_snapshot_stripped.digest])
+        )
+    else:
+        # If the module download has a go.mod, then just use the sources as is.
+        source_digest_final = source_snapshot_stripped.digest
 
     return DownloadedExternalModule(
-        path=request.path, version=request.version, digest=source_digest_stripped
+        path=request.path, version=request.version, digest=source_digest_final
     )
 
 

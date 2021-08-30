@@ -6,7 +6,7 @@
 # {
 #   "requirements_invalidation_digest": "b098df4cb8b4729e91282a0894f8804314269decfafe1a00d65b254074c63b8b",
 #   "valid_for_interpreter_constraints": [
-#     "CPython>=3.6"
+#     "CPython<4,>=3.6"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -17,9 +17,9 @@ astroid==2.4.2; python_version >= "3.5" \
 colorama==0.4.4; python_version >= "3.5" and python_full_version < "3.0.0" and sys_platform == "win32" or sys_platform == "win32" and python_version >= "3.5" and python_full_version >= "3.5.0" \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
-isort==4.3.21; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.5" \
-    --hash=sha256:6e811fcb295968434526407adb8796944f1988c5b65e8139058f2014cbe100fd \
-    --hash=sha256:54da7e92468955c4fceacd0c86bd0ec997b0e1ee80d97f67c35a78b719dccab1
+isort==5.8.0; python_version >= "3.6" and python_version < "4.0" \
+    --hash=sha256:2bb1680aad211e3c9944dbce1d4ba09a989f04e238296c87fe2139faa26d655d \
+    --hash=sha256:0a943902919f65c5684ac4e0154b1ad4fac6dcaa5d9f3426b732f1c8b5419be6
 lazy-object-proxy==1.4.3; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.5" \
     --hash=sha256:f3900e8a5de27447acbf900b4750b0ddfd7ec1ea7fbaf11dfa911141bc522af0 \
     --hash=sha256:a2238e9d1bb71a56cd710611a1614d1194dc10a175c1e08d75e1a7bcc250d442 \

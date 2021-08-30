@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+import itertools
+from typing import Iterable
+
 import pytest
 
-from pants.backend.experimental.python.lockfile_metadata import (
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
     calculate_invalidation_digest,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 def test_metadata_header_round_trip() -> None:
@@ -55,18 +57,24 @@ dave==3.1.4 \\
     assert line_by_line(result) == line_by_line(expected)
 
 
-_requirements = ["flake8-pantsbuild>=2.0,<3", "flake8-2020>=1.6.0,<1.7.0"]
+def test_invalidation_digest() -> None:
+    a = "flake8-pantsbuild>=2.0,<3"
+    b = "flake8-2020>=1.6.0,<1.7.0"
+    c = "flake8"
 
+    def assert_eq(left: Iterable[str], right: Iterable[str]) -> None:
+        assert calculate_invalidation_digest(left) == calculate_invalidation_digest(right)
 
-@pytest.mark.parametrize(
-    "requirements,expected",
-    [
-        ([], "c8e8d0a6d6ec36bee3942091046d81d86e3b83b143b37a7cc714e2d022bf4f85"),
-        (_requirements, "66327c52225d2f798ffad7f092bf1b51da8a66777f3ebf654e2444d7eb1429f4"),
-    ],
-)
-def test_invalidation_digest(requirements, expected) -> None:
-    assert calculate_invalidation_digest(FrozenOrderedSet(requirements)) == expected
+    def assert_neq(left: Iterable[str], right: Iterable[str]) -> None:
+        assert calculate_invalidation_digest(left) != calculate_invalidation_digest(right)
+
+    for reqs in itertools.permutations([a, b, c]):
+        assert_eq(reqs, [a, b, c])
+        assert_neq(reqs, [a, b])
+
+    assert_eq([], [])
+    assert_neq([], [a])
+    assert_eq([a, a, a, a], [a])
 
 
 @pytest.mark.parametrize(
@@ -116,10 +124,12 @@ def test_invalidation_digest(requirements, expected) -> None:
 def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
     m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
     assert (
-        m.is_valid_for(
-            user_digest,
-            InterpreterConstraints(user_ic),
-            ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+        bool(
+            m.is_valid_for(
+                user_digest,
+                InterpreterConstraints(user_ic),
+                ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            )
         )
         == matches
     )

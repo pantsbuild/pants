@@ -31,6 +31,7 @@ from pants.init.extension_loader import (
     load_plugins,
 )
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -138,7 +139,7 @@ class LoaderTest(unittest.TestCase):
         registered_aliases = build_configuration.registered_aliases
         self.assertEqual(0, len(registered_aliases.objects))
         self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
-        self.assertEqual(build_configuration.subsystems, FrozenOrderedSet())
+        self.assertEqual(build_configuration.subsystem_to_providers, FrozenDict())
         self.assertEqual(0, len(build_configuration.rules))
         self.assertEqual(0, len(build_configuration.target_types))
 
@@ -301,9 +302,7 @@ class LoaderTest(unittest.TestCase):
 
         with self.create_register(target_types=target_types) as backend_package:
             load_backend(self.bc_builder, backend_package)
-            assert self.bc_builder.create().target_types == FrozenOrderedSet(
-                [DummyTarget, DummyTarget2]
-            )
+            assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2)
 
         class PluginTarget(Target):
             alias = "plugin_tgt"
@@ -316,9 +315,7 @@ class LoaderTest(unittest.TestCase):
             self.get_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets)
         )
         self.load_plugins(["new-targets"])
-        assert self.bc_builder.create().target_types == FrozenOrderedSet(
-            [DummyTarget, DummyTarget2, PluginTarget]
-        )
+        assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2, PluginTarget)
 
     def test_backend_plugin_ordering(self):
         def reg_alias():

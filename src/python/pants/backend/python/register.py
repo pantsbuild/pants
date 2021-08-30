@@ -10,6 +10,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
+    lockfile,
     package_pex_binary,
     pytest_runner,
     repl,
@@ -58,6 +59,7 @@ def build_file_aliases():
 def rules():
     return (
         *coverage_py.rules(),
+        *lockfile.rules(),
         *tailor.rules(),
         *ancestor_files.rules(),
         *local_dists.rules(),

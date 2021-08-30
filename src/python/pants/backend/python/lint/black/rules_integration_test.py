@@ -9,6 +9,7 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
+from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
@@ -19,6 +20,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
@@ -89,10 +91,22 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(files)])
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(Black.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt])
+    interpreter_constraint = (
+        ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
+    )
+    lint_results, fmt_result = run_black(
+        rule_runner,
+        [tgt],
+        extra_args=[f"--black-interpreter-constraints=['{interpreter_constraint}']"],
+    )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr

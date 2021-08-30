@@ -4,16 +4,13 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "requirements_invalidation_digest": "c9ac324ac99361e93a096930b044d0b30e906833d1c7bba7f7af8e4e36621fb8",
+#   "requirements_invalidation_digest": "7b946efbcd8abc2a50c548b71c84b34e44eabf0430246b309d63d6200dc5715b",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.6"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
-setuptools==57.4.0; python_version >= "3.6" \
-    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
-    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465
 toml==0.10.2; (python_version >= "2.6" and python_full_version < "3.0.0") or (python_full_version >= "3.3.0") \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

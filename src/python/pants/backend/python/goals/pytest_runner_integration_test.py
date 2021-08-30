@@ -39,7 +39,11 @@ from pants.engine.process import InteractiveRunner
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
@@ -93,17 +97,9 @@ def run_pytest(
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> TestResult:
-    # pytest-html==1.22.1 has an undeclared dep on setuptools. This, unfortunately,
-    # is the most recent version of pytest-html that works with the low version of
-    # pytest that we pin to.
-    extra_reqs = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
-    extra_reqs_str = "['" + "', '".join(extra_reqs) + "']"
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
-        # pin to lower versions so that we can run Python 2 tests
-        "--pytest-version=pytest>=4.6.6,<4.7",
-        f"--pytest-extra-requirements={extra_reqs_str}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -117,17 +113,26 @@ def run_pytest(
     return test_result
 
 
-def test_passing_test(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt)
+    result = run_pytest(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_failing_test(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -221,17 +226,19 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    extra_args = ["--pytest-version=pytest>=4.6.6,<4.7", "--pytest-lockfile=<none>"]
+
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, py2_tgt)
+    result = run_pytest(rule_runner, py2_tgt, extra_args=extra_args)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
     py3_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, py3_tgt)
+    result = run_pytest(rule_runner, py3_tgt, extra_args=extra_args)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -323,7 +330,15 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(
-        rule_runner, tgt, extra_args=["--pytest-args='--html=extra-output/report.html'"]
+        rule_runner,
+        tgt,
+        extra_args=[
+            "--pytest-args='--html=extra-output/report.html'",
+            "--pytest-extra-requirements=pytest-html==3.1",
+            # pytest-html requires setuptools to be installed because it does not use PEP 517.
+            "--pytest-extra-requirements=setuptools",
+            "--pytest-lockfile=<none>",
+        ],
     )
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
