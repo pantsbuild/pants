@@ -122,6 +122,8 @@ async def pants_setup_kwargs(
             "Tracker": "https://github.com/pantsbuild/pants/issues",
             "Changelog": "https://www.pantsbuild.org/docs/changelog",
             "Twitter": "https://twitter.com/pantsbuild",
+            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,
