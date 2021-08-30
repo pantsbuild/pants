@@ -103,6 +103,7 @@ def create_pex_and_get_all_data(
     additional_pex_args: Tuple[str, ...] = (),
     env: Mapping[str, str] | None = None,
     internal_only: bool = True,
+    options_scope_name: str | None = None,
 ) -> Dict:
     request = PexRequest(
         output_filename="test.pex",
@@ -114,6 +115,7 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
+        options_scope_name=options_scope_name,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -542,77 +544,153 @@ def test_build_pex_description() -> None:
     )
 
 
+DEFAULT = "DEFAULT"
+OTHER_CONTENT = "OTHER_CONTENT"
+FILE = "FILE"
+
+
 def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
         _run_pex_for_lockfile_test(
             rule_runner,
-            use_file=True,
+            lockfile_type=FILE,
             behavior="error",
             invalid_reqs=True,
         )
 
 
-def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn", invalid_reqs=True)
-    assert "Invalid lockfile for PEX request" in caplog.text
-
-
-def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn", invalid_reqs=True)
-    assert "requirements set for this" in caplog.text
-    assert "generated under interpreter constraints" not in caplog.text
-
-
-def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, use_file=True, behavior="warn", invalid_constraints=True
-    )
-    assert "requirements set for this" not in caplog.text
-    assert "generated under interpreter constraints" in caplog.text
-
-
-def test_warn_on_mismatched_requirements_and_interpreter_constraints(
-    rule_runner: RuleRunner, caplog
-) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, use_file=True, behavior="warn", invalid_reqs=True, invalid_constraints=True
-    )
-    assert "requirements set for this" in caplog.text
-    assert "generated under interpreter constraints" in caplog.text
-
-
 def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="ignore", invalid_reqs=True)
+    _run_pex_for_lockfile_test(
+        rule_runner, lockfile_type=FILE, behavior="ignore", invalid_reqs=True
+    )
     assert not caplog.text.strip()
 
 
 def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=True, behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, lockfile_type=FILE, behavior="warn")
     assert not caplog.text.strip()
 
 
 def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="error", invalid_reqs=True)
-
-
-def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="warn", invalid_reqs=True)
-    assert "Invalid lockfile for PEX request" in caplog.text
+        _run_pex_for_lockfile_test(
+            rule_runner, lockfile_type=OTHER_CONTENT, behavior="error", invalid_reqs=True
+        )
 
 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, use_file=False, behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, lockfile_type=OTHER_CONTENT, behavior="warn")
     assert not caplog.text.strip()
+
+
+LOCKFILE_TYPES = (DEFAULT, OTHER_CONTENT, FILE)
+BOOLEANS = (True, False)
+
+
+@pytest.mark.parametrize(
+    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic",
+    [
+        (lft, ir, ic, usp, upi)
+        for lft in LOCKFILE_TYPES
+        for ir in BOOLEANS
+        for ic in BOOLEANS
+        for usp in BOOLEANS
+        for upi in BOOLEANS
+    ],
+)
+def test_lockfile_warnings(
+    rule_runner,
+    lockfile_type: str,
+    invalid_reqs,
+    invalid_constraints,
+    uses_source_plugins,
+    uses_project_ic,
+    caplog,
+) -> None:
+    class M:
+        opening_default = "You are using the `<default>` lockfile provided by Pants"
+        opening_other_content = "You are using a lockfile that was generated programmatically"
+        opening_file = "You are using the lockfile at"
+
+        invalid_requirements = (
+            "You have set different requirements than those used to generate the lockfile"
+        )
+        invalid_requirements_source_plugins = ".source_plugins`, and"
+
+        invalid_interpreter_constraints = "You have set interpreter constraints"
+        invalid_interpreter_constraints_tool_ics = (
+            ".interpreter_constraints`, or by using a new custom lockfile."
+        )
+        invalid_interpreter_constraints_project_ics = (
+            "determines its interpreter constraints based on your code's own constraints."
+        )
+
+        closing_lockfile_content = (
+            "To generate a custom lockfile based on your current configuration"
+        )
+        closing_file = "To regenerate your lockfile based on your current configuration"
+
+    any_error = invalid_constraints or invalid_reqs
+
+    _run_pex_for_lockfile_test(
+        rule_runner,
+        lockfile_type=lockfile_type,
+        invalid_reqs=invalid_reqs,
+        invalid_constraints=invalid_constraints,
+        uses_source_plugins=uses_source_plugins,
+        uses_project_ic=uses_project_ic,
+        behavior="warn",
+    )
+
+    txt = caplog.text.strip()
+
+    if not any_error:
+        assert not txt
+        return
+
+    expected_opening = {
+        DEFAULT: M.opening_default,
+        OTHER_CONTENT: M.opening_other_content,
+        FILE: M.opening_file,
+    }[lockfile_type]
+
+    assert expected_opening in txt
+
+    if invalid_reqs:
+        assert M.invalid_requirements in txt
+        if uses_source_plugins:
+            assert M.invalid_requirements_source_plugins in txt
+        else:
+            assert M.invalid_requirements_source_plugins not in txt
+    else:
+        assert M.invalid_requirements not in txt
+
+    if invalid_constraints:
+        assert M.invalid_interpreter_constraints in txt
+        if uses_project_ic:
+            assert M.invalid_interpreter_constraints_project_ics in txt
+            assert M.invalid_interpreter_constraints_tool_ics not in txt
+        else:
+            assert M.invalid_interpreter_constraints_project_ics not in txt
+            assert M.invalid_interpreter_constraints_tool_ics in txt
+
+    else:
+        assert M.invalid_interpreter_constraints not in txt
+
+    if lockfile_type == FILE:
+        assert M.closing_lockfile_content not in txt
+        assert M.closing_file in txt
 
 
 def _run_pex_for_lockfile_test(
     rule_runner,
     *,
-    use_file,
+    lockfile_type: str,
     behavior,
     invalid_reqs=False,
     invalid_constraints=False,
+    uses_source_plugins=False,
+    uses_project_ic=False,
 ) -> None:
     actual_digest = "900d"
     expected_digest = actual_digest
@@ -623,6 +701,16 @@ def _run_pex_for_lockfile_test(
     expected_constraints = actual_constraints
     if invalid_constraints:
         expected_constraints = "CPython>=3.9"
+
+    options_scope_name: str
+    if uses_source_plugins and uses_project_ic:
+        options_scope_name = "pylint"
+    elif uses_source_plugins:
+        options_scope_name = "mypy"
+    elif uses_project_ic:
+        options_scope_name = "bandit"
+    else:
+        options_scope_name = "kevin"
 
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
@@ -635,9 +723,9 @@ def _run_pex_for_lockfile_test(
 # --- END PANTS LOCKFILE METADATA ---
 ansicolors==1.1.8
 """
-    requirements: Lockfile | LockfileContent
 
-    if use_file:
+    requirements: Lockfile | LockfileContent
+    if lockfile_type == FILE:
         file_path = "lockfile.txt"
         rule_runner.write_files({file_path: lockfile})
         requirements = Lockfile(
@@ -645,14 +733,20 @@ ansicolors==1.1.8
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected_digest,
         )
-    else:
+    elif lockfile_type in (DEFAULT, OTHER_CONTENT):
+        is_default_lockfile = lockfile_type == DEFAULT
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
         requirements = LockfileContent(
-            file_content=content, lockfile_hex_digest=expected_digest, is_default_lockfile=False
+            file_content=content,
+            lockfile_hex_digest=expected_digest,
+            is_default_lockfile=is_default_lockfile,
         )
+    else:
+        raise Exception("incorrect lockfile_type value in test")
 
     create_pex_and_get_all_data(
         rule_runner,
+        options_scope_name=options_scope_name,
         interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=requirements,
         additional_pants_args=(

@@ -609,11 +609,9 @@ def _validate_metadata(
 
         yield "You are using "
 
-        is_default = False
         if isinstance(requirements, LockfileContent):
             if requirements.is_default_lockfile:
                 yield "the `<default>` lockfile provided by Pants "
-                is_default = True
             else:
                 yield "a lockfile that was generated programmatically "
         else:
@@ -662,7 +660,7 @@ def _validate_metadata(
 
         yield "\n"
 
-        if is_default:
+        if not isinstance(requirements, Lockfile):
             yield (
                 "To generate a custom lockfile based on your current configuration, set "
                 f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
