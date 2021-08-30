@@ -930,9 +930,7 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
   ) -> BoxFuture<'static, Result<(), String>> {
-    self
-      .materialize_directory_helper(destination, true, digest)
-      .boxed()
+    self.materialize_directory_helper(destination, true, digest)
   }
 
   fn materialize_directory_helper(
@@ -945,30 +943,31 @@ impl Store {
     async move {
       let destination2 = destination.clone();
       let directory_creation = if is_root {
+        // NB: `safe_create_dir_*` is necessary for the root, because parent directories might be
+        // created concurrently. But it is not necessary for internal directories, because the
+        // `Directory` struct guarantees uniqueness.
         store
           .local
           .executor()
-          .spawn_blocking(move || fs::safe_create_dir_all(&destination2))
-          .await
+          .spawn_blocking(move || fs::safe_create_dir_all_ioerror(&destination2))
+          .boxed()
       } else {
-        store
-          .local
-          .executor()
-          .spawn_blocking(move || fs::safe_create_dir(&destination2))
-          .await
+        tokio::fs::create_dir(&destination2).boxed()
       };
-      directory_creation.map_err(|e| {
-        format!(
-          "Failed to create directory {}: {}",
-          destination.display(),
-          e
-        )
-      })?;
 
-      let directory = store
-        .load_directory(digest)
-        .await?
-        .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
+      let (_, load_result) = future::try_join(
+        directory_creation.map_err(|e| {
+          format!(
+            "Failed to create directory {}: {}",
+            destination.display(),
+            e
+          )
+        }),
+        store.load_directory(digest),
+      )
+      .await?;
+      let directory =
+        load_result.ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
 
       let file_futures = directory
         .files
