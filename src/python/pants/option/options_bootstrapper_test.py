@@ -183,18 +183,18 @@ class OptionsBootstrapperTest(unittest.TestCase):
             options = options_bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
-                    ScopeInfo("compile.apt"),
+                    ScopeInfo("compile_apt"),
                     ScopeInfo("fruit"),
                 ],
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
             options.register("", "--config-override", type=list)
-            options.register("compile.apt", "--worker-count")
+            options.register("compile_apt", "--worker-count")
             options.register("fruit", "--apple")
 
             self.assertEqual(
-                str(expected_worker_count), options.for_scope("compile.apt").worker_count
+                str(expected_worker_count), options.for_scope("compile_apt").worker_count
             )
             self.assertEqual("red", options.for_scope("fruit").apple)
 
@@ -202,7 +202,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp1.write(
                 dedent(
                     """\
-                    [compile.apt]
+                    [compile_apt]
                     worker_count = 1
 
                     [fruit]
@@ -213,7 +213,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp2.write(
                 dedent(
                     """\
-                    [compile.apt]
+                    [compile_apt]
                     worker_count = 2
                     """
                 )
