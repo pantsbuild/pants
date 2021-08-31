@@ -648,7 +648,7 @@ def _validate_metadata(
 
             yield (
                 f"and `[{tool_name}].extra_requirements`, or by using a new "
-                "custom lockfile."  # TODO make this more descriptive based on the defaults.
+                "custom lockfile."
                 "\n"
             )
 
