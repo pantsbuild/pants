@@ -1616,15 +1616,15 @@ def targets_with_sources_types(
 # -----------------------------------------------------------------------------------------------
 
 
-class Dependencies(StringSequenceField, AsyncFieldMixin):
-    """The dependencies field.
+class DependenciesBase(StringSequenceField, AsyncFieldMixin):
+    """A base class for dependencies-like fields."""
 
-    To resolve all dependencies—including the results of dependency injection and inference—use
-    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
-    DependenciesRequest(tgt[Dependencies])`.
-    """
+    # Whether dependencies listed in this field can use the `!!` syntax to exclude a target
+    # from the entire graph, regardless of where or how it was introduced.
+    # This is off by default, since the semantics are confusing when this is specified on
+    # library targets. We turn this on for binary targets (see below).
+    supports_transitive_excludes = False
 
-    alias = "dependencies"
     help = (
         "Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib']."
         "\n\nAlternatively, you may include file names. Pants will find which target owns that "
@@ -1635,11 +1635,24 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         "This is intended for removing incorrectly inferred direct dependencies."
     )
 
-    # Whether dependencies listed in this field can use the `!!` syntax to exclude a target
-    # from the entire graph, regardless of where or how it was introduced.
-    # This is off by default, since the semantics are confusing when this is specified on
-    # library targets. We turn this on for binary targets (see below).
-    supports_transitive_excludes = False
+    supports_transitive_excludes_help = (
+        "\n\nYou can also exclude a target or file from the "
+        "entire graph by prefixing it with `!!`."
+    )
+
+
+class Dependencies(DependenciesBase):
+    """The dependencies field for regular library and test targets.
+
+    Depending on a target with this field means depending transitively on the dependencies
+    listed in this field.
+
+    To resolve all dependencies—including the results of dependency injection and inference—use
+    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    DependenciesRequest(tgt[Dependencies])`.
+    """
+
+    alias = "dependencies"
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
@@ -1665,9 +1678,8 @@ class TestTargetDependencies(Dependencies):
     e.g., once we figure out what depending on a test target should mean.
     """
 
+    help = Dependencies.help + Dependencies.supports_transitive_excludes_help
     supports_transitive_excludes = True
-
-    ...
 
 
 @dataclass(frozen=True)
@@ -1829,7 +1841,7 @@ class InjectDependenciesRequest(EngineAwareParameter, ABC):
     """
 
     dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies | BinaryTargetDependencies]]
+    inject_for: ClassVar[Type[Dependencies | PackageTargetDependencies]]
 
     def debug_hint(self) -> str:
         return self.dependencies_field.address.spec
@@ -1904,7 +1916,7 @@ class InferredDependencies:
         return iter(self.dependencies)
 
 
-class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
+class SpecialCasedDependencies(DependenciesBase):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
 
@@ -1925,32 +1937,26 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
         return UnparsedAddressInputs(self.value or (), owning_address=self.address)
 
 
-class BinaryTargetDependencies(SpecialCasedDependencies):
-    """A base class for dependencies of a target that represent a binary artifact.
+class PackageTargetDependencies(SpecialCasedDependencies):
+    """A base class for dependencies of a target that represent a packaged artifact.
 
-    A "binary target" is one that:
+    A "package target" is one that provides dependencies to its dependees - if at all -
+    from built artifacts, rather than from source. These artifacts are built from source code in
+    the package targets dependencies.
 
-    A) Does not own any source code itself.
-    B) Provides dependencies to its dependees - if at all - from built artifacts,
-       rather than from source. These artifacts are built from source code in the binary target's
-       dependencies.
-
-    These dependencies are special-cased because a dependee on a binary target does not want
+    These dependencies are special-cased because a dependee on a package target does not want
     to transitively depend on that target's own dependencies, since those dependencies should be
     provided - if at all - by an artifact.
 
-    Note: this is for the `dependencies` field *of* binary targets, not dependencies *on*
-      binary targets. The latter can be regular dependencies. This field indicates that
-      transitive dependency following "stops" at a binary target (except for in specific
+    Note: this is for the `dependencies` field *of* package targets, not dependencies *on*
+      package targets. The latter can be regular dependencies. This field indicates that
+      transitive dependency following "stops" at a package target (except for in specific
       use-cases like graph introspection).
     """
 
     alias = Dependencies.alias
-    help = (
-        Dependencies.help + "\n\nYou can also exclude a target or file from the entire graph "
-        "by prefixing it with `!!`."
-    )
-    # Non-library targets typically act as "root targets" for a goal, and can unconfusingly
+    help = Dependencies.help + Dependencies.supports_transitive_excludes_help
+    # Package targets typically act as "root targets" for a goal, and can unconfusingly
     # exclude dependencies downstream from them.
     supports_transitive_excludes = True
 

@@ -3,7 +3,7 @@
 
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    BinaryTargetDependencies,
+    PackageTargetDependencies,
     Sources,
     StringField,
     Target,
@@ -22,8 +22,8 @@ class DockerImageVersion(StringField):
     help = "Image tag to apply to built images."
 
 
-class DockerDependencies(BinaryTargetDependencies):
-    ...
+class DockerDependencies(PackageTargetDependencies):
+    pass
 
 
 class DockerContextRoot(StringField):

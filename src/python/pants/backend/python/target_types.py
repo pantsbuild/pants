@@ -26,7 +26,6 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
-    BinaryTargetDependencies,
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
@@ -35,6 +34,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     NestedDictStringToStringField,
+    PackageTargetDependencies,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -118,7 +118,7 @@ class PexBinaryDefaults(Subsystem):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PexBinaryDependencies(BinaryTargetDependencies):
+class PexBinaryDependencies(PackageTargetDependencies):
     ...
 
 
@@ -714,8 +714,8 @@ class PythonRequirementsFile(Target):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PythonDistributionDependencies(BinaryTargetDependencies):
-    ...
+class PythonDistributionDependencies(PackageTargetDependencies):
+    pass
 
 
 class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
