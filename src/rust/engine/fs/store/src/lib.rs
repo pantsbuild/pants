@@ -925,6 +925,10 @@ impl Store {
   /// Lays out the directory and all of its contents (files and directories) on disk so that a
   /// process which uses the directory structure can run.
   ///
+  /// Although `Directory` has internally unique paths, `materialize_directory` can be used with
+  /// an existing destination directory, meaning that directory and file creation must be
+  /// idempotent.
+  ///
   pub fn materialize_directory(
     &self,
     destination: PathBuf,
@@ -942,18 +946,13 @@ impl Store {
     let store = self.clone();
     async move {
       let destination2 = destination.clone();
-      let directory_creation = if is_root {
-        // NB: `safe_create_dir_*` is necessary for the root, because parent directories might be
-        // created concurrently. But it is not necessary for internal directories, because the
-        // `Directory` struct guarantees uniqueness.
-        store
-          .local
-          .executor()
-          .spawn_blocking(move || fs::safe_create_dir_all_ioerror(&destination2))
-          .boxed()
-      } else {
-        tokio::fs::create_dir(&destination2).boxed()
-      };
+      let directory_creation = store.local.executor().spawn_blocking(move || {
+        if is_root {
+          fs::safe_create_dir_all(&destination2)
+        } else {
+          fs::safe_create_dir(&destination2)
+        }
+      });
 
       let (_, load_result) = future::try_join(
         directory_creation.map_err(|e| {
