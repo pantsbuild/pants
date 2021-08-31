@@ -614,7 +614,7 @@ def _validate_metadata(
 
     def tool_message_parts(
         requirements: (ToolCustomLockfile | ToolProgrammaticLockfile | ToolDefaultLockfile),
-    ) -> Iterable[str]:
+    ) -> Iterator[str]:
 
         tool_name = requirements.options_scope_name
         uses_source_plugins = requirements.uses_source_plugins
@@ -678,7 +678,7 @@ def _validate_metadata(
             yield (
                 "To generate a custom lockfile based on your current configuration, set "
                 f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-                "`./pants generate-lockfiles`. "
+                "`./pants generate-lockfiles --resolve={tool_name}`. "
             )
         else:
             yield (
