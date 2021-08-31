@@ -6,10 +6,11 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python.goals.lockfile import (
+    AmbiguousResolveNamesError,
     PythonLockfileRequest,
     PythonToolLockfileSentinel,
     UnrecognizedResolveNamesError,
-    determine_tool_sentinels_to_generate,
+    determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
 from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
@@ -27,29 +28,67 @@ def test_determine_tool_sentinels_to_generate() -> None:
     class Tool3(PythonToolLockfileSentinel):
         options_scope = "tool3"
 
-    def assert_chosen(
-        requested: list[str], expected: list[type[PythonToolLockfileSentinel]]
-    ) -> None:
-        assert determine_tool_sentinels_to_generate([Tool1, Tool2, Tool3], requested) == expected
+    all_user_resolves = {
+        "u1": "some_lockfile.txt",
+        "u2": "another_lockfile.txt",
+        "u3": "yet_another_lockfile.txt",
+    }
 
-    assert_chosen([Tool2.options_scope], [Tool2])
-    assert_chosen([Tool1.options_scope, Tool3.options_scope], [Tool1, Tool3])
+    def assert_chosen(
+        requested: list[str],
+        expected_user_resolves: list[str],
+        expected_tools: list[type[PythonToolLockfileSentinel]],
+    ) -> None:
+        user_resolves, tools = determine_resolves_to_generate(
+            all_user_resolves, [Tool1, Tool2, Tool3], requested
+        )
+        assert user_resolves == {
+            resolve: all_user_resolves[resolve] for resolve in expected_user_resolves
+        }
+        assert tools == expected_tools
+
+    assert_chosen(
+        [Tool2.options_scope, "u2"], expected_user_resolves=["u2"], expected_tools=[Tool2]
+    )
+    assert_chosen(
+        [Tool1.options_scope, Tool3.options_scope],
+        expected_user_resolves=[],
+        expected_tools=[Tool1, Tool3],
+    )
 
     # If none are specifically requested, return all.
-    assert_chosen([], [Tool1, Tool2, Tool3])
+    assert_chosen(
+        [], expected_user_resolves=["u1", "u2", "u3"], expected_tools=[Tool1, Tool2, Tool3]
+    )
 
-    with pytest.raises(UnrecognizedResolveNamesError) as exc:
-        assert_chosen(["fake"], [])
-    assert (
-        "Unrecognized resolve name from the option `--generate-lockfiles-resolve`: fake\n\n"
-        "All valid resolve names: ['tool1', 'tool2', 'tool3']"
-    ) in str(exc.value)
+    with pytest.raises(UnrecognizedResolveNamesError):
+        assert_chosen(["fake"], expected_user_resolves=[], expected_tools=[])
 
+    # Error if same resolve name used for tool lockfiles and user lockfiles.
+    class AmbiguousTool(PythonToolLockfileSentinel):
+        options_scope = "ambiguous"
+
+    with pytest.raises(AmbiguousResolveNamesError):
+        determine_resolves_to_generate(
+            {"ambiguous": "lockfile.txt"}, [AmbiguousTool], ["ambiguous"]
+        )
+
+
+@pytest.mark.parametrize(
+    "unrecognized,bad_entry_str,name_str",
+    (
+        (["fake"], "fake", "name"),
+        (["fake1", "fake2"], "['fake1', 'fake2']", "names"),
+    ),
+)
+def test_unrecognized_resolve_names_error(
+    unrecognized: list[str], bad_entry_str: str, name_str: str
+) -> None:
     with pytest.raises(UnrecognizedResolveNamesError) as exc:
-        assert_chosen(["fake1", "fake2"], [])
+        raise UnrecognizedResolveNamesError(unrecognized, ["valid1", "valid2", "valid3"])
     assert (
-        "Unrecognized resolve names from the option `--generate-lockfiles-resolve`: "
-        "['fake1', 'fake2']"
+        f"Unrecognized resolve {name_str} from the option `--generate-lockfiles-resolve`: "
+        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
     ) in str(exc.value)
 
 
