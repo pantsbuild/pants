@@ -356,15 +356,15 @@ class PoetryRequirements:
     For example, if pyproject.toml contains the following entries under
     poetry.tool.dependencies: `foo = ">1"` and `bar = ">2.4"`,
 
-    python_requirement_library(
-        name="foo",
-        requirements=["foo>1"],
-      )
+        python_requirement_library(
+          name="foo",
+          requirements=["foo>1"],
+        )
 
-      python_requirement_library(
-        name="bar",
-        requirements=["bar>2.4"],
-      )
+        python_requirement_library(
+          name="bar",
+          requirements=["bar>2.4"],
+        )
 
     See Poetry documentation for correct specification of pyproject.toml:
     https://python-poetry.org/docs/pyproject/
@@ -374,7 +374,7 @@ class PoetryRequirements:
     requirement. This setting is important for Pants to know how to convert your import
     statements back into your dependencies. For example:
 
-        python_requirements(
+        poetry_requirements(
           module_mapping={
             "ansicolors": ["colors"],
             "setuptools": ["pkg_resources"],
