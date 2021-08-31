@@ -348,17 +348,17 @@ class _ConfigValues:
         section_values = self.values.get(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
-        result = OrderedSet(
+        result = [
             option
             for option, option_value in section_values.items()
             if self._is_an_option(option_value)
-        )
-        result.update(
+        ]
+        result.extend(
             default_option
             for default_option in self.defaults.keys()
             if default_option not in result
         )
-        return list(result)
+        return result
 
     def _maybe_deprecated_default(self, option: str) -> None:
         matched = option == "pants_supportdir"
