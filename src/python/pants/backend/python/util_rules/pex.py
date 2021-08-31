@@ -77,7 +77,28 @@ class Lockfile:
 class LockfileContent:
     file_content: FileContent
     lockfile_hex_digest: str | None
-    is_default_lockfile: bool
+
+
+@dataclass(frozen=True)
+class _ToolLockfileMixin:
+    options_scope_name: str
+    uses_source_plugins: bool
+    uses_project_interpreter_constraints: bool
+
+
+@dataclass(frozen=True)
+class ToolDefaultLockfile(LockfileContent, _ToolLockfileMixin):
+    pass
+
+
+@dataclass(frozen=True)
+class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
+    pass
+
+
+@dataclass(frozen=True)
+class ToolProgrammaticLockfile(LockfileContent, _ToolLockfileMixin):
+    pass
 
 
 @frozen_after_init
@@ -594,28 +615,24 @@ def _validate_metadata(
     if validation:
         return
 
-    def message_parts() -> Iterable[str]:
+    def tool_message_parts(
+        requirements: (ToolCustomLockfile | ToolProgrammaticLockfile | ToolDefaultLockfile),
+    ) -> Iterable[str]:
 
-        tool_name = request.options_scope_name
-        uses_source_plugins = tool_name in ["mypy", "pylint"]
-        uses_project_interpreter_constraints = tool_name in [
-            "bandit",
-            "flake8",
-            "pylint",
-            "setuptools",
-            "ipython",
-            "pytest",
-        ]
+        tool_name = requirements.options_scope_name
+        uses_source_plugins = requirements.uses_source_plugins
+        uses_project_interpreter_constraints = requirements.uses_project_interpreter_constraints
 
         yield "You are using "
 
-        if isinstance(requirements, LockfileContent):
-            if requirements.is_default_lockfile:
-                yield "the `<default>` lockfile provided by Pants "
-            else:
-                yield "a lockfile that was generated programmatically "
-        else:
+        if isinstance(requirements, ToolDefaultLockfile):
+            yield "the `<default>` lockfile provided by Pants "
+        elif isinstance(requirements, ToolProgrammaticLockfile):
+            yield "a lockfile that was generated programmatically "
+        elif isinstance(requirements, ToolCustomLockfile):
             yield f"the lockfile at {requirements.file_path} "
+        else:
+            raise Exception("Check the type hinting on `requirements`")
 
         yield (
             f"to install the tool `{tool_name}`, but it is not compatible with your "
@@ -660,7 +677,7 @@ def _validate_metadata(
 
         yield "\n"
 
-        if not isinstance(requirements, Lockfile):
+        if not isinstance(requirements, ToolCustomLockfile):
             yield (
                 "To generate a custom lockfile based on your current configuration, set "
                 f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
@@ -672,7 +689,13 @@ def _validate_metadata(
                 "`./pants generate-lockfiles`. "
             )
 
-    message = "".join(message_parts()).strip()
+    message: str
+    if isinstance(
+        requirements, (ToolCustomLockfile, ToolDefaultLockfile, ToolProgrammaticLockfile)
+    ):
+        message = "".join(tool_message_parts(requirements)).strip()
+    else:
+        message = "TODO: add support for user lockfiles"
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)

@@ -31,6 +31,9 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
     PexResolveInfo,
     ResolvedDistributions,
+    ToolCustomLockfile,
+    ToolDefaultLockfile,
+    ToolProgrammaticLockfile,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -535,7 +538,6 @@ def test_build_pex_description() -> None:
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
             lockfile_hex_digest=None,
-            is_default_lockfile=False,
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -664,7 +666,15 @@ def _run_pex_for_lockfile_test(
 ansicolors==1.1.8
 """
 
-    requirements = _prepare_pex_requirements(rule_runner, lockfile_type, lockfile, expected_digest)
+    requirements = _prepare_pex_requirements(
+        rule_runner,
+        lockfile_type,
+        lockfile,
+        expected_digest,
+        options_scope_name,
+        uses_source_plugins,
+        uses_project_ic,
+    )
 
     create_pex_and_get_all_data(
         rule_runner,
@@ -734,7 +744,13 @@ def test_validate_metadata(
 
     metadata = LockfileMetadata(expected_digest, InterpreterConstraints([expected_constraints]))
     requirements = _prepare_pex_requirements(
-        rule_runner, lockfile_type, "this is not a lockfile", actual_digest
+        rule_runner,
+        lockfile_type,
+        "lockfile_data_goes_here",
+        actual_digest,
+        options_scope_name,
+        uses_source_plugins,
+        uses_project_ic,
     )
 
     request = MagicMock(
@@ -818,23 +834,42 @@ def _metadata_validation_values(
 
 
 def _prepare_pex_requirements(
-    rule_runner: RuleRunner, lockfile_type: str, lockfile: str, expected_digest: str
+    rule_runner: RuleRunner,
+    lockfile_type: str,
+    lockfile: str,
+    expected_digest: str,
+    options_scope_name: str,
+    uses_source_plugins: bool,
+    uses_project_interpreter_constraints: bool,
 ) -> Lockfile | LockfileContent:
     if lockfile_type == FILE:
         file_path = "lockfile.txt"
         rule_runner.write_files({file_path: lockfile})
-        return Lockfile(
+        return ToolCustomLockfile(
             file_path=file_path,
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected_digest,
+            options_scope_name=options_scope_name,
+            uses_source_plugins=uses_source_plugins,
+            uses_project_interpreter_constraints=uses_project_interpreter_constraints,
         )
-    elif lockfile_type in (DEFAULT, OTHER_CONTENT):
-        is_default_lockfile = lockfile_type == DEFAULT
+    elif lockfile_type == DEFAULT:
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
-        return LockfileContent(
+        return ToolDefaultLockfile(
             file_content=content,
             lockfile_hex_digest=expected_digest,
-            is_default_lockfile=is_default_lockfile,
+            options_scope_name=options_scope_name,
+            uses_source_plugins=uses_source_plugins,
+            uses_project_interpreter_constraints=uses_project_interpreter_constraints,
+        )
+    elif lockfile_type == OTHER_CONTENT:
+        content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
+        return ToolProgrammaticLockfile(
+            file_content=content,
+            lockfile_hex_digest=expected_digest,
+            options_scope_name=options_scope_name,
+            uses_source_plugins=uses_source_plugins,
+            uses_project_interpreter_constraints=uses_project_interpreter_constraints,
         )
     else:
         raise Exception("incorrect lockfile_type value in test")
