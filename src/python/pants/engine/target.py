@@ -1654,7 +1654,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 class TestTargetDependencies(Dependencies):
     """A base class for dependencies of targets representing tests.
 
-    Test targets are in some ways like library targets (they contain sources, so they must have
+    Test targets are in some ways like library targets (they contain sources, so they must
     have their dependencies inferred) and in other ways they are like binary targets (they
     typically act as root targets for goals, and they should support transitive excludes).
     Further complicating matters: it's not clear what depending on a test target should mean:
