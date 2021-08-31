@@ -332,11 +332,14 @@ class _ConfigValues:
         if not isinstance(option_value, dict):
             return stringify(option_value)
 
-        # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
-        has_add = "add" in option_value
-        has_remove = "remove" in option_value
+        # Handle dict options, along with the special `my_list_option.add` and
+        # `my_list_option.remove` syntax. We only treat `add` and `remove` as the special list
+        # syntax if the values are lists to reduce the risk of incorrectly special casing.
+        has_add = isinstance(option_value.get("add"), list)
+        has_remove = isinstance(option_value.get("remove"), list)
         if not has_add and not has_remove:
-            raise configparser.NoOptionError(option, section)
+            return stringify(option_value)
+
         add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
         remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
         if has_add and has_remove:
