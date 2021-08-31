@@ -672,7 +672,7 @@ def _validate_metadata(
         else:
             yield (
                 "To regenerate your lockfile based on your current configuration, run "
-                "`./pants generate-lockfiles`. "
+                f"`./pants generate-lockfiles --resolve={tool_name}`. "
             )
 
     message: str
