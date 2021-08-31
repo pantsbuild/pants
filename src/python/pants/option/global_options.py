@@ -1611,6 +1611,7 @@ class GlobalOptions(Subsystem):
             (
                 "!*.pyc",
                 "!__pycache__/",
+                ".gitignore",
                 # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
                 # macros should be adapted to allow this dependency to be automatically detected.
                 "requirements.txt",
