@@ -33,7 +33,6 @@ from pants.backend.python.util_rules.pex import (
     ResolvedDistributions,
     ToolCustomLockfile,
     ToolDefaultLockfile,
-    ToolProgrammaticLockfile,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -549,7 +548,6 @@ def test_build_pex_description() -> None:
 
 
 DEFAULT = "DEFAULT"
-OTHER_CONTENT = "OTHER_CONTENT"
 FILE = "FILE"
 
 
@@ -611,23 +609,23 @@ def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog)
 def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
         _run_pex_for_lockfile_test(
-            rule_runner, lockfile_type=OTHER_CONTENT, behavior="error", invalid_reqs=True
+            rule_runner, lockfile_type=DEFAULT, behavior="error", invalid_reqs=True
         )
 
 
 def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(
-        rule_runner, lockfile_type=OTHER_CONTENT, behavior="warn", invalid_reqs=True
+        rule_runner, lockfile_type=DEFAULT, behavior="warn", invalid_reqs=True
     )
     assert "but it is not compatible with your configuration" in caplog.text
 
 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, lockfile_type=OTHER_CONTENT, behavior="warn")
+    _run_pex_for_lockfile_test(rule_runner, lockfile_type=DEFAULT, behavior="warn")
     assert not caplog.text.strip()
 
 
-LOCKFILE_TYPES = (DEFAULT, OTHER_CONTENT, FILE)
+LOCKFILE_TYPES = (DEFAULT, FILE)
 BOOLEANS = (True, False)
 
 
@@ -708,7 +706,6 @@ def test_validate_metadata(
 ) -> None:
     class M:
         opening_default = "You are using the `<default>` lockfile provided by Pants"
-        opening_other_content = "You are using a lockfile that was generated programmatically"
         opening_file = "You are using the lockfile at"
 
         invalid_requirements = (
@@ -765,7 +762,6 @@ def test_validate_metadata(
 
     expected_opening = {
         DEFAULT: M.opening_default,
-        OTHER_CONTENT: M.opening_other_content,
         FILE: M.opening_file,
     }[lockfile_type]
 
@@ -853,15 +849,6 @@ def _prepare_pex_requirements(
     elif lockfile_type == DEFAULT:
         content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
         return ToolDefaultLockfile(
-            file_content=content,
-            lockfile_hex_digest=expected_digest,
-            options_scope_name=options_scope_name,
-            uses_source_plugins=uses_source_plugins,
-            uses_project_interpreter_constraints=uses_project_interpreter_constraints,
-        )
-    elif lockfile_type == OTHER_CONTENT:
-        content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
-        return ToolProgrammaticLockfile(
             file_content=content,
             lockfile_hex_digest=expected_digest,
             options_scope_name=options_scope_name,

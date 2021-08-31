@@ -96,11 +96,6 @@ class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
     pass
 
 
-@dataclass(frozen=True)
-class ToolProgrammaticLockfile(LockfileContent, _ToolLockfileMixin):
-    pass
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexRequirements:
@@ -213,8 +208,6 @@ class PexRequest(EngineAwareParameter):
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
-        :param options_scope_name: The name for the options scope for the tool, if this request
-            corresponds to a tool. This is used for making more pleasant error messages.
         """
         self.output_filename = output_filename
         self.internal_only = internal_only
@@ -613,7 +606,7 @@ def _validate_metadata(
         return
 
     def tool_message_parts(
-        requirements: (ToolCustomLockfile | ToolProgrammaticLockfile | ToolDefaultLockfile),
+        requirements: (ToolCustomLockfile | ToolDefaultLockfile),
     ) -> Iterator[str]:
 
         tool_name = requirements.options_scope_name
@@ -624,12 +617,10 @@ def _validate_metadata(
 
         if isinstance(requirements, ToolDefaultLockfile):
             yield "the `<default>` lockfile provided by Pants "
-        elif isinstance(requirements, ToolProgrammaticLockfile):
-            yield "a lockfile that was generated programmatically "
         elif isinstance(requirements, ToolCustomLockfile):
             yield f"the lockfile at {requirements.file_path} "
         else:
-            raise Exception("Check the type hinting on `requirements`")
+            assert isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile))
 
         yield (
             f"to install the tool `{tool_name}`, but it is not compatible with your "
@@ -687,9 +678,7 @@ def _validate_metadata(
             )
 
     message: str
-    if isinstance(
-        requirements, (ToolCustomLockfile, ToolDefaultLockfile, ToolProgrammaticLockfile)
-    ):
+    if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
         message = "".join(tool_message_parts(requirements)).strip()
     else:
         message = "TODO: add support for user lockfiles"

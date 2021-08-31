@@ -134,7 +134,6 @@ class PythonToolRequirementsBase(Subsystem):
         self,
         *,
         extra_requirements: Iterable[str] = (),
-        uses_source_plugins: bool = False,
     ) -> PexRequirements | Lockfile | LockfileContent:
         """The requirements to be used when installing the tool.
 
