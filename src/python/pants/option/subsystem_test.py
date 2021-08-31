@@ -34,7 +34,7 @@ def test_scope_existence() -> None:
     assert "good" == Indirect.options_scope
 
 
-def test_is_valid_scope_name_component() -> None:
+def test_is_valid_scope_name() -> None:
     def check_true(s: str) -> None:
         assert Subsystem.is_valid_scope_name(s)
 
@@ -50,5 +50,8 @@ def test_is_valid_scope_name_component() -> None:
     check_false("Foo")
     check_false("fOo")
     check_false("foo.bar")
+    check_false("foo..bar")
+    check_false(".foo.bar")
+    check_false("foo.bar.")
     check_false("foo--bar")
     check_false("foo-bar-")
