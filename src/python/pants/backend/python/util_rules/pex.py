@@ -619,8 +619,6 @@ def _validate_metadata(
             yield "the `<default>` lockfile provided by Pants "
         elif isinstance(requirements, ToolCustomLockfile):
             yield f"the lockfile at {requirements.file_path} "
-        else:
-            assert isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile))
 
         yield (
             f"to install the tool `{tool_name}`, but it is not compatible with your "
@@ -683,7 +681,7 @@ def _validate_metadata(
     else:
         # TODO: Replace with an actual value once user lockfiles are supported
         assert False
-    
+
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
     elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
