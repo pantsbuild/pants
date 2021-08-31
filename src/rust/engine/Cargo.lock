@@ -3069,7 +3069,6 @@ dependencies = [
  "lmdb",
  "log 0.4.14",
  "madvise",
- "maplit",
  "memmap",
  "mock",
  "num_cpus",

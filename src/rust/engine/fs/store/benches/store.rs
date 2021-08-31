@@ -55,7 +55,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 
   let mut cgroup = c.benchmark_group("materialize_directory");
 
-  for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000)] {
+  for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
     let (store, _tempdir, digest) = snapshot(&executor, count, size);
     let parent_dest = TempDir::new().unwrap();
     let parent_dest_path = parent_dest.path();
@@ -157,7 +157,7 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
   let num_files: usize = 4000;
   let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 
-  let (directory, _metadata) = executor
+  let directory = executor
     .block_on(store.load_directory(digest))
     .unwrap()
     .unwrap();

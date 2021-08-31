@@ -134,7 +134,7 @@ impl CommandRunner {
 
       // Load the Directory proto corresponding to `current_directory_digest`.
       let current_directory = match store.load_directory(current_directory_digest).await? {
-        Some((dir, _)) => dir,
+        Some(dir) => dir,
         None => {
           return Err(format!(
             "Directory digest {:?} was referenced in output, but was not found in store.",
@@ -168,7 +168,7 @@ impl CommandRunner {
 
     while let Some(directory_digest) = digest_queue.pop_front() {
       let directory = match store.load_directory(directory_digest).await? {
-        Some((dir, _)) => dir,
+        Some(dir) => dir,
         None => {
           return Err(format!(
             "illegal state: directory for digest {:?} did not exist locally",
@@ -216,7 +216,7 @@ impl CommandRunner {
 
         // Load the Directory proto corresponding to `current_directory_digest`.
         let current_directory = match store.load_directory(current_directory_digest).await? {
-          Some((dir, _)) => dir,
+          Some(dir) => dir,
           None => {
             return Err(format!(
               "Directory digest {:?} was referenced in output, but was not found in store.",
@@ -244,7 +244,7 @@ impl CommandRunner {
 
     // Load the final directory.
     let directory = match store.load_directory(current_directory_digest).await? {
-      Some((dir, _)) => dir,
+      Some(dir) => dir,
       None => return Ok(None),
     };
 

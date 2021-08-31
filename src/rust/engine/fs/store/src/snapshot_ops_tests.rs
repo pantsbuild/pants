@@ -135,11 +135,7 @@ impl StoreWrapper for LoadTrackingStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    Ok(
-      Store::load_file_bytes_with(&self.store, digest, f)
-        .await?
-        .map(|(value, _)| value),
-    )
+    Ok(Store::load_file_bytes_with(&self.store, digest, f).await?)
   }
 
   async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
@@ -148,11 +144,7 @@ impl StoreWrapper for LoadTrackingStore {
       let entry = counts.entry(digest).or_insert(0);
       *entry += 1;
     }
-    Ok(
-      Store::load_directory(&self.store, digest)
-        .await?
-        .map(|(dir, _)| dir),
-    )
+    Ok(Store::load_directory(&self.store, digest).await?)
   }
 
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
