@@ -110,7 +110,6 @@ def create_pex_and_get_all_data(
     additional_pex_args: Tuple[str, ...] = (),
     env: Mapping[str, str] | None = None,
     internal_only: bool = True,
-    options_scope_name: str | None = None,
 ) -> Dict:
     request = PexRequest(
         output_filename="test.pex",
@@ -122,7 +121,6 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
-        options_scope_name=options_scope_name,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -678,7 +676,6 @@ ansicolors==1.1.8
 
     create_pex_and_get_all_data(
         rule_runner,
-        options_scope_name=options_scope_name,
         interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=requirements,
         additional_pants_args=(

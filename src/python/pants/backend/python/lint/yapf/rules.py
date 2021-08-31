@@ -75,7 +75,6 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
             requirements=yapf.pex_requirements(),
             interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
-            options_scope_name=yapf.options_scope,
         ),
     )
     source_files_get = Get(

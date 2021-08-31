@@ -83,7 +83,6 @@ async def create_ipython_repl_request(
             requirements=ipython.pex_requirements(),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             internal_only=True,
-            options_scope_name=ipython.options_scope,
         ),
     )
 

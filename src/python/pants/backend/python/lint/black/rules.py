@@ -96,7 +96,6 @@ async def setup_black(
             requirements=black.pex_requirements(),
             interpreter_constraints=tool_interpreter_constraints,
             main=black.main,
-            options_scope_name=black.options_scope,
         ),
     )
 

@@ -152,7 +152,6 @@ async def mypy_typecheck_partition(
                 extra_requirements=first_party_plugins.requirement_strings,
             ),
             interpreter_constraints=tool_interpreter_constraints,
-            options_scope_name=mypy.options_scope,
         ),
     )
 
@@ -181,7 +180,6 @@ async def mypy_typecheck_partition(
             internal_only=True,
             pex_path=pex_path_closure([requirements_pex]),
             interpreter_constraints=partition.interpreter_constraints,
-            options_scope_name=mypy.options_scope,  # TODO: is this correct?
         ),
     )
 

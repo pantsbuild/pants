@@ -187,7 +187,6 @@ async def setup_pytest_for_target(
             requirements=pytest.pex_requirements(),
             interpreter_constraints=interpreter_constraints,
             internal_only=True,
-            options_scope_name=pytest.options_scope,
         ),
     )
 
@@ -224,7 +223,6 @@ async def setup_pytest_for_target(
             main=pytest.main,
             internal_only=True,
             pex_path=pex_path_closure([pytest_pex, requirements_pex]),
-            options_scope_name=pytest.options_scope,  # I don't think this is correct
         ),
     )
     config_files_get = Get(

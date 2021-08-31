@@ -103,7 +103,6 @@ async def generate_python_from_protobuf(
         internal_only=True,
         requirements=python_protobuf_mypy_plugin.pex_requirements(),
         interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
-        options_scope_name=python_protobuf_mypy_plugin.options_scope,
     )
 
     if python_protobuf_subsystem.mypy_plugin:

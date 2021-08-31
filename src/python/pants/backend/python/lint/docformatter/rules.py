@@ -66,7 +66,6 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
             requirements=docformatter.pex_requirements(),
             interpreter_constraints=docformatter.interpreter_constraints,
             main=docformatter.main,
-            options_scope_name=docformatter.options_scope,
         ),
     )
     source_files_get = Get(
