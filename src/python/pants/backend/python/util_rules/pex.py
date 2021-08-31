@@ -678,7 +678,7 @@ def _validate_metadata(
             yield (
                 "To generate a custom lockfile based on your current configuration, set "
                 f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-                "`./pants generate-lockfiles --resolve={tool_name}`. "
+                f"`./pants generate-lockfiles --resolve={tool_name}`. "
             )
         else:
             yield (
