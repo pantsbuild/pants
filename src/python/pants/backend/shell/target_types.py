@@ -18,6 +18,7 @@ from pants.engine.target import (
     Sources,
     StringField,
     Target,
+    TestTargetDependencies,
 )
 from pants.util.enums import match
 
@@ -75,8 +76,8 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestsDependencies(Dependencies):
-    supports_transitive_excludes = True
+class Shunit2TestsDependencies(TestTargetDependencies):
+    ...
 
 
 class Shunit2TestsSources(ShellSources):

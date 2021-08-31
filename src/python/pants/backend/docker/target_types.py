@@ -1,7 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    BinaryTargetDependencies,
+    Sources,
+    StringField,
+    Target,
+)
 
 
 class DockerImageSources(Sources):
@@ -16,8 +22,8 @@ class DockerImageVersion(StringField):
     help = "Image tag to apply to built images."
 
 
-class DockerDependencies(Dependencies):
-    supports_transitive_excludes = True
+class DockerDependencies(BinaryTargetDependencies):
+    ...
 
 
 class DockerContextRoot(StringField):

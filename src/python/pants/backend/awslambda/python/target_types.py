@@ -15,6 +15,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BinaryTargetDependencies,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -117,8 +118,8 @@ async def resolve_python_aws_handler(
     return ResolvedPythonAwsHandler(f"{normalized_path}:{func}", file_name_used=True)
 
 
-class PythonAwsLambdaDependencies(Dependencies):
-    supports_transitive_excludes = True
+class PythonAwsLambdaDependencies(BinaryTargetDependencies):
+    ...
 
 
 class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):

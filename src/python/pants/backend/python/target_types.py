@@ -26,6 +26,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BinaryTargetDependencies,
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
@@ -41,6 +42,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TestTargetDependencies,
     TriBoolField,
 )
 from pants.option.subsystem import Subsystem
@@ -116,8 +118,8 @@ class PexBinaryDefaults(Subsystem):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PexBinaryDependencies(Dependencies):
-    supports_transitive_excludes = True
+class PexBinaryDependencies(BinaryTargetDependencies):
+    ...
 
 
 class MainSpecification(ABC):
@@ -420,8 +422,8 @@ class PythonTestsSources(PythonSources):
     )
 
 
-class PythonTestsDependencies(Dependencies):
-    supports_transitive_excludes = True
+class PythonTestsDependencies(TestTargetDependencies):
+    ...
 
 
 class PythonTestsTimeout(IntField):
@@ -712,8 +714,8 @@ class PythonRequirementsFile(Target):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PythonDistributionDependencies(Dependencies):
-    supports_transitive_excludes = True
+class PythonDistributionDependencies(BinaryTargetDependencies):
+    ...
 
 
 class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):

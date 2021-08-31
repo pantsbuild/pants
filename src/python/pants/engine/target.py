@@ -153,7 +153,7 @@ class Field:
         warn_or_error(
             cls.removal_version,
             entity=f"the {repr(cls.alias)} field",
-            hint=(f"Using the `{cls.alias}` field in the target {address}. " f"{cls.removal_hint}"),
+            hint=f"Using the `{cls.alias}` field in the target {address}. {cls.removal_hint}",
         )
 
     def __repr__(self) -> str:
@@ -1630,11 +1630,15 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         "\n\nAlternatively, you may include file names. Pants will find which target owns that "
         "file, and create a new target from that which only includes the file in its `sources` "
         "field. For files relative to the current BUILD file, prefix with `./`; otherwise, put the "
-        "full path, e.g. ['./sibling.txt', 'resources/demo.json'].\n\nYou may exclude dependencies "
-        "by prefixing with `!`, e.g. `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are "
-        "intended for false positives with dependency inference; otherwise, simply leave off the "
-        "dependency from the BUILD file."
+        "full path, e.g. ['./sibling.txt', 'resources/demo.json'].\n\nYou may exclude direct "
+        "dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib', '!./sibling.txt']`. "
+        "This is intended for removing incorrectly inferred direct dependencies."
     )
+
+    # Whether dependencies listed in this field can use the `!!` syntax to exclude a target
+    # from the entire graph, regardless of where or how it was introduced.
+    # This is off by default, since the semantics are confusing when this is specified on
+    # library targets. We turn this on for binary targets (see below).
     supports_transitive_excludes = False
 
     @memoized_property
@@ -1645,6 +1649,25 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
             (v[2:] for v in self.value if v.startswith("!!")),
             owning_address=self.address,
         )
+
+
+class TestTargetDependencies(Dependencies):
+    """A base class for dependencies of targets representing tests.
+
+    Test targets are in some ways like library targets (they contain sources, so they must have
+    have their dependencies inferred) and in other ways they are like binary targets (they
+    typically act as root targets for goals, and they should support transitive excludes).
+    Further complicating matters: it's not clear what depending on a test target should mean:
+    shoudld a dependee of a test target transitively depend on that test target's dependencies?
+    It currently does mean that, and dep inference won't work without that assumption.
+
+    This class makes the distinction explicit, so we can endow it with more meaning in the future,
+    e.g., once we figure out what depending on a test target should mean.
+    """
+
+    supports_transitive_excludes = True
+
+    ...
 
 
 @dataclass(frozen=True)
@@ -1806,7 +1829,7 @@ class InjectDependenciesRequest(EngineAwareParameter, ABC):
     """
 
     dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies]]
+    inject_for: ClassVar[Type[Dependencies | BinaryTargetDependencies]]
 
     def debug_hint(self) -> str:
         return self.dependencies_field.address.spec
@@ -1900,6 +1923,36 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.value or (), owning_address=self.address)
+
+
+class BinaryTargetDependencies(SpecialCasedDependencies):
+    """A base class for dependencies of a target that represent a binary artifact.
+
+    A "binary target" is one that:
+
+    A) Does not own any source code itself.
+    B) Provides dependencies to its dependees - if at all - from built artifacts,
+       rather than from source. These artifacts are built from source code in the binary target's
+       dependencies.
+
+    These dependencies are special-cased because a dependee on a binary target does not want
+    to transitively depend on that target's own dependencies, since those dependencies should be
+    provided - if at all - by an artifact.
+
+    Note: this is for the `dependencies` field *of* binary targets, not dependencies *on*
+      binary targets. The latter can be regular dependencies. This field indicates that
+      transitive dependency following "stops" at a binary target (except for in specific
+      use-cases like graph introspection).
+    """
+
+    alias = Dependencies.alias
+    help = (
+        Dependencies.help + "\n\nYou can also exclude a target or file from the entire graph "
+        "by prefixing it with `!!`."
+    )
+    # Non-library targets typically act as "root targets" for a goal, and can unconfusingly
+    # exclude dependencies downstream from them.
+    supports_transitive_excludes = True
 
 
 # -----------------------------------------------------------------------------------------------
