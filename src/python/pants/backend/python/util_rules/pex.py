@@ -681,8 +681,9 @@ def _validate_metadata(
     if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
         message = "".join(tool_message_parts(requirements)).strip()
     else:
-        message = "TODO: add support for user lockfiles"
-
+        # TODO: Replace with an actual value once user lockfiles are supported
+        assert False
+    
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
     elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
