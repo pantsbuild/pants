@@ -307,58 +307,56 @@ class _ConfigValues:
         return section in self.values
 
     def has_option(self, section: str, option: str) -> bool:
-        try:
-            self.get_value(section, option)
-        except (configparser.NoSectionError, configparser.NoOptionError):
+        if not self.has_section(section):
             return False
-        else:
-            return True
+        return option in self.values[section] or option in self.defaults
 
     def get_value(self, section: str, option: str) -> str | None:
         section_values = self.values.get(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
+
         stringify = partial(
             self._stringify_val,
             option=option,
             section=section,
             section_values=section_values,
         )
+
         if option not in section_values:
-            if option not in self.defaults:
-                raise configparser.NoOptionError(option, section)
-            return stringify(raw_value=self.defaults[option])
+            if option in self.defaults:
+                return stringify(raw_value=self.defaults[option])
+            raise configparser.NoOptionError(option, section)
+
         option_value = section_values[option]
+        if not isinstance(option_value, dict):
+            return stringify(option_value)
+
         # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
-        if isinstance(option_value, dict):
-            has_add = "add" in option_value
-            has_remove = "remove" in option_value
-            if not has_add and not has_remove:
-                raise configparser.NoOptionError(option, section)
-            add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
-            remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
-            if has_add and has_remove:
-                return f"{add_val},{remove_val}"
-            if has_add:
-                return add_val
-            return remove_val
-        return stringify(option_value)
+        has_add = "add" in option_value
+        has_remove = "remove" in option_value
+        if not has_add and not has_remove:
+            raise configparser.NoOptionError(option, section)
+        add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
+        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
+        if has_add and has_remove:
+            return f"{add_val},{remove_val}"
+        if has_add:
+            return add_val
+        return remove_val
 
     def options(self, section: str) -> list[str]:
         section_values = self.values.get(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
-        result = [
-            option
-            for option, option_value in section_values.items()
-            if self._is_an_option(option_value)
+        return [
+            *section_values.keys(),
+            *(
+                default_option
+                for default_option in self.defaults
+                if default_option not in section_values
+            ),
         ]
-        result.extend(
-            default_option
-            for default_option in self.defaults.keys()
-            if default_option not in result
-        )
-        return result
 
     def _maybe_deprecated_default(self, option: str) -> None:
         matched = option == "pants_supportdir"
@@ -371,7 +369,7 @@ class _ConfigValues:
         )
 
     @property
-    def defaults(self) -> Mapping[str, str]:
+    def defaults(self) -> dict[str, str]:
         return {
             option: self._stringify_val_without_interpolation(option_val)
             for option, option_val in self.values["DEFAULT"].items()
