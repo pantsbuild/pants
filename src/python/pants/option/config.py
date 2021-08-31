@@ -18,7 +18,6 @@ import toml
 from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
