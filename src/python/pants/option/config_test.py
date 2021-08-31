@@ -259,6 +259,6 @@ def test_toml_serializer() -> None:
 
 def test_toml_serializer_list_add_remove() -> None:
     original_values = {"GLOBAL": {"backend_packages.add": ["added"]}}
-    assert TomlSerializer(original_values).normalize() == {
+    assert TomlSerializer(original_values).normalize() == {  # type: ignore[arg-type]
         "GLOBAL": {"backend_packages": "+['added']"}
     }
