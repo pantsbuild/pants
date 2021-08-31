@@ -49,6 +49,12 @@ FILE_1 = ConfigFile(
         name = "overridden_from_default"
         interpolated_from_section = "%(name)s is interpolated"
         recursively_interpolated_from_section = "%(interpolated_from_section)s (again)"
+
+        [d.dict_val]
+        # Make sure we don't misinterpret `add` and `remove` as list options.
+        add = 0
+        remove = 0
+        nested = { nested_key = 'foo' }
         """
     ),
     default_values={
@@ -67,6 +73,7 @@ FILE_1 = ConfigFile(
             "interpolated_from_section": "overridden_from_default is interpolated",
             "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
         },
+        "d": {"dict_val": "{'add': 0, 'remove': 0, 'nested': {'nested_key': 'foo'}"},
     },
 )
 
