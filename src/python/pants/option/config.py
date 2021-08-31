@@ -23,8 +23,7 @@ from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
 
-# A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
-# pants_distdir.
+# A dict with optional override seed values for buildroot, pants_workdir, and pants_distdir.
 SeedValues = Dict[str, Value]
 
 
@@ -129,7 +128,6 @@ class Config(ABC):
             )
 
         update_seed_values("pants_workdir", default_dir=".pants.d")
-        update_seed_values("pants_supportdir", default_dir="build-support")
         update_seed_values("pants_distdir", default_dir="dist")
 
         return all_seed_values
@@ -247,7 +245,6 @@ class _ConfigValues:
             match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
             if not match:
                 return value
-            self._maybe_deprecated_default(match.group(1))
             return recursively_format_str(value=format_str(value))
 
         return recursively_format_str(raw_value)
@@ -360,16 +357,6 @@ class _ConfigValues:
                 if default_option not in section_values
             ),
         ]
-
-    def _maybe_deprecated_default(self, option: str) -> None:
-        matched = option == "pants_supportdir"
-        value = self.defaults[option] if matched else None
-        deprecated_conditional(
-            lambda: matched,
-            "2.8.0.dev0",
-            "The `pants_supportdir` default value in `pants.toml`",
-            hint=f"Replace use of the variable with the literal: {repr(value)}.",
-        )
 
     @property
     def defaults(self) -> dict[str, str]:

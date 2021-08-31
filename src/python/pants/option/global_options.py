@@ -630,11 +630,10 @@ class GlobalOptions(Subsystem):
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
-            deprecation_start_version="2.8.0.dev0",
             removal_version="2.9.0.dev0",
             removal_hint="Unused: this option has no necessary equivalent in v2.",
             default=os.path.join(buildroot, "build-support"),
-            help="Used only for templating in `pants.toml`.",
+            help="Does not do anything.",
         )
         register(
             "--pants-distdir",
