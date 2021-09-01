@@ -124,7 +124,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
             raise UnrecognizedResolveNamesError(
                 [self.value],
                 python_setup.resolves_to_lockfiles.keys(),
-                description_of_origin=f"the field `resolve` in the target {self.address}",
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
 
     def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
