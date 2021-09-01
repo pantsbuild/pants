@@ -42,9 +42,10 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.python.python_setup import InvalidLockfileBehavior
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.dirutil import safe_rmtree
 
 
 @dataclass(frozen=True)
@@ -337,9 +338,32 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,
+                    # We skip the process cache for this PEX to ensure that it re-runs.
+                    cache_scope=ProcessCacheScope.PER_SESSION,
                 )
             ],
         )
+
+        # For VenvPexes, run the PEX twice while clearing the venv dir in between. This emulates
+        # situations where a PEX creation hits the process cache, while venv seeding misses the PEX
+        # cache.
+        if isinstance(pex, VenvPex):
+            # Request once to ensure that the directory is seeded, and then start a new session so that
+            # the second run happens as well.
+            _ = rule_runner.request(ProcessResult, [process])
+            rule_runner.new_session("re-run-for-venv-pex")
+            rule_runner.set_options(
+                ["--backend-packages=pants.backend.python"],
+                env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+            )
+            # Clear the cache.
+            named_caches_dir = (
+                rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+            )
+            venv_dir = os.path.join(named_caches_dir, "pex_root", pex.venv_rel_dir)
+            assert os.path.isdir(venv_dir)
+            safe_rmtree(venv_dir)
+
         result = rule_runner.request(ProcessResult, [process])
         output_str = result.stdout.decode()
         mo = re.search(r"CWD: (.*)\n", output_str)
