@@ -39,7 +39,7 @@ python_distribution(
 
 # NB: we use this to avoid clang/gcc complaining `error: no input files` when building
 # `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
-# use `with_binaries()` to link to the actual native code, so clang/gcc do not need to build any
+# use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
 # native code. This is just a dummy file.
 resources(
   name="dummy_c",
