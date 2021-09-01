@@ -556,7 +556,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
 
     # Resolve entry points from python_distribution(entry_points=...) and from
-    # python_distribution(provides=setup_py(entry_points=...).with_binaries(...)
+    # python_distribution(provides=setup_py(entry_points=...)
     resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,

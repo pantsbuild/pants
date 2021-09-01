@@ -17,7 +17,7 @@ from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.goals.setup_py import InvalidEntryPoint, merge_entry_points
+from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.target_types import (
     EntryPoint,
     PexBinaryDependencies,
@@ -197,19 +197,7 @@ async def resolve_python_distribution_entry_points(
             _EntryPointsDictType, request.provides_field.value.kwargs.get("entry_points") or {}
         )
 
-        with_binaries = request.provides_field.value.binaries
-        if with_binaries:
-            all_entry_points = merge_entry_points(
-                (
-                    f"{address}'s field `provides=setup_py(entry_points={...})`",
-                    provides_field_value,
-                ),
-                (
-                    f"{address}'s field `provides=setup_py().with_binaries(...)",
-                    {"console_scripts": with_binaries},
-                ),
-            )
-        elif provides_field_value:
+        if provides_field_value:
             all_entry_points = provides_field_value
         else:
             return ResolvedPythonDistributionEntryPoints()
