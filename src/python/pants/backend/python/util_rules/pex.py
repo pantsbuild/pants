@@ -706,7 +706,7 @@ class VenvScriptWriter:
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            shlex.quote(arg)
+            f"$(ensure_absolute {shlex.quote(arg)})"
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
@@ -736,7 +736,7 @@ class VenvScriptWriter:
             export {" ".join(env_vars)}
             export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
 
-            execute_pex_args="$(ensure_absolute {execute_pex_args})"
+            execute_pex_args="{execute_pex_args}"
             target_venv_executable="$(ensure_absolute {target_venv_executable})"
             venv_dir="$(ensure_absolute {venv_dir})"
 
@@ -789,6 +789,7 @@ class VenvPex:
     pex: Script
     python: Script
     bin: FrozenDict[str, Script]
+    venv_rel_dir: str
 
 
 @frozen_after_init
@@ -880,6 +881,7 @@ async def create_venv_pex(
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
+        venv_rel_dir=venv_rel_dir.as_posix(),
     )
 
 
