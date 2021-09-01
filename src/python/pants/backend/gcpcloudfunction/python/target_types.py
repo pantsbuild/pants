@@ -173,7 +173,7 @@ class GCPPythonRuntimes(Enum):
 
 
 class PythonGcpCloudFunctionRuntime(StringField):
-    PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)(?P<minor>\d+)"
+    PYTHON_RUNTIME_REGEX = r"^python(?P<major>\d)(?P<minor>\d+)$"
 
     alias = "runtime"
     required = True

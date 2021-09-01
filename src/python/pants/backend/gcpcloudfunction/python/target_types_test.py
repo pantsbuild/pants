@@ -51,7 +51,7 @@ def test_to_interpreter_version(runtime: str, expected_major: int, expected_mino
     ).to_interpreter_version()
 
 
-@pytest.mark.parametrize("invalid_runtime", ("python8.99", "fooobar"))
+@pytest.mark.parametrize("invalid_runtime", ("python88.99", "fooobar"))
 def test_runtime_validation(invalid_runtime: str) -> None:
     with pytest.raises(InvalidFieldException):
         PythonGcpCloudFunctionRuntime(invalid_runtime, Address("", target_name="t"))
