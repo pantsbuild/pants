@@ -253,7 +253,7 @@ async def generate_lockfiles_goal(
     python_setup: PythonSetup,
 ) -> GenerateLockfilesGoal:
     _specified_user_lockfiles, specified_tool_sentinels = determine_resolves_to_generate(
-        python_setup.resolves_to_lockfiles,
+        python_setup.resolves_to_lockfiles.keys(),
         union_membership[PythonToolLockfileSentinel],
         generate_lockfiles_subsystem.resolve_names,
     )
@@ -281,13 +281,15 @@ class AmbiguousResolveNamesError(Exception):
     def __init__(self, ambiguous_names: list[str]) -> None:
         if len(ambiguous_names) == 1:
             first_paragraph = (
-                "The same resolve name is used both for a tool lockfile and a lockfile for your "
-                f"own code, so it's ambiguous what the resolve refers to: {ambiguous_names[0]}"
+                "A resolve name from the option "
+                "`[python-setup].experimental_resolves_to_lockfiles` collides with the name of a "
+                f"tool resolve: {ambiguous_names[0]}"
             )
         else:
             first_paragraph = (
-                "The same resolve names are used both for tool lockfiles and lockfiles for your "
-                f"own code, so it's ambiguous what the resolves refer to: {sorted(ambiguous_names)}"
+                "Some resolve names from the option "
+                "`[python-setup].experimental_resolves_to_lockfiles` collide with the names of "
+                f"tool resolves: {sorted(ambiguous_names)}"
             )
         super().__init__(
             f"{first_paragraph}\n\n"
@@ -315,44 +317,45 @@ class UnrecognizedResolveNamesError(Exception):
 
 
 def determine_resolves_to_generate(
-    all_user_resolves: dict[str, str],
+    all_user_resolves: Iterable[str],
     all_tool_sentinels: Iterable[type[PythonToolLockfileSentinel]],
     requested_resolve_names: Sequence[str],
-) -> tuple[dict[str, str], list[type[PythonToolLockfileSentinel]]]:
+) -> tuple[list[str], list[type[PythonToolLockfileSentinel]]]:
     """Apply the `--resolve` option to determine which resolves are specified.
 
-    Return a tuple of user_resolves, tool_lockfile_sentinels.
+    Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
     """
     resolve_names_to_sentinels = {
         sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
     }
 
-    ambiguous_resolve_names = set(resolve_names_to_sentinels.keys()).intersection(
-        all_user_resolves.keys()
-    )
+    ambiguous_resolve_names = [
+        resolve_name
+        for resolve_name in all_user_resolves
+        if resolve_name in resolve_names_to_sentinels
+    ]
     if ambiguous_resolve_names:
-        raise AmbiguousResolveNamesError(list(ambiguous_resolve_names))
+        raise AmbiguousResolveNamesError(ambiguous_resolve_names)
 
     if not requested_resolve_names:
-        return all_user_resolves, list(all_tool_sentinels)
+        return list(all_user_resolves), list(all_tool_sentinels)
 
-    specified_user_resolves = {}
+    specified_user_resolves = []
     specified_sentinels = []
     unrecognized_resolve_names = []
     for resolve_name in requested_resolve_names:
         sentinel = resolve_names_to_sentinels.get(resolve_name)
-        user_lockfile_path = all_user_resolves.get(resolve_name)
         if sentinel:
             specified_sentinels.append(sentinel)
-        elif user_lockfile_path:
-            specified_user_resolves[resolve_name] = user_lockfile_path
+        elif resolve_name in all_user_resolves:
+            specified_user_resolves.append(resolve_name)
         else:
             unrecognized_resolve_names.append(resolve_name)
 
     if unrecognized_resolve_names:
         raise UnrecognizedResolveNamesError(
             unrecognized_resolve_names,
-            {*all_user_resolves.keys(), *resolve_names_to_sentinels.keys()},
+            {*all_user_resolves, *resolve_names_to_sentinels.keys()},
         )
 
     return specified_user_resolves, specified_sentinels

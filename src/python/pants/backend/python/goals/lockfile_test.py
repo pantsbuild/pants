@@ -28,11 +28,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
     class Tool3(PythonToolLockfileSentinel):
         options_scope = "tool3"
 
-    all_user_resolves = {
-        "u1": "some_lockfile.txt",
-        "u2": "another_lockfile.txt",
-        "u3": "yet_another_lockfile.txt",
-    }
+    all_user_resolves = ["u1", "u2", "u3"]
 
     def assert_chosen(
         requested: list[str],
@@ -42,9 +38,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         user_resolves, tools = determine_resolves_to_generate(
             all_user_resolves, [Tool1, Tool2, Tool3], requested
         )
-        assert user_resolves == {
-            resolve: all_user_resolves[resolve] for resolve in expected_user_resolves
-        }
+        assert user_resolves == expected_user_resolves
         assert tools == expected_tools
 
     assert_chosen(
