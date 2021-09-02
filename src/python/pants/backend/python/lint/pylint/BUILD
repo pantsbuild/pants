@@ -8,7 +8,7 @@ python_tests(name="subsystem_test", sources=["subsystem_test.py"], timeout=120)
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
-    timeout=360,
+    timeout=330,
     # We want to make sure the default lockfile works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )

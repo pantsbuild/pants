@@ -8,7 +8,7 @@ python_tests(
   sources=["coverage_py_integration_test.py"],
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
-  timeout=300,
+  timeout=210,
 )
 
 python_tests(name="coverage_py_test", sources=["coverage_py_test.py"], timeout=20)
@@ -18,7 +18,7 @@ python_tests(name="lockfile_test", sources=["lockfile_test.py"])
 python_tests(
     name="package_pex_binary_integration",
     sources=["package_pex_binary_integration_test.py"],
-    timeout=150,
+    timeout=120,
 )
 
 python_tests(
@@ -26,26 +26,26 @@ python_tests(
   sources=["pytest_runner_integration_test.py"],
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
-  timeout=510,
+  timeout=480,
 )
 
 python_tests(
     name="run_pex_binary_integration",
     sources=["run_pex_binary_integration_test.py"],
-    timeout=200,
+    timeout=120,
 )
 
 python_tests(
   name="setup_py_integration",
   sources=["setup_py_integration_test.py"],
   dependencies=["testprojects/src/python:native_directory"],
-  timeout=220,
+  timeout=180,
 )
 
 python_tests(
     name="setup_py_test",
     sources=["setup_py_test.py"],
-    timeout=180,
+    timeout=150,
 )
 
 python_tests(name="tailor_test", sources=["tailor_test.py"])

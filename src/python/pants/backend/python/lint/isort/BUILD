@@ -7,7 +7,7 @@ resources(name="lockfile", sources=["lockfile.txt"])
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
-    timeout=300,
+    timeout=120,
     # We want to make sure the default lockfile works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )
