@@ -91,7 +91,7 @@ async def package_python_google_cloud_function(
     lambdex_request = PexRequest(
         output_filename="lambdex.pex",
         internal_only=True,
-        requirements=lambdex.pex_requirements,
+        requirements=lambdex.pex_requirements(),
         interpreter_constraints=lambdex.interpreter_constraints,
         main=lambdex.main,
     )
