@@ -16,6 +16,7 @@ from pants.engine.target import (
 
 class GoSources(Sources):
     expected_file_extensions = (".go",)
+    indivisible = True
 
 
 class GoPackageSources(GoSources):
@@ -47,6 +48,7 @@ class GoModuleSources(Sources):
     alias = "_sources"
     default = ("go.mod", "go.sum")
     expected_num_files = range(1, 3)
+    indivisible = True
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
@@ -95,13 +97,18 @@ class GoExternalModule(Target):
 # `_go_ext_mod_package` target
 # -----------------------------------------------------------------------------------------------
 
+
+class GoExtModPackageDependencies(Dependencies):
+    pass
+
+
 # Represents a Go package within a third-party Go package.
 # TODO: Create this target synthetically instead of relying on `./pants tailor` to create.
 class GoExtModPackage(Target):
     alias = "_go_ext_mod_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        GoExtModPackageDependencies,
         GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
         GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
         GoImportPath,

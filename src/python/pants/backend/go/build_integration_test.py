@@ -5,9 +5,9 @@ from typing import Iterable, List
 
 import pytest
 
-from pants.backend.go import build, import_analysis, sdk
+from pants.backend.go import build, import_analysis, module, pkg, sdk, target_type_rules
 from pants.backend.go.build import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinary, GoPackage
+from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import external_tool, source_files
@@ -20,12 +20,15 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[GoBinary, GoPackage],
+        target_types=[GoBinary, GoPackage, GoModule],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
             *build.rules(),
+            *pkg.rules(),
+            *module.rules(),
+            *target_type_rules.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
@@ -119,6 +122,9 @@ def build_package(
 
 
 def test_package_one_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"BUILD": "go_module(name='root')\n", "go.mod": "module foo.example.com\n"}
+    )
     target = make_target(rule_runner, [MAIN_SOURCE], import_path="main")
     built_package = build_package(rule_runner, target)
     assert len(built_package.artifacts) == 1
@@ -126,6 +132,9 @@ def test_package_one_target(rule_runner: RuleRunner) -> None:
 
 
 def test_package_with_depenedency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"BUILD": "go_module(name='root')\n", "go.mod": "module foo.example.com\n"}
+    )
     lib_target = make_target(
         rule_runner, [LIB_SOURCE], import_path="example.com/lib", target_name="lib"
     )

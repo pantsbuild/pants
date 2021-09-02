@@ -8,6 +8,7 @@ from pants.backend.go import module, pkg, sdk, target_type_rules
 from pants.backend.go.target_type_rules import InferGoPackageDependenciesRequest
 from pants.backend.go.target_types import (
     GoExternalModule,
+    GoExtModPackage,
     GoModule,
     GoModuleSources,
     GoPackage,
@@ -22,7 +23,7 @@ from pants.engine.target import (
     DependenciesRequest,
     InferredDependencies,
     Target,
-    UnexpandedTargets,
+    Targets,
 )
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -39,16 +40,16 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
-            QueryRule(UnexpandedTargets, (Addresses,)),
+            QueryRule(Targets, (Addresses,)),
             QueryRule(InferredDependencies, (InferGoPackageDependenciesRequest,)),
         ],
-        target_types=[GoPackage, GoModule, GoExternalModule],
+        target_types=[GoPackage, GoModule, GoExternalModule, GoExtModPackage],
     )
 
 
 def assert_go_module_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
     addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
-    targets = rule_runner.request(UnexpandedTargets, [addresses])
+    targets = rule_runner.request(Targets, [addresses])
     go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModuleSources)]
     assert len(go_module_targets) == 1
     assert go_module_targets[0].address == expected_address
@@ -87,6 +88,12 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                       path="github.com/google/go-cmp/cmp",
                       version="v0.4.0",
                       import_path="github.com/google/go-cmp",
+                    )
+                    _go_ext_mod_package(
+                      name="github.com_google_go-cmp_0.4.0-_cmp",
+                      path="github.com/google/go-cmp/cmp",
+                      version="v0.4.0",
+                      import_path="github.com/google/go-cmp/cmp",
                     )
                 """
                 ),
@@ -139,6 +146,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         InferredDependencies, [InferGoPackageDependenciesRequest(target2[GoPackageSources])]
     )
     assert inferred_deps_2.dependencies == FrozenOrderedSet(
-        [Address("foo", target_name="github.com_google_go-cmp_0.4.0")]
+        [Address("foo", target_name="github.com_google_go-cmp_0.4.0-_cmp")]
     )
     assert not inferred_deps_2.sibling_dependencies_inferrable
