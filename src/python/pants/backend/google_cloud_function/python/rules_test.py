@@ -10,9 +10,13 @@ from zipfile import ZipFile
 import pytest
 
 from pants.backend.google_cloud_function.python.lambdex import Lambdex
-from pants.backend.google_cloud_function.python.lambdex import rules as python_google_cloud_function_subsystem_rules
+from pants.backend.google_cloud_function.python.lambdex import (
+    rules as python_google_cloud_function_subsystem_rules,
+)
 from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
-from pants.backend.google_cloud_function.python.rules import rules as python_google_cloud_function_rules
+from pants.backend.google_cloud_function.python.rules import (
+    rules as python_google_cloud_function_rules,
+)
 from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.target_types import PythonLibrary
@@ -40,7 +44,7 @@ def rule_runner() -> RuleRunner:
 
 
 def create_python_google_cloud_function(
-        rule_runner: RuleRunner, addr: Address, *, extra_args: list[str] | None = None
+    rule_runner: RuleRunner, addr: Address, *, extra_args: list[str] | None = None
 ) -> tuple[str, bytes]:
     rule_runner.set_options(
         [
@@ -51,11 +55,13 @@ def create_python_google_cloud_function(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
-    built_asset = rule_runner.request(BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)])
+    built_asset = rule_runner.request(
+        BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)]
+    )
     assert (
-               "    Runtime: python3.7",
-               "    Handler: lambdex_handler.handler",
-           ) == built_asset.artifacts[0].extra_log_lines
+        "    Runtime: python3.7",
+        "    Handler: lambdex_handler.handler",
+    ) == built_asset.artifacts[0].extra_log_lines
     digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
     assert len(digest_contents) == 1
     relpath = built_asset.artifacts[0].relpath
@@ -155,7 +161,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-            "The python_awslambda target src/py/project:lambda transitively depends on" in caplog.text
+        "The python_awslambda target src/py/project:lambda transitively depends on" in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
