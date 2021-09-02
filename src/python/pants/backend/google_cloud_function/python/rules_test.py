@@ -59,8 +59,8 @@ def create_python_google_cloud_function(
         BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)]
     )
     assert (
-        "    Runtime: python3.7",
-        "    Handler: lambdex_handler.handler",
+        "    Runtime: python37",
+        "    Handler: main.handler",
     ) == built_asset.artifacts[0].extra_log_lines
     digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
     assert len(digest_contents) == 1
@@ -106,7 +106,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpre
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
     names = set(zipfile.namelist())
-    assert "lambdex_handler.py" in names
+    assert "main.py" in names
     assert "foo/bar/hello_world.py" in names
 
 
@@ -161,7 +161,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The python_awslambda target src/py/project:lambda transitively depends on" in caplog.text
+        "The python_google_cloud_function target src/py/project:lambda transitively depends on" in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
