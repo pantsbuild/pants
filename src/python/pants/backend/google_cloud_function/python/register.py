@@ -6,10 +6,10 @@
 FIXME See https://www.pantsbuild.org/docs/awslambda-python.
 """
 
-from pants.backend.google_cloud_function.python import lambdex
 from pants.backend.google_cloud_function.python import rules as python_rules
 from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
 from pants.backend.google_cloud_function.python.target_types import rules as target_types_rules
+from pants.backend.python.subsystems import lambdex
 
 
 def rules():

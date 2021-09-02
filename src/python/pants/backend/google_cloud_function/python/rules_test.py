@@ -9,16 +9,16 @@ from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.google_cloud_function.python.lambdex import Lambdex
-from pants.backend.google_cloud_function.python.lambdex import (
-    rules as python_google_cloud_function_subsystem_rules,
-)
 from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
 from pants.backend.google_cloud_function.python.rules import (
     rules as python_google_cloud_function_rules,
 )
 from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
+from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.lambdex import (
+    rules as python_google_cloud_function_subsystem_rules,
+)
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import Files, RelocatedFiles, Resources

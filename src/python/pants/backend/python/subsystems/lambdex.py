@@ -11,7 +11,7 @@ from pants.util.docutil import git_url
 
 class Lambdex(PythonToolBase):
     options_scope = "lambdex"
-    help = "A tool for turning .pex files into Google Cloud Functions (https://github.com/pantsbuild/lambdex)."
+    help = "A tool for turning .pex files into Funtion-as-a-Service artifacts (https://github.com/pantsbuild/lambdex)."
 
     default_version = "lambdex==0.1.6"
     default_main = ConsoleScript("lambdex")
@@ -21,12 +21,10 @@ class Lambdex(PythonToolBase):
 
     register_lockfile = True
     default_lockfile_resource = (
-        "pants.backend.google_cloud_function.python",
+        "pants.backend.python.subsystems",
         "lambdex_lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/google_cloud_function/python/lambdex_lockfile.txt"
-    )
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/lambdex_lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
 

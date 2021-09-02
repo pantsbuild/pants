@@ -11,7 +11,6 @@ should be.
 import logging
 import subprocess
 
-from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.bandit.subsystem import Bandit
@@ -22,6 +21,7 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
@@ -114,7 +114,6 @@ def main() -> None:
             f"--mypy-protobuf-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
             f"--mypy-protobuf-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
             # Lambdex.
-            "--backend-packages=+['pants.backend.awslambda.python','pants.backend.google_cloud_function.python']",
             f"--lambdex-version={Lambdex.default_version}",
             f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
             f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",

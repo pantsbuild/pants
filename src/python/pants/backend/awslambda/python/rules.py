@@ -4,13 +4,13 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,

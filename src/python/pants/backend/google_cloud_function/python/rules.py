@@ -4,7 +4,6 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.google_cloud_function.python.lambdex import Lambdex
 from pants.backend.google_cloud_function.python.target_types import (
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
@@ -12,6 +11,7 @@ from pants.backend.google_cloud_function.python.target_types import (
     ResolvedPythonGoogleHandler,
     ResolvePythonGoogleHandlerRequest,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
