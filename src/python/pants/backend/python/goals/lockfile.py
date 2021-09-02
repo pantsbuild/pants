@@ -319,7 +319,7 @@ def filter_tool_lockfile_requests(
             continue
         if resolve_specified:
             resolve = req.resolve_name
-            logger.warning(
+            raise ValueError(
                 f"You requested to generate a lockfile for {resolve} because "
                 "you included it in `--generate-lockfiles-resolve`, but "
                 f"`[{resolve}].lockfile` is set to `{req.lockfile_dest}` "
