@@ -4,13 +4,13 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.gcpcloudfunction.python.lambdex import Lambdex
-from pants.backend.gcpcloudfunction.python.target_types import (
-    PythonGcpCloudFunctionHandlerField,
-    PythonGcpCloudFunctionRuntime,
-    PythonGcpCloudFunctionType,
-    ResolvedPythonGcpHandler,
-    ResolvePythonGcpHandlerRequest,
+from pants.backend.google_cloud_function.python.lambdex import Lambdex
+from pants.backend.google_cloud_function.python.target_types import (
+    PythonGoogleCloudFunctionHandlerField,
+    PythonGoogleCloudFunctionRuntime,
+    PythonGoogleCloudFunctionType,
+    ResolvedPythonGoogleHandler,
+    ResolvePythonGoogleHandlerRequest,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
@@ -43,18 +43,18 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonGcpCloudFunctionFieldSet(PackageFieldSet):
-    required_fields = (PythonGcpCloudFunctionHandlerField, PythonGcpCloudFunctionRuntime)
+class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
+    required_fields = (PythonGoogleCloudFunctionHandlerField, PythonGoogleCloudFunctionRuntime)
 
-    handler: PythonGcpCloudFunctionHandlerField
-    runtime: PythonGcpCloudFunctionRuntime
-    type: PythonGcpCloudFunctionType
+    handler: PythonGoogleCloudFunctionHandlerField
+    runtime: PythonGoogleCloudFunctionRuntime
+    type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
 
 
-@rule(desc="Create Python GCP Cloud Function", level=LogLevel.DEBUG)
-async def package_python_gcpcloudfunction(
-    field_set: PythonGcpCloudFunctionFieldSet, lambdex: Lambdex, union_membership: UnionMembership
+@rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
+async def package_python_google_cloud_function(
+    field_set: PythonGoogleCloudFunctionFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
@@ -62,7 +62,7 @@ async def package_python_gcpcloudfunction(
         file_ending="zip",
     )
 
-    # We hardcode the platform value to the appropriate one for each GCP Cloud Function runtime.
+    # We hardcode the platform value to the appropriate one for each Google Cloud Function runtime.
     # (Running the "hello world" cloud function in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
     py_major, py_minor = field_set.runtime.to_interpreter_version()
@@ -97,7 +97,7 @@ async def package_python_gcpcloudfunction(
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),
         Get(Pex, PexFromTargetsRequest, pex_request),
-        Get(ResolvedPythonGcpHandler, ResolvePythonGcpHandlerRequest(field_set.handler)),
+        Get(ResolvedPythonGoogleHandler, ResolvePythonGoogleHandlerRequest(field_set.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
@@ -109,7 +109,7 @@ async def package_python_gcpcloudfunction(
     if files_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in files_tgts)
         logger.warning(
-            f"The python_gcpcloudfunction target {field_set.address} transitively depends on the below "
+            f"The python_google_cloud_function target {field_set.address} transitively depends on the below "
             "files targets, but Pants will not include them in the built Cloud Function. Filesystem APIs "
             "like `open()` are not able to load files within the binary itself; instead, they "
             "read from the current working directory."
@@ -143,6 +143,6 @@ async def package_python_gcpcloudfunction(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, PythonGcpCloudFunctionFieldSet),
+        UnionRule(PackageFieldSet, PythonGoogleCloudFunctionFieldSet),
         *pex_from_targets.rules(),
     ]

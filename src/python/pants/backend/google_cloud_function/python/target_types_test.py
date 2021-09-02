@@ -6,16 +6,16 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.gcpcloudfunction.python.target_types import (
+from pants.backend.google_cloud_function.python.target_types import (
     InjectPythonCloudFunctionHandlerDependency,
-    PythonGCPCloudFunction,
-    PythonGcpCloudFunctionDependencies,
-    PythonGcpCloudFunctionHandlerField,
-    PythonGcpCloudFunctionRuntime,
-    ResolvedPythonGcpHandler,
-    ResolvePythonGcpHandlerRequest,
+    PythonGoogleCloudFunction,
+    PythonGoogleCloudFunctionDependencies,
+    PythonGoogleCloudFunctionHandlerField,
+    PythonGoogleCloudFunctionRuntime,
+    ResolvedPythonGoogleHandler,
+    ResolvePythonGoogleHandlerRequest,
 )
-from pants.backend.gcpcloudfunction.python.target_types import rules as target_type_rules
+from pants.backend.google_cloud_function.python.target_types import rules as target_type_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -28,10 +28,10 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *target_type_rules(),
-            QueryRule(ResolvedPythonGcpHandler, [ResolvePythonGcpHandlerRequest]),
+            QueryRule(ResolvedPythonGoogleHandler, [ResolvePythonGoogleHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonCloudFunctionHandlerDependency]),
         ],
-        target_types=[PythonGCPCloudFunction, PythonRequirementLibrary, PythonLibrary],
+        target_types=[PythonGoogleCloudFunction, PythonRequirementLibrary, PythonLibrary],
     )
 
 
@@ -46,7 +46,7 @@ def rule_runner() -> RuleRunner:
     ),
 )
 def test_to_interpreter_version(runtime: str, expected_major: int, expected_minor: int) -> None:
-    assert (expected_major, expected_minor) == PythonGcpCloudFunctionRuntime(
+    assert (expected_major, expected_minor) == PythonGoogleCloudFunctionRuntime(
         runtime, Address("", target_name="t")
     ).to_interpreter_version()
 
@@ -54,13 +54,13 @@ def test_to_interpreter_version(runtime: str, expected_major: int, expected_mino
 @pytest.mark.parametrize("invalid_runtime", ("python88.99", "fooobar"))
 def test_runtime_validation(invalid_runtime: str) -> None:
     with pytest.raises(InvalidFieldException):
-        PythonGcpCloudFunctionRuntime(invalid_runtime, Address("", target_name="t"))
+        PythonGoogleCloudFunctionRuntime(invalid_runtime, Address("", target_name="t"))
 
 
 @pytest.mark.parametrize("invalid_handler", ("path.to.function", "function.py"))
 def test_handler_validation(invalid_handler: str) -> None:
     with pytest.raises(InvalidFieldException):
-        PythonGcpCloudFunctionHandlerField(invalid_handler, Address("", target_name="t"))
+        PythonGoogleCloudFunctionHandlerField(invalid_handler, Address("", target_name="t"))
 
 
 @pytest.mark.parametrize(
@@ -68,7 +68,7 @@ def test_handler_validation(invalid_handler: str) -> None:
     (("path.to.module:func", []), ("cloud_function.py:func", ["project/dir/cloud_function.py"])),
 )
 def test_handler_filespec(handler: str, expected: List[str]) -> None:
-    field = PythonGcpCloudFunctionHandlerField(handler, Address("project/dir"))
+    field = PythonGoogleCloudFunctionHandlerField(handler, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
 
@@ -78,9 +78,9 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         rule_runner.write_files(
             {"src/python/project/cloud_function.py": "", "src/python/project/f2.py": ""}
         )
-        field = PythonGcpCloudFunctionHandlerField(handler, addr)
+        field = PythonGoogleCloudFunctionHandlerField(handler, addr)
         result = rule_runner.request(
-            ResolvedPythonGcpHandler, [ResolvePythonGcpHandlerRequest(field)]
+            ResolvedPythonGoogleHandler, [ResolvePythonGoogleHandlerRequest(field)]
         )
         assert result.val == expected
         assert result.file_name_used == is_file
@@ -115,25 +115,25 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
             "project/BUILD": dedent(
                 """\
                 python_library(sources=['app.py'])
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='first_party',
                     handler='project.app:func',
                     runtime='python37',
                     type='event',
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='first_party_shorthand',
                     handler='app.py:func',
                     runtime='python37',
                     type='event',
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='third_party',
                     handler='colors:func',
                     runtime='python37',
                     type='event',
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='unrecognized',
                     handler='who_knows.module:func',
                     runtime='python37',
@@ -142,13 +142,13 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
                 python_library(name="dep1", sources=["ambiguous.py"])
                 python_library(name="dep2", sources=["ambiguous.py"])
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name="ambiguous",
                     handler='ambiguous.py:func',
                     runtime='python37',
                     type='event',
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name="disambiguated",
                     handler='ambiguous.py:func',
                     runtime='python37',
@@ -159,13 +159,13 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                 python_library(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name="another_root__file_used",
                     handler="ambiguous_in_another_root.py:func",
                     runtime="python37",
                     type="event",
                 )
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name="another_root__module_used",
                     handler="project.ambiguous_in_another_root:func",
                     runtime="python37",
@@ -182,7 +182,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPythonCloudFunctionHandlerDependency(tgt[PythonGcpCloudFunctionDependencies])],
+            [InjectPythonCloudFunctionHandlerDependency(tgt[PythonGoogleCloudFunctionDependencies])],
         )
         assert injected == InjectedDependencies([expected] if expected else [])
 
@@ -221,7 +221,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
     # Test that using a file path results in ignoring all targets which are not an ancestor. We can
     # do this because we know the file name must be in the current directory or subdir of the
-    # `python_gcpcloudfunction`.
+    # `python_google_cloud_function`.
     assert_injected(
         Address("project", target_name="another_root__file_used"),
         expected=Address(

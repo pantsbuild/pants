@@ -33,12 +33,12 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 
 
-class PythonGcpCloudFunctionHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+class PythonGoogleCloudFunctionHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
     help = (
-        "Entry point to the GCP Cloud Function handler.\n\nYou can specify a full module like "
+        "Entry point to the Google Cloud Function handler.\n\nYou can specify a full module like "
         "'path.to.module:handler_func' or use a shorthand to specify a file name, using the same "
         "syntax as the `sources` field, e.g. 'cloud_function.py:handler_func'.\n\nYou must use the file "
         "name shorthand for file arguments to work with this target."
@@ -64,20 +64,20 @@ class PythonGcpCloudFunctionHandlerField(StringField, AsyncFieldMixin, Secondary
 
 
 @dataclass(frozen=True)
-class ResolvedPythonGcpHandler:
+class ResolvedPythonGoogleHandler:
     val: str
     file_name_used: bool
 
 
 @dataclass(frozen=True)
-class ResolvePythonGcpHandlerRequest:
-    field: PythonGcpCloudFunctionHandlerField
+class ResolvePythonGoogleHandlerRequest:
+    field: PythonGoogleCloudFunctionHandlerField
 
 
-@rule(desc="Determining the handler for a `python_gcpcloudfunction` target")
-async def resolve_python_gcp_handler(
-    request: ResolvePythonGcpHandlerRequest,
-) -> ResolvedPythonGcpHandler:
+@rule(desc="Determining the handler for a `python_google_cloud_function` target")
+async def resolve_python_google_cloud_function_handler(
+    request: ResolvePythonGoogleHandlerRequest,
+) -> ResolvedPythonGoogleHandler:
     handler_val = request.field.value
     field_alias = request.field.alias
     address = request.field.address
@@ -86,7 +86,7 @@ async def resolve_python_gcp_handler(
     # If it's already a module, simply use that. Otherwise, convert the file name into a module
     # path.
     if not path.endswith(".py"):
-        return ResolvedPythonGcpHandler(handler_val, file_name_used=False)
+        return ResolvedPythonGoogleHandler(handler_val, file_name_used=False)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
@@ -115,18 +115,18 @@ async def resolve_python_gcp_handler(
     stripped_source_path = os.path.relpath(handler_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPythonGcpHandler(f"{normalized_path}:{func}", file_name_used=True)
+    return ResolvedPythonGoogleHandler(f"{normalized_path}:{func}", file_name_used=True)
 
 
-class PythonGcpCloudFunctionDependencies(Dependencies):
+class PythonGoogleCloudFunctionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
 class InjectPythonCloudFunctionHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonGcpCloudFunctionDependencies
+    inject_for = PythonGoogleCloudFunctionDependencies
 
 
-@rule(desc="Inferring dependency from the python_gcpcloudfunction `handler` field")
+@rule(desc="Inferring dependency from the python_google_cloud_function `handler` field")
 async def inject_cloud_function_handler_dependency(
     request: InjectPythonCloudFunctionHandlerDependency,
     python_infer_subsystem: PythonInferSubsystem,
@@ -137,8 +137,8 @@ async def inject_cloud_function_handler_dependency(
     explicitly_provided_deps, handler = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
-            ResolvedPythonGcpHandler,
-            ResolvePythonGcpHandlerRequest(original_tgt.target[PythonGcpCloudFunctionHandlerField]),
+            ResolvedPythonGoogleHandler,
+            ResolvePythonGoogleHandlerRequest(original_tgt.target[PythonGoogleCloudFunctionHandlerField]),
         ),
     )
     module, _, _func = handler.val.partition(":")
@@ -148,12 +148,12 @@ async def inject_cloud_function_handler_dependency(
         owners.ambiguous,
         address,
         # If the handler was specified as a file, like `app.py`, we know the module must
-        # live in the python_gcpcloudfunction's directory or subdirectory, so the owners must be ancestors.
+        # live in the python_google_cloud_function's directory or subdirectory, so the owners must be ancestors.
         owners_must_be_ancestors=handler.file_name_used,
         import_reference="module",
         context=(
-            f"The python_gcpcloudfunction target {address} has the field "
-            f"`handler={repr(original_tgt.target[PythonGcpCloudFunctionHandlerField].value)}`, which maps "
+            f"The python_google_cloud_function target {address} has the field "
+            f"`handler={repr(original_tgt.target[PythonGoogleCloudFunctionHandlerField].value)}`, which maps "
             f"to the Python module `{module}`"
         ),
     )
@@ -166,20 +166,20 @@ async def inject_cloud_function_handler_dependency(
     return InjectedDependencies(unambiguous_owners)
 
 
-class GCPPythonRuntimes(Enum):
+class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_37 = "python37"
     PYTHON_38 = "python38"
     PYTHON_39 = "python39"
 
 
-class PythonGcpCloudFunctionRuntime(StringField):
+class PythonGoogleCloudFunctionRuntime(StringField):
     PYTHON_RUNTIME_REGEX = r"^python(?P<major>\d)(?P<minor>\d+)$"
 
     alias = "runtime"
     required = True
-    valid_choices = GCPPythonRuntimes
+    valid_choices = PythonGoogleCloudFunctionRuntimes
     help = (
-        "The identifier of the GCP Cloud Function runtime to target (pythonXY). See "
+        "The identifier of the Google Cloud Function runtime to target (pythonXY). See "
         "https://cloud.google.com/functions/docs/concepts/python-runtime."
     )
 
@@ -199,35 +199,35 @@ class PythonGcpCloudFunctionRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
-class GCPCloudFunctionTypes(Enum):
+class GoogleCloudFunctionTypes(Enum):
     EVENT = "event"
     HTTP = "http"
 
 
-class PythonGcpCloudFunctionType(StringField):
+class PythonGoogleCloudFunctionType(StringField):
 
     alias = "type"
     required = True
-    valid_choices = GCPCloudFunctionTypes
+    valid_choices = GoogleCloudFunctionTypes
     help = (
         "The trigger type of the cloud function. Can either be 'event' or 'http'. "
         "See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to --trigger-http."
     )
 
 
-class PythonGCPCloudFunction(Target):
-    alias = "python_gcpcloudfunction"
+class PythonGoogleCloudFunction(Target):
+    alias = "python_google_cloud_function"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        PythonGcpCloudFunctionDependencies,
-        PythonGcpCloudFunctionHandlerField,
-        PythonGcpCloudFunctionRuntime,
-        PythonGcpCloudFunctionType,
+        PythonGoogleCloudFunctionDependencies,
+        PythonGoogleCloudFunctionHandlerField,
+        PythonGoogleCloudFunctionRuntime,
+        PythonGoogleCloudFunctionType,
     )
     help = (
-        "A self-contained Python function suitable for uploading to GCP CLoud Function.\n\n"
-        f"See {doc_url('gcpcloudfunction-python')}."
+        "A self-contained Python function suitable for uploading to Google Cloud Function.\n\n"
+        f"See {doc_url('python-google-cloud-function')}."
     )
 
 

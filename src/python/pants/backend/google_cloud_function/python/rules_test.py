@@ -8,10 +8,10 @@ from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.gcpcloudfunction.python.rules import PythonGcpCloudFunctionFieldSet
-from pants.backend.gcpcloudfunction.python.rules import rules as gcpcloudfunction_python_rules
-from pants.backend.gcpcloudfunction.python.target_types import PythonGCPCloudFunction
-from pants.backend.gcpcloudfunction.python.target_types import rules as target_rules
+from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
+from pants.backend.google_cloud_function.python.rules import rules as python_google_cloud_function_rules
+from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
+from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import Files, RelocatedFiles, Resources
@@ -25,25 +25,25 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *gcpcloudfunction_python_rules(),
+            *python_google_cloud_function_rules(),
             *target_rules(),
             *core_target_types_rules(),
-            QueryRule(BuiltPackage, (PythonGcpCloudFunctionFieldSet,)),
+            QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
         ],
-        target_types=[PythonGCPCloudFunction, PythonLibrary, Files, RelocatedFiles, Resources],
+        target_types=[PythonGoogleCloudFunction, PythonLibrary, Files, RelocatedFiles, Resources],
     )
 
 
-def create_python_gcpcloudfunction(rule_runner: RuleRunner, addr: Address) -> Tuple[str, bytes]:
+def create_python_google_cloud_function(rule_runner: RuleRunner, addr: Address) -> Tuple[str, bytes]:
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.gcpcloudfunction.python",
+            "--backend-packages=pants.backend.google_cloud_function.python",
             "--source-root-patterns=src/python",
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
-    built_asset = rule_runner.request(BuiltPackage, [PythonGcpCloudFunctionFieldSet.create(target)])
+    built_asset = rule_runner.request(BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)])
     assert (
         "    Runtime: python37",
         "    Handler: main.handler",
@@ -68,7 +68,7 @@ def test_create_hello_world_cloud_function(rule_runner: RuleRunner) -> None:
                 """
                 python_library(name='lib')
 
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='cloud_function',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
@@ -79,7 +79,7 @@ def test_create_hello_world_cloud_function(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    zip_file_relpath, content = create_python_gcpcloudfunction(
+    zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner, Address("src/python/foo/bar", target_name="cloud_function")
     )
     assert "src.python.foo.bar/cloud_function.zip" == zip_file_relpath
@@ -121,7 +121,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
                     dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
                 )
 
-                python_gcpcloudfunction(
+                python_google_cloud_function(
                     name='cloud_function',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
@@ -134,13 +134,13 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     )
 
     assert not caplog.records
-    zip_file_relpath, _ = create_python_gcpcloudfunction(
+    zip_file_relpath, _ = create_python_google_cloud_function(
         rule_runner, Address("src/py/project", target_name="cloud_function")
     )
     assert caplog.records
     assert "src.py.project/cloud_function.zip" == zip_file_relpath
     assert (
-        "The python_gcpcloudfunction target src/py/project:cloud_function transitively depends on"
+        "The python_google_cloud_function target src/py/project:cloud_function transitively depends on"
         in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text

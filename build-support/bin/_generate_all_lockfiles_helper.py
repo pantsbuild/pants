@@ -119,7 +119,7 @@ def main() -> None:
             f"--python-protobuf-mypy-plugin-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
             f"--python-protobuf-mypy-plugin-experimental-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
             # Lambdex.
-            "--backend-packages=+['pants.backend.awslambda.python','pants.backend.gcpcloudfunction.python']",
+            "--backend-packages=+['pants.backend.awslambda.python','pants.backend.google_cloud_function.python']",
             f"--lambdex-version={Lambdex.default_version}",
             f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
             f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",
