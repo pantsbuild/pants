@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.go import import_analysis, pkg
@@ -69,7 +70,7 @@ class GoImportPathToPackageMapping:
 
 @rule
 async def analyze_import_path_to_package_mapping() -> GoImportPathToPackageMapping:
-    mapping: dict[str, list[Address]] = {}
+    mapping: dict[str, list[Address]] = defaultdict(list)
 
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     for tgt in all_targets:
@@ -82,8 +83,6 @@ async def analyze_import_path_to_package_mapping() -> GoImportPathToPackageMappi
         if not import_path:
             continue
 
-        if import_path not in mapping:
-            mapping[import_path] = []
         mapping[import_path].append(tgt.address)
 
     frozen_mapping = FrozenDict({ip: tuple(tgts) for ip, tgts in mapping.items()})
