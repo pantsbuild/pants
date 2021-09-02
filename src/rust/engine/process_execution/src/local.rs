@@ -29,7 +29,7 @@ use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
@@ -467,24 +467,9 @@ pub trait CapturedWorkdir {
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
     // non-determinism when paths overlap.
-    let store2 = store.clone();
-    let workdir_path_2 = workdir_path.clone();
-    let input_files = req.input_files;
-    in_workunit!(
-      context.workunit_store.clone(),
-      "setup_sandbox".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| async move {
-        store2
-          .materialize_directory(workdir_path_2, input_files)
-          .await
-      },
-    )
-    .await?;
-
+    store
+      .materialize_directory(workdir_path.clone(), req.input_files)
+      .await?;
     let workdir_path2 = workdir_path.clone();
     let output_file_paths = req.output_files.clone();
     let output_dir_paths = req.output_directories.clone();

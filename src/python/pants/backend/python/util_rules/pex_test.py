@@ -42,9 +42,10 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.python.python_setup import InvalidLockfileBehavior
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.dirutil import safe_rmtree
 
 
 @dataclass(frozen=True)
@@ -337,9 +338,32 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,
+                    # We skip the process cache for this PEX to ensure that it re-runs.
+                    cache_scope=ProcessCacheScope.PER_SESSION,
                 )
             ],
         )
+
+        # For VenvPexes, run the PEX twice while clearing the venv dir in between. This emulates
+        # situations where a PEX creation hits the process cache, while venv seeding misses the PEX
+        # cache.
+        if isinstance(pex, VenvPex):
+            # Request once to ensure that the directory is seeded, and then start a new session so that
+            # the second run happens as well.
+            _ = rule_runner.request(ProcessResult, [process])
+            rule_runner.new_session("re-run-for-venv-pex")
+            rule_runner.set_options(
+                ["--backend-packages=pants.backend.python"],
+                env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+            )
+            # Clear the cache.
+            named_caches_dir = (
+                rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+            )
+            venv_dir = os.path.join(named_caches_dir, "pex_root", pex.venv_rel_dir)
+            assert os.path.isdir(venv_dir)
+            safe_rmtree(venv_dir)
+
         result = rule_runner.request(ProcessResult, [process])
         output_str = result.stdout.decode()
         mo = re.search(r"CWD: (.*)\n", output_str)
@@ -491,6 +515,7 @@ def test_build_pex_description() -> None:
     def assert_description(
         requirements: PexRequirements | Lockfile | LockfileContent,
         *,
+        pex_path_length: int = 0,
         description: str | None = None,
         expected: str,
     ) -> None:
@@ -499,6 +524,7 @@ def test_build_pex_description() -> None:
             internal_only=True,
             requirements=requirements,
             description=description,
+            pex_path=(Pex(EMPTY_DIGEST, f"{i}.pex", None, ()) for i in range(0, pex_path_length)),
         )
         assert _build_pex_description(request) == expected
 
@@ -512,14 +538,18 @@ def test_build_pex_description() -> None:
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(resolved_dists=resolved_dists), expected="Building new.pex")
+    assert_description(
+        PexRequirements(resolved_dists=resolved_dists),
+        pex_path_length=2,
+        expected="Composing 2 requirements to build new.pex from repo.pex",
+    )
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
         PexRequirements(["req"], resolved_dists=resolved_dists),
-        expected="Extracting 1 requirement to build new.pex from repo.pex: req",
+        expected="Extracting req from repo.pex",
     )
 
     assert_description(
@@ -527,8 +557,8 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"], resolved_dists=resolved_dists),
-        expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
+        PexRequirements(["req1"], resolved_dists=resolved_dists),
+        expected="Extracting req1 from repo.pex",
     )
 
     assert_description(
@@ -536,14 +566,14 @@ def test_build_pex_description() -> None:
             file_content=FileContent("lock.txt", b""),
             lockfile_hex_digest=None,
         ),
-        expected="Building new.pex from lock.txt",
+        expected="Resolving new.pex from lock.txt",
     )
 
     assert_description(
         Lockfile(
             file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
         ),
-        expected="Building new.pex from lock.txt",
+        expected="Resolving new.pex from lock.txt",
     )
 
 

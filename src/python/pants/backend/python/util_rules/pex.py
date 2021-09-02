@@ -692,26 +692,27 @@ def _build_pex_description(request: PexRequest) -> str:
     if request.description:
         return request.description
 
-    if isinstance(request.requirements, Lockfile):
-        desc_suffix = f"from {request.requirements.file_path}"
-    elif isinstance(request.requirements, LockfileContent):
-        desc_suffix = f"from {request.requirements.file_content.path}"
-    else:
-        if not request.requirements.req_strings:
-            return f"Building {request.output_filename}"
-        elif request.requirements.resolved_dists:
-            repo_pex = request.requirements.resolved_dists.pex.name
-            return (
-                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"to build {request.output_filename} from {repo_pex}: "
-                f"{', '.join(request.requirements.req_strings)}"
-            )
+    reqs = request.requirements
+    if isinstance(reqs, Lockfile):
+        return f"Resolving {request.output_filename} from {reqs.file_path}"
+    elif isinstance(reqs, LockfileContent):
+        return f"Resolving {request.output_filename} from {reqs.file_content.path}"
+    elif request.internal_only and reqs.resolved_dists:
+        repo_pex = reqs.resolved_dists.pex
+        if reqs.req_strings:
+            return f"Extracting {', '.join(reqs.req_strings)} from {repo_pex.name}"
         else:
-            desc_suffix = (
-                f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-                f"{', '.join(request.requirements.req_strings)}"
+            return (
+                f"Composing {pluralize(len(request.pex_path), 'requirement')} to build "
+                f"{request.output_filename} from {repo_pex.name}"
             )
-    return f"Building {request.output_filename} {desc_suffix}"
+    elif not reqs.req_strings:
+        return f"Building {request.output_filename}"
+    else:
+        return (
+            f"Building {request.output_filename} with "
+            f"{pluralize(len(reqs.req_strings), 'requirement')}: {', '.join(reqs.req_strings)}"
+        )
 
 
 @rule
@@ -769,7 +770,7 @@ class VenvScriptWriter:
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            shlex.quote(arg)
+            f"$(ensure_absolute {shlex.quote(arg)})"
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
@@ -799,7 +800,7 @@ class VenvScriptWriter:
             export {" ".join(env_vars)}
             export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
 
-            execute_pex_args="$(ensure_absolute {execute_pex_args})"
+            execute_pex_args="{execute_pex_args}"
             target_venv_executable="$(ensure_absolute {target_venv_executable})"
             venv_dir="$(ensure_absolute {venv_dir})"
 
@@ -852,6 +853,7 @@ class VenvPex:
     pex: Script
     python: Script
     bin: FrozenDict[str, Script]
+    venv_rel_dir: str
 
 
 @frozen_after_init
@@ -943,6 +945,7 @@ async def create_venv_pex(
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
+        venv_rel_dir=venv_rel_dir.as_posix(),
     )
 
 

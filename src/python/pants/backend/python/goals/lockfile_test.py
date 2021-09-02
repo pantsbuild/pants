@@ -68,7 +68,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         )
 
 
-def test_filter_tool_lockfile_requests(caplog) -> None:
+def test_filter_tool_lockfile_requests() -> None:
     def create_request(name: str, lockfile_dest: str | None = None) -> PythonLockfileRequest:
         return PythonLockfileRequest(
             FrozenOrderedSet(),
@@ -86,7 +86,6 @@ def test_filter_tool_lockfile_requests(caplog) -> None:
         extra_request: PythonLockfileRequest | None,
         *,
         resolve_specified: bool,
-        expected_log: str | None,
     ) -> None:
         requests = [tool1, tool2]
         if extra_request:
@@ -95,28 +94,20 @@ def test_filter_tool_lockfile_requests(caplog) -> None:
             tool1,
             tool2,
         ]
-        if expected_log:
-            assert len(caplog.records) == 1
-            assert expected_log in caplog.text
-        else:
-            assert not caplog.records
-        caplog.clear()
 
-    assert_filtered(None, resolve_specified=False, expected_log=None)
-    assert_filtered(None, resolve_specified=True, expected_log=None)
+    assert_filtered(None, resolve_specified=False)
+    assert_filtered(None, resolve_specified=True)
 
-    assert_filtered(disabled_tool, resolve_specified=False, expected_log=None)
-    assert_filtered(
-        disabled_tool,
-        resolve_specified=True,
-        expected_log=f"`[{disabled_tool.resolve_name}].lockfile` is set to `{NO_TOOL_LOCKFILE}`",
+    assert_filtered(disabled_tool, resolve_specified=False)
+    with pytest.raises(ValueError) as exc:
+        assert_filtered(disabled_tool, resolve_specified=True)
+    assert f"`[{disabled_tool.resolve_name}].lockfile` is set to `{NO_TOOL_LOCKFILE}`" in str(
+        exc.value
     )
 
-    assert_filtered(default_tool, resolve_specified=False, expected_log=None)
-    assert_filtered(
-        default_tool,
-        resolve_specified=True,
-        expected_log=(
-            f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`"
-        ),
+    assert_filtered(default_tool, resolve_specified=False)
+    with pytest.raises(ValueError) as exc:
+        assert_filtered(default_tool, resolve_specified=True)
+    assert f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`" in str(
+        exc.value
     )
