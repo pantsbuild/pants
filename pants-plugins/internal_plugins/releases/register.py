@@ -98,12 +98,12 @@ async def pants_setup_kwargs(
     ]
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
-    # Determine the long description by reading from ABOUT.rst and the release notes.
+    # Determine the long description by reading from ABOUT.md and the release notes.
     notes_file = pants_releases.notes_file_for_version(PANTS_SEMVER)
     digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            ["src/python/pants/ABOUT.rst", notes_file],
+            ["src/python/pants/ABOUT.md", notes_file],
             description_of_origin="Pants release files",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
         ),
