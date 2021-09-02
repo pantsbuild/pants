@@ -182,7 +182,11 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPythonCloudFunctionHandlerDependency(tgt[PythonGoogleCloudFunctionDependencies])],
+            [
+                InjectPythonCloudFunctionHandlerDependency(
+                    tgt[PythonGoogleCloudFunctionDependencies]
+                )
+            ],
         )
         assert injected == InjectedDependencies([expected] if expected else [])
 

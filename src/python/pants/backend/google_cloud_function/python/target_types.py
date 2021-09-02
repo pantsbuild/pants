@@ -138,7 +138,9 @@ async def inject_cloud_function_handler_dependency(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
             ResolvedPythonGoogleHandler,
-            ResolvePythonGoogleHandlerRequest(original_tgt.target[PythonGoogleCloudFunctionHandlerField]),
+            ResolvePythonGoogleHandlerRequest(
+                original_tgt.target[PythonGoogleCloudFunctionHandlerField]
+            ),
         ),
     )
     module, _, _func = handler.val.partition(":")

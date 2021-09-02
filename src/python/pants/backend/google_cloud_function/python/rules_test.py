@@ -9,7 +9,9 @@ from zipfile import ZipFile
 import pytest
 
 from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
-from pants.backend.google_cloud_function.python.rules import rules as python_google_cloud_function_rules
+from pants.backend.google_cloud_function.python.rules import (
+    rules as python_google_cloud_function_rules,
+)
 from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.target_types import PythonLibrary
@@ -34,7 +36,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def create_python_google_cloud_function(rule_runner: RuleRunner, addr: Address) -> Tuple[str, bytes]:
+def create_python_google_cloud_function(
+    rule_runner: RuleRunner, addr: Address
+) -> Tuple[str, bytes]:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.google_cloud_function.python",
@@ -43,7 +47,9 @@ def create_python_google_cloud_function(rule_runner: RuleRunner, addr: Address) 
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
-    built_asset = rule_runner.request(BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)])
+    built_asset = rule_runner.request(
+        BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)]
+    )
     assert (
         "    Runtime: python37",
         "    Handler: main.handler",

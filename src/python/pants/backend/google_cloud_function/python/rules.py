@@ -54,7 +54,9 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
 async def package_python_google_cloud_function(
-    field_set: PythonGoogleCloudFunctionFieldSet, lambdex: Lambdex, union_membership: UnionMembership
+    field_set: PythonGoogleCloudFunctionFieldSet,
+    lambdex: Lambdex,
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
