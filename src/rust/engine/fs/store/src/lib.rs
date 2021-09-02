@@ -1100,22 +1100,21 @@ impl Store {
   ) -> BoxFuture<'static, Result<Vec<FileEntry>, String>> {
     self
       .walk(digest, move |_, path_so_far, _, directory| {
-        future::try_join_all(
+        future::ready(
           directory
             .files
             .iter()
             .map(|file_node| {
               let path = path_so_far.join(file_node.name.clone());
               let is_executable = file_node.is_executable;
-              let file_node_digest = try_future!(require_digest(file_node.digest.as_ref()));
-              future::ready(Ok(FileEntry {
+              let file_node_digest = require_digest(file_node.digest.as_ref())?;
+              Ok(FileEntry {
                 path,
                 digest: file_node_digest,
                 is_executable,
-              }))
-              .boxed()
+              })
             })
-            .collect::<Vec<_>>(),
+            .collect::<Result<Vec<_>, String>>(),
         )
         .boxed()
       })
