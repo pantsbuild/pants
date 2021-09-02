@@ -8,7 +8,7 @@ These are always activated and cannot be disabled.
 
 import os
 
-from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
@@ -25,6 +25,6 @@ class BuildFilePath:
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={"get_buildroot": get_buildroot, "pants_version": pants_version},
+        objects={"get_buildroot": get_buildroot},
         context_aware_object_factories={"buildfile_path": BuildFilePath},
     )
