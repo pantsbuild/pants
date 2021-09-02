@@ -73,6 +73,7 @@ class Pylint(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/python/lint/pylint/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+    uses_requirements_from_source_plugins = True
 
     @classmethod
     def register_options(cls, register):
