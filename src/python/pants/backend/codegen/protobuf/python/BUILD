@@ -11,7 +11,7 @@ python_tests(name="python_protobuf_subsystem_test", sources=["python_protobuf_su
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
-    timeout=120,
+    timeout=210,
     # We want to make sure the default lockfile for MyPy Protobuf works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )
