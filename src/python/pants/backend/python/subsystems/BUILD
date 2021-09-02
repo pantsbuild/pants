@@ -4,4 +4,4 @@
 python_library(dependencies=[":lockfiles"])
 resources(name="lockfiles", sources=["*_lockfile.txt"])
 
-python_tests(name="tests")
+python_tests(name="tests", timeout=120)
