@@ -33,7 +33,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, Targets, WrappedTarget
+from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ class ResolvedOwningGoModule:
 async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> ResolvedOwningGoModule:
     spec_path = request.spec_path
     candidate_targets = await Get(
-        Targets,
+        UnexpandedTargets,
         AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),
     )
     go_module_targets = [tgt for tgt in candidate_targets if tgt.has_field(GoModuleSources)]
@@ -179,7 +179,7 @@ class GoResolveGoal(Goal):
 
 
 @goal_rule
-async def run_go_resolve(targets: Targets, workspace: Workspace) -> GoResolveGoal:
+async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> GoResolveGoal:
     # TODO: Use MultiGet to resolve the go_module targets.
     # TODO: Combine all of the go.sum's into a single Digest to write.
     for target in targets:

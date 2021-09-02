@@ -30,7 +30,7 @@ from pants.core.goals.tailor import (
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Targets
+from pants.engine.target import UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -114,7 +114,7 @@ async def find_putative_go_external_module_targets(
             for search_path in request.search_paths.dirs
         ]
     )
-    candidate_targets = await Get(Targets, AddressSpecs(addresses))
+    candidate_targets = await Get(UnexpandedTargets, AddressSpecs(addresses))
     go_module_targets = [tgt for tgt in candidate_targets if tgt.has_field(GoModuleSources)]
 
     putative_targets = []

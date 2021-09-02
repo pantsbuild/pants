@@ -34,7 +34,7 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
-    Targets,
+    UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -72,7 +72,7 @@ class GoImportPathToPackageMapping:
 async def analyze_import_path_to_package_mapping() -> GoImportPathToPackageMapping:
     mapping: dict[str, list[Address]] = defaultdict(list)
 
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     for tgt in all_targets:
         if not tgt.has_field(GoImportPath):
             continue
@@ -112,7 +112,7 @@ async def infer_go_dependencies(
         MaybeEmptySiblingAddresses(spec_path),
         MaybeEmptyDescendantAddresses(spec_path),
     ]
-    candidate_targets = await Get(Targets, AddressSpecs(address_specs))
+    candidate_targets = await Get(UnexpandedTargets, AddressSpecs(address_specs))
     go_package_targets = [
         tgt
         for tgt in candidate_targets

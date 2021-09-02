@@ -44,7 +44,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, Targets, WrappedTarget
+from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -440,7 +440,7 @@ class GoPkgDebugGoal(Goal):
 
 
 @goal_rule
-async def run_go_pkg_debug(targets: Targets, console: Console) -> GoPkgDebugGoal:
+async def run_go_pkg_debug(targets: UnexpandedTargets, console: Console) -> GoPkgDebugGoal:
     first_party_package_targets = [tgt for tgt in targets if is_first_party_package_target(tgt)]
     first_party_requests = [
         Get(ResolvedGoPackage, ResolveGoPackageRequest(address=tgt.address))

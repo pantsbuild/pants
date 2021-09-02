@@ -46,9 +46,9 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSet,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    UnexpandedTargets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -101,7 +101,7 @@ class GoBinaryFieldSet(PackageFieldSet):
 
 
 @goal_rule
-async def run_go_build(targets: Targets) -> GoBuildGoal:
+async def run_go_build(targets: UnexpandedTargets) -> GoBuildGoal:
     await MultiGet(
         Get(BuiltGoPackage, BuildGoPackageRequest(address=tgt.address))
         for tgt in targets
@@ -202,7 +202,7 @@ async def build_target(
         raise ValueError(f"Unknown how to build Go target at address {request.address}.")
 
     dependencies = await Get(Addresses, DependenciesRequest(field=target[Dependencies]))
-    dependencies_targets = await Get(Targets, Addresses(dependencies))
+    dependencies_targets = await Get(UnexpandedTargets, Addresses(dependencies))
     buildable_dependencies_targets = [
         dep_tgt
         for dep_tgt in dependencies_targets
