@@ -629,26 +629,27 @@ def _build_pex_description(request: PexRequest) -> str:
     if request.description:
         return request.description
 
-    if isinstance(request.requirements, Lockfile):
-        desc_suffix = f"from {request.requirements.file_path}"
-    elif isinstance(request.requirements, LockfileContent):
-        desc_suffix = f"from {request.requirements.file_content.path}"
-    else:
-        if not request.requirements.req_strings:
-            return f"Building {request.output_filename}"
-        elif request.requirements.resolved_dists:
-            repo_pex = request.requirements.resolved_dists.pex.name
-            return (
-                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"to build {request.output_filename} from {repo_pex}: "
-                f"{', '.join(request.requirements.req_strings)}"
-            )
+    reqs = request.requirements
+    if isinstance(reqs, Lockfile):
+        return f"Resolving {request.output_filename} from {reqs.file_path}"
+    elif isinstance(reqs, LockfileContent):
+        return f"Resolving {request.output_filename} from {reqs.file_content.path}"
+    elif request.internal_only and reqs.resolved_dists:
+        repo_pex = reqs.resolved_dists.pex
+        if reqs.req_strings:
+            return f"Extracting {', '.join(reqs.req_strings)} from {repo_pex.name}"
         else:
-            desc_suffix = (
-                f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-                f"{', '.join(request.requirements.req_strings)}"
+            return (
+                f"Composing {pluralize(len(request.pex_path), 'requirement')} to build "
+                f"{request.output_filename} from {repo_pex.name}"
             )
-    return f"Building {request.output_filename} {desc_suffix}"
+    elif not reqs.req_strings:
+        return f"Building {request.output_filename}"
+    else:
+        return (
+            f"Building {request.output_filename} with "
+            f"{pluralize(len(reqs.req_strings), 'requirement')}: {', '.join(reqs.req_strings)}"
+        )
 
 
 @rule
