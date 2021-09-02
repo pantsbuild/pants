@@ -291,16 +291,19 @@ async def resolve_external_go_package(
 
     import_path = target[GoImportPath].value
     if not import_path:
+        # TODO: Implement via `required = True` on the Target.
         raise ValueError(
             f"_go_ext_mod_package at address {request.address} does not have an import path set."
         )
 
     module_path = target[GoExternalModulePath].value
     if not module_path:
+        # TODO: Implement GoExternalModulePath.compute_value for this check.
         raise ValueError(f"_go_ext_mod_package at address {request.address} has a blank `path`")
 
     module_version = target[GoExternalModuleVersion].value
     if not module_version:
+        # TODO: Implement GoExternalModuleVersion.compute_value for this check.
         raise ValueError(f"_go_ext_mod_package at address {request.address} has a blank `version`")
 
     module = await Get(
