@@ -92,8 +92,9 @@ class ArgSplitterTest(unittest.TestCase):
         ]
 
         directories_vs_goals = ["foo", "a_b_c"]
-        files_vs_subscopes = ["cache.java", "cache.tmp.java"]
-        ambiguous_specs = [*directories_vs_goals, *files_vs_subscopes]
+        # TODO: Once we properly ban scopes with dots in them, we can stop testing this case.
+        files_vs_dotted_scopes = ["cache.java", "cache.tmp.java"]
+        ambiguous_specs = [*directories_vs_goals, *files_vs_dotted_scopes]
 
         # With no files/directories on disk to tiebreak.
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
@@ -107,7 +108,7 @@ class ArgSplitterTest(unittest.TestCase):
             splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, tmpdir)
             for directory in directories_vs_goals:
                 Path(tmpdir, directory).mkdir()
-            for f in files_vs_subscopes:
+            for f in files_vs_dotted_scopes:
                 Path(tmpdir, f).touch()
             for spec in ambiguous_specs:
                 assert splitter.likely_a_spec(spec) is True
@@ -221,11 +222,11 @@ class ArgSplitterTest(unittest.TestCase):
 
     def test_passthru_args(self) -> None:
         self.assert_valid_split(
-            "./pants test foo/bar -- -t arg",
+            "./pants test foo/bar -- -t 'this is the arg'",
             expected_goals=["test"],
             expected_scope_to_flags={"": [], "test": []},
             expected_specs=["foo/bar"],
-            expected_passthru=["-t", "arg"],
+            expected_passthru=["-t", "this is the arg"],
         )
         self.assert_valid_split(
             "./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii "

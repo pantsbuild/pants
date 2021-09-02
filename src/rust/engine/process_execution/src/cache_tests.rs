@@ -149,7 +149,7 @@ async fn recover_from_missing_store_contents() {
   // than just the root of the output is present when hitting the cache.
   {
     let output_dir_digest = first_result.output_directory;
-    let (output_dir, _) = store
+    let output_dir = store
       .load_directory(output_dir_digest)
       .await
       .unwrap()

@@ -5,22 +5,20 @@ from __future__ import annotations
 
 import configparser
 import getpass
-import io
 import itertools
 import os
 import re
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from hashlib import sha1
-from pathlib import PurePath
-from typing import Any, ClassVar, Dict, List, Mapping, Sequence, Tuple, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Union, cast
 
 import toml
-from typing_extensions import Literal
+from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -28,6 +26,22 @@ from pants.util.ordered_set import OrderedSet
 # A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
 # pants_distdir.
 SeedValues = Dict[str, Value]
+
+
+class ConfigSource(Protocol):
+    """A protocol that matches pants.engine.fs.FileContent.
+
+    Also matches the ad-hoc FileContent-like class we use during options bootstrapping, where we
+    cannot use pants.engine.fs.FileContent itself due to circular imports.
+    """
+
+    @property
+    def path(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def content(self) -> bytes:
+        raise NotImplementedError()
 
 
 class Config(ABC):
@@ -47,82 +61,35 @@ class Config(ABC):
         pass
 
     @classmethod
-    def load_file_contents(
-        cls,
-        file_contents,
-        *,
-        seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        """Loads config from the given string payloads, with later payloads taking precedence over
-        earlier ones.
-
-        A handful of seed values will be set to act as if specified in the loaded config file's
-        DEFAULT section, and be available for use in substitutions.  The caller may override some of
-        these seed values.
-        """
-
-        @contextmanager
-        def opener(file_content):
-            with io.BytesIO(file_content.content) as fh:
-                yield fh
-
-        return cls._meta_load(opener, file_contents, seed_values=seed_values)
-
-    @classmethod
     def load(
         cls,
-        config_paths: List[str],
+        file_contents: Iterable[ConfigSource],
         *,
         seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        """Loads config from the given paths, with later paths taking precedence over earlier ones.
+    ) -> Config:
+        """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
         A handful of seed values will be set to act as if specified in the loaded config file's
         DEFAULT section, and be available for use in substitutions.  The caller may override some of
         these seed values.
         """
-
-        @contextmanager
-        def opener(f):
-            with open(f, "rb") as fh:
-                yield fh
-
-        return cls._meta_load(opener, config_paths, seed_values=seed_values)
-
-    @classmethod
-    def _meta_load(
-        cls,
-        open_ctx,
-        config_items: Sequence,
-        *,
-        seed_values: SeedValues | None = None,
-    ) -> _EmptyConfig | _ChainedConfig:
-        if not config_items:
-            return _EmptyConfig()
-
         single_file_configs = []
-        for config_item in config_items:
-            config_path = config_item.path if hasattr(config_item, "path") else config_item
-            with open_ctx(config_item) as config_file:
-                content_bytes = config_file.read()
-            content_digest = sha1(content_bytes).hexdigest()
-            content = content_bytes.decode()
+        for file_content in file_contents:
+            content_digest = sha1(file_content.content).hexdigest()
             normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
-            if PurePath(config_path).suffix == ".toml":
-                config_values = cls._parse_toml(content, normalized_seed_values)
-            else:
-                try:
-                    config_values = cls._parse_toml(content, normalized_seed_values)
-                except Exception as e:
-                    raise cls.ConfigError(
-                        f"Unsuffixed Config path {config_path} could not be parsed "
-                        f"as TOML:\n  {e}"
-                    )
+            try:
+                config_values = cls._parse_toml(
+                    file_content.content.decode(), normalized_seed_values
+                )
+            except Exception as e:
+                raise cls.ConfigError(
+                    f"Config file {file_content.path} could not be parsed as TOML:\n  {e}"
+                )
 
             single_file_configs.append(
                 _SingleFileConfig(
-                    config_path=config_path,
+                    config_path=file_content.path,
                     content_digest=content_digest,
                     values=config_values,
                 ),
@@ -175,14 +142,11 @@ class Config(ABC):
         is looked up in the DEFAULT section.  If there is still no definition found, the default
         value supplied is returned.
         """
-        return self._getinstance(section, option, type_, default)
-
-    def _getinstance(self, section, option, type_, default=None):
         if not self.has_option(section, option):
             return default
 
         raw_value = self.get_value(section, option)
-        if type_ == str or issubclass(type_, str):
+        if issubclass(type_, str):
             return raw_value
 
         key = f"{section}.{option}"
@@ -239,56 +203,11 @@ class _ConfigValues:
     def _is_an_option(option_value: _TomlValue | dict) -> bool:
         """Determine if the value is actually an option belonging to that section.
 
-        A value that looks like an option might actually be a subscope, e.g. the option value
-        `java` belonging to the section `cache` could actually be the section `cache.java`, rather
-        than the option `--cache-java`.
-
-        We must also handle the special syntax of `my_list_option.add` and `my_list_option.remove`.
+        This handles the special syntax of `my_list_option.add` and `my_list_option.remove`.
         """
         if isinstance(option_value, dict):
             return "add" in option_value or "remove" in option_value
         return True
-
-    @staticmethod
-    def _section_explicitly_defined(section_values: Dict) -> bool:
-        """Determine if the section is truly a defined section, meaning that the user explicitly
-        wrote the section in their config file.
-
-        For example, the user may have explicitly defined `cache.java` but never defined `cache`.
-        Due to TOML's representation of the config as a nested dictionary, naively, it would appear
-        that `cache` was defined even though the user never explicitly added it to their config.
-        """
-        at_least_one_option_defined = any(
-            _ConfigValues._is_an_option(section_value) for section_value in section_values.values()
-        )
-        # We also check if the section was explicitly defined but has no options. We can be
-        # confident that this is not a parent scope (e.g. `cache` when `cache.java` is really what
-        # was defined) because the parent scope would store its child scope in its values, so the
-        # values would not be empty.
-        blank_section = len(section_values.values()) == 0
-        return at_least_one_option_defined or blank_section
-
-    def _find_section_values(self, section: str) -> dict | None:
-        """Find the values for a section, if any.
-
-        For example, if the config file was `{'GLOBAL': {'foo': 1}}`, this function would return
-        `{'foo': 1}` given `section='GLOBAL'`.
-        """
-
-        def recurse(mapping: Dict, *, remaining_sections: List[str]) -> dict | None:
-            if not remaining_sections:
-                return None
-            current_section = remaining_sections[0]
-            if current_section not in mapping:
-                return None
-            section_values = mapping[current_section]
-            if len(remaining_sections) > 1:
-                return recurse(section_values, remaining_sections=remaining_sections[1:])
-            if not self._section_explicitly_defined(section_values):
-                return None
-            return cast(Dict, section_values)
-
-        return recurse(mapping=self.values, remaining_sections=section.split("."))
 
     def _possibly_interpolate_value(
         self,
@@ -325,8 +244,10 @@ class _ConfigValues:
         def recursively_format_str(value: str) -> str:
             # It's possible to interpolate with a value that itself has an interpolation. We must
             # fully evaluate all expressions for parity with configparser.
-            if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
+            match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
+            if not match:
                 return value
+            self._maybe_deprecated_default(match.group(1))
             return recursively_format_str(value=format_str(value))
 
         return recursively_format_str(raw_value)
@@ -379,117 +300,83 @@ class _ConfigValues:
         )
 
     @property
-    def sections(self) -> List[str]:
-        sections: List[str] = []
-
-        def recurse(mapping: Dict, *, parent_section: str | None = None) -> None:
-            for section, section_values in mapping.items():
-                if not isinstance(section_values, dict):
-                    continue
-                # We filter out "DEFAULT" and also check for the special `my_list_option.add` and
-                # `my_list_option.remove` syntax.
-                if section == "DEFAULT" or "add" in section_values or "remove" in section_values:
-                    continue
-                section_name = section if not parent_section else f"{parent_section}.{section}"
-                if self._section_explicitly_defined(section_values):
-                    sections.append(section_name)
-                recurse(section_values, parent_section=section_name)
-
-        recurse(self.values)
-        return sections
+    def sections(self) -> list[str]:
+        return [scope for scope in self.values if scope != "DEFAULT"]
 
     def has_section(self, section: str) -> bool:
-        return self._find_section_values(section) is not None
+        return section in self.values
 
     def has_option(self, section: str, option: str) -> bool:
-        try:
-            self.get_value(section, option)
-        except (configparser.NoSectionError, configparser.NoOptionError):
+        if not self.has_section(section):
             return False
-        else:
-            return True
+        return option in self.values[section] or option in self.defaults
 
     def get_value(self, section: str, option: str) -> str | None:
-        section_values = self._find_section_values(section)
+        section_values = self.values.get(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
+
         stringify = partial(
             self._stringify_val,
             option=option,
             section=section,
             section_values=section_values,
         )
-        if option not in section_values:
-            if option not in self.defaults:
-                raise configparser.NoOptionError(option, section)
-            return stringify(raw_value=self.defaults[option])
-        option_value = section_values[option]
-        # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
-        if isinstance(option_value, dict):
-            has_add = "add" in option_value
-            has_remove = "remove" in option_value
-            if not has_add and not has_remove:
-                raise configparser.NoOptionError(option, section)
-            add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
-            remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
-            if has_add and has_remove:
-                return f"{add_val},{remove_val}"
-            if has_add:
-                return add_val
-            return remove_val
-        return stringify(option_value)
 
-    def options(self, section: str) -> List[str]:
-        section_values = self._find_section_values(section)
+        if option not in section_values:
+            if option in self.defaults:
+                return stringify(raw_value=self.defaults[option])
+            raise configparser.NoOptionError(option, section)
+
+        option_value = section_values[option]
+        if not isinstance(option_value, dict):
+            return stringify(option_value)
+
+        # Handle dict options, along with the special `my_list_option.add` and
+        # `my_list_option.remove` syntax. We only treat `add` and `remove` as the special list
+        # syntax if the values are lists to reduce the risk of incorrectly special casing.
+        has_add = isinstance(option_value.get("add"), list)
+        has_remove = isinstance(option_value.get("remove"), list)
+        if not has_add and not has_remove:
+            return stringify(option_value)
+
+        add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
+        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
+        if has_add and has_remove:
+            return f"{add_val},{remove_val}"
+        if has_add:
+            return add_val
+        return remove_val
+
+    def options(self, section: str) -> list[str]:
+        section_values = self.values.get(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
-        result = [
-            option
-            for option, option_value in section_values.items()
-            if self._is_an_option(option_value)
+        return [
+            *section_values.keys(),
+            *(
+                default_option
+                for default_option in self.defaults
+                if default_option not in section_values
+            ),
         ]
-        result.extend(
-            default_option
-            for default_option in self.defaults.keys()
-            if default_option not in result
+
+    def _maybe_deprecated_default(self, option: str) -> None:
+        matched = option == "pants_supportdir"
+        value = self.defaults[option] if matched else None
+        deprecated_conditional(
+            lambda: matched,
+            "2.8.0.dev0",
+            "The `pants_supportdir` default value in `pants.toml`",
+            hint=f"Replace use of the variable with the literal: {repr(value)}.",
         )
-        return result
 
     @property
-    def defaults(self) -> Mapping[str, str]:
+    def defaults(self) -> dict[str, str]:
         return {
             option: self._stringify_val_without_interpolation(option_val)
             for option, option_val in self.values["DEFAULT"].items()
         }
-
-
-@dataclass(frozen=True)
-class _EmptyConfig(Config):
-    """A dummy config with no data at all."""
-
-    def sources(self) -> List[str]:
-        return []
-
-    def configs(self) -> List["_SingleFileConfig"]:
-        return []
-
-    def sections(self) -> List[str]:
-        return []
-
-    def has_section(self, section: str) -> Literal[False]:
-        return False
-
-    def has_option(self, section: str, option: str) -> Literal[False]:
-        return False
-
-    def get_value(self, section: str, option: str) -> None:
-        return None
-
-    def get_source_for_option(self, section: str, option: str) -> None:
-        return None
-
-    def __repr__(self) -> str:
-        return "EmptyConfig()"
 
 
 @dataclass(frozen=True, eq=False)
@@ -500,13 +387,13 @@ class _SingleFileConfig(Config):
     content_digest: str
     values: _ConfigValues
 
-    def configs(self) -> List["_SingleFileConfig"]:
+    def configs(self) -> list[_SingleFileConfig]:
         return [self]
 
-    def sources(self) -> List[str]:
+    def sources(self) -> list[str]:
         return [self.config_path]
 
-    def sections(self) -> List[str]:
+    def sections(self) -> list[str]:
         return self.values.sections
 
     def has_section(self, section: str) -> bool:
@@ -540,20 +427,20 @@ class _ChainedConfig(Config):
     """Config read from multiple sources."""
 
     # Config instances to chain. Later instances take precedence over earlier ones.
-    chained_configs: Tuple[_SingleFileConfig, ...]
+    chained_configs: tuple[_SingleFileConfig, ...]
 
     @property
-    def _configs(self) -> Tuple[_SingleFileConfig, ...]:
+    def _configs(self) -> tuple[_SingleFileConfig, ...]:
         return self.chained_configs
 
-    def configs(self) -> Tuple[_SingleFileConfig, ...]:
+    def configs(self) -> tuple[_SingleFileConfig, ...]:
         return self.chained_configs
 
-    def sources(self) -> List[str]:
+    def sources(self) -> list[str]:
         # NB: Present the sources in the order we were given them.
         return list(itertools.chain.from_iterable(cfg.sources() for cfg in reversed(self._configs)))
 
-    def sections(self) -> List[str]:
+    def sections(self) -> list[str]:
         ret: OrderedSet[str] = OrderedSet()
         for cfg in self._configs:
             ret.update(cfg.sections())
@@ -604,7 +491,7 @@ class TomlSerializer:
           "o2": "hello",
           "o3": [0, 1, 2],
         },
-        "cache.java": {
+        "some-subsystem": {
           "dict_option": {
             "a": 0,
             "b": 0,
@@ -615,53 +502,26 @@ class TomlSerializer:
 
     parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]
 
-    def normalize(self) -> Dict:
-        result: Dict = {}
-        for section, section_values in self.parsed.items():
-            # With TOML, we store dict values as strings to avoid ambiguity between sections/option
-            # scopes vs. dict values.
-            def normalize_section_value(option, option_value) -> Tuple[str, Any]:
-                option_value = str(option_value) if isinstance(option_value, dict) else option_value
-                if option.endswith(".add"):
-                    option = option.rsplit(".", 1)[0]
-                    option_value = f"+{option_value!r}"
-                elif option.endswith(".remove"):
-                    option = option.rsplit(".", 1)[0]
-                    option_value = f"-{option_value!r}"
-                return option, option_value
+    def normalize(self) -> dict:
+        def normalize_section_value(option, option_value) -> Tuple[str, Any]:
+            # With TOML, we store dict values as strings (for now).
+            if isinstance(option_value, dict):
+                option_value = str(option_value)
+            if option.endswith(".add"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"+{option_value!r}"
+            elif option.endswith(".remove"):
+                option = option.rsplit(".", 1)[0]
+                option_value = f"-{option_value!r}"
+            return option, option_value
 
-            section_values = dict(
+        return {
+            section: dict(
                 normalize_section_value(option, option_value)
                 for option, option_value in section_values.items()
             )
-
-            def add_section_values(
-                section_component: str,
-                seen_section_components: List[str],
-                remaining_section_components: List[str],
-            ) -> None:
-                current_scope = result
-                for seen in seen_section_components:
-                    current_scope = current_scope[seen]
-                if not remaining_section_components:
-                    current_scope[section_component] = section_values
-                    return
-                child_section_component = remaining_section_components[0]
-                current_scope[section_component] = {child_section_component: {}}
-                add_section_values(
-                    section_component=child_section_component,
-                    seen_section_components=[*seen_section_components, section_component],
-                    remaining_section_components=remaining_section_components[1:],
-                )
-
-            section_components = section.split(".")
-            add_section_values(
-                section_component=section_components[0],
-                seen_section_components=[],
-                remaining_section_components=section_components[1:],
-            )
-
-        return result
+            for section, section_values in self.parsed.items()
+        }
 
     def serialize(self) -> str:
         toml_values = self.normalize()

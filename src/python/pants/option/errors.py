@@ -87,17 +87,6 @@ class PassthroughType(RegistrationError):
     """Options marked passthrough must be typed as a string list."""
 
 
-class RecursiveSubsystemOption(RegistrationError):
-    """Subsystem option cannot specify 'recursive'.
-
-    Subsystem options are always recursive.
-    """
-
-
-class Shadowing(RegistrationError):
-    """Option shadows an option in {outer_scope}."""
-
-
 # -----------------------------------------------------------------------
 # Flag parsing errors
 # -----------------------------------------------------------------------

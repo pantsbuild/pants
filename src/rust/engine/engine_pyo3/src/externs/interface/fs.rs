@@ -9,9 +9,11 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyTuple, PyType};
 
+use either::Either;
 use fs::PathStat;
 use fs::{GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching};
 use hashing::{Digest, Fingerprint};
+use itertools::Itertools;
 use store::Snapshot;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
@@ -208,6 +210,21 @@ impl PyObjectProtocol for PySnapshot {
 
   fn __hash__(&self) -> u64 {
     self.0.digest.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> PyResult<String> {
+    let (dirs, files): (Vec<_>, Vec<_>) = self.0.path_stats.iter().partition_map(|ps| match ps {
+      PathStat::Dir { path, .. } => Either::Left(path.to_string_lossy()),
+      PathStat::File { path, .. } => Either::Right(path.to_string_lossy()),
+    });
+
+    Ok(format!(
+      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
+      self.0.digest.hash.to_hex(),
+      self.0.digest.size_bytes,
+      dirs.join(","),
+      files.join(",")
+    ))
   }
 }
 

@@ -69,8 +69,8 @@ class InterpreterConstraintsField(StringSequenceField):
     alias = "interpreter_constraints"
     help = (
         "The Python interpreters this code is compatible with.\n\nEach element should be written "
-        "in pip-style format, e.g. 'CPython==2.7.*' or 'CPython>=3.6,<4'. You can leave off "
-        "`CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.\n\nSpecify "
+        "in pip-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`. You can leave off "
+        "`CPython` as a shorthand, e.g. `>=2.7` will be expanded to `CPython>=2.7`.\n\nSpecify "
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\n"
@@ -520,7 +520,7 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def _format_invalid_requirement_string_error(
+def format_invalid_requirement_string_error(
     value: str, e: Exception, *, description_of_origin: str
 ) -> str:
     prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
@@ -580,7 +580,7 @@ class _RequirementSequenceField(Field):
                     parsed = Requirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
-                        _format_invalid_requirement_string_error(
+                        format_invalid_requirement_string_error(
                             v,
                             e,
                             description_of_origin=(
@@ -689,7 +689,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             yield Requirement.parse(line)
         except Exception as e:
             raise ValueError(
-                _format_invalid_requirement_string_error(
+                format_invalid_requirement_string_error(
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )

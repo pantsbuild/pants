@@ -23,6 +23,8 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import resolve_conflicting_options
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.native_engine_pyo3 import PyExecutor as PyExecutorPyO3
@@ -49,18 +51,6 @@ LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
 
 MEGABYTES = 1_000_000
 GIGABYTES = 1_000 * MEGABYTES
-
-
-class GlobMatchErrorBehavior(Enum):
-    """Describe the action to perform when matching globs in BUILD files to source files.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
 
 class FilesNotFoundBehavior(Enum):
@@ -338,6 +328,7 @@ class ExecutionOptions:
     remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
     remote_store_rpc_concurrency: int
+    remote_store_batch_api_size_limit: int
 
     remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
@@ -377,6 +368,7 @@ class ExecutionOptions:
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
+            remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
@@ -455,6 +447,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
+    remote_store_batch_api_size_limit=4194304,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
     remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
@@ -571,7 +564,8 @@ class GlobalOptions(Subsystem):
             default=sys.stdout.isatty(),
             help=(
                 "Whether Pants should use colors in output or not. This may also impact whether "
-                "some tools Pants run use color."
+                "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
+                "whether the output destination supports color."
             ),
         )
 
@@ -587,10 +581,10 @@ class GlobalOptions(Subsystem):
                 "Normally, Pants will look for literal matches from the start of the log/warning "
                 "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
                 "your string as a regex pattern. For example:\n\n"
-                "  ignore_warnings = [\n"
-                "    \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
-                "    '$regex$:No files\\s*'\n"
-                "  ]"
+                "    ignore_warnings = [\n"
+                "        \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
+                "        '$regex$:No files\\s*'\n"
+                "    ]\n"
             ),
         )
 
@@ -636,8 +630,11 @@ class GlobalOptions(Subsystem):
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
+            deprecation_start_version="2.8.0.dev0",
+            removal_version="2.9.0.dev0",
+            removal_hint="Unused: this option has no necessary equivalent in v2.",
             default=os.path.join(buildroot, "build-support"),
-            help="Unused. Will be deprecated in 2.2.0.",
+            help="Used only for templating in `pants.toml`.",
         )
         register(
             "--pants-distdir",
@@ -710,7 +707,7 @@ class GlobalOptions(Subsystem):
             # affects fingerprints.
             fingerprint=False,
             help=(
-                "Read additional specs (target addresses, files, and/or globs), one per line,"
+                "Read additional specs (target addresses, files, and/or globs), one per line, "
                 "from these files."
             ),
         )
@@ -792,7 +789,7 @@ class GlobalOptions(Subsystem):
             default=False,
             help="Enable concurrent runs of Pants. Without this enabled, Pants will "
             "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
-            "Enabling this option requires parallel Pants invocations to block on the first",
+            "Enabling this option requires parallel Pants invocations to block on the first.",
         )
 
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -843,8 +840,22 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=None,
             type=dir_option,
-            help="A directory to write execution and rule graphs to as `dot` files. The contents "
-            "of the directory will be overwritten if any filenames collide.",
+            removal_version="2.8.0.dev0",
+            removal_hint="Use `--engine-visualize-to` instead.",
+            help=(
+                "A directory to write execution and rule graphs to as `dot` files. The contents "
+                "of the directory will be overwritten if any filenames collide."
+            ),
+        )
+        register(
+            "--engine-visualize-to",
+            advanced=True,
+            default=None,
+            type=dir_option,
+            help=(
+                "A directory to write execution and rule graphs to as `dot` files. The contents "
+                "of the directory will be overwritten if any filenames collide."
+            ),
         )
 
         # Pants Daemon options.
@@ -1106,7 +1117,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Path to a PEM file containing CA certificates used for verifying secure "
-                "connections to --remote-execution-address and --remote-store-address.\n\nIf "
+                "connections to `--remote-execution-address` and `--remote-store-address`.\n\nIf "
                 "unspecified, Pants will attempt to auto-discover root CA certificates when TLS "
                 "is enabled with remote execution and caching."
             ),
@@ -1116,7 +1127,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Path to a file containing an oauth token to use for gGRPC connections to "
-                "--remote-execution-address and --remote-store-address.\n\nIf specified, Pants will "
+                "`--remote-execution-address` and `--remote-store-address`.\n\nIf specified, Pants will "
                 "add a header in the format `authorization: Bearer <token>`. You can also manually "
                 "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
                 "use `--remote-auth-plugin` to provide a plugin to dynamically set the relevant "
@@ -1144,7 +1155,7 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-headers` still work.\n\n"
                 "If you return `instance_name`, Pants will replace `--remote-instance-name` "
                 "with this value.\n\n"
-                "If the returned auth state is AuthPluginState.UNAVAILABLE, Pants will disable "
+                "If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable "
                 "remote caching and execution.\n\n"
                 "If Pantsd is in use, `prior_result` will be the previous "
                 "`AuthPluginResult` returned by your plugin, which allows you to reuse the result. "
@@ -1201,6 +1212,13 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
             help="The number of concurrent requests allowed to the remote store service.",
+        )
+        register(
+            "--remote-store-batch-api-size-limit",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
+            help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
         )
 
         register(
@@ -1387,7 +1405,7 @@ class GlobalOptions(Subsystem):
         register(
             loop_flag,
             type=bool,
-            help="Run goals continuously as file changes are detected. Alpha feature.",
+            help="Run goals continuously as file changes are detected.",
         )
         register(
             "--loop-max",
@@ -1524,6 +1542,18 @@ class GlobalOptions(Subsystem):
         )
 
     @staticmethod
+    def compute_engine_visualize_to(bootstrap_options: OptionValueContainer) -> str | None:
+        result = resolve_conflicting_options(
+            old_option="native_engine_visualize_to",
+            new_option="engine_visualize_to",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
+        return cast("str | None", result)
+
+    @staticmethod
     def compute_pants_ignore(buildroot, global_options):
         """Computes the merged value of the `--pants-ignore` flag.
 
@@ -1581,6 +1611,7 @@ class GlobalOptions(Subsystem):
             (
                 "!*.pyc",
                 "!__pycache__/",
+                ".gitignore",
                 # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
                 # macros should be adapted to allow this dependency to be automatically detected.
                 "requirements.txt",

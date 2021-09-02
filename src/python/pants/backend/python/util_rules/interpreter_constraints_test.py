@@ -4,18 +4,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from typing import Iterable, List
 
 import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import InterpreterConstraintsField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import (
+    _EXPECTED_LAST_PATCH_VERSION,
+    InterpreterConstraints,
+)
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -139,6 +143,7 @@ def test_merge_interpreter_constraints() -> None:
         ["CPython>=2.7.13,<2.7.16"],
         ["CPython>=2.7.13,!=2.7.16"],
         ["PyPy>=2.7,<3"],
+        ["CPython"],
     ],
 )
 def test_interpreter_constraints_includes_python2(constraints) -> None:
@@ -153,6 +158,7 @@ def test_interpreter_constraints_includes_python2(constraints) -> None:
         ["CPython>=3.6", "CPython>=3.8"],
         ["CPython!=2.7.*"],
         ["PyPy>=3.6"],
+        [],
     ],
 )
 def test_interpreter_constraints_do_not_include_python2(constraints):
@@ -172,6 +178,8 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
         (["CPython==2.7.10"], "2.7"),
         (["CPython==3.5.*", "CPython>=3.6"], "3.5"),
         (["CPython==2.6.*"], None),
+        (["CPython"], "2.7"),
+        ([], None),
     ],
 )
 def test_interpreter_constraints_minimum_python_version(
@@ -216,6 +224,8 @@ def test_interpreter_constraints_require_python38(constraints) -> None:
         ["CPython==3.7.*", "CPython==3.8.*"],
         ["CPython==3.5.3", "CPython==3.8.3"],
         ["PyPy>=3.7"],
+        ["CPython"],
+        [],
     ],
 )
 def test_interpreter_constraints_do_not_require_python38(constraints):
@@ -275,3 +285,141 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
             Address("src/python/c_dir/path.py", target_name="test"), "==3.6.*"
         ),
     )
+
+
+_SKIPPED_PY3 = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        (["==2.7.*"], "==2.7.*"),
+        (["==2.7.*", ">=3.6,!=3.6.1"], "!=3.6.1,>=3.6 || ==2.7.*"),
+        ([], "*"),
+        # If any of the constraints are unconstrained (e.g. `CPython`), use a wildcard.
+        (["==2.7", ""], "*"),
+    ),
+)
+def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
+    assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
+
+
+_ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+
+
+def patches(
+    major: int, minor: int, unqualified_patches: Iterable[int]
+) -> list[tuple[int, int, int]]:
+    return [(major, minor, patch) for patch in unqualified_patches]
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        (["==2.7.15"], [(2, 7, 15)]),
+        (["==2.7.*"], patches(2, 7, _ALL_PATCHES)),
+        (["==3.6.15", "==3.7.15"], [(3, 6, 15), (3, 7, 15)]),
+        (["==3.6.*", "==3.7.*"], patches(3, 6, _ALL_PATCHES) + patches(3, 7, _ALL_PATCHES)),
+        (
+            ["==2.7.1", ">=3.6.15"],
+            (
+                [(2, 7, 1)]
+                + patches(3, 6, range(15, _EXPECTED_LAST_PATCH_VERSION + 1))
+                + patches(3, 7, _ALL_PATCHES)
+                + patches(3, 8, _ALL_PATCHES)
+                + patches(3, 9, _ALL_PATCHES)
+            ),
+        ),
+        ([], []),
+    ),
+)
+def test_enumerate_python_versions(
+    constraints: list[str], expected: list[tuple[int, int, int]]
+) -> None:
+    assert InterpreterConstraints(constraints).enumerate_python_versions(
+        ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9"]
+    ) == FrozenOrderedSet(expected)
+
+
+def test_enumerate_python_versions_none_matching() -> None:
+    with pytest.raises(ValueError):
+        InterpreterConstraints(["==3.6.*"]).enumerate_python_versions(interpreter_universe=["2.7"])
+
+
+@pytest.mark.parametrize("version", ["2.6", "2.8", "4.1", "1.0"])
+def test_enumerate_python_versions_invalid_universe(version: str) -> None:
+    with pytest.raises(AssertionError):
+        InterpreterConstraints(["==2.7.*", "==3.5.*"]).enumerate_python_versions([version])
+
+
+@pytest.mark.parametrize(
+    "candidate,target,matches",
+    (
+        ([">=3.5,<=3.6"], [">=3.5.5"], False),  # Target ICs contain versions in the 3.6 range
+        ([">=3.5,<=3.6"], [">=3.5.5,<=3.5.10"], True),
+        (
+            [">=3.5", "<=3.6"],
+            [">=3.5.5,<=3.5.10"],
+            True,
+        ),  # Target ICs match each of the actual ICs individually
+        (
+            [">=3.5", "<=3.5.4"],
+            [">=3.5.5,<=3.5.10"],
+            True,
+        ),  # Target ICs do not match any candidate ICs
+        ([">=3.5,<=3.6"], ["==3.5.*,!=3.5.10"], True),
+        (
+            [">=3.5,<=3.6, !=3.5.10"],
+            ["==3.5.*"],
+            False,
+        ),  # Excluded IC from candidate range is valid for target ICs
+        ([">=3.5"], [">=3.5,<=3.6", ">= 3.8"], True),
+        (
+            [">=3.5,!=3.7.10"],
+            [">=3.5,<=3.6", ">= 3.8"],
+            True,
+        ),  # Excluded version from candidate ICs is not in a range specified by target ICs
+        (
+            [">=3.5,<=3.6", ">= 3.8"],
+            [">=3.9"],
+            True,
+        ),  # matches only one of the candidate specifications
+        (
+            ["<3.6", ">=3.6"],
+            [">=3.5"],
+            True,
+        ),  # target matches a weirdly specified non-disjoint IC list
+    ),
+)
+def test_contains(candidate, target, matches) -> None:
+    assert (
+        InterpreterConstraints(candidate).contains(
+            InterpreterConstraints(target), ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+        )
+        == matches
+    )
+
+
+def test_constraints_are_correctly_sorted_at_construction() -> None:
+    # #12578: This list itself is out of order, and `CPython>=3.6,<4,!=3.7.*` is specified with
+    # out-of-order component requirements. This test verifies that the list is fully sorted after
+    # the first call to `InterpreterConstraints()`
+    inputs = ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
+    a = InterpreterConstraints(inputs)
+    a_str = [str(i) for i in a]
+    b = InterpreterConstraints(a_str)
+    assert a == b
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    (
+        (["==2.7.*"], ["2.7"]),
+        ([">=3.7"], ["3.7", "3.8", "3.9", "3.10"]),
+        (["==2.7", "==3.6.5"], ["2.7", "3.6"]),
+    ),
+)
+def test_partition_into_major_minor_versions(constraints: list[str], expected: list[str]) -> None:
+    assert InterpreterConstraints(constraints).partition_into_major_minor_versions(
+        ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ) == tuple(expected)

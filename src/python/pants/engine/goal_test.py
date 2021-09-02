@@ -41,7 +41,4 @@ def test_goal_scope_flag() -> None:
         name = "dummy"
 
     dummy = create_goal_subsystem(DummyGoal)
-    assert dummy.get_scope_info().is_goal is True
-    assert dummy.known_scope_infos() == {
-        ScopeInfo(scope="dummy", optionable_cls=DummyGoal, is_goal=True)
-    }
+    assert dummy.get_scope_info() == ScopeInfo(scope="dummy", subsystem_cls=DummyGoal, is_goal=True)

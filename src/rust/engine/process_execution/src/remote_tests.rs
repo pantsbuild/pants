@@ -7,6 +7,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
 use grpc_util::prost::MessageExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
@@ -32,6 +33,7 @@ use tonic::{Code, Status};
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 const RETRY_INTERVAL: Duration = Duration::from_micros(0);
 const STORE_CONCURRENCY_LIMIT: usize = 256;
+const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 const CACHE_CONCURRENCY_LIMIT: usize = 256;
 
@@ -864,12 +866,14 @@ async fn sends_headers() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -888,6 +892,7 @@ async fn sends_headers() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
   let context = Context {
@@ -1062,12 +1067,14 @@ async fn ensure_inline_stdio_is_stored() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1083,6 +1090,7 @@ async fn ensure_inline_stdio_is_stored() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -1103,8 +1111,7 @@ async fn ensure_inline_stdio_is_stored() {
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
         .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stdout.bytes()
     );
     assert_eq!(
@@ -1112,8 +1119,7 @@ async fn ensure_inline_stdio_is_stored() {
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
         .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stderr.bytes()
     );
   }
@@ -1441,12 +1447,14 @@ async fn execute_missing_file_uploads_if_known() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
   store
@@ -1469,6 +1477,7 @@ async fn execute_missing_file_uploads_if_known() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -1519,12 +1528,14 @@ async fn execute_missing_file_errors_if_unknown() {
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1540,6 +1551,7 @@ async fn execute_missing_file_errors_if_unknown() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .unwrap();
 
@@ -2178,16 +2190,14 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .unwrap();
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
+    .unwrap();
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2215,6 +2225,7 @@ fn create_command_runner(
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    None,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
@@ -2235,16 +2246,14 @@ async fn run_command_remote(
     .run(Context::default(), &mut workunit, request)
     .await?;
 
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .unwrap();
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
+    .unwrap();
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2262,12 +2271,14 @@ pub(crate) fn make_store(
     .into_with_remote(
       &cas.address(),
       None,
-      None,
+      tls::Config::default(),
       BTreeMap::new(),
       10 * 1024 * 1024,
       Duration::from_secs(1),
       1,
       STORE_CONCURRENCY_LIMIT,
+      None,
+      STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap()
 }
@@ -2290,18 +2301,16 @@ async fn extract_execute_response(
     .await?;
 
   let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   Ok(RemoteTestResult {
     original,

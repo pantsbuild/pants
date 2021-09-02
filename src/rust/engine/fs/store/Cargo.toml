@@ -10,6 +10,7 @@ async-trait = "0.1"
 bazel_protos = { path = "../../bazel_protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
+double-checked-cell-async = "2.0"
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
 futures = "0.3"
@@ -32,6 +33,7 @@ sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.22"
+tokio = { version = "1.4", features = ["fs"] }
 tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
@@ -40,7 +42,6 @@ workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]
 criterion = "0.3"
-maplit = "*"
 mock = { path = "../../testutil/mock" }
 num_cpus = "1"
 testutil = { path = "../../testutil" }

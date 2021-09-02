@@ -101,17 +101,14 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements,
+        requirements=python_protobuf_mypy_plugin.pex_requirements(),
         interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
     )
 
     if python_protobuf_subsystem.mypy_plugin:
         mypy_pex = await Get(
             VenvPex,
-            VenvPexRequest(
-                bin_names=[protoc_gen_mypy_script],
-                pex_request=mypy_request,
-            ),
+            VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),
         )
 
         if request.protocol_target.get(ProtobufGrpcToggle).value:

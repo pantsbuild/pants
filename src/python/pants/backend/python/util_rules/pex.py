@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import shlex
+from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
@@ -22,6 +23,10 @@ from pants.backend.python.target_types import PexPlatformsField as PythonPlatfor
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
+    InvalidLockfileReason,
+    LockfileMetadata,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
@@ -36,6 +41,7 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -49,56 +55,71 @@ from pants.engine.process import (
     ProcessCacheScope,
     ProcessResult,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.python_repos import PythonRepos
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import InvalidLockfileBehavior, PythonSetup
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import path_safe, pluralize
+
+
+@dataclass(frozen=True)
+class Lockfile:
+    file_path: str
+    file_path_description_of_origin: str
+    lockfile_hex_digest: str | None
+
+
+@dataclass(frozen=True)
+class LockfileContent:
+    file_content: FileContent
+    lockfile_hex_digest: str | None
+
+
+@dataclass(frozen=True)
+class _ToolLockfileMixin:
+    options_scope_name: str
+    uses_source_plugins: bool
+    uses_project_interpreter_constraints: bool
+
+
+@dataclass(frozen=True)
+class ToolDefaultLockfile(LockfileContent, _ToolLockfileMixin):
+    pass
+
+
+@dataclass(frozen=True)
+class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
+    pass
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
-    file_content: FileContent | None
-    file_path: str | None
-    file_path_description_of_origin: str | None
-    is_lockfile: bool
+    apply_constraints: bool
+    resolved_dists: ResolvedDistributions | None
 
     def __init__(
         self,
         req_strings: Iterable[str] = (),
         *,
-        file_content: FileContent | None = None,
-        file_path: str | None = None,
-        file_path_description_of_origin: str | None = None,
-        is_lockfile: bool = False,
+        apply_constraints: bool = False,
+        resolved_dists: ResolvedDistributions | None = None,
     ) -> None:
+        """
+        :param req_strings: The requirement strings to resolve.
+        :param apply_constraints: Whether to apply any configured
+            requirement_constraints while building this PEX.
+        :param resolved_dists: An optional ResolvedDistributions instance containing the
+            closed universe of wheels that this PEX should be built from..
+        """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
-        self.file_content = file_content
-        self.file_path = file_path
-        self.file_path_description_of_origin = file_path_description_of_origin
-        self.is_lockfile = is_lockfile
-
-        if self.file_path and not self.file_path_description_of_origin:
-            raise ValueError(
-                "You must specify `file_path_description_of_origin` if `file_path` is set."
-            )
-        if self.req_strings and self.file_path:
-            raise ValueError(
-                "You should only specify `req_strings` or `file_path`, but both were set."
-            )
-        if self.req_strings and self.file_content:
-            raise ValueError(
-                "You should only specify `req_strings` or `file_content`, but both were set."
-            )
-        if self.file_path and self.file_content:
-            raise ValueError(
-                "You should only specify `file_content` or `file_path`, but both were set."
-            )
+        self.apply_constraints = apply_constraints
+        self.resolved_dists = resolved_dists
 
     @classmethod
     def create_from_requirement_fields(
@@ -106,19 +127,15 @@ class PexRequirements:
         fields: Iterable[PythonRequirementsField],
         *,
         additional_requirements: Iterable[str] = (),
+        apply_constraints: bool = True,
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
-        return PexRequirements({*field_requirements, *additional_requirements})
-
-    def __repr__(self) -> str:
-        if self.file_content:
-            return f"PexRequirements(file_content=FileContent({self.file_content.path}, ...))"
-        if self.file_path:
-            return f"PexRequirements(file_path={self.file_path})"
-        return f"PexRequirements({list(self.req_strings)!r})"
+        return PexRequirements(
+            {*field_requirements, *additional_requirements}, apply_constraints=apply_constraints
+        )
 
     def __bool__(self) -> bool:
-        return bool(self.req_strings) or bool(self.file_path) or bool(self.file_content)
+        return bool(self.req_strings)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -141,16 +158,14 @@ class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     python: PythonExecutable | None
-    requirements: PexRequirements
+    requirements: PexRequirements | Lockfile | LockfileContent
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
-    repository_pex: Pex | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
-    apply_requirement_constraints: bool
     description: str | None = dataclasses.field(compare=False)
 
     def __init__(
@@ -159,16 +174,14 @@ class PexRequest(EngineAwareParameter):
         output_filename: str,
         internal_only: bool,
         python: PythonExecutable | None = None,
-        requirements: PexRequirements = PexRequirements(),
+        requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
-        repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
-        apply_requirement_constraints: bool = True,
         description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
@@ -181,7 +194,7 @@ class PexRequest(EngineAwareParameter):
             that results in faster build time but compatibility with fewer interpreters at runtime.
         :param python: A particular PythonExecutable to use, which must match any relevant
             interpreter_constraints.
-        :param requirements: The requirements to install.
+        :param requirements: The requirements that the PEX should contain.
         :param interpreter_constraints: Any constraints on which Python versions may be used.
         :param platforms: Which platforms should be supported. Setting this value will cause
             interpreter constraints to not be used because platforms already constrain the valid
@@ -191,12 +204,8 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
-        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
-            `--pex-repository` option.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
-        :param apply_requirement_constraints: Whether to apply any configured
-            requirement_constraints while building this PEX.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -209,10 +218,8 @@ class PexRequest(EngineAwareParameter):
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.main = main
-        self.repository_pex = repository_pex
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
-        self.apply_requirement_constraints = apply_requirement_constraints
         self.description = description
         self.__post_init__()
 
@@ -245,9 +252,23 @@ class Pex:
     digest: Digest
     name: str
     python: PythonExecutable | None
+    pex_path: Tuple[Pex, ...]
 
 
 logger = logging.getLogger(__name__)
+
+
+def pex_path_closure(pexes: Iterable[Pex]) -> OrderedSet[Pex]:
+    """Return all distinct Pex files in the transitive pex_path of the given Pexes."""
+    output: OrderedSet[Pex] = OrderedSet()
+    to_visit = deque(pexes)
+    while to_visit:
+        pex = to_visit.popleft()
+        if pex in output:
+            continue
+        output.add(pex)
+        to_visit.extend(pex.pex_path)
+    return output
 
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
@@ -312,24 +333,90 @@ class BuildPexResult:
     pex_filename: str
     digest: Digest
     python: PythonExecutable | None
+    pex_path: Tuple[Pex, ...]
 
     def create_pex(self) -> Pex:
-        return Pex(digest=self.digest, name=self.pex_filename, python=self.python)
+        return Pex(
+            digest=self.digest, name=self.pex_filename, python=self.python, pex_path=self.pex_path
+        )
+
+
+@dataclass(frozen=True)
+class BuildPexComponentResult:
+    """A wrapper around BuildPexResult to enable iterativately building a PEX from multiple PEXes.
+
+    TODO: The `BuildPexResult` rule is not able to recurse on itself due to a bad @rule graph
+    interplay with the mypy+protobuf rules (which request a PEX during the generation of sources).
+    So instead, this rule adjusts the PexRequest and requests the dependencies first. See if this
+    trampoline can be removed once https://github.com/pantsbuild/pants/issues/11269 is fixed.
+    """
+
+    result: BuildPexResult
 
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
     request: PexRequest,
+) -> BuildPexResult:
+    # If there are requirements and we're resolving from ResolvedDistributions, request
+    # individual PEX files for each requirement, and then compose them using the
+    # PEX_PATH. This is much friendlier to the cache, because unlike a monolithic PEX,
+    # per-requirement PEX files can be deduped in the CAS across many consumers.
+    #
+    # TODO: Note that due to https://github.com/pantsbuild/pex/issues/1423, the PEX files
+    # resolved here are each transitive, meaning that when the root requirements have
+    # overlapping transitive dependencies, the PEXes will contain redundant-but-identical
+    # content. This is still much less redundant than a direct subset though:
+    #  see https://github.com/pantsbuild/pants/issues/12688
+    reqs = request.requirements
+    if (
+        request.internal_only
+        and isinstance(reqs, PexRequirements)
+        and reqs.resolved_dists
+        and reqs.req_strings
+    ):
+        partial_results = await MultiGet(
+            Get(
+                BuildPexComponentResult,
+                PexRequest,
+                dataclasses.replace(
+                    request,
+                    requirements=dataclasses.replace(
+                        request.requirements, req_strings=(req_string,)
+                    ),
+                    output_filename=f"__reqs/{path_safe(req_string)}.pex",
+                ),
+            )
+            for req_string in reqs.req_strings
+        )
+        request = dataclasses.replace(
+            request,
+            requirements=dataclasses.replace(request.requirements, req_strings=()),
+            pex_path=request.pex_path + tuple(p.result.create_pex() for p in partial_results),
+        )
+
+    partial = await Get(BuildPexComponentResult, PexRequest, request)
+    return partial.result
+
+
+@rule(level=LogLevel.DEBUG)
+async def build_pex_component(
+    request: PexRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
-) -> BuildPexResult:
+) -> BuildPexComponentResult:
     """Returns a PEX with the given settings."""
     argv = ["--output-file", request.output_filename, *request.additional_args]
 
-    if request.repository_pex:
-        argv.extend(["--pex-repository", request.repository_pex.name])
+    resolved_dists = (
+        request.requirements.resolved_dists
+        if isinstance(request.requirements, PexRequirements)
+        else None
+    )
+    if resolved_dists:
+        argv.extend(["--pex-repository", resolved_dists.pex.name])
     else:
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
@@ -345,10 +432,8 @@ async def build_pex(
             ]
         )
 
-    if request.requirements.is_lockfile:
-        argv.append("--no-transitive")
-
     python: PythonExecutable | None = None
+    pex_path = list(request.pex_path)
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -387,12 +472,6 @@ async def build_pex(
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
 
-    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
-    #  requirements, which could lead to problems. Support shading python binaries.
-    #  See: https://github.com/pantsbuild/pants/issues/9206
-    if request.pex_path:
-        argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
-
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
@@ -400,42 +479,60 @@ async def build_pex(
     )
 
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
-    repository_pex_digest = (
-        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
-    )
-
+    resolved_dists_digest = resolved_dists.pex.digest if resolved_dists else EMPTY_DIGEST
     constraint_file_digest = EMPTY_DIGEST
-    if (
-        not request.requirements.is_lockfile and request.apply_requirement_constraints
-    ) and python_setup.requirement_constraints is not None:
-        argv.extend(["--constraints", python_setup.requirement_constraints])
-        constraint_file_digest = await Get(
-            Digest,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="the option `[python-setup].requirement_constraints`",
-            ),
+    requirements_file_digest = EMPTY_DIGEST
+
+    if isinstance(request.requirements, Lockfile):
+        argv.extend(["--requirement", request.requirements.file_path])
+        argv.append("--no-transitive")
+
+        globs = PathGlobs(
+            [request.requirements.file_path],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=request.requirements.file_path_description_of_origin,
         )
 
-    requirements_file_digest = EMPTY_DIGEST
-    if request.requirements.file_path:
-        argv.extend(["--requirement", request.requirements.file_path])
-        requirements_file_digest = await Get(
-            Digest,
-            PathGlobs(
-                [request.requirements.file_path],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=request.requirements.file_path_description_of_origin,
-            ),
-        )
-    elif request.requirements.file_content:
-        argv.extend(["--requirement", request.requirements.file_content.path])
-        requirements_file_digest = await Get(
-            Digest, CreateDigest([request.requirements.file_content])
-        )
+        requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
+        metadata = LockfileMetadata.from_lockfile(requirements_file_digest_contents[0].content)
+        _validate_metadata(metadata, request, request.requirements, python_setup)
+
+        requirements_file_digest = await Get(Digest, PathGlobs, globs)
+
+    elif isinstance(request.requirements, LockfileContent):
+        file_content = request.requirements.file_content
+        argv.extend(["--requirement", file_content.path])
+        argv.append("--no-transitive")
+
+        metadata = LockfileMetadata.from_lockfile(file_content.content)
+        _validate_metadata(metadata, request, request.requirements, python_setup)
+
+        requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
+        assert isinstance(request.requirements, PexRequirements)
+
+        # If constraints should be applied and are set, capture them.
+        if (
+            request.requirements.apply_constraints
+            and python_setup.requirement_constraints is not None
+        ):
+            argv.extend(["--constraints", python_setup.requirement_constraints])
+            constraint_file_digest = await Get(
+                Digest,
+                PathGlobs(
+                    [python_setup.requirement_constraints],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="the option `[python-setup].requirement_constraints`",
+                ),
+            )
+
         argv.extend(request.requirements.req_strings)
+
+    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
+    #  requirements, which could lead to problems. Support shading python binaries.
+    #  See: https://github.com/pantsbuild/pants/issues/9206
+    if pex_path:
+        argv.extend(["--pex-path", ":".join(pex.name for pex in pex_path_closure(pex_path))])
 
     merged_digest = await Get(
         Digest,
@@ -445,8 +542,8 @@ async def build_pex(
                 additional_inputs_digest,
                 constraint_file_digest,
                 requirements_file_digest,
-                repository_pex_digest,
-                *(pex.digest for pex in request.pex_path),
+                resolved_dists_digest,
+                *(pex.digest for pex in pex_path),
             )
         ),
     )
@@ -474,52 +571,148 @@ async def build_pex(
 
     digest = (
         await Get(
-            Digest, MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
+            Digest,
+            MergeDigests((result.output_digest, *(pex.digest for pex in pex_path))),
         )
-        if request.pex_path
+        if pex_path
         else result.output_digest
     )
 
-    return BuildPexResult(
-        result=result, pex_filename=request.output_filename, digest=digest, python=python
+    return BuildPexComponentResult(
+        BuildPexResult(
+            result=result,
+            pex_filename=request.output_filename,
+            digest=digest,
+            python=python,
+            pex_path=tuple(pex_path),
+        )
     )
+
+
+def _validate_metadata(
+    metadata: LockfileMetadata,
+    request: PexRequest,
+    requirements: (Lockfile | LockfileContent),
+    python_setup: PythonSetup,
+) -> None:
+
+    validation = metadata.is_valid_for(
+        requirements.lockfile_hex_digest,
+        request.interpreter_constraints,
+        python_setup.interpreter_universe,
+    )
+
+    if validation:
+        return
+
+    def tool_message_parts(
+        requirements: (ToolCustomLockfile | ToolDefaultLockfile),
+    ) -> Iterator[str]:
+
+        tool_name = requirements.options_scope_name
+        uses_source_plugins = requirements.uses_source_plugins
+        uses_project_interpreter_constraints = requirements.uses_project_interpreter_constraints
+
+        yield "You are using "
+
+        if isinstance(requirements, ToolDefaultLockfile):
+            yield "the `<default>` lockfile provided by Pants "
+        elif isinstance(requirements, ToolCustomLockfile):
+            yield f"the lockfile at {requirements.file_path} "
+
+        yield (
+            f"to install the tool `{tool_name}`, but it is not compatible with your "
+            "configuration: "
+            "\n\n"
+        )
+
+        if InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH in validation.failure_reasons:
+            yield (
+                "- You have set different requirements than those used to generate the lockfile. "
+                f"You can fix this by not setting `[{tool_name}].version`, "
+            )
+
+            if uses_source_plugins:
+                yield f"`[{tool_name}].source_plugins`, "
+
+            yield (
+                f"and `[{tool_name}].extra_requirements`, or by using a new "
+                "custom lockfile."
+                "\n"
+            )
+
+        if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+            yield (
+                f"- You have set interpreter constraints (`{request.interpreter_constraints}`) that "
+                "are not compatible with those used to generate the lockfile "
+                f"(`{metadata.valid_for_interpreter_constraints}`). "
+            )
+            if not uses_project_interpreter_constraints:
+                yield (
+                    f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
+                    "or by using a new custom lockfile. "
+                )
+            else:
+                yield (
+                    f"`{tool_name}` determines its interpreter constraints based on your code's own "
+                    "constraints. To fix this error, you can either change your code's constraints "
+                    f"(see {doc_url('python-interpreter-compatibility')}) or by generating a new "
+                    "custom lockfile. "
+                )
+            yield "\n"
+
+        yield "\n"
+
+        if not isinstance(requirements, ToolCustomLockfile):
+            yield (
+                "To generate a custom lockfile based on your current configuration, set "
+                f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
+                f"`./pants generate-lockfiles --resolve={tool_name}`. "
+            )
+        else:
+            yield (
+                "To regenerate your lockfile based on your current configuration, run "
+                f"`./pants generate-lockfiles --resolve={tool_name}`. "
+            )
+
+    message: str
+    if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
+        message = "".join(tool_message_parts(requirements)).strip()
+    else:
+        # TODO: Replace with an actual value once user lockfiles are supported
+        assert False
+
+    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
+        raise ValueError(message)
+    elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
+        logger.warning("%s", message)
 
 
 def _build_pex_description(request: PexRequest) -> str:
     if request.description:
         return request.description
-    if not request.requirements:
-        return f"Building {request.output_filename}"
 
-    if request.repository_pex:
-        repo_pex = request.repository_pex.name
-        if request.requirements.req_strings:
+    reqs = request.requirements
+    if isinstance(reqs, Lockfile):
+        return f"Resolving {request.output_filename} from {reqs.file_path}"
+    elif isinstance(reqs, LockfileContent):
+        return f"Resolving {request.output_filename} from {reqs.file_content.path}"
+    elif request.internal_only and reqs.resolved_dists:
+        repo_pex = reqs.resolved_dists.pex
+        if reqs.req_strings:
+            return f"Extracting {', '.join(reqs.req_strings)} from {repo_pex.name}"
+        else:
             return (
-                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"to build {request.output_filename} from {repo_pex}: "
-                f"{', '.join(request.requirements.req_strings)}"
+                f"Composing {pluralize(len(request.pex_path), 'requirement')} to build "
+                f"{request.output_filename} from {repo_pex.name}"
             )
-        reqs_file = (
-            request.requirements.file_content.path
-            if request.requirements.file_content
-            else request.requirements.file_path
-        )
-        assert reqs_file is not None
-        return (
-            f"Extracting all requirements in {reqs_file} from {repo_pex} to build "
-            f"{request.output_filename}"
-        )
-
-    if request.requirements.file_path:
-        desc_suffix = f"from {request.requirements.file_path}"
-    elif request.requirements.file_content:
-        desc_suffix = f"from {request.requirements.file_content.path}"
+    elif not reqs.req_strings:
+        return f"Building {request.output_filename}"
     else:
-        desc_suffix = (
-            f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-            f"{', '.join(request.requirements.req_strings)}"
+        return (
+            f"Building {request.output_filename} with "
+            f"{pluralize(len(reqs.req_strings), 'requirement')}: {', '.join(reqs.req_strings)}"
         )
-    return f"Building {request.output_filename} {desc_suffix}"
 
 
 @rule
@@ -577,7 +770,7 @@ class VenvScriptWriter:
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            shlex.quote(arg)
+            f"$(ensure_absolute {shlex.quote(arg)})"
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
@@ -607,7 +800,7 @@ class VenvScriptWriter:
             export {" ".join(env_vars)}
             export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
 
-            execute_pex_args="$(ensure_absolute {execute_pex_args})"
+            execute_pex_args="{execute_pex_args}"
             target_venv_executable="$(ensure_absolute {target_venv_executable})"
             venv_dir="$(ensure_absolute {venv_dir})"
 
@@ -660,6 +853,7 @@ class VenvPex:
     pex: Script
     python: Script
     bin: FrozenDict[str, Script]
+    venv_rel_dir: str
 
 
 @frozen_after_init
@@ -751,6 +945,7 @@ async def create_venv_pex(
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
+        venv_rel_dir=venv_rel_dir.as_posix(),
     )
 
 
@@ -968,7 +1163,9 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
     process_result = await Get(
         ProcessResult,
         PexProcess(
-            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+            pex=Pex(
+                digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=pex.pex_path
+            ),
             argv=[pex.name, "repository", "info", "-v"],
             input_digest=pex.digest,
             extra_env={"PEX_MODULE": "pex.tools"},
@@ -977,6 +1174,29 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
         ),
     )
     return parse_repository_info(process_result.stdout.decode())
+
+
+@dataclass(frozen=True)
+class ResolvedDistributions:
+    """A 'repository' pex, containing the entire contents of the resolve for multiple libraries.
+
+    Generally constructed from a lockfile.
+    """
+
+    pex: Pex
+
+
+@rule
+async def resolve(request: PexRequest, platform: Platform) -> ResolvedDistributions:
+    # Build the repository PEX.
+    request = dataclasses.replace(
+        request, additional_args=(*request.additional_args, "--include-tools")
+    )
+    pex = await Get(Pex, PexRequest, request)
+
+    # TODO: extract the graph.
+
+    return ResolvedDistributions(pex)
 
 
 def rules():

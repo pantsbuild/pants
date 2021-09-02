@@ -273,6 +273,14 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
+                    "name": "Validate CI config",
+                    "run": dedent(
+                        """\
+                        ./pants run build-support/bin/generate_github_workflows.py -- --check
+                        """
+                    ),
+                },
+                {
                     "name": "Run smoke tests",
                     "run": dedent(
                         """\
@@ -295,6 +303,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         sudo apt-get install -y pkg-config fuse libfuse-dev
                         ./build-support/bin/check_rust_pre_commit.sh
                         ./cargo test --all --tests -- --nocapture
+                        ./cargo check --benches
                         """
                     ),
                     "if": DONT_SKIP_RUST,
@@ -381,7 +390,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 native_binaries_download(),
                 {
                     "name": "Run Python tests",
-                    "run": "./pants --tag=+platform_specific_behavior test ::\n",
+                    "run": (
+                        "./pants --tag=+platform_specific_behavior test :: "
+                        "-- -m platform_specific_behavior\n"
+                    ),
                 },
                 upload_log_artifacts(name="python-test-macos"),
             ],

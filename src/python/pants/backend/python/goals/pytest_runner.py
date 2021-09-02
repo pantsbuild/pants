@@ -4,7 +4,6 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Optional
 
 from pants.backend.python.goals.coverage_py import (
@@ -12,15 +11,15 @@ from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import (
-    PythonTestsExtraEnvVars,
-    PythonTestsSources,
-    PythonTestsTimeout,
-    SkipPythonTestsField,
-)
+from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    pex_path_closure,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -67,27 +66,6 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
-
-
-@dataclass(frozen=True)
-class PythonTestFieldSet(TestFieldSet):
-    required_fields = (PythonTestsSources,)
-
-    sources: PythonTestsSources
-    timeout: PythonTestsTimeout
-    runtime_package_dependencies: RuntimePackageDependenciesField
-    extra_env_vars: PythonTestsExtraEnvVars
-    skip_tests: SkipPythonTestsField
-
-    def should_skip(self) -> bool:
-        """Check if the target was set to be skipped, or it's `conftest.py` or a type stub."""
-        if self.skip_tests.value:
-            return True
-        # Defend against it being a BUILD target, which should never happen in production.
-        if not self.address.is_file_target:
-            return False
-        file_name = PurePath(self.address.filename)
-        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
 
 # -----------------------------------------------------------------------------------------
@@ -206,7 +184,7 @@ async def setup_pytest_for_target(
         Pex,
         PexRequest(
             output_filename="pytest.pex",
-            requirements=pytest.pex_requirements,
+            requirements=pytest.pex_requirements(),
             interpreter_constraints=interpreter_constraints,
             internal_only=True,
         ),
@@ -244,7 +222,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex],
+            pex_path=pex_path_closure([pytest_pex, requirements_pex]),
         ),
     )
     config_files_get = Get(
@@ -280,6 +258,7 @@ async def setup_pytest_for_target(
 
     coverage_args = []
     if test_subsystem.use_coverage and not request.is_debug:
+        pytest.validate_pytest_cov_included()
         output_files.append(".coverage")
 
         if coverage_subsystem.filter:
@@ -334,9 +313,6 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
 ) -> TestResult:
-    if field_set.should_skip():
-        return TestResult.skip(field_set.address)
-
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -380,8 +356,6 @@ async def run_python_test(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    if field_set.should_skip():
-        return TestDebugRequest(None)
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)

@@ -9,13 +9,18 @@ use std::time::{Duration, Instant};
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bytes::{Bytes, BytesMut};
+use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
-use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
+use remexec::{
+  capabilities_client::CapabilitiesClient,
+  content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
+  ServerCapabilities,
+};
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
 
@@ -27,6 +32,9 @@ pub struct ByteStore {
   rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
+  capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
+  capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
+  batch_api_size_limit: usize,
 }
 
 impl fmt::Debug for ByteStore {
@@ -62,15 +70,17 @@ impl ByteStore {
   pub fn new(
     cas_address: &str,
     instance_name: Option<String>,
-    root_ca_certs: Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     mut headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
-      Some(grpc_util::create_tls_config(root_ca_certs)?)
+      Some(tls_config.try_into()?)
     } else {
       None
     };
@@ -86,7 +96,9 @@ impl ByteStore {
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
 
-    let cas_client = Arc::new(ContentAddressableStorageClient::new(channel));
+    let cas_client = Arc::new(ContentAddressableStorageClient::new(channel.clone()));
+
+    let capabilities_client = Arc::new(CapabilitiesClient::new(channel));
 
     Ok(ByteStore {
       instance_name,
@@ -95,6 +107,10 @@ impl ByteStore {
       rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
+      capabilities_cell: capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
+      capabilities_client,
+      batch_api_size_limit,
     })
   }
 
@@ -195,6 +211,60 @@ impl ByteStore {
     ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
   {
     let len = digest.size_bytes;
+
+    let max_batch_total_size_bytes = {
+      let capabilities = self.get_capabilities().await?;
+
+      capabilities
+        .cache_capabilities
+        .as_ref()
+        .map(|c| c.max_batch_total_size_bytes as usize)
+        .unwrap_or_default()
+    };
+
+    let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
+    let batch_api_allowed_by_server_config =
+      max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
+    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+      self.store_bytes_source_batch(digest, bytes).await
+    } else {
+      self.store_bytes_source_stream(digest, bytes).await
+    }
+  }
+
+  async fn store_bytes_source_batch<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let request = BatchUpdateBlobsRequest {
+      instance_name: self.instance_name.clone().unwrap_or_default(),
+      requests: vec![remexec::batch_update_blobs_request::Request {
+        digest: Some(digest.into()),
+        data: bytes(0..digest.size_bytes),
+      }],
+    };
+
+    let mut client = self.cas_client.as_ref().clone();
+    client
+      .batch_update_blobs(request)
+      .await
+      .map_err(ByteStoreError::Grpc)?;
+    Ok(())
+  }
+
+  async fn store_bytes_source_stream<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    let len = digest.size_bytes;
     let instance_name = self.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
       "{}{}uploads/{}/blobs/{}/{}",
@@ -279,6 +349,7 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, ByteStoreError> {
+    let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -368,6 +439,10 @@ impl ByteStore {
     };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      workunit_store_handle.store.record_observation(
+        ObservationMetric::RemoteStoreReadBlobTimeMicros,
+        start.elapsed().as_micros() as u64,
+      );
       in_workunit!(
         workunit_store_handle.store,
         workunit_name,
@@ -442,7 +517,7 @@ impl ByteStore {
     }
   }
 
-  pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
+  pub fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
     &self,
     digests: Digests,
   ) -> remexec::FindMissingBlobsRequest {
@@ -450,5 +525,26 @@ impl ByteStore {
       instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
       blob_digests: digests.map(|d| d.into()).collect::<Vec<_>>(),
     }
+  }
+
+  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {
+    let capabilities_fut = async {
+      let mut request = remexec::GetCapabilitiesRequest::default();
+      if let Some(s) = self.instance_name.as_ref() {
+        request.instance_name = s.clone();
+      }
+
+      let mut client = self.capabilities_client.as_ref().clone();
+      client
+        .get_capabilities(request)
+        .await
+        .map(|r| r.into_inner())
+        .map_err(ByteStoreError::Grpc)
+    };
+
+    self
+      .capabilities_cell
+      .get_or_try_init(capabilities_fut)
+      .await
   }
 }

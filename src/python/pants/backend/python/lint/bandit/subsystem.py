@@ -7,10 +7,7 @@ import itertools
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -46,11 +43,15 @@ class Bandit(PythonToolBase):
     options_scope = "bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
+    # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
+    # remove `setuptools` from `default_extra_requirements`.
     default_version = "bandit>=1.7.0,<1.8"
     default_extra_requirements = [
-        "setuptools<45; python_full_version == '2.7.*'",
-        "setuptools; python_version > '2.7'",
-        "stevedore<3",  # stevedore 3.0 breaks Bandit.
+        "setuptools",
+        # GitPython 3.1.20 was yanked because it breaks Python 3.8+, but Poetry's lockfile
+        # generation still tries to use it. Upgrade this to the newest version once released or
+        # when switching away from Poetry.
+        "GitPython==3.1.18",
     ]
     default_main = ConsoleScript("bandit")
 
@@ -110,7 +111,7 @@ class Bandit(PythonToolBase):
 
 
 class BanditLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = Bandit.options_scope
 
 
 @rule(
@@ -123,6 +124,9 @@ class BanditLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not bandit.uses_lockfile:
+        return PythonLockfileRequest.from_tool(bandit)
+
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
     #

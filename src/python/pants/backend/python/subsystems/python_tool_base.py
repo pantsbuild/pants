@@ -4,14 +4,24 @@
 from __future__ import annotations
 
 import importlib.resources
-from typing import ClassVar, Sequence, cast
+from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.lockfile_metadata import calculate_invalidation_digest
+from pants.backend.python.util_rules.pex import (
+    Lockfile,
+    LockfileContent,
+    PexRequirements,
+    ToolCustomLockfile,
+    ToolDefaultLockfile,
+)
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+
+DEFAULT_TOOL_LOCKFILE = "<default>"
+NO_TOOL_LOCKFILE = "<none>"
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -34,6 +44,7 @@ class PythonToolRequirementsBase(Subsystem):
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
+    uses_requirements_from_source_plugins: ClassVar[bool] = False
 
     @classmethod
     def register_options(cls, register):
@@ -81,23 +92,25 @@ class PythonToolRequirementsBase(Subsystem):
             )
         if cls.register_lockfile:
             register(
-                "--experimental-lockfile",
+                "--lockfile",
                 type=str,
-                default="<none>",
+                default=DEFAULT_TOOL_LOCKFILE,
                 advanced=True,
                 help=(
                     "Path to a lockfile used for installing the tool.\n\n"
-                    "Set to the string '<default>' to use a lockfile provided by "
-                    "Pants, so long as you have not changed the `--version`, "
-                    "`--extra-requirements`, and `--interpreter-constraints` options. See "
+                    f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
+                    "Pants, so long as you have not changed the `--version` and "
+                    "`--extra-requirements` options, and the tool's interpreter constraints are "
+                    "compatible with the default. Pants will error or warn if the lockfile is not "
+                    "compatible (controlled by `[python-setup].invalid_lockfile_behavior`). See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                    "Set to the string '<none>' to opt out of using a lockfile. We do not "
-                    "recommend this, as lockfiles are essential for reproducible builds.\n\n"
+                    f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We "
+                    f"do not recommend this, though, as lockfiles are essential for reproducible "
+                    f"builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
-                    "build root, then activate the backend_package "
-                    "`pants.backend.experimental.python` and run `./pants tool-lock`.\n\n"
-                    "This option is experimental and will likely change. It does not follow the "
-                    "normal deprecation cycle."
+                    f"build root, then run `./pants generate-lockfiles "
+                    f"--resolve={cls.options_scope}`.\n\n"
+                    ""
                 ),
             )
 
@@ -117,39 +130,56 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return (self.version, *self.extra_requirements)
 
-    @property
-    def pex_requirements(self) -> PexRequirements:
+    def pex_requirements(
+        self,
+        *,
+        extra_requirements: Iterable[str] = (),
+    ) -> PexRequirements | Lockfile | LockfileContent:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
-        if not self.register_lockfile or self.lockfile == "<none>":
-            return PexRequirements(self.all_requirements)
-        if self.lockfile == "<default>":
+
+        requirements = (*self.all_requirements, *extra_requirements)
+
+        if not self.uses_lockfile:
+            return PexRequirements(requirements)
+
+        hex_digest = calculate_invalidation_digest(requirements)
+
+        if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            return PexRequirements(
+            return ToolDefaultLockfile(
                 file_content=FileContent(
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
-                is_lockfile=True,
+                lockfile_hex_digest=hex_digest,
+                options_scope_name=self.options_scope,
+                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
+                uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
-        return PexRequirements(
+        return ToolCustomLockfile(
             file_path=self.lockfile,
-            file_path_description_of_origin=(
-                f"the option `[{self.options_scope}].experimental_lockfile`"
-            ),
-            is_lockfile=True,
+            file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
+            lockfile_hex_digest=hex_digest,
+            options_scope_name=self.options_scope,
+            uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
+            uses_source_plugins=self.uses_requirements_from_source_plugins,
         )
 
     @property
     def lockfile(self) -> str:
-        """The path to a lockfile or special strings '<none>' and '<default>'.
+        f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
 
         This assumes you have set the class property `register_lockfile = True`.
         """
-        return cast(str, self.options.experimental_lockfile)
+        return cast(str, self.options.lockfile)
+
+    @property
+    def uses_lockfile(self) -> bool:
+        return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
@@ -199,9 +229,9 @@ class PythonToolBase(PythonToolRequirementsBase):
         is_default_entry_point = self.options.is_default("entry_point")
         if not is_default_console_script and not is_default_entry_point:
             raise OptionsError(
-                f"Both [{self.scope}].console-script={self.options.console_script} and "
-                f"[{self.scope}].entry-point={self.options.entry_point} are configured but these "
-                f"options are mutually exclusive. Please pick one."
+                f"Both [{self.options_scope}].console-script={self.options.console_script} and "
+                f"[{self.options_scope}].entry-point={self.options.entry_point} are configured "
+                f"but these options are mutually exclusive. Please pick one."
             )
         if not is_default_console_script:
             return ConsoleScript(cast(str, self.options.console_script))

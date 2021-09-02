@@ -5,7 +5,7 @@ from pants.core.util_rules.external_tool import TemplatedExternalTool
 
 
 class GrpcPythonPlugin(TemplatedExternalTool):
-    options_scope = "grpc_python_plugin"
+    options_scope = "grpc-python-plugin"
     help = "The gRPC Protobuf plugin for Python."
 
     default_version = "1.32.0"

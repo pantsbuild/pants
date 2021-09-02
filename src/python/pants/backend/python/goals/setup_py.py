@@ -414,12 +414,13 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     """Run a setup.py command on a single exported target."""
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
+
     setuptools_pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
-            requirements=setuptools.pex_requirements,
+            requirements=setuptools.pex_requirements(),
             interpreter_constraints=req.interpreter_constraints,
         ),
     )
@@ -528,7 +529,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 f"{','.join(sorted(invalid_keys))}."
             )
         stripped_setup_script = await Get(
-            StrippedSourceFileNames, SourcesPaths(files=(setup_script,), dirs=())
+            StrippedSourceFileNames,
+            SourcesPaths(files=(os.path.join(target.address.spec_path, setup_script),), dirs=()),
         )
         return SetupPyChroot(
             sources.digest,
@@ -554,7 +556,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
 
     # Resolve entry points from python_distribution(entry_points=...) and from
-    # python_distribution(provides=setup_py(entry_points=...).with_binaries(...)
+    # python_distribution(provides=setup_py(entry_points=...)
     resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,

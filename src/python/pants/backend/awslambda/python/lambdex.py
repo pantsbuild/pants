@@ -1,10 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules, rule
@@ -20,7 +17,7 @@ class Lambdex(PythonToolBase):
     default_main = ConsoleScript("lambdex")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<3.10"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.awslambda.python", "lambdex_lockfile.txt")
@@ -29,7 +26,7 @@ class Lambdex(PythonToolBase):
 
 
 class LambdexLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = Lambdex.options_scope
 
 
 @rule

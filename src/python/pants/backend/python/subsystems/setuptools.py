@@ -4,10 +4,7 @@
 import itertools
 from dataclasses import dataclass
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -32,8 +29,8 @@ class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help = "Python setuptools, used to package `python_distribution` targets."
 
-    default_version = "setuptools>=50.3.0,<57.0"
-    default_extra_requirements = ["wheel>=0.35.1,<0.37"]
+    default_version = "setuptools>=50.3.0,<58.0"
+    default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_lockfile.txt")
@@ -42,7 +39,7 @@ class Setuptools(PythonToolRequirementsBase):
 
 
 class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = Setuptools.options_scope
 
 
 @rule(
@@ -52,6 +49,9 @@ class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not setuptools.uses_lockfile:
+        return PythonLockfileRequest.from_tool(setuptools)
+
     all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     transitive_targets_per_python_dist = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))

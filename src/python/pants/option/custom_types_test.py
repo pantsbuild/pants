@@ -7,7 +7,13 @@ from typing import Dict, List, Union
 
 import pytest
 
-from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool, memory_size
+from pants.option.custom_types import (
+    DictValueComponent,
+    ListValueComponent,
+    UnsetBool,
+    _flatten_shlexed_list,
+    memory_size,
+)
 from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
@@ -47,6 +53,16 @@ def test_memory_size() -> None:
         memory_size("")
     with pytest.raises(ParseError):
         memory_size("foo")
+
+
+def test_flatten_shlexed_list() -> None:
+    assert _flatten_shlexed_list(["arg1", "arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2=foo", "--arg3"]) == ["arg1", "arg2=foo", "--arg3"]
+    assert _flatten_shlexed_list(["arg1='foo bar'", "arg2='baz'"]) == [
+        "arg1=foo bar",
+        "arg2=baz",
+    ]
 
 
 class CustomTypesTest(unittest.TestCase):

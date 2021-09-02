@@ -411,7 +411,12 @@ def test_inject_python_distribution_dependencies() -> None:
                 name="dist-a",
                 provides=setup_py(
                     name='my-dist-a'
-                ).with_binaries({"my_cmd": ":my_binary"})
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "my_cmd": ":my_binary",
+                    },
+                },
             )
 
             python_distribution(

@@ -31,7 +31,7 @@ from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
-from pants.option.optionable import OptionableFactory
+from pants.option.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -76,9 +76,9 @@ class _RuleVisitor(ast.NodeVisitor):
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> TaskRule:
+def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
-    return TaskRule(**optionable_factory.signature())
+    return TaskRule(**subsystem.signature())
 
 
 def _get_starting_indent(source):
@@ -107,13 +107,10 @@ def _make_rule(
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
-    As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
-    are registered as dependency Optionables.
-
     :param rule_type: The specific decorator used to declare the rule.
     :param return_type: The return/output type for the Rule. This must be a concrete Python type.
-    :param parameter_types: A sequence of types that matches the number and order of arguments to the
-                            decorated function.
+    :param parameter_types: A sequence of types that matches the number and order of arguments to
+                            the decorated function.
     :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
                       its inputs.
     """
@@ -371,7 +368,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
                     for input in rule.input_selectors:
-                        if issubclass(input, OptionableFactory):
+                        if issubclass(input, Subsystem):
                             yield SubsystemRule(input)
                     if issubclass(rule.output_type, Goal):
                         yield SubsystemRule(rule.output_type.subsystem_cls)
@@ -462,7 +459,7 @@ class RuleIndex:
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries: Iterable[Rule]) -> RuleIndex:
+    def create(cls, rule_entries: Iterable[Rule | UnionRule]) -> RuleIndex:
         """Creates a RuleIndex with tasks indexed by their output type."""
         rules: OrderedSet[TaskRule] = OrderedSet()
         queries: OrderedSet[QueryRule] = OrderedSet()

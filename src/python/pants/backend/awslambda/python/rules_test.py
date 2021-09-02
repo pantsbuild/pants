@@ -1,13 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from io import BytesIO
 from textwrap import dedent
-from typing import Tuple
 from zipfile import ZipFile
 
 import pytest
 
+from pants.backend.awslambda.python.lambdex import Lambdex
+from pants.backend.awslambda.python.lambdex import rules as awslambda_python_subsystem_rules
 from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
@@ -18,6 +21,7 @@ from pants.core.target_types import Files, RelocatedFiles, Resources
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -26,6 +30,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *awslambda_python_rules(),
+            *awslambda_python_subsystem_rules(),
             *target_rules(),
             *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
@@ -34,11 +39,14 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str, bytes]:
+def create_python_awslambda(
+    rule_runner: RuleRunner, addr: Address, *, extra_args: list[str] | None = None
+) -> tuple[str, bytes]:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
+            *(extra_args or ()),
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
@@ -55,7 +63,12 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
     return relpath, digest_contents[0].content
 
 
-def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
+)
+def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -79,7 +92,9 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
         }
     )
     zip_file_relpath, content = create_python_awslambda(
-        rule_runner, Address("src/python/foo/bar", target_name="lambda")
+        rule_runner,
+        Address("src/python/foo/bar", target_name="lambda"),
+        extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))

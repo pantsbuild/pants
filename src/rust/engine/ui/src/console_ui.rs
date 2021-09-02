@@ -37,7 +37,7 @@ use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 use task_executor::Executor;
-use workunit_store::{format_workunit_duration, WorkunitStore};
+use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
@@ -81,8 +81,8 @@ impl ConsoleUI {
   /// Setup progress bars, and return them along with a running task that will drive them.
   ///
   fn setup_bars(
+    &self,
     executor: Executor,
-    num_swimlanes: usize,
   ) -> Result<(Vec<ProgressBar>, MultiProgressTask), String> {
     // Stderr is propagated across a channel to remove lock interleavings between stdio and the UI.
     let (stderr_sender, stderr_receiver) = mpsc::sync_channel(0);
@@ -93,13 +93,18 @@ impl ConsoleUI {
         stderr_sender.send(msg.to_owned()).map_err(|_| ())
       }))?;
 
-    let term = console::Term::read_write_pair(term_read, term_stderr_write);
+    let stderr_use_color = term_stderr_write.use_color;
+    let term = console::Term::read_write_pair_with_style(
+      term_read,
+      term_stderr_write,
+      console::Style::new().force_styling(stderr_use_color),
+    );
     // NB: We render more frequently than we receive new data in order to minimize aliasing where a
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::to_term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
 
-    let bars = (0..num_swimlanes)
+    let bars = (0..self.local_parallelism)
       .map(|_n| {
         let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
         multi_progress.add(ProgressBar::new(50).with_style(style))
@@ -124,18 +129,19 @@ impl ConsoleUI {
     Ok((bars, multi_progress_task))
   }
 
-  fn get_label_from_heavy_hitters<'a>(
-    tasks_to_display: impl Iterator<Item = (&'a String, &'a Option<Duration>)>,
-  ) -> Vec<String> {
+  fn get_label_from_heavy_hitters(
+    tasks_to_display: &IndexMap<SpanId, (String, Option<Duration>)>,
+    index: usize,
+  ) -> Option<String> {
     tasks_to_display
-      .map(|(label, maybe_duration)| {
+      .get_index(index)
+      .map(|(_, (label, maybe_duration))| {
         let duration_label = match maybe_duration {
           None => "(Waiting) ".to_string(),
           Some(duration) => format_workunit_duration(*duration),
         };
         format!("{}{}", duration_label, label)
       })
-      .collect()
   }
 
   ///
@@ -167,10 +173,9 @@ impl ConsoleUI {
       }
     }
 
-    let swimlane_labels: Vec<String> = Self::get_label_from_heavy_hitters(tasks_to_display.iter());
     for (n, pbar) in instance.bars.iter().enumerate() {
-      match swimlane_labels.get(n) {
-        Some(label) => pbar.set_message(label),
+      match Self::get_label_from_heavy_hitters(tasks_to_display, n) {
+        Some(ref label) => pbar.set_message(label),
         None => pbar.set_message(""),
       }
     }
@@ -189,7 +194,7 @@ impl ConsoleUI {
 
     // Setup bars (which will take ownership of the current Console), and then spawn rendering
     // of the bars into a background task.
-    let (bars, multi_progress_task) = Self::setup_bars(executor, self.local_parallelism)?;
+    let (bars, multi_progress_task) = self.setup_bars(executor)?;
 
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
@@ -225,7 +230,7 @@ type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send
 
 /// The state for one run of the ConsoleUI.
 struct Instance {
-  tasks_to_display: IndexMap<String, Option<Duration>>,
+  tasks_to_display: IndexMap<SpanId, (String, Option<Duration>)>,
   multi_progress_task: MultiProgressTask,
   bars: Vec<ProgressBar>,
 }

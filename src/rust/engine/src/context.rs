@@ -17,6 +17,8 @@ use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
+use bazel_protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
+use double_checked_cell_async::DoubleCheckedCell;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
@@ -79,6 +81,7 @@ pub struct RemotingOptions {
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub cache_rpc_concurrency: usize,
@@ -128,6 +131,7 @@ impl Core {
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     let local_only = Store::local_only_with_options(
       executor.clone(),
@@ -141,12 +145,14 @@ impl Core {
       local_only.into_with_remote(
         remote_store_address,
         remoting_opts.instance_name.clone(),
-        root_ca_certs.clone(),
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
+        capabilities_cell_opt,
+        remoting_opts.store_batch_api_size_limit,
       )
     } else {
       Ok(local_only)
@@ -198,6 +204,7 @@ impl Core {
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Box<dyn CommandRunner>, String> {
     let remote_caching_used =
       exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
@@ -240,6 +247,7 @@ impl Core {
             Duration::from_millis(100),
             remoting_opts.execution_rpc_concurrency,
             remoting_opts.cache_rpc_concurrency,
+            capabilities_cell_opt,
           )?),
           exec_strategy_opts.remote_parallelism,
         ))
@@ -349,6 +357,17 @@ impl Core {
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
 
+    // If the remote store and remote execution server are the same (address and headers),
+    // then share the capabilities cache between them to avoid duplicate GetCapabilities calls.
+    let capabilities_cell_opt = if need_remote_store
+      && remoting_opts.execution_address == remoting_opts.store_address
+      && remoting_opts.execution_headers == remoting_opts.store_headers
+    {
+      Some(Arc::new(DoubleCheckedCell::new()))
+    } else {
+      None
+    };
+
     safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
@@ -362,6 +381,7 @@ impl Core {
       &remoting_opts,
       &remoting_opts.store_address,
       &root_ca_certs,
+      capabilities_cell_opt.clone(),
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
@@ -394,6 +414,7 @@ impl Core {
       &root_ca_certs,
       &exec_strategy_opts,
       &remoting_opts,
+      capabilities_cell_opt,
     )?;
 
     let graph = Arc::new(InvalidatableGraph(Graph::new()));

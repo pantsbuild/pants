@@ -1,12 +1,18 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import List, Optional
+from typing import List
 
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
@@ -15,6 +21,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.source.source_root import NoSourceRootError
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GRPC_PROTO_STANZA = """
@@ -45,6 +52,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *protobuf_subsystem_rules(),
             *additional_fields.rules(),
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
@@ -61,16 +69,15 @@ def assert_files_generated(
     expected_files: List[str],
     source_roots: List[str],
     mypy: bool = False,
-    mypy_plugin_version: Optional[str] = None,
+    extra_args: list[str] | None = None,
 ) -> None:
     options = [
         "--backend-packages=pants.backend.codegen.protobuf.python",
         f"--source-root-patterns={repr(source_roots)}",
+        *(extra_args or ()),
     ]
     if mypy:
         options.append("--python-protobuf-mypy-plugin")
-    if mypy_plugin_version:
-        options.append(f"--python-protobuf-mypy-plugin-version={mypy_plugin_version}")
     rule_runner.set_options(
         options,
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -224,7 +231,12 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
     assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)
 
 
-def test_mypy_plugin(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonProtobufMypyPlugin.default_interpreter_constraints),
+)
+def test_mypy_plugin(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
@@ -247,7 +259,10 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         "src/protobuf/dir1",
         source_roots=["src/protobuf"],
-        mypy=True,
+        extra_args=[
+            "--python-protobuf-mypy-plugin",
+            f"--mypy-protobuf-interpreter-constraints=['=={major_minor_interpreter}.*']",
+        ],
         expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2.pyi"],
     )
 
@@ -299,8 +314,11 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         "src/protobuf/dir1",
         source_roots=["src/protobuf"],
-        mypy=True,
-        mypy_plugin_version="mypy-protobuf==1.24",
+        extra_args=[
+            "--python-protobuf-mypy-plugin",
+            "--mypy-protobuf-version=mypy-protobuf==1.24",
+            "--mypy-protobuf-lockfile=<none>",
+        ],
         expected_files=[
             "src/protobuf/dir1/f_pb2.py",
             "src/protobuf/dir1/f_pb2.pyi",

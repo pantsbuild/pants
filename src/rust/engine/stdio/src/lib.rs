@@ -52,6 +52,7 @@ struct Console {
   stdin_handle: Option<File>,
   stdout_handle: Option<File>,
   stderr_handle: Option<File>,
+  stderr_use_color: bool,
 }
 
 impl Console {
@@ -67,6 +68,7 @@ impl Console {
       stdin_handle: Some(stdin),
       stdout_handle: Some(stdout),
       stderr_handle: Some(stderr),
+      stderr_use_color: false,
     }
   }
 
@@ -88,6 +90,10 @@ impl Console {
 
   fn stdin_as_raw_fd(&self) -> RawFd {
     self.stdin_handle.as_ref().unwrap().as_raw_fd()
+  }
+
+  fn stderr_set_use_color(&mut self, use_color: bool) {
+    self.stderr_use_color = use_color;
   }
 
   fn stdout_as_raw_fd(&self) -> RawFd {
@@ -123,7 +129,10 @@ impl Drop for Console {
 enum InnerDestination {
   Logging,
   Console(Console),
-  Exclusive { stderr_handler: StdioHandler },
+  Exclusive {
+    stderr_handler: StdioHandler,
+    stderr_use_color: bool,
+  },
 }
 
 impl fmt::Debug for InnerDestination {
@@ -168,15 +177,23 @@ impl Destination {
     String,
   > {
     let mut destination = self.0.lock();
-    if !matches!(*destination, InnerDestination::Console(..)) {
-      return Err(format!(
-        "Cannot start Exclusive access on Destination {:?}",
-        destination
-      ));
-    }
+    let stderr_use_color = match *destination {
+      InnerDestination::Console(Console {
+        stderr_use_color, ..
+      }) => stderr_use_color,
+      _ => {
+        return Err(format!(
+          "Cannot start Exclusive access on Destination {:?}",
+          destination
+        ))
+      }
+    };
     let console = std::mem::replace(
       &mut *destination,
-      InnerDestination::Exclusive { stderr_handler },
+      InnerDestination::Exclusive {
+        stderr_handler,
+        stderr_use_color,
+      },
     );
     match console {
       InnerDestination::Console(console) => Ok(term::TermDestination::new(console, self.clone())),
@@ -194,6 +211,30 @@ impl Destination {
     } else {
       // Exclusive access was torn down independently: drop the Console.
       *destination = InnerDestination::Logging;
+    }
+  }
+
+  ///
+  /// Set whether to use color for stderr.
+  ///
+  pub fn stderr_set_use_color(&self, use_color: bool) {
+    let mut destination = self.0.lock();
+    if let InnerDestination::Console(ref mut console) = *destination {
+      console.stderr_set_use_color(use_color);
+    }
+  }
+
+  ///
+  /// True if color should be used with stderr.
+  ///
+  pub fn stderr_use_color(&self) -> bool {
+    let destination = self.0.lock();
+    match *destination {
+      InnerDestination::Console(ref console) => console.stderr_use_color,
+      InnerDestination::Exclusive {
+        stderr_use_color, ..
+      } => stderr_use_color,
+      InnerDestination::Logging => false,
     }
   }
 
@@ -263,10 +304,10 @@ impl Destination {
       InnerDestination::Console(ref mut console) => {
         console.write_stderr(content).map_err(|e| e.to_string())
       }
-      InnerDestination::Exclusive { ref stderr_handler } => {
-        stderr_handler(&String::from_utf8_lossy(content))
-          .map_err(|()| "Exclusive handler failed.".to_owned())
-      }
+      InnerDestination::Exclusive {
+        ref stderr_handler, ..
+      } => stderr_handler(&String::from_utf8_lossy(content))
+        .map_err(|()| "Exclusive handler failed.".to_owned()),
       InnerDestination::Logging => {
         Err("There is no 'real' stdio destination available.".to_owned())
       }
@@ -289,7 +330,9 @@ impl Destination {
         // If writing to the stdout handle fails, fall through to mutate self to drop it.
         res.map_err(|e| e.to_string())
       }
-      InnerDestination::Exclusive { ref stderr_handler } => {
+      InnerDestination::Exclusive {
+        ref stderr_handler, ..
+      } => {
         // Write to the Exclusive handler.
         let res = stderr_handler(&String::from_utf8_lossy(content));
         if res.is_ok() {

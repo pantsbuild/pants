@@ -10,7 +10,7 @@ import pytest
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.engine.environment import Environment
-from pants.python.python_setup import PythonSetup, get_asdf_dir, get_pyenv_root
+from pants.python.python_setup import PythonSetup, get_asdf_data_dir, get_pyenv_root
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
@@ -116,7 +116,7 @@ def rule_runner() -> RuleRunner:
 
 def test_get_pyenv_root() -> None:
     home = "/♡"
-    default_root = f"{home}/.cache"
+    default_root = f"{home}/.pyenv"
     explicit_root = f"{home}/explicit"
 
     assert explicit_root == get_pyenv_root(Environment({"PYENV_ROOT": explicit_root}))
@@ -146,9 +146,9 @@ def test_get_asdf_dir() -> None:
     default_root = home / ".asdf"
     explicit_root = home / "explicit"
 
-    assert explicit_root == get_asdf_dir(Environment({"ASDF_DIR": f"{explicit_root}"}))
-    assert default_root == get_asdf_dir(Environment({"HOME": f"{home}"}))
-    assert get_asdf_dir(Environment({})) is None
+    assert explicit_root == get_asdf_data_dir(Environment({"ASDF_DATA_DIR": f"{explicit_root}"}))
+    assert default_root == get_asdf_data_dir(Environment({"HOME": f"{home}"}))
+    assert get_asdf_data_dir(Environment({})) is None
 
 
 def test_get_asdf_paths(rule_runner: RuleRunner) -> None:
@@ -178,13 +178,13 @@ def test_get_asdf_paths(rule_runner: RuleRunner) -> None:
         expected_asdf_local_paths,
     ):
         # Check the "all installed" fallback
-        all_paths = PythonSetup.get_asdf_paths(Environment({"ASDF_DIR": asdf_dir}))
+        all_paths = PythonSetup.get_asdf_paths(Environment({"ASDF_DATA_DIR": asdf_dir}))
 
         home_paths = PythonSetup.get_asdf_paths(
-            Environment({"HOME": home_dir, "ASDF_DIR": asdf_dir})
+            Environment({"HOME": home_dir, "ASDF_DATA_DIR": asdf_dir})
         )
         local_paths = PythonSetup.get_asdf_paths(
-            Environment({"HOME": home_dir, "ASDF_DIR": asdf_dir}), asdf_local=True
+            Environment({"HOME": home_dir, "ASDF_DATA_DIR": asdf_dir}), asdf_local=True
         )
 
         # The order the filesystem returns the "installed" folders is arbitrary
@@ -243,7 +243,7 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
                     "HOME": home_dir,
                     "PATH": "/env/path1:/env/path2",
                     "PYENV_ROOT": pyenv_root,
-                    "ASDF_DIR": asdf_dir,
+                    "ASDF_DATA_DIR": asdf_dir,
                 }
             )
             expanded_paths = PythonSetup.expand_interpreter_search_paths(

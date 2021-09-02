@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
+# Re-export GlobMatchErrorBehavior here as part of the public Plugin API.
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.internals.native_engine import PyDigest, PySnapshot
 from pants.engine.rules import QueryRule, side_effecting
-from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:

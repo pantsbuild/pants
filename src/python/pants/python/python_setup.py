@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import enum
 import logging
 import os
 import re
@@ -23,11 +24,19 @@ from pants.util.osutil import CPU_COUNT
 logger = logging.getLogger(__name__)
 
 
+@enum.unique
+class InvalidLockfileBehavior(enum.Enum):
+    error = "error"
+    ignore = "ignore"
+    warn = "warn"
+
+
 class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
 
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<4"]
+    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
     @classmethod
     def register_options(cls, register):
@@ -50,7 +59,7 @@ class PythonSetup(Subsystem):
             "--interpreter-versions-universe",
             advanced=True,
             type=list,
-            default=["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+            default=cls.default_interpreter_universe,
             help=(
                 "All known Python major/minor interpreter versions that may be used by either "
                 "your code or tools used by your code.\n\n"
@@ -72,11 +81,15 @@ class PythonSetup(Subsystem):
             type=file_option,
             mutually_exclusive_group="lockfile",
             help=(
-                "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use.\n\nSee "
-                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and pip."
-                "\n\nMutually exclusive with `--requirement-constraints-target`."
+                "When resolving third-party requirements for your own code (vs. tools you run), "
+                "use this constraints file to determine which versions to use.\n\n"
+                "This only applies when resolving user requirements, rather than tools you run "
+                "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
+                "`[black].lockfile`.\n\n"
+                "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
+                "information on the format of constraint files and how constraints are applied in "
+                "Pex and pip.\n\n"
+                "Mutually exclusive with `[python-setup].experimental_lockfile`."
             ),
         )
         register(
@@ -110,23 +123,32 @@ class PythonSetup(Subsystem):
                 "multiple lockfiles. This option's behavior may change without the normal "
                 "deprecation cycle.\n\n"
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants lock ::`."
+                "and run `./pants generate-user-lockfile ::`.\n\n"
+                "Mutually exclusive with `[python-setup].requirement_constraints`."
             ),
         )
-        # TODO(#12293): It's plausible this option might not exist once we figure out the semantics
-        #  for lockfile generation. One tricky edge is that the command to regenerate stale
-        #  lockfiles might need to consume this. In the meantime to figuring this all out, this is
-        #  helpful for internal pantsbuild/pants use.
         register(
-            "--experimental-lockfile-custom-regeneration-command",
+            "--experimental-resolves-to-lockfiles",
             advanced=True,
-            type=str,
-            default=None,
+            type=dict,
             help=(
-                "If set, Pants will instruct your users to run a custom command to regenerate "
-                "lockfiles, rather than running `./pants lock` and `./pants tool-lock` like normal."
-                "\n\nThis option is experimental and it may change at any time without the normal "
-                "deprecation cycle."
+                "A mapping of logical names to lockfile paths used in your project, e.g. "
+                "`{ default = '3rdparty/default_lockfile.txt', py2 = '3rdparty/py2.txt' }`.\n\n"
+                "To generate a lockfile, run `./pants generate-lockfiles --resolve=<name>` or "
+                "`./pants generate-lockfiles` to generate for all resolves (including tool "
+                "lockfiles).\n\n"
+                "This is highly experimental and will likely change."
+            ),
+        )
+        register(
+            "--invalid-lockfile-behavior",
+            advanced=True,
+            type=InvalidLockfileBehavior,
+            default=InvalidLockfileBehavior.error,
+            help=(
+                "The behavior when a lockfile has requirements or interpreter constraints that are "
+                "not compatible with what the current build is using.\n\n"
+                "We recommend keeping the default of `error` for CI builds."
             ),
         )
         register(
@@ -212,8 +234,12 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.experimental_lockfile)
 
     @property
-    def lockfile_custom_regeneration_command(self) -> str | None:
-        return cast("str | None", self.options.experimental_lockfile_custom_regeneration_command)
+    def resolves_to_lockfiles(self) -> dict[str, str]:
+        return cast("dict[str, str]", self.options.experimental_resolves_to_lockfiles)
+
+    @property
+    def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
+        return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
 
     @property
     def resolve_all_constraints(self) -> bool:
@@ -328,7 +354,7 @@ class PythonSetup(Subsystem):
         :param bool asdf_local: If True, only use the interpreter specified by
                                 '.tool-versions' file under `build_root`.
         """
-        asdf_dir = get_asdf_dir(env)
+        asdf_dir = get_asdf_data_dir(env)
         if not asdf_dir:
             return []
 
@@ -487,14 +513,29 @@ class PythonSetup(Subsystem):
         return paths
 
 
-def get_asdf_dir(env: Environment) -> PurePath | None:
-    """See https://asdf-vm.com/#/core-configuration?id=environment-variables."""
-    asdf_dir = env.get("ASDF_DIR", env.get("ASDF_DATA_DIR"))
-    if not asdf_dir:
+def get_asdf_data_dir(env: Environment) -> PurePath | None:
+    """Returns the location of asdf's installed tool versions.
+
+    See https://asdf-vm.com/manage/configuration.html#environment-variables.
+
+    `ASDF_DATA_DIR` is an environment variable that can be set to override the directory
+    in which the plugins, installs, and shims are installed.
+
+    `ASDF_DIR` is another environment variable that can be set, but we ignore it since
+    that location only specifies where the asdf tool itself is installed, not the managed versions.
+
+    Per the documentation, if `ASDF_DATA_DIR` is not specified, the tool will fall back to
+    `$HOME/.asdf`, so we do that as well.
+
+    :param env: The environment to use to look up asdf.
+    :return: Path to the data directory, or None if it couldn't be found in the environment.
+    """
+    asdf_data_dir = env.get("ASDF_DATA_DIR")
+    if not asdf_data_dir:
         home = env.get("HOME")
         if home:
             return PurePath(home) / ".asdf"
-    return PurePath(asdf_dir) if asdf_dir else None
+    return PurePath(asdf_data_dir) if asdf_data_dir else None
 
 
 def get_pyenv_root(env: Environment) -> str | None:
@@ -504,5 +545,5 @@ def get_pyenv_root(env: Environment) -> str | None:
         return from_env
     home_from_env = env.get("HOME")
     if home_from_env:
-        return os.path.join(home_from_env, ".cache")
+        return os.path.join(home_from_env, ".pyenv")
     return None

@@ -10,13 +10,18 @@ import pytest
 from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
+from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -25,6 +30,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *flake8_rules(),
+            *flake8_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
             QueryRule(LintResults, [Flake8Request]),
@@ -63,13 +69,22 @@ def assert_success(
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
 
 
-def test_failing_source(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt])
@@ -107,21 +122,23 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    extra_args = ["--flake8-lockfile=<none>"]
+
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_flake8(rule_runner, [py2_tgt])
+    py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 1
     assert "f.py:1:8: E999 SyntaxError" in py2_result[0].stdout
 
     py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_flake8(rule_runner, [py3_tgt])
+    py3_result = run_flake8(rule_runner, [py3_tgt], extra_args=extra_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
     assert py3_result[0].stdout.strip() == ""
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py2
     # to still fail, but Py3 should pass.
-    combined_result = run_flake8(rule_runner, [py2_tgt, py3_tgt])
+    combined_result = run_flake8(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
     batched_py3_result, batched_py2_result = sorted(
         combined_result, key=lambda result: result.exit_code
@@ -170,7 +187,12 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
-        rule_runner, [tgt], extra_args=["--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3"]
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3",
+            "--flake8-lockfile=<none>",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1

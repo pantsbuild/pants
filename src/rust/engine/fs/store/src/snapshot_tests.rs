@@ -36,7 +36,7 @@ pub fn setup() -> (
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
   let ignorer = GitignoreStyleExcludes::create(vec![]).unwrap();
   let posix_fs = Arc::new(PosixFS::new(dir.path(), ignorer, executor).unwrap());
-  let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
+  let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), true);
   (store, dir, posix_fs, file_saver)
 }
 
@@ -272,7 +272,7 @@ async fn snapshot_merge_two_files() {
     .merge(vec![snapshot1.digest, snapshot2.digest])
     .await
     .unwrap();
-  let merged_root_directory = store.load_directory(merged).await.unwrap().unwrap().0;
+  let merged_root_directory = store.load_directory(merged).await.unwrap().unwrap();
 
   assert_eq!(merged_root_directory.files.len(), 0);
   assert_eq!(merged_root_directory.directories.len(), 1);
@@ -286,8 +286,7 @@ async fn snapshot_merge_two_files() {
     .load_directory(merged_child_dirnode_digest.unwrap())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   assert_eq!(merged_child_dirnode.name, common_dir_name);
   assert_eq!(

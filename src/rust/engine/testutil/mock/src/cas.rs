@@ -583,16 +583,137 @@ impl ContentAddressableStorage for StubCASResponder {
 
   async fn batch_update_blobs(
     &self,
-    _: Request<BatchUpdateBlobsRequest>,
+    request: Request<BatchUpdateBlobsRequest>,
   ) -> Result<Response<BatchUpdateBlobsResponse>, Status> {
-    Err(Status::unimplemented("".to_owned()))
+    check_auth!(self, request);
+
+    if self.always_errors {
+      return Err(Status::invalid_argument(
+        "StubCAS is configured to always fail".to_owned(),
+      ));
+    }
+
+    let request = request.into_inner();
+
+    check_instance_name!(self, request);
+
+    let mut responses = Vec::new();
+    let mut blobs = self.blobs.lock();
+
+    fn write_blob(
+      request: remexec::batch_update_blobs_request::Request,
+      blobs: &mut HashMap<Fingerprint, Bytes>,
+    ) -> Status {
+      let digest = match request.digest {
+        Some(d) => d,
+        None => return Status::invalid_argument("digest not set in batch update request"),
+      };
+
+      let fingerprint = match Fingerprint::from_hex_string(&digest.hash) {
+        Ok(f) => f,
+        Err(err) => {
+          return Status::invalid_argument(format!("Bad fingerprint: {}: {}", &digest.hash, err));
+        }
+      };
+
+      if request.data.len() != digest.size_bytes as usize {
+        return Status::invalid_argument(format!(
+          "Size was incorrect: digest size is {} but got {} from data",
+          digest.size_bytes,
+          request.data.len()
+        ));
+      }
+
+      blobs.insert(fingerprint, request.data);
+      Status::ok("")
+    }
+
+    for blob_request in request.requests {
+      let digest = blob_request.digest.clone();
+      self
+        .write_message_sizes
+        .lock()
+        .push(blob_request.data.len());
+      let status = write_blob(blob_request, &mut blobs);
+      responses.push(remexec::batch_update_blobs_response::Response {
+        digest,
+        status: Some(bazel_protos::gen::google::rpc::Status {
+          code: status.code() as i32,
+          message: status.message().to_string(),
+          ..bazel_protos::gen::google::rpc::Status::default()
+        }),
+      })
+    }
+
+    Ok(Response::new(BatchUpdateBlobsResponse { responses }))
   }
 
   async fn batch_read_blobs(
     &self,
-    _: Request<BatchReadBlobsRequest>,
+    request: Request<BatchReadBlobsRequest>,
   ) -> Result<Response<BatchReadBlobsResponse>, Status> {
-    Err(Status::unimplemented("".to_owned()))
+    check_auth!(self, request);
+
+    if self.always_errors {
+      return Err(Status::invalid_argument(
+        "StubCAS is configured to always fail".to_owned(),
+      ));
+    }
+
+    let request = request.into_inner();
+
+    check_instance_name!(self, request);
+
+    let mut responses = Vec::new();
+    let blobs = self.blobs.lock();
+
+    fn read_blob(
+      digest: remexec::Digest,
+      blobs: &HashMap<Fingerprint, Bytes>,
+    ) -> (Option<Bytes>, Status) {
+      let fingerprint = match Fingerprint::from_hex_string(&digest.hash) {
+        Ok(f) => f,
+        Err(err) => {
+          return (
+            None,
+            Status::invalid_argument(format!("Bad fingerprint: {}: {}", &digest.hash, err)),
+          );
+        }
+      };
+
+      match blobs.get(&fingerprint) {
+        Some(data) => {
+          if data.len() == digest.size_bytes as usize {
+            (Some(data.clone()), Status::ok(""))
+          } else {
+            (
+              None,
+              Status::invalid_argument(format!(
+                "Size was incorrect: digest size is {} but got {} from data",
+                digest.size_bytes,
+                data.len()
+              )),
+            )
+          }
+        }
+        None => (None, Status::not_found("")),
+      }
+    }
+
+    for digest in request.digests {
+      let (data_opt, status) = read_blob(digest.clone(), &blobs);
+      responses.push(remexec::batch_read_blobs_response::Response {
+        digest: Some(digest),
+        data: data_opt.unwrap_or_else(Bytes::new),
+        status: Some(bazel_protos::gen::google::rpc::Status {
+          code: status.code() as i32,
+          message: status.message().to_string(),
+          ..bazel_protos::gen::google::rpc::Status::default()
+        }),
+      });
+    }
+
+    Ok(Response::new(remexec::BatchReadBlobsResponse { responses }))
   }
 
   type GetTreeStream = tonic::codec::Streaming<GetTreeResponse>;

@@ -606,16 +606,14 @@ async fn run_command_locally_in_dir(
     cleanup,
   );
   let original = runner.run(Context::default(), workunit, req.into()).await?;
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .unwrap();
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
+    .unwrap();
   Ok(LocalTestResult {
     original,
     stdout_bytes,

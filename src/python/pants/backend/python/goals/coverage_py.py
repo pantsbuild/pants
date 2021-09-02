@@ -12,10 +12,7 @@ from typing import List, Optional, Tuple, cast
 
 import toml
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -102,11 +99,11 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=5.0.3,<5.1"
+    default_version = "coverage[toml]>=5.5,<5.6"
     default_main = ConsoleScript("coverage")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py_lockfile.txt")
@@ -155,9 +152,7 @@ class CoverageSubsystem(PythonToolBase):
                 "Path to an INI or TOML config file understood by coverage.py "
                 "(https://coverage.readthedocs.io/en/stable/config.html).\n\n"
                 f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location.\n\n"
-                "To use a TOML config file, you should add the `toml` library to "
-                "`[pytest].pytest_plugins`."
+                f"this option if the config is located in a non-standard location."
             ),
         )
         register(
@@ -220,7 +215,7 @@ class CoverageSubsystem(PythonToolBase):
 
 
 class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = CoverageSubsystem.options_scope
 
 
 @rule
@@ -339,7 +334,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
         PexRequest(
             output_filename="coverage.pex",
             internal_only=True,
-            requirements=coverage.pex_requirements,
+            requirements=coverage.pex_requirements(),
             interpreter_constraints=coverage.interpreter_constraints,
             main=coverage.main,
         ),

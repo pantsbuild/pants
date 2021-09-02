@@ -43,6 +43,7 @@ use fs::{
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
 use grpc_util::prost::MessageExt;
+use grpc_util::tls::{CertificateCheck, MtlsConfig};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use serde_derive::Serialize;
@@ -224,6 +225,26 @@ to this directory.",
               .long("oauth-bearer-token-file")
               .required(false)
         )
+        .arg(
+          Arg::with_name("mtls-client-certificate-chain-path")
+              .help("Path to certificate chain to use when using MTLS.")
+              .takes_value(true)
+              .long("mtls-client-certificate-chain-path")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("mtls-client-key-path")
+              .help("Path to private key to use when using MTLS.")
+              .takes_value(true)
+              .long("mtls-client-key-path")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("dangerously-ignore-certificates")
+              .help("Ignore invalid certificates when using a remote CAS.")
+              .takes_value(false)
+              .long("dangerously-ignore-certificates")
+        )
         .arg(Arg::with_name("remote-instance-name")
             .takes_value(true)
                  .long("remote-instance-name")
@@ -252,6 +273,13 @@ to this directory.",
               .required(false)
               .default_value("128")
         )
+        .arg(
+          Arg::with_name("batch-api-size-limit")
+               .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+               .takes_value(true)
+               .long("batch-api-size-limit")
+               .required(false)
+               .default_value("4194304"))
       .get_matches(),
   ).await {
     Ok(_) => {}
@@ -291,6 +319,43 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           None
         };
 
+        let mtls = match (
+          top_match.value_of("mtls-client-certificate-chain-path"),
+          top_match.value_of("mtls-client-key-path"),
+        ) {
+          (Some(cert_chain_path), Some(key_path)) => {
+            let key = std::fs::read(key_path).map_err(|err| {
+              format!(
+                "Failed to read mtls-client-key-path from {:?}: {:?}",
+                key_path, err
+              )
+            })?;
+            let cert_chain = std::fs::read(cert_chain_path).map_err(|err| {
+              format!(
+                "Failed to read mtls-client-certificate-chain-path from {:?}: {:?}",
+                cert_chain_path, err
+              )
+            })?;
+            Some(MtlsConfig { key, cert_chain })
+          }
+          (None, None) => None,
+          _ => {
+            return Err("Must specify both or neither of mtls-client-certificate-chain-path and mtls-client-key-path".to_owned().into());
+          }
+        };
+
+        let certificate_check = if top_match.is_present("dangerously-ignore-certificates") {
+          CertificateCheck::DangerouslyDisabled
+        } else {
+          CertificateCheck::Enabled
+        };
+
+        let tls_config = grpc_util::tls::Config {
+          root_ca_certs,
+          mtls,
+          certificate_check,
+        };
+
         let mut headers = BTreeMap::new();
         if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
           let token = std::fs::read_to_string(oauth_path).map_err(|err| {
@@ -311,7 +376,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
-            root_ca_certs,
+            tls_config,
             headers,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
@@ -326,6 +391,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
             value_t!(top_match.value_of("rpc-concurrency-limit"), usize)
               .expect("Bad rpc-concurrency-limit flag"),
+            None,
+            value_t!(top_match.value_of("batch-api-size-limit"), usize)
+              .expect("Bad batch-api-size-limit flag"),
           ),
           true,
         )
@@ -349,14 +417,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let write_result = store
             .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
             .await?;
-          write_result
-            .ok_or_else(|| {
-              ExitError(
-                format!("File with digest {:?} not found", digest),
-                ExitCode::NotFound,
-              )
-            })
-            .map(|((), _metadata)| ())
+          write_result.ok_or_else(|| {
+            ExitError(
+              format!("File with digest {:?} not found", digest),
+              ExitCode::NotFound,
+            )
+          })
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -375,10 +441,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .ok_or_else(|| format!("Tried to save file {:?} but it did not exist", path))?;
           match file {
             fs::Stat::File(f) => {
-              let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                .store_by_digest(f)
-                .await
-                .unwrap();
+              let digest =
+                store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs), false)
+                  .store_by_digest(f)
+                  .await
+                  .unwrap();
 
               let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
                 .await
@@ -448,7 +515,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         let snapshot = Snapshot::from_path_stats(
           store_copy.clone(),
-          store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+          store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
           paths,
         )
         .await?;
@@ -496,11 +563,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| d.to_bytes().to_vec())
+            maybe_directory.map(|d| d.to_bytes().to_vec())
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
-            maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
+            maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
             let maybe_v = expand_files(store, digest).await?;
@@ -555,9 +622,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|(dir, _metadata)| dir.to_bytes())
+          maybe_dir.map(|dir| dir.to_bytes())
         }
-        Some((bytes, _metadata)) => Some(bytes),
+        Some(bytes) => Some(bytes),
       };
       match v {
         Some(bytes) => {
@@ -615,7 +682,7 @@ fn expand_files_helper(
   async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
-      Some((dir, _metadata)) => {
+      Some(dir) => {
         {
           let mut files_unlocked = files.lock();
           for file in &dir.files {

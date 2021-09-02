@@ -127,12 +127,13 @@ impl CommandRunner {
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
     cache_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
     let store_use_tls = store_address.starts_with("https://");
 
     let tls_client_config = if execution_use_tls || store_use_tls {
-      Some(grpc_util::create_tls_config(root_ca_certs)?)
+      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
     } else {
       None
     };
@@ -177,7 +178,8 @@ impl CommandRunner {
       platform,
       overall_deadline,
       retry_interval_duration,
-      capabilities_cell: Arc::new(DoubleCheckedCell::new()),
+      capabilities_cell: capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
       capabilities_client,
     };
 

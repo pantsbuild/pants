@@ -215,7 +215,7 @@ class RunTracker:
         scope_to_look_up = scope if scope != GLOBAL_SCOPE_CONFIG_SECTION else ""
         try:
             value = self._all_options.for_scope(
-                scope_to_look_up, inherit_from_enclosing_scope=False
+                scope_to_look_up, check_deprecations=False
             ).as_dict()
             if option is None:
                 return value

@@ -4,10 +4,7 @@
 from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -56,11 +53,10 @@ class PythonProtobufSubsystem(Subsystem):
 
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
-    options_scope = PythonProtobufSubsystem.subscope("mypy-plugin")
-    help = (
-        "Configuration of the mypy-protobuf type stub generation plugin for the Protobuf Python "
-        "backend."
-    )
+    options_scope = "mypy-protobuf"
+    deprecated_options_scope = "python-protobuf.mypy-plugin"
+    deprecated_options_scope_removal_version = "2.8.0.dev0"
+    help = "Configuration of the mypy-protobuf type stub generation plugin."
 
     default_version = "mypy-protobuf==2.4"
 
@@ -79,11 +75,11 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 
 class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = PythonProtobufMypyPlugin.options_scope
 
 
 @rule
-def setup_bandit_lockfile(
+def setup_mypy_protobuf_lockfile(
     _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
 ) -> PythonLockfileRequest:
     return PythonLockfileRequest.from_tool(mypy_protobuf)

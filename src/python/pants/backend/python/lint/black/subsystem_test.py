@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.black import skip_field
 from pants.backend.python.lint.black.subsystem import Black, BlackLockfileSentinel
 from pants.backend.python.lint.black.subsystem import rules as subsystem_rules
@@ -27,7 +27,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     global_constraint = "==3.9.*"
     rule_runner.set_options(
-        [], env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"}
+        ["--black-lockfile=lockfile.txt"],
+        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:

@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
     args = create_parser().parse_args()
-    version = determine_pants_version()
+    version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
     doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
     logger.info("Found the following docsite URLs:")
@@ -61,8 +61,12 @@ def main() -> None:
         generator.render()
 
 
-def determine_pants_version() -> str:
+def determine_pants_version(no_prompt: bool) -> str:
     version = MAJOR_MINOR
+    if no_prompt:
+        logger.info(f"Generating docs for Pants {version}.")
+        return version
+
     key_confirmation = input(
         f"Generating docs for Pants {version}. Is this the correct version? [Y/n]: "
     )
@@ -72,34 +76,6 @@ def determine_pants_version() -> str:
             "src/python/pants/VERSION."
         )
     return version
-
-
-_markdown_trans = str.maketrans({c: f"\\{c}" for c in "\\`*_"})
-
-
-def markdown_safe(s: str) -> str:
-    """Escapes special characters in s, so it can be used as a literal string in markdown."""
-    return html.escape(s.translate(_markdown_trans), quote=False)
-
-
-_backtick_re = re.compile(r"`([^`]*)`")
-
-
-def html_safe(s: str) -> str:
-    """Escapes special characters in s, so it can be used as a literal string in readme HTML."""
-    return _backtick_re.sub(r"<code>\1</code>", html.escape(s))
-
-
-def description_safe(s: str) -> str:
-    """Escapes special characters in description text.
-
-    Descriptions are generally treated as plain text, not as markdown. But readme.com still renders
-    indented lines as blockquotes, so we must take care not to html-quote inside those.
-    """
-    safe_lines = [line if line.startswith("    ") else html_safe(line) for line in s.splitlines()]
-    safe_lines_str = "\n".join(safe_lines)
-    # Mark as a paragraph to render as plain text, rather than markdown. The spaces matter.
-    return f"<p> {safe_lines_str} </p>"
 
 
 # Code to replace doc urls with appropriate markdown, for rendering on the docsite.
@@ -192,6 +168,12 @@ def get_titles(urls: set[str]) -> dict[str, str]:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
     parser.add_argument(
+        "--no-prompt",
+        action="store_true",
+        default=False,
+        help="Don't prompt the user, accept defaults for all questions.",
+    )
+    parser.add_argument(
         "--sync",
         action="store_true",
         default=False,
@@ -212,12 +194,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run_pants_help_all() -> Dict:
-    deactivated_backends = [
-        "internal_plugins.releases",
-        "toolchain.pants.auth",
-        "toolchain.pants.buildsense",
-        "toolchain.pants.common",
-    ]
+    deactivated_backends = ["internal_plugins.releases"]
     activated_backends = [
         "pants.backend.codegen.protobuf.python",
         "pants.backend.awslambda.python",
@@ -225,9 +202,11 @@ def run_pants_help_all() -> Dict:
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
     ]
+    deactivated_plugins = ["toolchain.pants.plugin==0.13.1"]
     argv = [
         "./pants",
         "--concurrent",
+        f"--plugins=-[{', '.join(map(repr, deactivated_plugins))}]",
         f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
         f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
         "--no-verify-config",
@@ -341,7 +320,7 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
-            escaped_default_str = markdown_safe(default_str)
+            escaped_default_str = html.escape(default_str, quote=False)
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
@@ -363,13 +342,13 @@ class ReferenceGenerator:
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = markdown_safe(str(field["default"]))
+                default_str = html.escape(str(field["default"]))
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
-                field["description"] = description_safe(str(field["description"]))
+                field["description"] = str(field["description"])
             target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
-            target["description"] = description_safe(str(target["description"]))
+            target["description"] = str(target["description"])
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 

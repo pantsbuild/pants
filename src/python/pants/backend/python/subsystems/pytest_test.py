@@ -5,12 +5,16 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.experimental.python.lockfile import PythonLockfileRequest
-from pants.backend.python.subsystems.pytest import PytestLockfileSentinel
+import pytest
+
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.subsystems.pytest import PyTest, PytestLockfileSentinel
 from pants.backend.python.subsystems.pytest import rules as subsystem_rules
 from pants.backend.python.target_types import PythonLibrary, PythonTests
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
+from pants.option.ranked_value import Rank, RankedValue
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -22,7 +26,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     global_constraint = "==3.9.*"
     rule_runner.set_options(
-        [], env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"}
+        ["--pytest-lockfile=lockfile.txt"],
+        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
@@ -41,6 +46,17 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     # Only care about `python_tests` and their transitive deps, not unused `python_library`s.
     assert_ics("python_library(interpreter_constraints=['==2.7.*'])", [global_constraint])
+
+    # Ignore targets that are skipped.
+    assert_ics(
+        dedent(
+            """\
+            python_tests(name='a', interpreter_constraints=['==2.7.*'])
+            python_tests(name='b', interpreter_constraints=['==3.5.*'], skip_tests=True)
+            """
+        ),
+        ["==2.7.*"],
+    )
 
     # If there are multiple distinct ICs in the repo, we OR them because the lockfile needs to be
     # compatible with every target.
@@ -96,3 +112,27 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         ),
         ["==2.7.*", "==2.7.*,==3.6.*", ">=3.7,==3.8.*"],
     )
+
+
+def test_validate_pytest_cov_included() -> None:
+    def validate(extra_requirements: list[str] | None = None) -> None:
+        extra_reqs_rv = (
+            RankedValue(Rank.CONFIG, extra_requirements)
+            if extra_requirements is not None
+            else RankedValue(Rank.HARDCODED, PyTest.default_extra_requirements)
+        )
+        pytest = create_subsystem(PyTest, extra_requirements=extra_reqs_rv)
+        pytest.validate_pytest_cov_included()
+
+    # Default should not error.
+    validate()
+    # Canonicalize project name.
+    validate(["PyTeST_cOV"])
+
+    with pytest.raises(ValueError) as exc:
+        validate([])
+    assert "missing `pytest-cov`" in str(exc.value)
+
+    with pytest.raises(ValueError) as exc:
+        validate(["custom-plugin"])
+    assert "missing `pytest-cov`" in str(exc.value)

@@ -13,11 +13,9 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import (
-    PytestPluginSetup,
-    PytestPluginSetupRequest,
-    PythonTestFieldSet,
-)
+from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.subsystems.pytest import PythonTestFieldSet
+from pants.backend.python.subsystems.pytest import rules as pytest_subsystem_rules
 from pants.backend.python.target_types import (
     PexBinary,
     PythonLibrary,
@@ -38,7 +36,11 @@ from pants.engine.process import InteractiveRunner
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python27_and_python3_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
@@ -49,6 +51,7 @@ def rule_runner() -> RuleRunner:
             build_runtime_package_dependencies,
             create_or_update_coverage_config,
             *pytest_runner.rules(),
+            *pytest_subsystem_rules(),
             *pex_from_targets.rules(),
             *dependency_inference_rules.rules(),
             *distdir.rules(),
@@ -81,17 +84,9 @@ def run_pytest(
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> TestResult:
-    # pytest-html==1.22.1 has an undeclared dep on setuptools. This, unfortunately,
-    # is the most recent version of pytest-html that works with the low version of
-    # pytest that we pin to.
-    extra_reqs = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
-    extra_reqs_str = "['" + "', '".join(extra_reqs) + "']"
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
-        # pin to lower versions so that we can run Python 2 tests
-        "--pytest-version=pytest>=4.6.6,<4.7",
-        f"--pytest-extra-requirements={extra_reqs_str}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -105,17 +100,26 @@ def run_pytest(
     return test_result
 
 
-def test_passing_test(rule_runner: RuleRunner) -> None:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt)
+    result = run_pytest(
+        rule_runner,
+        tgt,
+        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_failing_test(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -209,17 +213,19 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    extra_args = ["--pytest-version=pytest>=4.6.6,<4.7", "--pytest-lockfile=<none>"]
+
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, py2_tgt)
+    result = run_pytest(rule_runner, py2_tgt, extra_args=extra_args)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
     py3_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, py3_tgt)
+    result = run_pytest(rule_runner, py3_tgt, extra_args=extra_args)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -311,7 +317,15 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(
-        rule_runner, tgt, extra_args=["--pytest-args='--html=extra-output/report.html'"]
+        rule_runner,
+        tgt,
+        extra_args=[
+            "--pytest-args='--html=extra-output/report.html'",
+            "--pytest-extra-requirements=pytest-html==3.1",
+            # pytest-html requires setuptools to be installed because it does not use PEP 517.
+            "--pytest-extra-requirements=setuptools",
+            "--pytest-lockfile=<none>",
+        ],
     )
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
@@ -332,9 +346,8 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     assert result.coverage_data is not None
 
 
-def test_conftest_handling(rule_runner: RuleRunner) -> None:
-    """Tests that we a) inject a dependency on conftest.py and b) skip running directly on
-    conftest.py."""
+def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
+    # See `test_skip_tests` for a test that we properly skip running on conftest.py.
     rule_runner.write_files(
         {
             f"{SOURCE_ROOT}/conftest.py": dedent(
@@ -348,15 +361,10 @@ def test_conftest_handling(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": "python_tests()",
         }
     )
-
-    test_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, test_tgt, extra_args=["--pytest-args='-s'"])
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-args='-s'"])
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py In conftest!\n." in result.stdout
-
-    conftest_tgt = rule_runner.get_target(Address(SOURCE_ROOT, relative_file_path="conftest.py"))
-    result = run_pytest(rule_runner, conftest_tgt)
-    assert result.exit_code is None
 
 
 def test_execution_slot_variable(rule_runner: RuleRunner) -> None:
@@ -499,25 +507,27 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
     assert result.exit_code == 0
 
 
-def test_skip_type_stubs(rule_runner: RuleRunner) -> None:
+def test_skip_tests(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/test_foo.pyi": "def test_foo() -> None:\n    ...\n",
-            f"{PACKAGE}/BUILD": "python_tests()",
+            f"{PACKAGE}/test_skip_me.py": "",
+            f"{PACKAGE}/test_foo.py": "",
+            f"{PACKAGE}/test_foo.pyi": "",
+            f"{PACKAGE}/conftest.py": "",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(name='t1', sources=['test_skip_me.py'], skip_tests=True)
+                python_tests(name='t2', sources=['test_foo*', 'conftest.py'])
+                """
+            ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
-    result = run_pytest(rule_runner, tgt)
-    assert result.exit_code is None
 
+    def is_applicable(tgt_name: str, fp: str) -> bool:
+        tgt = rule_runner.get_target(Address(PACKAGE, target_name=tgt_name, relative_file_path=fp))
+        return PythonTestFieldSet.is_applicable(tgt)
 
-def test_skip_tests_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            f"{PACKAGE}/test_foo.pyi": "def test_foo() -> None:\n    ...\n",
-            f"{PACKAGE}/BUILD": "python_tests(skip_tests=True)",
-        }
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
-    result = run_pytest(rule_runner, tgt)
-    assert result.exit_code is None
+    assert not is_applicable("t1", "test_skip_me.py")
+    assert is_applicable("t2", "test_foo.py")
+    assert not is_applicable("t2", "test_foo.pyi")
+    assert not is_applicable("t2", "conftest.py")

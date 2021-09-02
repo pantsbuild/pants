@@ -225,15 +225,11 @@ def test_merge_entry_points() -> None:
             "console_scripts": {"foo_qux": "foo.baz.qux"},
             "foo_plugins": {"foo-bar": "foo.bar:plugin"},
         },
-        "src/python/foo:foo-dist `provides.with_binaries()`": {
-            "console_scripts": {"foo_main": "foo.qux.bin:main"},
-        },
     }
     expect = {
         "console_scripts": {
             "foo_tool": "foo.bar.baz:Tool.main",
             "foo_qux": "foo.baz.qux",
-            "foo_main": "foo.qux.bin:main",
         },
         "foo_plugins": {
             "qux": "foo.qux",
@@ -306,9 +302,12 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
                 ],
                 provides=setup_py(
                     name='foo', version='1.2.3'
-                ).with_binaries(
-                    foo_main='src/python/foo/qux:bin'
-                )
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "foo_main": "src/python/foo/qux:bin",
+                    },
+                },
             )
 
             python_library(
@@ -371,6 +370,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                 name='foo-dist',
                 entry_points={
                     "console_scripts":{
+                        "foo_main": "src/python/foo/qux:bin",
                         "foo_tool":"foo.bar.baz:Tool.main",
                         "bin_tool":"//src/python/foo/qux:bin",
                         "bin_tool2":"src/python/foo/qux:bin",
@@ -391,8 +391,6 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                             "foo-bar=foo.bar:plugin",
                         ],
                     },
-                ).with_binaries(
-                    foo_main='src/python/foo/qux:bin'
                 )
             )
 
@@ -423,13 +421,13 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "install_requires": tuple(),
             "entry_points": {
                 "console_scripts": [
+                    "foo_main = foo.qux.bin:main",
                     "foo_tool = foo.bar.baz:Tool.main",
                     "bin_tool = foo.qux.bin:main",
                     "bin_tool2 = foo.qux.bin:main",
                     "hello = foo.bin:main",
                     "foo_qux = foo.baz.qux:main",
                     "foo_bin = foo.bin:main",
-                    "foo_main = foo.qux.bin:main",
                 ],
                 "foo_plugins": [
                     "qux = foo.qux",
@@ -454,19 +452,34 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 name='invalid_bin1',
                 provides=setup_py(
                     name='invalid_bin1', version='1.1.1'
-                ).with_binaries(foo=':not_a_binary')
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "foo": ":not_a_binary",
+                    },
+                },
             )
             python_distribution(
                 name='invalid_bin2',
                 provides=setup_py(
                     name='invalid_bin2', version='1.1.1'
-                ).with_binaries(foo=':invalid_entrypoint_unowned1')
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "foo": ":invalid_entrypoint_unowned1",
+                    },
+                },
             )
             python_distribution(
                 name='invalid_bin3',
                 provides=setup_py(
                     name='invalid_bin3', version='1.1.1'
-                ).with_binaries(foo=':invalid_entrypoint_unowned2')
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "foo": ":invalid_entrypoint_unowned2",
+                    },
+                },
             )
             """
         ),
@@ -501,7 +514,12 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
                 name='dist',
                 provides=setup_py(
                     name='bin', version='1.1.1'
-                ).with_binaries(foo=':bin')
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "foo": ":bin",
+                    },
+                },
             )
             """
         ),

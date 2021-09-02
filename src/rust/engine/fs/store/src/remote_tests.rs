@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
 use bytes::Bytes;
+use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
@@ -152,12 +153,14 @@ async fn write_file_multiple_chunks() {
   let store = ByteStore::new(
     &cas.address(),
     None,
-    None,
+    tls::Config::default(),
     BTreeMap::new(),
     10 * 1024,
     Duration::from_secs(5),
     1,
     256,
+    None,
+    0, // disable batch API, force streaming API
   )
   .unwrap();
 
@@ -222,12 +225,14 @@ async fn write_connection_error() {
   let store = ByteStore::new(
     "http://doesnotexist.example",
     None,
-    None,
+    tls::Config::default(),
     BTreeMap::new(),
     10 * 1024 * 1024,
     Duration::from_secs(1),
     1,
     256,
+    None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap();
   let error = store
@@ -298,12 +303,14 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
     &cas.address(),
     None,
-    None,
+    tls::Config::default(),
     BTreeMap::new(),
     10 * MEGABYTES,
     Duration::from_secs(1),
     1,
     256,
+    None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap()
 }

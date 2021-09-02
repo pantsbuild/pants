@@ -3,10 +3,7 @@
 
 from typing import Tuple, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules, rule
@@ -62,7 +59,7 @@ class Docformatter(PythonToolBase):
 
 
 class DocformatterLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = Docformatter.options_scope
 
 
 @rule

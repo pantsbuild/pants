@@ -109,7 +109,6 @@ def test_default() -> None:
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
-            parent_parser=None,
         )
         parser.register(*args, **kwargs)
         oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
@@ -211,7 +210,6 @@ def test_grouping():
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
-            parent_parser=None,
         )
         parser.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
@@ -221,8 +219,6 @@ def test_grouping():
     do_test({}, expected_basic=True)
     do_test({"advanced": False}, expected_basic=True)
     do_test({"advanced": True}, expected_advanced=True)
-    do_test({"recursive_root": True}, expected_basic=True)
-    do_test({"advanced": True, "recursive_root": True}, expected_advanced=True)
 
 
 def test_get_all_help_info():
@@ -265,7 +261,7 @@ def test_get_all_help_info():
 
     options = Options.create(
         env={},
-        config=Config.load_file_contents(""),
+        config=Config.load([]),
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants"],
         bootstrap_option_values=None,

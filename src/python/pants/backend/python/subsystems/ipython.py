@@ -5,10 +5,7 @@ from __future__ import annotations
 
 import itertools
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -51,7 +48,7 @@ class IPython(PythonToolBase):
 
 
 class IPythonLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = IPython.options_scope
 
 
 @rule(
@@ -64,6 +61,9 @@ class IPythonLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not ipython.uses_lockfile:
+        return PythonLockfileRequest.from_tool(ipython)
+
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
     # `./pants repl py2::` and then `./pants repl py3::`. Still, even with those subsets possible,

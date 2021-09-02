@@ -119,8 +119,8 @@ FS_TAR_ALL_FILES = (
 FS_TAR_ALL_DIRS = ("a", "a/b", "c.ln", "d.ln", "d.ln/b")
 
 
-def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
-    for i in range(4):
+def try_with_backoff(assertion_fn: Callable[[], bool], count: int = 4) -> bool:
+    for i in range(count):
         time.sleep(0.1 * i)
         if assertion_fn():
             return True
@@ -966,7 +966,7 @@ def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
     assert read_file() == "one\n"
 
     shutil.rmtree(Path(rule_runner.build_root, "a/b"))
-    assert try_with_backoff(lambda: read_file() is None)
+    assert try_with_backoff((lambda: read_file() is None), count=10)
 
 
 def test_invalidated_after_child_deletion(rule_runner: RuleRunner) -> None:

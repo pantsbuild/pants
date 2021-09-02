@@ -39,6 +39,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use clap::{value_t, App, Arg};
 use futures::future::FutureExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -194,7 +195,7 @@ impl BuildResultFS {
           .runtime
           .block_on(async move { store.load_file_bytes_with(digest, |_| ()).await })
         {
-          Ok(Some(((), _metadata))) => {
+          Ok(Some(())) => {
             let executable_inode = self.next_inode;
             self.next_inode += 1;
             let non_executable_inode = self.next_inode;
@@ -333,7 +334,7 @@ impl BuildResultFS {
             .block_on(async move { store.load_directory(digest).await });
 
           match maybe_directory {
-            Ok(Some((directory, _metadata))) => {
+            Ok(Some(directory)) => {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
@@ -478,7 +479,7 @@ impl fuse::Filesystem for BuildResultFS {
                   error!("Error reading directory {:?}: {}", parent_digest, err);
                   libc::EINVAL
                 })?
-                .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
+                .and_then(|directory| self.node_for_digest(&directory, filename))
                 .ok_or(libc::ENOENT)
             })
             .and_then(|node| match node {
@@ -712,7 +713,15 @@ async fn main() {
           .long("rpc-concurrency-limit")
           .required(false)
           .default_value("128")
-    ).get_matches();
+    ).arg(
+    Arg::with_name("batch-api-size-limit")
+        .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+        .takes_value(true)
+        .long("batch-api-size-limit")
+        .required(false)
+        .default_value("4194304")
+  )
+      .get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
@@ -748,13 +757,16 @@ async fn main() {
       .into_with_remote(
         address,
         args.value_of("remote-instance-name").map(str::to_owned),
-        root_ca_certs,
+        tls::Config::new_without_mtls(root_ca_certs),
         headers,
         4 * 1024 * 1024,
         std::time::Duration::from_secs(5 * 60),
         1,
         value_t!(args.value_of("rpc-concurrency-limit"), usize)
           .expect("Bad rpc-concurrency-limit flag"),
+        None,
+        value_t!(args.value_of("batch-api-size-limit"), usize)
+          .expect("Bad batch-api-size-limit flag"),
       )
       .expect("Error making remote store"),
     None => local_only_store,

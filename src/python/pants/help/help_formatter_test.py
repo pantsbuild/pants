@@ -61,7 +61,6 @@ class OptionHelpFormatterTest(unittest.TestCase):
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
-            parent_parser=None,
         )
         parser.register(*args, **kwargs)
         # Force a parse to generate the derivation history.

@@ -5,25 +5,59 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from packaging.utils import canonicalize_name as canonicalize_project_name
+from pkg_resources import Requirement
+
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, PythonTestsSources
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    PythonTestsExtraEnvVars,
+    PythonTestsSources,
+    PythonTestsTimeout,
+    SkipPythonTestsField,
+    format_invalid_requirement_string_error,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    UnexpandedTargets,
+)
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import git_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_method
+
+
+@dataclass(frozen=True)
+class PythonTestFieldSet(TestFieldSet):
+    required_fields = (PythonTestsSources,)
+
+    sources: PythonTestsSources
+    timeout: PythonTestsTimeout
+    runtime_package_dependencies: RuntimePackageDependenciesField
+    extra_env_vars: PythonTestsExtraEnvVars
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        if tgt.get(SkipPythonTestsField).value:
+            return True
+        if not tgt.address.is_file_target:
+            return False
+        file_name = PurePath(tgt.address.filename)
+        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
 
 class PyTest(PythonToolBase):
@@ -33,10 +67,8 @@ class PyTest(PythonToolBase):
     # This should be kept in sync with `requirements.txt`.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement_library` to override the version.
-    default_version = "pytest>=6.0.1,<6.3"
-    # TODO: When updating pytest-cov to 2.12+, update the help message for
-    #  `[coverage-py].config` to not mention installing TOML.
-    default_extra_requirements = ["pytest-cov>=2.10.1,<2.12"]
+    default_version = "pytest>=6.2.4,<6.3"
+    default_extra_requirements = ["pytest-cov>=2.12.1,<2.13"]
 
     default_main = ConsoleScript("pytest")
 
@@ -54,20 +86,6 @@ class PyTest(PythonToolBase):
             member_type=shell_str,
             passthrough=True,
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
-        )
-        register(
-            "--pytest-plugins",
-            type=list,
-            advanced=True,
-            default=PyTest.default_extra_requirements,
-            help=(
-                "Requirement strings for any plugins or additional requirements you'd like to use."
-            ),
-            removal_version="2.8.0.dev0",
-            removal_hint=(
-                "Use `[pytest].extra_requirements` instead, which behaves the same. (The option is "
-                "being renamed for uniformity with other Python tools.)"
-            ),
         )
         register(
             "--timeouts",
@@ -137,15 +155,7 @@ class PyTest(PythonToolBase):
 
     @property
     def all_requirements(self) -> tuple[str, ...]:
-        extras = resolve_conflicting_options(
-            old_option="pytest_plugins",
-            new_option="extra_requirements",
-            old_scope=self.options_scope,
-            new_scope=self.options_scope,
-            old_container=self.options,
-            new_container=self.options,
-        )
-        return (self.version, *extras)
+        return (self.version, *self.extra_requirements)
 
     @property
     def timeouts_enabled(self) -> bool:
@@ -176,9 +186,33 @@ class PyTest(PythonToolBase):
             check_content=check_content,
         )
 
+    @memoized_method
+    def validate_pytest_cov_included(self) -> None:
+        for s in self.extra_requirements:
+            try:
+                req = Requirement.parse(s).project_name
+            except Exception as e:
+                raise ValueError(
+                    format_invalid_requirement_string_error(
+                        s, e, description_of_origin="`[pytest].extra_requirements`"
+                    )
+                )
+            if canonicalize_project_name(req) == "pytest-cov":
+                return
+
+        raise ValueError(
+            "You set `[test].use_coverage`, but `[pytest].extra_requirements` is missing "
+            "`pytest-cov`, which is needed to collect coverage data.\n\nThis happens when "
+            "overriding the `extra_requirements` option. Please either explicitly add back "
+            "`pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than "
+            "overriding it. Run `./pants help-advanced pytest` to see the default version of "
+            f"`pytest-cov` and see {doc_url('options#list-values')} for more on adding vs. "
+            "overriding list options."
+        )
+
 
 class PytestLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = PyTest.options_scope
 
 
 @rule(
@@ -191,6 +225,9 @@ class PytestLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not pytest.uses_lockfile:
+        return PythonLockfileRequest.from_tool(pytest)
+
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
     #
@@ -202,7 +239,7 @@ async def setup_pytest_lockfile(
     transitive_targets_per_test = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in all_build_targets
-        if tgt.has_field(PythonTestsSources)
+        if PythonTestFieldSet.is_applicable(tgt)
     )
     unique_constraints = {
         InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)

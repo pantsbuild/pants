@@ -73,6 +73,9 @@ async def pants_setup_kwargs(
 ) -> SetupKwargs:
     kwargs = request.explicit_kwargs.copy()
 
+    if request.target.address.path_safe_spec.startswith("testprojects"):
+        return SetupKwargs(kwargs, address=request.target.address)
+
     # Validate that required fields are set.
     if not kwargs["name"].startswith("pantsbuild.pants"):
         raise ValueError(
@@ -117,6 +120,10 @@ async def pants_setup_kwargs(
             "Documentation": "https://www.pantsbuild.org/",
             "Source": "https://github.com/pantsbuild/pants",
             "Tracker": "https://github.com/pantsbuild/pants/issues",
+            "Changelog": "https://www.pantsbuild.org/docs/changelog",
+            "Twitter": "https://twitter.com/pantsbuild",
+            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,

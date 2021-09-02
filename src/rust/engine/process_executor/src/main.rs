@@ -176,6 +176,10 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   store_rpc_concurrency: usize,
 
+  /// Total size of blobs allowed to be sent in a single API call.
+  #[structopt(long, default_value = "4194304")]
+  store_batch_api_size_limit: usize,
+
   /// Number of concurrent requests to the execution service.
   #[structopt(long, default_value = "128")]
   execution_rpc_concurrency: usize,
@@ -244,12 +248,14 @@ async fn main() {
       local_only_store.into_with_remote(
         cas_server,
         args.remote_instance_name.clone(),
-        root_ca_certs,
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs),
         headers,
         args.upload_chunk_bytes,
         Duration::from_secs(30),
         args.store_rpc_retries,
         args.store_rpc_concurrency,
+        None,
+        args.store_batch_api_size_limit,
       )
     }
     (None, None) => Ok(local_only_store),
@@ -298,6 +304,7 @@ async fn main() {
             Duration::from_millis(100),
             args.execution_rpc_concurrency,
             args.cache_rpc_concurrency,
+            None,
           )
           .expect("Failed to make command runner"),
         )
@@ -342,15 +349,13 @@ async fn main() {
     .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr: Vec<u8> = store
     .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   print!("{}", String::from_utf8(stdout).unwrap());
   eprint!("{}", String::from_utf8(stderr).unwrap());
@@ -450,7 +455,6 @@ async fn extract_request_from_action_digest(
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
     .await?
     .ok_or_else(|| format!("Could not find action proto in CAS: {:?}", action_digest))?
-    .0
     .map_err(|err| {
       format!(
         "Error deserializing action proto {:?}: {:?}",
@@ -464,7 +468,6 @@ async fn extract_request_from_action_digest(
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
     .await?
     .ok_or_else(|| format!("Could not find command proto in CAS: {:?}", command_digest))?
-    .0
     .map_err(|err| {
       format!(
         "Error deserializing command proto {:?}: {:?}",
@@ -574,7 +577,6 @@ async fn extract_request_from_buildbarn_url(
         })
         .await?
         .ok_or_else(|| "Couldn't fetch action result proto".to_owned())?
-        .0
         .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
 
       require_digest(&action_result.action_digest)?

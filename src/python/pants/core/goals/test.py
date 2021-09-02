@@ -23,7 +23,7 @@ from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TestResult:
-    exit_code: Optional[int]
+    exit_code: int
     stdout: str
     stdout_digest: FileDigest
     stderr: str
@@ -60,17 +60,6 @@ class TestResult:
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
-
-    @classmethod
-    def skip(cls, address: Address) -> TestResult:
-        return cls(
-            exit_code=None,
-            stdout="",
-            stderr="",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            address=address,
-        )
 
     @classmethod
     def from_fallible_process_result(
@@ -94,27 +83,13 @@ class TestResult:
             extra_output=extra_output,
         )
 
-    @property
-    def skipped(self) -> bool:
-        return (
-            self.exit_code is None
-            and not self.stdout
-            and not self.stderr
-            and not self.coverage_data
-            and not self.xml_results
-        )
-
     def __lt__(self, other: Union[Any, EnrichedTestResult]) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
+        """We sort first by status (failed vs succeeded), then alphanumerically within each
+        group."""
         if not isinstance(other, EnrichedTestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.address.spec < other.address.spec
-        if self.exit_code is None:
-            return True
-        if other.exit_code is None:
-            return False
         return abs(self.exit_code) < abs(other.exit_code)
 
 
@@ -146,13 +121,9 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
-        if self.skipped:
-            return LogLevel.DEBUG
-        return LogLevel.INFO if self.exit_code == 0 else LogLevel.WARN
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        if self.skipped:
-            return f"{self.address} skipped."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         message = f"{self.address} {status}."
         if self.output_setting == ShowOutput.NONE or (
@@ -174,7 +145,7 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    process: Optional[InteractiveProcess]
+    process: InteractiveProcess
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -393,8 +364,6 @@ async def run_tests(
         )
         exit_code = 0
         for debug_request in debug_requests:
-            if debug_request.process is None:
-                continue
             debug_result = interactive_runner.run(debug_request.process)
             if debug_result.exit_code != 0:
                 exit_code = debug_result.exit_code
@@ -421,15 +390,13 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped:
-            continue
         if result.exit_code == 0:
-            sigil = console.green("✓")
+            sigil = console.sigil_succeeded()
             status = "succeeded"
         else:
-            sigil = console.red("𐄂")
+            sigil = console.sigil_failed()
             status = "failed"
-            exit_code = cast(int, result.exit_code)
+            exit_code = result.exit_code
         console.print_stderr(f"{sigil} {result.address} {status}.")
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(

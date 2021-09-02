@@ -59,8 +59,8 @@ class Shfmt(TemplatedExternalTool):
         )
 
     def generate_exe(self, plat: Platform) -> str:
-        plat_str = "linux" if plat == Platform.linux else "darwin"
-        return f"./shfmt_{self.version}_{plat_str}_amd64"
+        plat_str = self.default_url_platform_mapping[plat.value]
+        return f"./shfmt_{self.version}_{plat_str}"
 
     @property
     def skip(self) -> bool:

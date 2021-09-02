@@ -72,7 +72,7 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
         PexRequest(
             output_filename="yapf.pex",
             internal_only=True,
-            requirements=yapf.pex_requirements,
+            requirements=yapf.pex_requirements(),
             interpreter_constraints=yapf.interpreter_constraints,
             main=yapf.main,
         ),

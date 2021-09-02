@@ -6,10 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.experimental.python.lockfile import (
-    PythonLockfileRequest,
-    PythonToolLockfileSentinel,
-)
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -29,12 +26,11 @@ class Black(PythonToolBase):
     options_scope = "black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==21.5b2"
-    default_extra_requirements = ["setuptools"]
+    default_version = "black==21.8b0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6.2"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
@@ -111,7 +107,7 @@ class Black(PythonToolBase):
 
 
 class BlackLockfileSentinel(PythonToolLockfileSentinel):
-    pass
+    options_scope = Black.options_scope
 
 
 @rule(
@@ -121,6 +117,9 @@ class BlackLockfileSentinel(PythonToolLockfileSentinel):
 async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> PythonLockfileRequest:
+    if not black.uses_lockfile:
+        return PythonLockfileRequest.from_tool(black)
+
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
         all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))

@@ -7,6 +7,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::RelativePath;
+use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
@@ -90,12 +91,14 @@ impl StoreSetup {
       .into_with_remote(
         &cas.address(),
         None,
-        None,
+        tls::Config::default(),
         BTreeMap::new(),
         10 * 1024 * 1024,
         Duration::from_secs(1),
         1,
         256,
+        None,
+        4 * 1024 * 1024,
       )
       .unwrap();
     StoreSetup {

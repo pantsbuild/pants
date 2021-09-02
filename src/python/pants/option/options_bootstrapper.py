@@ -16,9 +16,9 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
-from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
@@ -160,7 +160,7 @@ class OptionsBootstrapper:
 
             config_file_paths = cls.get_config_file_paths(env=env, args=args)
             config_files_products = [filecontent_for(p) for p in config_file_paths]
-            pre_bootstrap_config = Config.load_file_contents(config_files_products)
+            pre_bootstrap_config = Config.load(config_files_products)
 
             initial_bootstrap_options = cls.parse_bootstrap_options(
                 env, bargs, pre_bootstrap_config
@@ -179,7 +179,7 @@ class OptionsBootstrapper:
                 full_config_paths.extend(existing_rcfiles)
 
             full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-            post_bootstrap_config = Config.load_file_contents(
+            post_bootstrap_config = Config.load(
                 full_config_files_products,
                 seed_values=bootstrap_option_values.as_dict(),
             )
@@ -223,12 +223,12 @@ class OptionsBootstrapper:
             allow_unknown_options=allow_unknown_options,
         )
 
-        distinct_optionable_classes: Set[Type[Optionable]] = set()
+        distinct_subsystem_classes: Set[Type[Subsystem]] = set()
         for ksi in known_scope_infos:
-            if not ksi.optionable_cls or ksi.optionable_cls in distinct_optionable_classes:
+            if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue
-            distinct_optionable_classes.add(ksi.optionable_cls)
-            ksi.optionable_cls.register_options_on_scope(options)
+            distinct_subsystem_classes.add(ksi.subsystem_cls)
+            ksi.subsystem_cls.register_options_on_scope(options)
 
         return options
 
@@ -256,9 +256,7 @@ class OptionsBootstrapper:
 
         # Parse and register options.
         known_scope_infos = [
-            si
-            for optionable in build_configuration.all_optionables
-            for si in optionable.known_scope_infos()
+            subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
         ]
         options = self.full_options_for_scopes(
             known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options

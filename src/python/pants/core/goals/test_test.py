@@ -321,7 +321,7 @@ def sort_results() -> None:
 
 def assert_streaming_output(
     *,
-    exit_code: Optional[int],
+    exit_code: int,
     stdout: str = "stdout",
     stderr: str = "stderr",
     output_setting: ShowOutput = ShowOutput.ALL,
@@ -339,16 +339,6 @@ def assert_streaming_output(
     )
     assert result.level() == expected_level
     assert result.message() == expected_message
-
-
-def test_streaming_output_skip() -> None:
-    assert_streaming_output(
-        exit_code=None,
-        stdout="",
-        stderr="",
-        expected_level=LogLevel.DEBUG,
-        expected_message="demo_test skipped.",
-    )
 
 
 def test_streaming_output_success() -> None:
@@ -373,7 +363,7 @@ def test_streaming_output_success() -> None:
 
 def test_streaming_output_failure() -> None:
     assert_failure_streamed = partial(
-        assert_streaming_output, exit_code=1, expected_level=LogLevel.WARN
+        assert_streaming_output, exit_code=1, expected_level=LogLevel.ERROR
     )
     message = dedent(
         """\

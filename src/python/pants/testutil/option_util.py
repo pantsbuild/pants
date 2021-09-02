@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Type, TypeVar, cast
+from typing import Iterable, Mapping, Type, TypeVar
 
 from pants.engine.goal import GoalSubsystem
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -48,7 +48,6 @@ def create_goal_subsystem(
     :param options: The option values to populate the new goal subsystem instance with.
     """
     return goal_subsystem_type(
-        scope=goal_subsystem_type.name,
         options=create_option_value_container(default_rank, **options),
     )
 
@@ -65,8 +64,6 @@ def create_subsystem(
     :param default_rank: The rank to assign any raw option values passed.
     :param options: The option values to populate the new subsystem instance with.
     """
-    options_scope = cast(str, subsystem_type.options_scope)
     return subsystem_type(
-        scope=options_scope,
         options=create_option_value_container(default_rank, **options),
     )
