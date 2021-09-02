@@ -298,7 +298,7 @@ async def setup_user_lockfile_requests(
             InterpreterConstraints.create_from_compatibility_fields(ic_fields, python_setup)
         )
 
-    requests = [
+    requests = (
         PythonLockfileRequest(
             requirements.req_strings,
             interpreter_constraints,
@@ -308,7 +308,7 @@ async def setup_user_lockfile_requests(
         for resolve, requirements, interpreter_constraints in zip(
             requested, pex_requirements_per_resolve, interpreter_constraints_per_resolve
         )
-    ]
+    )
     return _UserLockfileRequests(requests)
 
 
