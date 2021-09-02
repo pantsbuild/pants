@@ -85,7 +85,9 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         assert result.val == expected
         assert result.file_name_used == is_file
 
-    assert_resolved("path.to.cloud_function:func", expected="path.to.cloud_function:func", is_file=False)
+    assert_resolved(
+        "path.to.cloud_function:func", expected="path.to.cloud_function:func", is_file=False
+    )
     assert_resolved("cloud_function.py:func", expected="project.cloud_function:func", is_file=True)
 
     with pytest.raises(ExecutionError):
