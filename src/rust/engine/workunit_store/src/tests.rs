@@ -14,6 +14,16 @@ fn heavy_hitters_basic() {
 }
 
 #[test]
+fn heavy_hitters_only_running() {
+  // A completed child should not prevent a parent from being rendered.
+  let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![wu(2, 1)]);
+  assert_eq!(
+    vec![SpanId(1)],
+    ws.heavy_hitters(1).keys().cloned().collect::<Vec<_>>()
+  );
+}
+
+#[test]
 fn straggling_workunits_basic() {
   let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![]);
   assert_eq!(
