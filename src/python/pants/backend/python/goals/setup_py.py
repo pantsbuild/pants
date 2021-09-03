@@ -655,8 +655,7 @@ def missing_py_typed_files(typed: Optional[bool], targets: Targets) -> Tuple[Fil
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     # Create any py.typed files, if required.
     missing_py_typed = missing_py_typed_files(request.typed, request.targets)
-    py_typed_digest = await Get(Digest, CreateDigest(missing_py_typed))
-    py_typed_files = await Get(Snapshot, Digest, py_typed_digest)
+    py_typed_files = await Get(Snapshot, CreateDigest(missing_py_typed))
     py_typed_stripped = await Get(StrippedSourceFiles, SourceFiles(py_typed_files, ()))
 
     python_sources_request = PythonSourceFilesRequest(
