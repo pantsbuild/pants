@@ -25,7 +25,7 @@ use crate::Types;
 use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
-  self, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
+  self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
   Vfs,
 };
@@ -781,6 +781,13 @@ impl Snapshot {
     ))
   }
 
+  fn store_empty_directory(types: &crate::types::Types, path: &Path) -> Result<Value, String> {
+    Ok(externs::unsafe_call(
+      types.directory,
+      &[Self::store_path(path)?],
+    ))
+  }
+
   pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
     let entries = item
       .iter()
@@ -792,10 +799,13 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_digest_entries(context: &Context, item: &[FileEntry]) -> Result<Value, String> {
+  pub fn store_digest_entries(context: &Context, item: &[DigestEntry]) -> Result<Value, String> {
     let entries = item
       .iter()
-      .map(|e| Self::store_file_entry(&context.core.types, e))
+      .map(|digest_entry| match digest_entry {
+        DigestEntry::File(file_entry) => Self::store_file_entry(&context.core.types, file_entry),
+        DigestEntry::EmptyDirectory(path) => Self::store_empty_directory(&context.core.types, path),
+      })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_entries,

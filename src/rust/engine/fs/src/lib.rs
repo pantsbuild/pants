@@ -729,11 +729,26 @@ impl fmt::Debug for FileContent {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct FileEntry {
   pub path: PathBuf,
   pub digest: hashing::Digest,
   pub is_executable: bool,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum DigestEntry {
+  File(FileEntry),
+  EmptyDirectory(PathBuf),
+}
+
+impl DigestEntry {
+  pub fn path(&self) -> &Path {
+    match self {
+      DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::EmptyDirectory(path) => path,
+    }
+  }
 }
 
 ///

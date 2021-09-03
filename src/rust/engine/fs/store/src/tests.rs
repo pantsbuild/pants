@@ -9,7 +9,7 @@ use testutil::data::{TestData, TestDirectory};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
-use fs::{FileEntry, RelativePath};
+use fs::{DigestEntry, FileEntry};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -1247,59 +1247,76 @@ async fn entries_for_directory() {
     .await
     .expect("Error saving catnip file bytes");
 
-  let file_entries = store
+  let digest_entries = store
     .entries_for_directory(recursive_testdir.digest())
     .await
     .expect("Getting FileContents");
 
-  assert_same_file_entries(
-    file_entries,
+  assert_same_digest_entries(
+    digest_entries,
     vec![
-      FileEntry {
+      DigestEntry::File(FileEntry {
         path: PathBuf::from("cats").join("roland.ext"),
         digest: roland.digest(),
         is_executable: false,
-      },
-      FileEntry {
+      }),
+      DigestEntry::File(FileEntry {
         path: PathBuf::from("treats.ext"),
         digest: catnip.digest(),
         is_executable: false,
-      },
+      }),
     ],
   );
 }
 
-fn assert_same_file_entries(left: Vec<FileEntry>, right: Vec<FileEntry>) {
+fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
   assert_eq!(
     left.len(),
     right.len(),
-    "FileEntry vectors did not match, different lengths: left: {:?} right: {:?}",
+    "DigestEntry vectors did not match, different lengths: left: {:?} right: {:?}",
     left,
     right
   );
 
   let mut success = true;
   for (index, (l, r)) in left.iter().zip(right.iter()).enumerate() {
-    if l.path != r.path {
-      success = false;
-      eprintln!(
-        "Paths did not match for index {}: {:?}, {:?}",
-        index, l.path, r.path
-      );
-    }
-    if l.digest != r.digest {
-      success = false;
-      eprintln!(
-        "Digest did not match for index {}: {:?}, {:?}",
-        index, l.digest, r.digest
-      );
-    }
-    if l.is_executable != r.is_executable {
-      success = false;
-      eprintln!(
-        "Executable bit did not match for index {}: {:?}, {:?}",
-        index, l.is_executable, r.is_executable
-      );
+    match (l, r) {
+      (DigestEntry::File(l), DigestEntry::File(r)) => {
+        if l.path != r.path {
+          success = false;
+          eprintln!(
+            "Paths did not match for index {}: {:?}, {:?}",
+            index, l.path, r.path
+          );
+        }
+        if l.digest != r.digest {
+          success = false;
+          eprintln!(
+            "Digest did not match for index {}: {:?}, {:?}",
+            index, l.digest, r.digest
+          );
+        }
+        if l.is_executable != r.is_executable {
+          success = false;
+          eprintln!(
+            "Executable bit did not match for index {}: {:?}, {:?}",
+            index, l.is_executable, r.is_executable
+          );
+        }
+      }
+      (DigestEntry::EmptyDirectory(path_left), DigestEntry::EmptyDirectory(path_right)) => {
+        if path_left != path_right {
+          success = false;
+          eprintln!(
+            "Paths did not match for empty directory at index {}: {:?}, {:?}",
+            index, path_left, path_right
+          );
+        }
+      }
+      (l, r) => {
+        success = false;
+        eprintln!("Differing types at index {}: {:?}, {:?}", index, l, r)
+      }
     }
   }
   assert!(

@@ -101,8 +101,12 @@ class DigestContents(Collection[FileContent]):
     """The file contents of a Digest."""
 
 
-class DigestEntries(Collection[FileEntry]):
-    """The indirect file contents of a Digest."""
+class DigestEntries(Collection[Union[FileEntry, Directory]]):
+    """The indirect file contents of a Digest.
+
+    DigestEntries is a collection of FileContent and Directory instances representing, respecively,
+    actual files and empty directories present in the Digest.
+    """
 
 
 class CreateDigest(Collection[Union[FileContent, FileEntry, Directory]]):
