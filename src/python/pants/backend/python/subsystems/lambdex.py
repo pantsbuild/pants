@@ -11,17 +11,20 @@ from pants.util.docutil import git_url
 
 class Lambdex(PythonToolBase):
     options_scope = "lambdex"
-    help = "A tool for turning .pex files into AWS Lambdas (https://github.com/wickman/lambdex)."
+    help = "A tool for turning .pex files into Funtion-as-a-Service artifacts (https://github.com/pantsbuild/lambdex)."
 
-    default_version = "lambdex==0.1.5"
+    default_version = "lambdex==0.1.6"
     default_main = ConsoleScript("lambdex")
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6,<3.10"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.awslambda.python", "lambdex_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/awslambda/python/lambdex_lockfile.txt"
+    default_lockfile_resource = (
+        "pants.backend.python.subsystems",
+        "lambdex_lockfile.txt",
+    )
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/lambdex_lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
