@@ -84,8 +84,6 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     all_major_minor_python_versions(Isort.default_interpreter_constraints),
 )
 def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    if major_minor_interpreter == "3.6":
-        major_minor_interpreter = "3.6.1"
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(
