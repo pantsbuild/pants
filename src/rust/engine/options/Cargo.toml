@@ -1,0 +1,15 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "options"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+log = "0.4"
+peg = "0.7"
+shellexpand = "2.1"
+toml = "0.5"
+
+[dev-dependencies]
+tempdir = "0.3"

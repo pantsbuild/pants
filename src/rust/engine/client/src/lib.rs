@@ -27,15 +27,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-mod build_root;
-#[cfg(test)]
-mod build_root_tests;
-
 mod client;
 #[cfg(test)]
 mod client_tests;
-
-pub mod options;
 
 pub mod pantsd;
 #[cfg(test)]
@@ -47,12 +41,3 @@ pub use crate::client::{execute_command, ConnectionSettings};
 
 #[cfg(test)]
 mod lib_tests;
-
-pub fn render_choice(items: &[&str]) -> Option<String> {
-  match items {
-    [] => None,
-    [this] => Some(this.to_string()),
-    [this, that] => Some(format!("{} or {}", this, that)),
-    [these @ .., that] => Some(format!("{} or {}", these.join(", "), that)),
-  }
-}

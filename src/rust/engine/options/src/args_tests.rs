@@ -1,9 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::args::Args;
 use crate::option_id;
-use crate::options::args::Args;
-use crate::options::{ListEdit, ListEditAction, OptionId, OptionsSource};
+use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 
 fn args<I: IntoIterator<Item = &'static str>>(args: I) -> Args {
   Args {

@@ -1,8 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::id::{OptionId, Scope};
 use crate::option_id;
-use crate::options::id::{OptionId, Scope};
 
 #[test]
 fn test_option_id_global_switch() {
