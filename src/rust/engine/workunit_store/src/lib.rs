@@ -43,7 +43,7 @@ use log::log;
 pub use log::Level;
 pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use rand::thread_rng;
 use rand::Rng;
 use tokio::task_local;
@@ -66,7 +66,7 @@ impl std::fmt::Display for SpanId {
   }
 }
 
-type WorkunitGraph = DiGraph<SpanId, (), u32>;
+type RunningWorkunitGraph = StableDiGraph<SpanId, (), u32>;
 
 ///
 /// Workunits form a tree of running, blocked, and completed work, with parent ids propagated via
@@ -340,7 +340,7 @@ impl HeavyHittersData {
     let (msg_tx, msg_rx) = channel();
     HeavyHittersData {
       inner: Arc::new(Mutex::new(HeavyHittersInnerStore {
-        graph: DiGraph::new(),
+        running_graph: RunningWorkunitGraph::new(),
         span_id_to_graph: HashMap::new(),
         workunit_records: HashMap::new(),
       })),
@@ -355,11 +355,11 @@ impl HeavyHittersData {
 
     inner_store.workunit_records.insert(span_id, started);
 
-    let child = inner_store.graph.add_node(span_id);
+    let child = inner_store.running_graph.add_node(span_id);
     inner_store.span_id_to_graph.insert(span_id, child);
     if let Some(parent_id) = parent_id {
-      if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id).cloned() {
-        inner_store.graph.add_edge(parent, child, ());
+      if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id) {
+        inner_store.running_graph.add_edge(*parent, child, ());
       }
     }
   }
@@ -371,28 +371,29 @@ impl HeavyHittersData {
     new_counters: HashMap<Metric, u64>,
     inner_store: &mut HeavyHittersInnerStore,
   ) {
+    if let Some(node) = inner_store.span_id_to_graph.remove(&span_id) {
+      inner_store.running_graph.remove_node(node);
+    }
+
     match inner_store.workunit_records.entry(span_id) {
       Entry::Vacant(_) => {
         log::warn!("No previously-started workunit found for id: {}", span_id);
       }
-      Entry::Occupied(o) => {
-        let (span_id, mut workunit) = o.remove_entry();
-        let time_span = match workunit.state {
+      Entry::Occupied(mut o) => {
+        let workunit = o.get_mut();
+        match workunit.state {
           WorkunitState::Completed { .. } => {
             log::warn!("Workunit {} was already completed", span_id);
-            return;
           }
           WorkunitState::Started { start_time, .. } => {
-            TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
+            let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
+            workunit.state = WorkunitState::Completed { time_span };
           }
         };
-        let new_state = WorkunitState::Completed { time_span };
-        workunit.state = new_state;
         if let Some(metadata) = new_metadata {
           workunit.metadata = metadata;
         }
         workunit.counters = new_counters;
-        inner_store.workunit_records.insert(span_id, workunit);
       }
     }
   }
@@ -414,7 +415,9 @@ impl HeavyHittersData {
         }
         StoreMsg::Canceled(span_id) => {
           inner.workunit_records.remove(&span_id);
-          inner.span_id_to_graph.remove(&span_id);
+          if let Some(node) = inner.span_id_to_graph.remove(&span_id) {
+            inner.running_graph.remove_node(node);
+          }
         }
       }
     }
@@ -425,12 +428,12 @@ impl HeavyHittersData {
 
     let now = SystemTime::now();
     let inner = self.inner.lock();
-    let workunit_graph = &inner.graph;
 
-    // Initialize the heap with the leaves of the workunit graph.
-    let mut queue: BinaryHeap<(Duration, SpanId)> = workunit_graph
+    // Initialize the heap with the leaves of the running workunit graph.
+    let mut queue: BinaryHeap<(Duration, SpanId)> = inner
+      .running_graph
       .externals(petgraph::Direction::Outgoing)
-      .map(|entry| workunit_graph[entry])
+      .map(|entry| inner.running_graph[entry])
       .flat_map(|span_id: SpanId| {
         let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
         match workunit {
@@ -472,9 +475,9 @@ impl HeavyHittersData {
     let inner = self.inner.lock();
 
     let matching_visible_parents = inner
-      .graph
+      .running_graph
       .externals(petgraph::Direction::Outgoing)
-      .map(|entry| inner.graph[entry])
+      .map(|entry| inner.running_graph[entry])
       .flat_map(|span_id: SpanId| inner.workunit_records.get(&span_id))
       .filter_map(|workunit| match Self::duration_for(now, workunit) {
         Some(duration) if !workunit.state.blocked() && duration >= duration_threshold => {
@@ -521,7 +524,7 @@ impl HeavyHittersData {
 
 #[derive(Default)]
 pub struct HeavyHittersInnerStore {
-  graph: WorkunitGraph,
+  running_graph: RunningWorkunitGraph,
   span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
   workunit_records: HashMap<SpanId, Workunit>,
 }
