@@ -6,7 +6,17 @@ use crate::{SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[test]
 fn heavy_hitters_basic() {
-  let ws = create_store(vec![], vec![wu_root(0), wu(1, 0)], vec![]);
+  let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![]);
+  assert_eq!(
+    vec![SpanId(1)],
+    ws.heavy_hitters(1).keys().cloned().collect::<Vec<_>>()
+  );
+}
+
+#[test]
+fn heavy_hitters_only_running() {
+  // A completed child should not prevent a parent from being rendered.
+  let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![wu(2, 1)]);
   assert_eq!(
     vec![SpanId(1)],
     ws.heavy_hitters(1).keys().cloned().collect::<Vec<_>>()
@@ -15,7 +25,7 @@ fn heavy_hitters_basic() {
 
 #[test]
 fn straggling_workunits_basic() {
-  let ws = create_store(vec![], vec![wu_root(0), wu(1, 0)], vec![]);
+  let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![]);
   assert_eq!(
     vec!["1"],
     ws.straggling_workunits(Duration::from_secs(0))
@@ -28,7 +38,7 @@ fn straggling_workunits_basic() {
 #[test]
 fn straggling_workunits_blocked() {
   // Test that a blocked leaf is not eligible to be rendered.
-  let ws = create_store(vec![], vec![wu_root(0)], vec![wu(1, 0)]);
+  let ws = create_store(vec![wu_root(0)], vec![wu(1, 0)], vec![]);
   assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
 }
 
@@ -56,9 +66,9 @@ fn hex_16_digit_string_actually_uses_input_number() {
 }
 
 fn create_store(
-  completed: Vec<AnonymousWorkunit>,
   started: Vec<AnonymousWorkunit>,
   blocked: Vec<AnonymousWorkunit>,
+  completed: Vec<AnonymousWorkunit>,
 ) -> WorkunitStore {
   let completed_ids = completed
     .iter()
@@ -70,12 +80,21 @@ fn create_store(
     .collect::<HashSet<_>>();
   let ws = WorkunitStore::new(true);
 
-  // Start all of completed, started, and blocked workunits.
-  let workunits = completed
+  // Collect and sort by SpanId.
+  let mut all = started
     .into_iter()
-    .chain(started.into_iter())
     .chain(blocked.into_iter())
+    .chain(completed.into_iter())
+    .collect::<Vec<_>>();
+  all.sort_by(|a, b| a.0.cmp(&b.0));
+
+  // Start all workunits in SpanId order.
+  let workunits = all
+    .into_iter()
     .map(|(span_id, parent_id, metadata)| {
+      if let Some(parent_id) = parent_id {
+        assert!(span_id > parent_id);
+      }
       ws.start_workunit(span_id, format!("{}", span_id.0), parent_id, metadata)
     })
     .collect::<Vec<_>>();
