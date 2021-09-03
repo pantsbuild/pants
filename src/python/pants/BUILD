@@ -12,6 +12,7 @@ python_library(
 
 python_distribution(
   name='pants-packaged',
+  typed='yes',
   dependencies=[
     ':dummy_c',
     ':entry_point',

@@ -3,6 +3,7 @@
 
 python_distribution(
   name='testutil_wheel',
+  typed='yes',
   dependencies=[
     ':testutil',
     ':pants_integration_test',

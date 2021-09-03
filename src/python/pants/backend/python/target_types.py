@@ -86,6 +86,25 @@ class InterpreterConstraintsField(StringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
+class PythonTyped(Enum):
+    YES = "yes"
+    NO = "no"
+    PARTIAL = "partial"
+
+
+class PythonTypedField(StringField):
+    alias = "typed"
+    valid_choices = PythonTyped
+    expected_type = str
+    default = None
+    help = (
+        "Whether to mark this target as typed, partially typed, or not typed. (PEP-561)\n"
+        "When marked as typed, it applies recursively to all sub modules as well.\n"
+        "\n"
+        "Notice: that 'partial' MUST be applied to a top-level library."
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` target
 # -----------------------------------------------------------------------------------------------
@@ -507,6 +526,7 @@ class PythonLibrary(Target):
         InterpreterConstraintsField,
         Dependencies,
         PythonLibrarySources,
+        PythonTypedField,
     )
     help = (
         "Python source code.\n\nA `python_library` does not necessarily correspond to a "
@@ -855,6 +875,7 @@ class PythonDistribution(Target):
         PythonDistributionDependencies,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
+        PythonTypedField,
         SetupPyCommandsField,
     )
     help = (

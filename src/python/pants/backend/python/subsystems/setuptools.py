@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.target_types import PythonProvidesField
+from pants.backend.python.target_types import PythonProvidesField, PythonTypedField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.package import PackageFieldSet
@@ -23,6 +23,7 @@ class PythonDistributionFieldSet(PackageFieldSet):
     required_fields = (PythonProvidesField,)
 
     provides: PythonProvidesField
+    typed: PythonTypedField
 
 
 class Setuptools(PythonToolRequirementsBase):

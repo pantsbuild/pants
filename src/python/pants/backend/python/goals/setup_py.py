@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
+from typing import Any, DefaultDict, Dict, List, Mapping, Optional, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
@@ -20,6 +20,8 @@ from pants.backend.python.target_types import (
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
+    PythonTyped,
+    PythonTypedField,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
     SetupPyCommandsField,
@@ -34,7 +36,8 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames, StrippedSourceFiles
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -167,6 +170,7 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
 class SetupPySourcesRequest:
     targets: Targets
     py2: bool  # Whether to use py2 or py3 package semantics.
+    typed: Optional[bool] = None  # Whether to enforce typed packages (PEP-561)
 
 
 @dataclass(frozen=True)
@@ -189,6 +193,7 @@ class SetupPyChrootRequest:
 
     exported_target: ExportedTarget
     py2: bool  # Whether to use py2 or py3 package semantics.
+    typed: Optional[bool] = None  # Whether to enforce typed packages (PEP-561)
 
 
 @frozen_after_init
@@ -375,9 +380,18 @@ async def package_python_dist(
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     ) or InterpreterConstraints(python_setup.interpreter_constraints)
+
+    typed = None
+    if field_set.typed.value == PythonTyped.YES.value:
+        typed = True
+    elif field_set.typed.value == PythonTyped.NO.value:
+        typed = False
+
     chroot = await Get(
         SetupPyChroot,
-        SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
+        SetupPyChrootRequest(
+            exported_target, py2=interpreter_constraints.includes_python2(), typed=typed
+        ),
     )
 
     # If commands were provided, run setup.py with them; Otherwise just dump chroots.
@@ -508,7 +522,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
 
     sources, requirements = await MultiGet(
-        Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
+        Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2, typed=request.typed)),
         Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
     )
     # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
@@ -614,8 +628,37 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
 
 
+def missing_py_typed_files(typed: Optional[bool], targets: Targets) -> Tuple[FileContent, ...]:
+    """Return tuple with all 'py.typed' files that should be created."""
+    if typed is False:
+        return ()
+
+    py_typed = []
+    for tgt in targets:
+        if not tgt.has_field(PythonTypedField):
+            continue
+        target_typed = (typed and PythonTyped.YES.value) or tgt[PythonTypedField].value
+        if target_typed in [None, PythonTyped.NO.value]:
+            continue
+
+        py_typed.append(
+            FileContent(
+                os.path.join(tgt.address.spec_path, "py.typed"),
+                b"partial\n" if target_typed == PythonTyped.PARTIAL.value else b"",
+            )
+        )
+
+    return tuple(py_typed)
+
+
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
+    # Create any py.typed files, if required.
+    missing_py_typed = missing_py_typed_files(request.typed, request.targets)
+    py_typed_digest = await Get(Digest, CreateDigest(missing_py_typed))
+    py_typed_files = await Get(Snapshot, Digest, py_typed_digest)
+    py_typed_stripped = await Get(StrippedSourceFiles, SourceFiles(py_typed_files, ()))
+
     python_sources_request = PythonSourceFilesRequest(
         targets=request.targets, include_resources=False, include_files=False
     )
@@ -627,8 +670,16 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
         Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, all_sources_request),
     )
 
+    # Merge in any created py.typed files with all other sources.
+    all_sources_snapshot = await Get(
+        Snapshot,
+        MergeDigests(
+            [all_sources.stripped_source_files.snapshot.digest, py_typed_stripped.snapshot.digest]
+        ),
+    )
+
     python_files = set(python_sources.stripped_source_files.snapshot.files)
-    all_files = set(all_sources.stripped_source_files.snapshot.files)
+    all_files = set(all_sources_snapshot.files)
     resource_files = all_files - python_files
 
     init_py_digest_contents = await Get(
@@ -644,8 +695,9 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
         init_py_digest_contents=init_py_digest_contents,
         py2=request.py2,
     )
+
     return SetupPySources(
-        digest=all_sources.stripped_source_files.snapshot.digest,
+        digest=all_sources_snapshot.digest,
         packages=packages,
         namespace_packages=namespace_packages,
         package_data=package_data,

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Iterable, Type
+from typing import Iterable, Optional, Type
 
 import pytest
 
@@ -48,7 +48,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Targets
@@ -555,8 +555,10 @@ def test_get_sources() -> None:
         "src/python/foo/bar/baz",
         textwrap.dedent(
             """
-            python_library(name='baz1', sources=['baz1.py'])
+            python_library(name='baz1', sources=['baz1.py'], typed="no")
             python_library(name='baz2', sources=['baz2.py'])
+            python_library(name='pep561', typed="yes")
+            python_library(name='pep561-partial', typed="partial")
             """
         ),
     )
@@ -576,11 +578,13 @@ def test_get_sources() -> None:
         expected_namespace_packages,
         expected_package_data,
         addrs,
+        typed: Optional[bool] = None,
+        expected_file_contents=None,
     ):
         targets = Targets(rule_runner.get_target(addr) for addr in addrs)
         srcs = rule_runner.request(
             SetupPySources,
-            [SetupPySourcesRequest(targets, py2=False)],
+            [SetupPySourcesRequest(targets, py2=False, typed=typed)],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 
@@ -588,6 +592,12 @@ def test_get_sources() -> None:
         assert sorted(expected_packages) == sorted(srcs.packages)
         assert sorted(expected_namespace_packages) == sorted(srcs.namespace_packages)
         assert expected_package_data == dict(srcs.package_data)
+
+        if expected_file_contents:
+            files = rule_runner.request(DigestContents, [chroot_snapshot.digest])
+            for f in files:
+                if f.path in expected_file_contents:
+                    assert f.content == expected_file_contents[f.path].encode()
 
     assert_sources(
         expected_files=["foo/bar/baz/baz1.py", "foo/bar/__init__.py", "foo/__init__.py"],
@@ -651,6 +661,65 @@ def test_get_sources() -> None:
             Address("src/python/foo/qux"),
             Address("src/python/foo/resources"),
         ],
+    )
+
+    assert_sources(
+        expected_files=[
+            "foo/__init__.py",
+            "foo/bar/__init__.py",
+            "foo/bar/baz/baz1.py",
+            "foo/bar/baz/baz2.py",
+            "foo/bar/baz/py.typed",
+        ],
+        expected_packages=["foo", "foo.bar", "foo.bar.baz"],
+        expected_namespace_packages=["foo.bar"],
+        expected_package_data={"foo.bar.baz": ("py.typed",)},
+        addrs=[Address("src/python/foo/bar/baz", target_name="pep561")],
+    )
+
+    assert_sources(
+        expected_files=[
+            "foo/__init__.py",
+            "foo/bar/__init__.py",
+            "foo/bar/baz/baz1.py",
+            "foo/bar/baz/baz2.py",
+        ],
+        expected_packages=["foo", "foo.bar", "foo.bar.baz"],
+        expected_namespace_packages=["foo.bar"],
+        expected_package_data={},
+        addrs=[Address("src/python/foo/bar/baz", target_name="pep561")],
+        typed=False,
+    )
+
+    assert_sources(
+        expected_files=[
+            "foo/bar/baz/baz1.py",
+            "foo/bar/__init__.py",
+            "foo/__init__.py",
+            "foo/bar/baz/py.typed",
+        ],
+        expected_packages=["foo", "foo.bar", "foo.bar.baz"],
+        expected_namespace_packages=["foo.bar"],
+        expected_package_data={"foo.bar.baz": ("py.typed",)},
+        addrs=[Address("src/python/foo/bar/baz", target_name="baz1")],
+        typed=True,
+    )
+
+    assert_sources(
+        expected_files=[
+            "foo/__init__.py",
+            "foo/bar/__init__.py",
+            "foo/bar/baz/baz1.py",
+            "foo/bar/baz/baz2.py",
+            "foo/bar/baz/py.typed",
+        ],
+        expected_file_contents={
+            "foo/bar/baz/py.typed": "partial\n",
+        },
+        expected_packages=["foo", "foo.bar", "foo.bar.baz"],
+        expected_namespace_packages=["foo.bar"],
+        expected_package_data={"foo.bar.baz": ("py.typed",)},
+        addrs=[Address("src/python/foo/bar/baz", target_name="pep561-partial")],
     )
 
 

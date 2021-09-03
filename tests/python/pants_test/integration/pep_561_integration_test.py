@@ -60,6 +60,7 @@ def test_type_stubs() -> None:
         ),
         "proj1/ok.py": dedent(
             """\
+            # import should be ok
             from pants.testutil.option_util import create_subsystem
             """
         ),
@@ -68,6 +69,7 @@ def test_type_stubs() -> None:
             from pants.testutil.option_util import create_subsystem
 
             def dummy() -> None:
+                # wrong args should not be ok
                 create_subsystem()
             """
         ),
