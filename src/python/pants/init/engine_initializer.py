@@ -177,7 +177,6 @@ class EngineInitializer:
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
-        engine_visualize_to = GlobalOptions.compute_engine_visualize_to(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
@@ -190,7 +189,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             include_trace_on_error=bootstrap_options.print_stacktrace,
-            engine_visualize_to=engine_visualize_to,
+            engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
         )
 
