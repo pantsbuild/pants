@@ -1,9 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::env::Env;
 use crate::option_id;
-use crate::options::env::Env;
-use crate::options::{ListEdit, ListEditAction, OptionId, OptionsSource};
+use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 use std::collections::HashMap;
 
 fn env<I: IntoIterator<Item = (&'static str, &'static str)>>(vars: I) -> Env {

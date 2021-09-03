@@ -6,8 +6,8 @@ use std::env;
 use super::id::{NameTransform, OptionId, Scope};
 use super::parse::parse_bool;
 use super::OptionsSource;
-use crate::options::parse::parse_string_list;
-use crate::options::ListEdit;
+use crate::parse::parse_string_list;
+use crate::ListEdit;
 use std::collections::HashMap;
 
 pub(crate) struct Args {

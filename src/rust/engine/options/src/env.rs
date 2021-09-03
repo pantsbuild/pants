@@ -6,8 +6,8 @@ use std::env;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::OptionsSource;
-use crate::options::parse::{parse_bool, parse_string_list};
-use crate::options::ListEdit;
+use crate::parse::{parse_bool, parse_string_list};
+use crate::ListEdit;
 
 #[derive(Debug)]
 pub(crate) struct Env {

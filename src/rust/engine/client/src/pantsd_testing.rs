@@ -7,7 +7,7 @@ use std::str::from_utf8;
 
 use tempdir::TempDir;
 
-use crate::build_root::BuildRoot;
+use options::BuildRoot;
 
 pub(crate) fn launch_pantsd() -> (BuildRoot, TempDir) {
   let build_root = BuildRoot::find()

@@ -70,29 +70,29 @@ impl Display for OptionId {
 #[macro_export]
 macro_rules! option_id {
     (-$switch:literal, [$scope:literal], $($name_component:literal),+) => {
-        $crate::options::OptionId::new(
-            $crate::options::Scope::named($scope),
+        $crate::OptionId::new(
+            $crate::Scope::named($scope),
             [$($name_component),+].iter(),
             Some($switch)
         ).expect("Creating an OptionId via macro should ensure at least one name component")
     };
     (-$switch:literal, $($name_component:literal),+) => {
-        $crate::options::OptionId::new(
-            $crate::options::Scope::Global,
+        $crate::OptionId::new(
+            $crate::Scope::Global,
             [$($name_component),+].iter(),
             Some($switch)
         ).expect("Creating an OptionId via macro should ensure at least one name component")
     };
     ([$scope:literal], $($name_component:literal),+) => {
-        $crate::options::OptionId::new(
-            $crate::options::Scope::named($scope),
+        $crate::OptionId::new(
+            $crate::Scope::named($scope),
             [$($name_component),+].iter(),
             None
         ).expect("Creating an OptionId via macro should ensure at least one name component")
     };
     ($($name_component:literal),+) => {
-        $crate::options::OptionId::new(
-            $crate::options::Scope::Global,
+        $crate::OptionId::new(
+            $crate::Scope::Global,
             [$($name_component),+].iter(),
             None
         ).expect("Creating an OptionId via macro should ensure at least one name component")

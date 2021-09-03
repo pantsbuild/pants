@@ -1,8 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::options::parse::{parse_bool, parse_string_list};
-use crate::options::{ListEdit, ListEditAction};
+use crate::parse::{parse_bool, parse_string_list};
+use crate::{ListEdit, ListEditAction};
 
 #[test]
 fn test_parse_bool() {
