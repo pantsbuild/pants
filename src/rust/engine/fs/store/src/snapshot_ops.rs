@@ -406,6 +406,12 @@ impl IntermediateGlobbedFilesAndDirectories {
           RestrictedPathGlob::Wildcard { wildcard } => {
             // NB: We interpret globs such that the *only* way to have a glob match the contents of
             // a whole directory is to end in '/**' or '/**/*'.
+
+            if exclude.maybe_is_parent_of_ignored_path(&directory_path) {
+              // leave this directory in todo_directories, so we process ignore patterns correctly..
+              continue;
+            }
+
             if *wildcard == *DOUBLE_STAR_GLOB {
               globbed_directories.insert(directory_path, directory_node.clone());
             } else if !globbed_directories.contains_key(&directory_path) {
@@ -425,23 +431,23 @@ impl IntermediateGlobbedFilesAndDirectories {
             if (*wildcard == *DOUBLE_STAR_GLOB) || (*wildcard == *SINGLE_STAR_GLOB) {
               // Here we short-circuit all cases which would swallow up a directory without
               // subsetting it or needing to perform any further recursive work.
-              let has_ignores = exclude.has_ignored_paths(&directory_path);
-
-              let short_circuit: bool = match &remainder[..] {
-                [] => !has_ignores,
+              let is_short_circuit_pattern: bool = match &remainder[..] {
+                [] => true,
                 // NB: Very often, /**/* is seen ending zsh-style globs, which means the same as
                 // ending in /**. Because we want to *avoid* recursing and just use the subdirectory
                 // as-is for /**/* and /**, we `continue` here in both cases.
-                [single_glob] if *single_glob == *SINGLE_STAR_GLOB => !has_ignores,
-                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => !has_ignores,
+                [single_glob] if *single_glob == *SINGLE_STAR_GLOB => true,
+                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => true,
                 [double_glob, single_glob]
                   if *double_glob == *DOUBLE_STAR_GLOB && *single_glob == *SINGLE_STAR_GLOB =>
                 {
-                  !has_ignores
+                  true
                 }
                 _ => false,
               };
-              if short_circuit {
+              if is_short_circuit_pattern
+                && !exclude.maybe_is_parent_of_ignored_path(&directory_path)
+              {
                 globbed_directories.insert(directory_path, directory_node.clone());
                 continue;
               }
