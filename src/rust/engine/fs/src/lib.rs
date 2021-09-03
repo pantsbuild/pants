@@ -315,7 +315,7 @@ impl GitignoreStyleExcludes {
   /// Find out if a path has any ignore patterns for files/paths in its tree.
   ///
   /// Used by the IntermediateGlobbedFilesAndDirectories in snapshot_ops.rs,
-  /// to check if it mayoptimize the snapshot subset operation on this tree,
+  /// to check if it may optimize the snapshot subset operation on this tree,
   /// or need to check for excluded files/directories.
   ///
   pub fn maybe_is_parent_of_ignored_path(&self, path: &Path) -> bool {
