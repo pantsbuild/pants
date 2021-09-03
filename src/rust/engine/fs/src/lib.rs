@@ -729,6 +729,28 @@ impl fmt::Debug for FileContent {
   }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct FileEntry {
+  pub path: PathBuf,
+  pub digest: hashing::Digest,
+  pub is_executable: bool,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum DigestEntry {
+  File(FileEntry),
+  EmptyDirectory(PathBuf),
+}
+
+impl DigestEntry {
+  pub fn path(&self) -> &Path {
+    match self {
+      DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::EmptyDirectory(path) => path,
+    }
+  }
+}
+
 ///
 /// Increase file handle limits as much as the OS will allow us to, returning an error if we are
 /// unable to either get or sufficiently raise them. Generally the returned error should be treated

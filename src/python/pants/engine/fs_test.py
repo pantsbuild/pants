@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Set
+from typing import Callable, Iterable, List, Optional, Set, Union
 
 import pytest
 
@@ -24,11 +24,13 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     DigestSubset,
     Directory,
     DownloadFile,
     FileContent,
     FileDigest,
+    FileEntry,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -52,7 +54,10 @@ from pants.util.dirutil import relative_symlink, safe_file_dump
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            QueryRule(Digest, [CreateDigest]),
             QueryRule(DigestContents, [PathGlobs]),
+            QueryRule(DigestEntries, [Digest]),
+            QueryRule(DigestEntries, [PathGlobs]),
             QueryRule(Snapshot, [CreateDigest]),
             QueryRule(Snapshot, [DigestSubset]),
             QueryRule(Snapshot, [PathGlobs]),
@@ -356,6 +361,50 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     assert not get_contents(["c.ln"])
 
 
+def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+        return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
+
+    assert get_entries(["4.txt", "a/4.txt.ln"]) == {
+        FileEntry(
+            "4.txt",
+            FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+        ),
+        FileEntry(
+            "a/4.txt.ln",
+            FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+        ),
+    }
+    assert get_entries(["c.ln/../3.txt"]) == {
+        FileEntry(
+            "c.ln/../3.txt",
+            FileDigest("f6936912184481f5edd4c304ce27c5a1a827804fc7f329f43d273b8621870776", 6),
+        )
+    }
+
+    # Directories are empty.
+    assert get_entries(["a/b"]) == {Directory("a/b")}
+    assert get_entries(["c.ln"]) == {Directory("c.ln")}
+
+
+def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(
+        Digest, [CreateDigest([Directory("a/b"), FileContent("a/foo.txt", b"four\n")])]
+    )
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            Directory("a/b"),
+            FileEntry(
+                "a/foo.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+        ]
+    )
+
+
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
     setup_fs_test_tar(rule_runner)
     test_name = f"{__name__}.{test_glob_match_error_behavior.__name__}()"
@@ -453,6 +502,18 @@ def test_create_empty_directory(rule_runner: RuleRunner) -> None:
     assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
     assert not res.files
     assert res.digest != EMPTY_DIGEST
+
+
+def test_create_digest_with_file_entries(rule_runner: RuleRunner) -> None:
+    # Retrieve some known FileEntry's from the test tar.
+    setup_fs_test_tar(rule_runner)
+    file_entries = rule_runner.request(DigestEntries, [PathGlobs(["4.txt", "a/4.txt.ln"])])
+
+    # Make a snapshot with just those files.
+    snapshot = rule_runner.request(Snapshot, [CreateDigest(file_entries)])
+    assert snapshot.dirs == ("a",)
+    assert snapshot.files == ("4.txt", "a/4.txt.ln")
+    assert snapshot.digest != EMPTY_DIGEST
 
 
 # -----------------------------------------------------------------------------------------------
