@@ -527,6 +527,19 @@ class PantsdClientException(Exception):
     pass
 
 # ------------------------------------------------------------------------------
+# Options
+# ------------------------------------------------------------------------------
+
+class PyOptionId:
+    def __init__(
+        self, *components: str, scope: str | None = None, switch: str | None = None
+    ) -> None: ...
+
+class PyOptionParser:
+    def __init__(self, env: dict[str, str], args: list[str]) -> None: ...
+    def parse_bool(self, option_id: PyOptionId, default: bool) -> tuple[bool, str]: ...
+
+# ------------------------------------------------------------------------------
 # Testutil
 # ------------------------------------------------------------------------------
 

@@ -53,11 +53,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
-use self::args::Args;
+pub use self::args::Args;
 use self::config::Config;
-use self::env::Env;
+pub use self::env::Env;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 
@@ -80,7 +80,7 @@ pub(crate) struct ListEdit<T> {
 /// This is currently a subset of the types of options the Pants python option system handles.
 /// Implementations should mimic the behavior of the equivalent python source.
 ///
-pub(crate) trait OptionsSource {
+pub(crate) trait OptionsSource: Send + Sync {
   ///
   /// Get a display version of the option `id` that most closely matches the syntax used to supply
   /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
@@ -152,14 +152,14 @@ impl<T> Deref for OptionValue<T> {
 }
 
 pub struct OptionParser {
-  sources: BTreeMap<Source, Rc<dyn OptionsSource>>,
+  sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
 }
 
 impl OptionParser {
-  pub fn new() -> Result<OptionParser, String> {
-    let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-    sources.insert(Source::Env, Rc::new(Env::capture()));
-    sources.insert(Source::Flag, Rc::new(Args::argv()));
+  pub fn new(env: Env, args: Args) -> Result<Self, String> {
+    let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+    sources.insert(Source::Env, Arc::new(env));
+    sources.insert(Source::Flag, Arc::new(args));
     let mut parser = OptionParser {
       sources: sources.clone(),
     };
@@ -178,7 +178,7 @@ impl OptionParser {
       ],
     )?;
     let mut config = Config::merged(&repo_config_files)?;
-    sources.insert(Source::Config, Rc::new(config.clone()));
+    sources.insert(Source::Config, Arc::new(config.clone()));
     parser = OptionParser {
       sources: sources.clone(),
     };
@@ -195,8 +195,12 @@ impl OptionParser {
         }
       }
     }
-    sources.insert(Source::Config, Rc::new(config));
+    sources.insert(Source::Config, Arc::new(config));
     Ok(OptionParser { sources })
+  }
+
+  pub fn from_globals() -> Result<Self, String> {
+    Self::new(Env::capture(), Args::argv())
   }
 
   pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
