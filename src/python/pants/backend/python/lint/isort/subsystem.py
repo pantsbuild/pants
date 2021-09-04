@@ -20,11 +20,11 @@ class Isort(PythonToolBase):
     options_scope = "isort"
     help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
 
-    default_version = "isort[pyproject,colors]>=5.5.1,<5.6"
+    default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
     default_main = ConsoleScript("isort")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6,<4"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.isort", "lockfile.txt")
