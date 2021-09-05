@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from pants.option.ranked_value import Rank, RankedValue, Value
+from pants.option.ranked_value import Rank, Value
 
 Key = str
+RankedValue = Tuple[Any, Rank]
 
 
 class OptionValueContainerBuilder:
@@ -24,22 +25,19 @@ class OptionValueContainerBuilder:
         for k, v in other._value_map.items():
             self._set(k, v)
 
-    def _set(self, key: Key, value: RankedValue) -> None:
-        if not isinstance(value, RankedValue):
-            raise AttributeError(f"Value must be of type RankedValue: {value}")
-
+    def _set(self, key: Key, ranked_value: RankedValue) -> None:
         existing_value = self._value_map.get(key)
-        existing_rank = existing_value.rank if existing_value is not None else Rank.NONE
-        if value.rank >= existing_rank:
-            # We set values from outer scopes before values from inner scopes, so
-            # in case of equal rank we overwrite. That way that the inner scope value wins.
-            self._value_map[key] = value
+        if existing_value is not None:
+            raise AssertionError(
+                f"Option values should not be set multiple times: {existing_value} vs {ranked_value}"
+            )
+        self._value_map[key] = ranked_value
 
     # Support attribute setting, e.g., opts.foo = RankedValue(Rank.HARDCODED, 42).
-    def __setattr__(self, key: Key, value: RankedValue) -> None:
+    def __setattr__(self, key: Key, ranked_value: RankedValue) -> None:
         if key == "_value_map":
-            return super().__setattr__(key, value)
-        self._set(key, value)
+            return super().__setattr__(key, ranked_value)
+        self._set(key, ranked_value)
 
     def build(self) -> OptionValueContainer:
         return OptionValueContainer(copy.copy(self._value_map))
@@ -66,8 +64,8 @@ class OptionValueContainer:
         """Returns the keys for any values that were set explicitly (via flag, config, or env
         var)."""
         ret = []
-        for k, v in self._value_map.items():
-            if v.rank > Rank.CONFIG_DEFAULT:
+        for k, (v, rank) in self._value_map.items():
+            if rank > Rank.CONFIG_DEFAULT:
                 ret.append(k)
         return ret
 
@@ -79,7 +77,7 @@ class OptionValueContainer:
         ranked_value = self._value_map.get(key)
         if ranked_value is None:
             raise AttributeError(key)
-        return ranked_value.rank
+        return ranked_value[1]
 
     def is_flagged(self, key: Key) -> bool:
         """Returns `True` if the value for the specified key was supplied via a flag.
@@ -125,8 +123,8 @@ class OptionValueContainer:
         # test self._value_map.get() for None.
         if key not in self._value_map:
             raise AttributeError(key)
-        ranked_val = self._value_map[key]
-        return ranked_val.value
+        value, _ = self._value_map[key]
+        return value
 
     # Support natural dynamic access, e.g., opts[foo] is more idiomatic than getattr(opts, 'foo').
     def __getitem__(self, key: Key):

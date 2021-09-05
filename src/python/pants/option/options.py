@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Iterable, Mapping, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence, Mapping
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import ArgSplitter
+from pants.engine.internals.native_engine import PyOptionParser
+from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.errors import ConfigValidationError
 from pants.option.option_util import is_list_option
@@ -102,21 +103,16 @@ class Options:
     @classmethod
     def create(
         cls,
-        env: Mapping[str, str],
-        config: Config,
         known_scope_infos: Iterable[ScopeInfo],
         args: Sequence[str],
+        option_parser: PyOptionParser,
         bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
     ) -> Options:
         """Create an Options instance.
 
-        :param env: a dict of environment variables.
-        :param config: data from a config file.
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
         :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
-        :param bootstrap_option_values: An optional namespace containing the values of bootstrap
-               options. We can use these values when registering other options.
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
         """
         # We need parsers for all the intermediate scopes, so inherited option values
@@ -147,7 +143,7 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
+        parser_by_scope = {si.scope: Parser(option_parser, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             builtin_goal=split_args.builtin_goal,
@@ -266,7 +262,7 @@ class Options:
             self.register(subsystem_cls.options_scope, *args, **kwargs)
 
         # Clients can access the bootstrap option values as register.bootstrap.
-        register.bootstrap = self.bootstrap_option_values()
+        register.bootstrap = self._bootstrap_option_values
         # Clients can access the scope as register.scope.
         register.scope = subsystem_cls.options_scope
         return register
@@ -398,14 +394,6 @@ class Options:
         # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
         # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
         return self.for_scope(scope)
-
-    def bootstrap_option_values(self) -> OptionValueContainer | None:
-        """Return the option values for bootstrap options.
-
-        General code can also access these values in the global scope.  But option registration code
-        cannot, hence this special-casing of this small set of options.
-        """
-        return self._bootstrap_option_values
 
     def for_global_scope(self) -> OptionValueContainer:
         """Return the option values for the global scope.

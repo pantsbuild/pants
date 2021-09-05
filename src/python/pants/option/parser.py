@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import inspect
 import json
@@ -18,7 +19,7 @@ import yaml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.config import DEFAULT_SECTION, Config
+from pants.engine.internals.native_engine import PyOptionId, PyOptionParser
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -49,16 +50,16 @@ from pants.option.errors import (
     RegistrationError,
     UnknownFlagsError,
 )
-from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.strutil import softwrap
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 @dataclass(frozen=True)
 class OptionValueHistory:
-    ranked_values: tuple[RankedValue]
+    ranked_values: tuple[RankedValue, ...]
 
     @property
     def final_value(self) -> RankedValue:
@@ -106,8 +107,7 @@ class Parser:
 
     def __init__(
         self,
-        env: Mapping[str, str],
-        config: Config,
+        option_parser: PyOptionParser,
         scope_info: ScopeInfo,
     ) -> None:
         """Create a Parser instance.
@@ -116,19 +116,15 @@ class Parser:
         :param config: data from a config file.
         :param scope_info: the scope this parser acts for.
         """
-        self._env = env
-        self._config = config
+        self._option_parser = option_parser
         self._scope_info = scope_info
         self._scope = self._scope_info.scope
 
-        # All option args registered with this parser.  Used to prevent conflicts.
+        # All option args registered with this parser. Used to prevent conflicts.
         self._known_args: set[str] = set()
 
         # List of (args, kwargs) registration pairs, exactly as captured at registration time.
         self._option_registrations: list[tuple[tuple[str, ...], dict[str, Any]]] = []
-
-        # Map of dest -> history.
-        self._history: dict[str, OptionValueHistory] = {}
 
     @property
     def scope_info(self) -> ScopeInfo:
@@ -142,9 +138,6 @@ class Parser:
     def known_scoped_args(self) -> frozenset[str]:
         prefix = f"{self.scope}-" if self.scope != GLOBAL_SCOPE else ""
         return frozenset(f"--{prefix}{arg.lstrip('--')}" for arg in self._known_args)
-
-    def history(self, dest: str) -> OptionValueHistory | None:
-        return self._history.get(dest)
 
     @dataclass(frozen=True)
     class ParseArgsRequest:
@@ -207,31 +200,6 @@ class Parser:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
 
-            # Compute the values provided on the command line for this option.  Note that there may be
-            # multiple values, for any combination of the following reasons:
-            #   - The user used the same flag multiple times.
-            #   - The user specified a boolean flag (--foo) and its inverse (--no-foo).
-            #   - The option has multiple names, and the user used more than one of them.
-            #
-            # We also check if the option is deprecated, but we only do so if the option is explicitly
-            # specified as a command-line flag, so we don't spam users with deprecated option values
-            # specified in config, which isn't something they control.
-            implicit_value = kwargs.get("implicit_value")
-            if implicit_value is None and self.is_bool(kwargs):
-                implicit_value = True  # Allows --foo to mean --foo=true.
-
-            flag_vals: list[int | float | bool | str] = []
-
-            def add_flag_val(v: int | float | bool | str | None) -> None:
-                if v is None:
-                    if implicit_value is None:
-                        raise ParseError(
-                            f"Missing value for command line flag {arg} in {self._scope_str()}"
-                        )
-                    flag_vals.append(implicit_value)
-                else:
-                    flag_vals.append(v)
-
             for arg in args:
                 # If the user specified --no-foo on the cmd line, treat it as if the user specified
                 # --foo, but with the inverse value.
@@ -239,39 +207,19 @@ class Parser:
                     inverse_arg = self._inverse_arg(arg)
                     if inverse_arg in flag_value_map:
                         flag_value_map[arg] = [self._invert(v) for v in flag_value_map[inverse_arg]]
-                        implicit_value = self._invert(implicit_value)
                         del flag_value_map[inverse_arg]
 
                 if arg in flag_value_map:
-                    for v in flag_value_map[arg]:
-                        add_flag_val(v)
                     del flag_value_map[arg]
 
             # Get the value for this option, falling back to defaults as needed.
             try:
-                value_history = self._compute_value(
-                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
-                )
-                self._history[dest] = value_history
-                val = value_history.final_value
-            except ParseError as e:
-                # Reraise a new exception with context on the option being processed at the time of error.
-                # Note that other exception types can be raised here that are caught by ParseError (e.g.
-                # BooleanConversionError), hence we reference the original exception type as type(e).
-                args_str = ", ".join(args)
-                raise type(e)(
-                    softwrap(
-                        f"""
-                        Error computing value for {args_str} in {self._scope_str()} (may also be
-                        from PANTS_* environment variables). Caused by:
-
-                        {e}
-                        """
-                    )
-                )
+                val, rank = self._compute_value(dest, kwargs, parse_args_request.passthrough_args)
+            except Exception as e:
+                raise ParseError(f"Error computing value for `{dest}` in {self._scope_str()}:\n{e}")
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
-            if val.rank > Rank.HARDCODED:
+            if rank > Rank.HARDCODED:
                 self._check_deprecated(dest, kwargs)
                 mutex_dest = kwargs.get("mutually_exclusive_group")
                 mutex_map_key = mutex_dest or dest
@@ -287,7 +235,7 @@ class Parser:
                         )
                     )
 
-            setattr(namespace, dest, val)
+            setattr(namespace, dest, (val, rank))
 
         if not parse_args_request.allow_unknown_flags and flag_value_map:
             # There were unconsumed flags.
@@ -554,20 +502,18 @@ class Parser:
             env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
         return env_vars
 
-    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
+    def _compute_value(self, dest, kwargs, passthru_arg_strs) -> tuple[Any, Rank]:
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
         """
         type_arg = kwargs.get("type", str)
         member_type = kwargs.get("member_type", str)
-
-        def to_value_type(val_str):
-            return self.to_value_type(val_str, type_arg, member_type)
+        val: Any
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
-        def expand(val_or_str):
+        def atfile_expand(val_or_str):
             if (
                 kwargs.get("fromfile", True)
                 and isinstance(val_or_str, str)
@@ -592,106 +538,22 @@ class Parser:
             else:
                 return val_or_str
 
-        # Helper function to merge multiple values from a single rank (e.g., multiple flags,
-        # or multiple config files).
-        def merge_in_rank(vals):
-            if not vals:
-                return None
-            expanded_vals = [to_value_type(expand(x)) for x in vals]
-            if is_list_option(kwargs):
-                return ListValueComponent.merge(expanded_vals)
-            if is_dict_option(kwargs):
-                return DictValueComponent.merge(expanded_vals)
-            return expanded_vals[-1]  # Last value wins.
+        # TODO: Pass short flag name.
+        option_id = PyOptionId(*dest.split("_"), scope=(self._scope or None))
 
-        # Get value from config files, and capture details about its derivation.
-        config_details = None
-        config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-        config_default_val = merge_in_rank(self._config.get(DEFAULT_SECTION, dest))
-        config_val = merge_in_rank(self._config.get(config_section, dest))
-        config_source_files = self._config.get_sources_for_option(config_section, dest)
-        if config_source_files:
-            config_details = f"from {', '.join(config_source_files)}"
-
-        # Get value from environment, and capture details about its derivation.
-        env_vars = self.get_env_var_names(self._scope, dest)
-        env_val = None
-        env_details = None
-        if self._env:
-            for env_var in env_vars:
-                if env_var in self._env:
-                    env_val = merge_in_rank([self._env.get(env_var)])
-                    env_details = f"from env var {env_var}"
-                    break
-
-        # Get value from cmd-line flags.
-        flag_vals = list(flag_val_strs)
-        if kwargs.get("passthrough") and passthru_arg_strs:
-            # NB: Passthrough arguments are either of type `str` or `shell_str`
-            # (see self._validate): the former never need interpretation, and the latter do not
-            # need interpretation when they have been provided directly via `sys.argv` as the
-            # passthrough args have been.
-            flag_vals.append(
-                ListValueComponent(ListValueComponent.MODIFY, [*passthru_arg_strs], [])
+        if type_arg == bool:
+            val, source = self._option_parser.parse_bool(option_id, kwargs.get("default", False))
+        elif type_arg == str:
+            val, source = self._option_parser.parse_string(option_id, kwargs.get("default"))
+        elif type_arg == list:
+            val, source = self._option_parser.parse_string_list(
+                option_id, kwargs.get("default", [])
             )
-        if len(flag_vals) > 1 and not (is_list_option(kwargs) or is_dict_option(kwargs)):
-            raise ParseError(
-                f"Multiple cmd line flags specified for option {dest} in {self._scope_str()}"
-            )
-        flag_val = merge_in_rank(flag_vals)
-        flag_details = None if flag_val is None else "from command-line flag"
-
-        # Rank all available values.
-        values_to_rank = [
-            (flag_val, flag_details),
-            (env_val, env_details),
-            (config_val, config_details),
-            (config_default_val, config_details),
-            (to_value_type(kwargs.get("default")), None),
-            (None, None),
-        ]
-        # Note that ranked_vals will always have at least one element, and all elements will be
-        # instances of RankedValue (so none will be None, although they may wrap a None value).
-        ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
-
-        def group(value_component_type, process_val_func) -> list[RankedValue]:
-            # We group any values that are merged together, so that the history can reflect
-            # merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
-            # and then replace it with [d, e], the history will contain:
-            #   - [d, e] (from command-line flag)
-            #   - [a, b, c] (from env var, from config)
-            # And similarly for dicts.
-            grouped: list[list[RankedValue]] = [[]]
-            for ranked_val in ranked_vals:
-                if ranked_val.value and ranked_val.value.action == value_component_type.REPLACE:
-                    grouped.append([])
-                grouped[-1].append(ranked_val)
-            return [
-                RankedValue(
-                    grp[-1].rank,
-                    process_val_func(
-                        value_component_type.merge(
-                            rv.value for rv in grp if rv.value is not None
-                        ).val
-                    ),
-                    ", ".join(rv.details for rv in grp if rv.details),
-                )
-                for grp in grouped
-                if grp
-            ]
-
-        if is_list_option(kwargs):
-
-            def process_list(lst):
-                return [self._convert_member_type(member_type, val) for val in lst]
-
-            historic_ranked_vals = group(ListValueComponent, process_list)
-        elif is_dict_option(kwargs):
-            historic_ranked_vals = group(DictValueComponent, lambda x: x)
+        elif issubclass(type_arg, Enum):
+            val, source = self._option_parser.parse_string(option_id, kwargs.get("default").name)
+            val = type_arg[val]
         else:
-            historic_ranked_vals = ranked_vals
-
-        value_history = OptionValueHistory(tuple(historic_ranked_vals))
+            val, source = self._option_parser.parse_string(option_id, kwargs.get("default"))
 
         # Helper function to check various validity constraints on final option values.
         def check_scalar_value(val):
@@ -736,20 +598,19 @@ class Parser:
                 raise ParseError(f"{error_prefix} does not exist.")
 
         # Validate the final value.
-        final_val = value_history.final_value
-        if isinstance(final_val.value, list):
-            for component in final_val.value:
+        if isinstance(val, list):
+            for component in val:
                 check_scalar_value(component)
             if inspect.isclass(member_type) and issubclass(member_type, Enum):
-                if len(final_val.value) != len(set(final_val.value)):
-                    raise ParseError(f"Duplicate enum values specified in list: {final_val.value}")
-        elif isinstance(final_val.value, dict):
-            for component in final_val.value.values():
+                if len(val) != len(set(val)):
+                    raise ParseError(f"Duplicate enum values specified in list: {val}")
+        elif isinstance(val, dict):
+            for component in val.values():
                 check_scalar_value(component)
         else:
-            check_scalar_value(final_val.value)
+            check_scalar_value(val)
 
-        return value_history
+        return val, Rank.from_pyo3_source(source)
 
     def _inverse_arg(self, arg: str) -> str | None:
         if not arg.startswith("--"):

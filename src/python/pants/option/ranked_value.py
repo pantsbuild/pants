@@ -32,6 +32,19 @@ class Rank(Enum):
             return NotImplemented
         return self._rank < other._rank
 
+    @classmethod
+    def from_pyo3_source(cls, source: str) -> Rank:
+        return _SOURCE_TO_RANK[source]
+
+
+# TODO: Align the Rust and Python rank names.
+_SOURCE_TO_RANK = {
+    "Default": Rank.HARDCODED,
+    "Config": Rank.CONFIG,
+    "Flag": Rank.FLAG,
+    "Env": Rank.ENVIRONMENT,
+}
+
 
 Value = Union[str, int, float, None, Dict, Enum, List]
 ValueAndDetails = Tuple[Optional[Value], Optional[str]]

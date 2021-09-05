@@ -165,18 +165,20 @@ impl OptionParser {
     };
 
     let config_path = BuildRoot::find()?.join("pants.toml");
-    let repo_config_files = parser.parse_string_list(
-      &option_id!("pants", "config", "files"),
-      &[
-        std::str::from_utf8(config_path.as_os_str().as_bytes()).map_err(|e| {
-          format!(
-            "Failed to decode build root path {}: {}",
-            config_path.display(),
-            e
-          )
-        })?,
-      ],
-    )?;
+    let repo_config_files = parser
+      .parse_string_list(
+        &option_id!("pants", "config", "files"),
+        &[
+          std::str::from_utf8(config_path.as_os_str().as_bytes()).map_err(|e| {
+            format!(
+              "Failed to decode build root path {}: {}",
+              config_path.display(),
+              e
+            )
+          })?,
+        ],
+      )?
+      .value;
     let mut config = Config::merged(&repo_config_files)?;
     sources.insert(Source::Config, Arc::new(config.clone()));
     parser = OptionParser {
@@ -184,10 +186,13 @@ impl OptionParser {
     };
 
     if *parser.parse_bool(&option_id!("pantsrc"), true)? {
-      for rcfile in parser.parse_string_list(
-        &option_id!("pantsrc", "files"),
-        &["/etc/pantsrc", shellexpand::tilde("~/.pants.rc").as_ref()],
-      )? {
+      for rcfile in parser
+        .parse_string_list(
+          &option_id!("pantsrc", "files"),
+          &["/etc/pantsrc", shellexpand::tilde("~/.pants.rc").as_ref()],
+        )?
+        .value
+      {
         let rcfile_path = Path::new(&rcfile);
         if rcfile_path.exists() {
           let rc_config = Config::parse(rcfile_path)?;
@@ -248,11 +253,19 @@ impl OptionParser {
     })
   }
 
-  pub fn parse_string_list(&self, id: &OptionId, default: &[&str]) -> Result<Vec<String>, String> {
+  pub fn parse_string_list(
+    &self,
+    id: &OptionId,
+    default: &[&str],
+  ) -> Result<OptionValue<Vec<String>>, String> {
     let mut list_edits = vec![];
-    for (_, source) in self.sources.iter() {
+    let mut last_source = Source::Default;
+    for (source_type, source) in self.sources.iter() {
       if let Some(edits) = source.get_string_list(id)? {
         list_edits.extend(edits);
+        // NB: We return the last encountered Source as the only Source. Although this is not
+        // entirely accurate, it allows for consistency of the API.
+        last_source = *source_type;
       }
     }
     let mut string_list = default.iter().map(|s| s.to_string()).collect::<Vec<_>>();
@@ -270,7 +283,10 @@ impl OptionParser {
         }
       }
     }
-    Ok(string_list)
+    Ok(OptionValue {
+      source: last_source,
+      value: string_list,
+    })
   }
 }
 

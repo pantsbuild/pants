@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import itertools
 import os
-import warnings
+import itertools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Dict, Iterable, Mapping, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
@@ -18,10 +17,10 @@ from pants.option.config import Config
 from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
+from pants.engine.internals.native_engine import PyOptionParser
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
-from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text, softwrap
@@ -36,67 +35,24 @@ class OptionsBootstrapper:
     options."""
 
     env_tuples: tuple[tuple[str, str], ...]
-    bootstrap_args: tuple[str, ...]
     args: tuple[str, ...]
-    config: Config
     alias: CliAlias
+    # TODO: Need eq/hash that do something useful with the config.
+    option_parser: PyOptionParser
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
         # Bootstrap args are included in `args`. We also drop the first argument, which is the path
         # to `pants_loader.py`.
         args = list(self.args[1:])
-        return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
+        return f"OptionsBootstrapper(args={args}, env={env}, option_parser={self.option_parser})"
 
     @staticmethod
-    def get_config_file_paths(env, args) -> list[str]:
-        """Get the location of the config files.
-
-        The locations are specified by the --pants-config-files option.  However we need to load the
-        config in order to process the options.  This method special-cases --pants-config-files
-        in order to solve this chicken-and-egg problem.
-
-        Note that, obviously, it's not possible to set the location of config files in a config file.
-        Doing so will have no effect.
-        """
-        # This exactly mirrors the logic applied in Option to all regular options.  Note that we'll
-        # also parse --pants-config as a regular option later, but there's no harm in that.  In fact,
-        # it's preferable, so that any code that happens to want to know where we read config from
-        # can inspect the option.
-        flag = "--pants-config-files="
-        evars = [
-            "PANTS_GLOBAL_PANTS_CONFIG_FILES",
-            "PANTS_PANTS_CONFIG_FILES",
-            "PANTS_CONFIG_FILES",
-        ]
-
-        path_list_values = []
-        default = get_default_pants_config_file()
-        if Path(default).is_file():
-            path_list_values.append(ListValueComponent.create(default))
-        for var in evars:
-            if var in env:
-                path_list_values.append(ListValueComponent.create(env[var]))
-                break
-
-        for arg in args:
-            # Technically this is very slightly incorrect, as we don't check scope.  But it's
-            # very unlikely that any task or subsystem will have an option named --pants-config-files.
-            # TODO: Enforce a ban on options with a --pants- prefix outside our global options?
-            if arg.startswith(flag):
-                path_list_values.append(ListValueComponent.create(arg[len(flag) :]))
-
-        return ListValueComponent.merge(path_list_values).val
-
-    @staticmethod
-    def parse_bootstrap_options(
-        env: Mapping[str, str], args: Sequence[str], config: Config
-    ) -> Options:
+    def parse_bootstrap_options(args: Sequence[str], option_parser: PyOptionParser) -> Options:
         bootstrap_options = Options.create(
-            env=env,
-            config=config,
             known_scope_infos=[GlobalOptions.get_scope_info()],
             args=args,
+            option_parser=option_parser,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -120,80 +76,15 @@ class OptionsBootstrapper:
           absolute paths. Production usecases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
-        with warnings.catch_warnings(record=True):
-            # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
-            @dataclass(frozen=True)
-            class FileContent:
-                path: str
-                content: bytes
+        assert allow_pantsrc, "TODO: Support allow_pantsrc=False"
 
-            def filecontent_for(path: str) -> FileContent:
-                return FileContent(
-                    ensure_text(path),
-                    read_file(path, binary_mode=True),
-                )
+        args = tuple(args)
+        env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
+        return cls(env_tuples, args, PyOptionParser(dict(env), args))
 
-            bargs = cls._get_bootstrap_args(args)
-
-            config_file_paths = cls.get_config_file_paths(env=env, args=args)
-            config_files_products = [filecontent_for(p) for p in config_file_paths]
-            pre_bootstrap_config = Config.load(config_files_products, env=env)
-
-            initial_bootstrap_options = cls.parse_bootstrap_options(
-                env, bargs, pre_bootstrap_config
-            )
-            bootstrap_option_values = initial_bootstrap_options.for_global_scope()
-
-            # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
-            # from (typically pants.toml), then config override, then rcfiles.
-            full_config_paths = pre_bootstrap_config.sources()
-            if allow_pantsrc and bootstrap_option_values.pantsrc:
-                rcfiles = [
-                    os.path.expanduser(str(rcfile))
-                    for rcfile in bootstrap_option_values.pantsrc_files
-                ]
-                existing_rcfiles = list(filter(os.path.exists, rcfiles))
-                full_config_paths.extend(existing_rcfiles)
-
-            full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-            post_bootstrap_config = Config.load(
-                full_config_files_products,
-                seed_values=bootstrap_option_values.as_dict(),
-                env=env,
-            )
-
-            # Finally, we expand any aliases and re-populate the bootstrap args, in case there
-            # were any from aliases.
-            # stuhood: This could potentially break the rust client when aliases are used:
-            # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
-            alias_vals = post_bootstrap_config.get("cli", "alias")
-            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
-            alias = CliAlias.from_dict(val)
-
-            args = alias.expand_args(tuple(args))
-            bargs = cls._get_bootstrap_args(args)
-
-            # We need to set this env var to allow various static help strings to reference the
-            # right name (via `pants.util.docutil`), and we need to do it as early as possible to
-            # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
-            # earliest place it makes sense to do so and is generically used by both the local and
-            # remote pants runners.
-            os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
-                bootstrap_option_values.pants_bin_name, get_buildroot()
-            )
-
-            env_tuples = tuple(
-                sorted(
-                    (item for item in env.items() if item[0].startswith("PANTS_")),
-                )
-            )
-            return cls(
-                env_tuples=env_tuples,
-                bootstrap_args=bargs,
-                args=args,
-                config=post_bootstrap_config,
-                alias=alias,
-            )
+    @memoized_property
+    def env(self) -> dict[str, str]:
+        return dict(self.env_tuples)
 
     @classmethod
     def _get_bootstrap_args(cls, args: Sequence[str]) -> tuple[str, ...]:
@@ -218,10 +109,6 @@ class OptionsBootstrapper:
         return bargs
 
     @memoized_property
-    def env(self) -> dict[str, str]:
-        return dict(self.env_tuples)
-
-    @memoized_property
     def bootstrap_options(self) -> Options:
         """The post-bootstrap options, computed from the env, args, and fully discovered Config.
 
@@ -231,7 +118,21 @@ class OptionsBootstrapper:
         Because this can be computed from the in-memory representation of these values, it is not part
         of the object's identity.
         """
-        return self.parse_bootstrap_options(self.env, self.bootstrap_args, self.config)
+
+        bargs = self._get_bootstrap_args(self.args)
+        bootstrap_options = self.parse_bootstrap_options(bargs, self.option_parser)
+
+        # We need to set this env var to allow various static help strings to reference the
+        # right name (via `pants.util.docutil`), and we need to do it as early as possible to
+        # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
+        # earliest place it makes sense to do so and is generically used by both the local and
+        # remote pants runners.
+        bootstrap_option_values = bootstrap_options.for_global_scope()
+        os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
+            bootstrap_option_values.pants_bin_name, get_buildroot()
+        )
+
+        return bootstrap_options
 
     def get_bootstrap_options(self) -> Options:
         """Returns an Options instance that only knows about the bootstrap options."""
@@ -246,10 +147,9 @@ class OptionsBootstrapper:
     ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
-            self.env,
-            self.config,
             known_scope_infos,
             args=self.args,
+            option_parser=self.option_parser,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
         )

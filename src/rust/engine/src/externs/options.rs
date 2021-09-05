@@ -71,7 +71,78 @@ impl PyOptionParser {
       .0
       .parse_bool(&option_id.0, default)
       .map_err(exceptions::PyException::new_err)?;
-    // TODO: Find a better way to propagate the Source.
+    Ok((opt_val.value, format!("{:?}", opt_val.source)))
+  }
+
+  fn parse_int(&self, option_id: &PyOptionId, default: i64) -> PyResult<(i64, String)> {
+    let opt_val = self
+      .0
+      .parse_int(&option_id.0, default)
+      .map_err(exceptions::PyException::new_err)?;
+    Ok((opt_val.value, format!("{:?}", opt_val.source)))
+  }
+
+  fn parse_int_optional(
+    &self,
+    option_id: &PyOptionId,
+    default: Option<i64>,
+  ) -> PyResult<(Option<i64>, String)> {
+    // Parse with an arbitrary default, and replace with the optional default if the Source
+    // indicates that we defaulted.
+    let opt_val = self
+      .0
+      .parse_int(&option_id.0, 0)
+      .map_err(exceptions::PyException::new_err)?;
+    if opt_val.source == Source::Default {
+      Ok((default, format!("{:?}", Source::Default)))
+    } else {
+      Ok((Some(opt_val.value), format!("{:?}", opt_val.source)))
+    }
+  }
+
+  fn parse_float(&self, option_id: &PyOptionId, default: f64) -> PyResult<(f64, String)> {
+    let opt_val = self
+      .0
+      .parse_float(&option_id.0, default)
+      .map_err(exceptions::PyException::new_err)?;
+    Ok((opt_val.value, format!("{:?}", opt_val.source)))
+  }
+
+  fn parse_float_optional(
+    &self,
+    option_id: &PyOptionId,
+    default: Option<f64>,
+  ) -> PyResult<(Option<f64>, String)> {
+    // Parse with an arbitrary default, and replace with the optional default if the Source
+    // indicates that we defaulted.
+    let opt_val = self
+      .0
+      .parse_float(&option_id.0, 0.0)
+      .map_err(exceptions::PyException::new_err)?;
+    if opt_val.source == Source::Default {
+      Ok((default, format!("{:?}", Source::Default)))
+    } else {
+      Ok((Some(opt_val.value), format!("{:?}", opt_val.source)))
+    }
+  }
+
+  fn parse_string(&self, option_id: &PyOptionId, default: &str) -> PyResult<(String, String)> {
+    let opt_val = self
+      .0
+      .parse_string(&option_id.0, &default)
+      .map_err(exceptions::PyException::new_err)?;
+    Ok((opt_val.value, format!("{:?}", opt_val.source)))
+  }
+
+  fn parse_string_list(
+    &self,
+    option_id: &PyOptionId,
+    default: Vec<&str>,
+  ) -> PyResult<(Vec<String>, String)> {
+    let opt_val = self
+      .0
+      .parse_string_list(&option_id.0, &default)
+      .map_err(exceptions::PyException::new_err)?;
     Ok((opt_val.value, format!("{:?}", opt_val.source)))
   }
 }
