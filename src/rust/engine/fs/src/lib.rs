@@ -310,6 +310,29 @@ impl GitignoreStyleExcludes {
       ::ignore::Match::Ignore(_) => true,
     }
   }
+
+  ///
+  /// Find out if a path has any ignore patterns for files/paths in its tree.
+  ///
+  /// Used by the IntermediateGlobbedFilesAndDirectories in snapshot_ops.rs,
+  /// to check if it mayoptimize the snapshot subset operation on this tree,
+  /// or need to check for excluded files/directories.
+  ///
+  pub fn maybe_is_parent_of_ignored_path(&self, path: &Path) -> bool {
+    match path.to_str() {
+      None => true,
+      Some(s) => {
+        for pattern in self.exclude_patterns().iter() {
+          if pattern.starts_with(s) || s.starts_with(pattern) {
+            // In case the pattern is shorter than path, we are inside a ignored tree, so both
+            // parent and child of ignored paths.
+            return true;
+          }
+        }
+        false
+      }
+    }
+  }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
