@@ -61,7 +61,13 @@ async def build_docker_image(
     docker, context = await MultiGet(
         Get(DockerBinary, DockerBinaryRequest()),
         Get(
-            DockerBuildContext, DockerBuildContextRequest(field_set.address, field_set.context_root)
+            DockerBuildContext,
+            DockerBuildContextRequest(
+                address=field_set.address,
+                context_root=field_set.context_root,
+                organize_context_tree=not field_set.context_root_field.value,
+                build_upstream_images=True,
+            ),
         ),
     )
 
