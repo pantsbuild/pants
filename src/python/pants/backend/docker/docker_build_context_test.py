@@ -1,79 +1,89 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.docker.docker_build_context import (
-    DockerBuildContextRequest,
-    create_docker_build_context,
-)
+from __future__ import annotations
+
+from textwrap import dedent
+
+import pytest
+
+from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
+from pants.backend.docker.rules import rules
 from pants.backend.docker.target_types import DockerImage
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.target_types import PexBinary
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.target_types import Files
+from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, AddPrefix, Digest, MergeDigests
-from pants.engine.target import (
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
-from pants.engine.unions import UnionMembership
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.engine.fs import Snapshot
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_create_docker_build_context():
-    img = DockerImage(address=Address("src/test", target_name="image"), unhydrated_values={})
-    pex = PexBinary(
-        address=Address("src/test", target_name="bin"),
-        unhydrated_values={"entry_point": "src.test.main:main"},
-    )
-    request = DockerBuildContextRequest(
-        address=img.address,
-        context_root=".",
-    )
-
-    result = run_rule_with_mocks(
-        create_docker_build_context,
-        rule_args=[request],
-        mock_gets=[
-            MockGet(
-                output_type=TransitiveTargets,
-                input_type=TransitiveTargetsRequest,
-                mock=lambda _: TransitiveTargets([img], [pex]),
-            ),
-            MockGet(
-                output_type=SourceFiles,
-                input_type=SourceFilesRequest,
-                mock=lambda _: SourceFiles(
-                    snapshot=EMPTY_SNAPSHOT,
-                    unrooted_files=tuple(),
-                ),
-            ),
-            MockGet(
-                output_type=FieldSetsPerTarget,
-                input_type=FieldSetsPerTargetRequest,
-                mock=lambda request: FieldSetsPerTarget([[PexBinaryFieldSet.create(pex)]]),
-            ),
-            MockGet(
-                output_type=BuiltPackage,
-                input_type=PackageFieldSet,
-                mock=lambda _: BuiltPackage(EMPTY_DIGEST, []),
-            ),
-            MockGet(
-                output_type=Digest,
-                input_type=AddPrefix,
-                mock=lambda _: EMPTY_DIGEST,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_type=MergeDigests,
-                mock=lambda _: EMPTY_DIGEST,
-            ),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *rules(),
+            *source_files_rules(),
+            QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        # need AddPrefix here, since UnionMembership.is_member() throws when called with non
-        # registered types
-        union_membership=UnionMembership({PackageFieldSet: [PexBinaryFieldSet], AddPrefix: []}),
+        target_types=[DockerImage, Files],
     )
 
-    assert result.digest == EMPTY_DIGEST
+
+def assert_build_context(
+    rule_runner: RuleRunner, context_root: str, address: Address, expected_files: list[str]
+) -> None:
+    context = rule_runner.request(
+        DockerBuildContext,
+        [
+            DockerBuildContextRequest(
+                address=address,
+                context_root=context_root,
+            )
+        ],
+    )
+
+    snapshot = rule_runner.request(Snapshot, [context.digest])
+    assert sorted(expected_files) == sorted(snapshot.files)
+
+
+def test_file_dependencies(rule_runner: RuleRunner) -> None:
+    # img_A -> files_A
+    # img_A -> img_B -> files_B
+    rule_runner.add_to_build_file(
+        "src/a",
+        dedent(
+            """\
+        docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+        files(name="files_A", sources=["files/**"])
+        """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        "src/b",
+        dedent(
+            """\
+        docker_image(name="img_B", dependencies=[":files_B"])
+        files(name="files_B", sources=["files/**"])
+        """
+        ),
+    )
+    rule_runner.create_files("src/a", ["Dockerfile"])
+    rule_runner.create_files("src/a/files", ["a01", "a02"])
+    rule_runner.create_files("src/b", ["Dockerfile"])
+    rule_runner.create_files("src/b/files", ["b01", "b02"])
+
+    # We want files_B in build context for img_B
+    assert_build_context(
+        rule_runner,
+        ".",
+        Address("src/b", target_name="img_B"),
+        expected_files=["src/b/Dockerfile", "src/b/files/b01", "src/b/files/b02"],
+    )
+
+    # We want files_A in build context for img_A, but not files_B
+    assert_build_context(
+        rule_runner,
+        ".",
+        Address("src/a", target_name="img_A"),
+        expected_files=["src/a/Dockerfile", "src/a/files/a01", "src/a/files/a02"],
+    )
