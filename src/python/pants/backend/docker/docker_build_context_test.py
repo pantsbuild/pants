@@ -62,18 +62,18 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         "src/a",
         dedent(
             """\
-        docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
-        files(name="files_A", sources=["files/**"])
-        """
+            docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+            files(name="files_A", sources=["files/**"])
+            """
         ),
     )
     rule_runner.add_to_build_file(
         "src/b",
         dedent(
             """\
-        docker_image(name="img_B", dependencies=[":files_B"])
-        files(name="files_B", sources=["files/**"])
-        """
+            docker_image(name="img_B", dependencies=[":files_B"])
+            files(name="files_B", sources=["files/**"])
+            """
         ),
     )
     rule_runner.create_files("src/a", ["Dockerfile"])
@@ -110,7 +110,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         "src/c",
         dedent(
             """\
-        docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
+            docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
             """
         ),
     )
@@ -137,16 +137,16 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
         "src/a",
         dedent(
             """\
-        docker_image(name="img_A", dependencies=["res/static:files"])
-        """
+            docker_image(name="img_A", dependencies=["res/static:files"])
+            """
         ),
     )
     rule_runner.add_to_build_file(
         "res/static",
         dedent(
             """\
-        files(name="files", sources=["!BUILD", "**/*"])
-        """
+            files(name="files", sources=["!BUILD", "**/*"])
+            """
         ),
     )
     rule_runner.create_files("src/a", ["Dockerfile"])
