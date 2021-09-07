@@ -5,14 +5,47 @@ use std::collections::HashMap;
 
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyFunction, PyList, PyTuple};
 
-use options::{Args, Env, OptionId, OptionParser, Scope};
+use options::{Args, Env, OptionId, OptionParser, Scope, Source};
+
+use crate::Key;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyOptionId>()?;
   m.add_class::<PyOptionParser>()?;
   Ok(())
+}
+
+fn toml_value_to_py_object(py: Python, value: toml::Value) -> PyResult<PyObject> {
+  use toml::Value::*;
+  let res = match value {
+    String(s) => s.into_py(py),
+    Integer(i) => i.into_py(py),
+    Float(f) => f.into_py(py),
+    Boolean(b) => b.into_py(py),
+    Datetime(_) => {
+      return Err(exceptions::PyException::new_err(
+        "datetime type not supported.",
+      ))
+    }
+    Array(a) => {
+      let list = PyList::empty(py);
+      for m in a {
+        list.append(toml_value_to_py_object(py, m)?)?;
+      }
+      list.into_py(py)
+    }
+    Table(t) => {
+      let dict = PyDict::new(py);
+      for (k, v) in t {
+        dict.set_item(k, toml_value_to_py_object(py, v)?)?;
+      }
+      dict.into_py(py)
+    }
+  };
+
+  Ok(res)
 }
 
 #[pyclass]
@@ -21,12 +54,8 @@ struct PyOptionId(OptionId);
 #[pymethods]
 impl PyOptionId {
   #[new]
-  #[args(components = "*", scope = "None", switch = "None")]
-  fn __new__(
-    components: &PyTuple,
-    scope: Option<String>,
-    switch: Option<String>,
-  ) -> PyResult<Self> {
+  #[pyo3(signature = (*components, scope = None, switch = None))]
+  fn __new__(components: &PyTuple, scope: Option<&str>, switch: Option<&str>) -> PyResult<Self> {
     let components = components
       .iter()
       .map(|c| c.extract::<String>())
@@ -126,22 +155,81 @@ impl PyOptionParser {
     }
   }
 
-  fn parse_string(&self, option_id: &PyOptionId, default: &str) -> PyResult<(String, String)> {
+  fn parse_from_string<'a>(
+    &self,
+    option_id: &PyOptionId,
+    default: &'a PyAny,
+    parser: &'a PyFunction,
+  ) -> PyResult<(&'a PyAny, String)> {
     let opt_val = self
       .0
-      .parse_string(&option_id.0, &default)
+      .parse_from_string(&option_id.0, default, |s| {
+        parser.call((s,), None).map_err(|e| e.to_string())
+      })
       .map_err(exceptions::PyException::new_err)?;
     Ok((opt_val.value, format!("{:?}", opt_val.source)))
   }
 
-  fn parse_string_list(
+  fn parse_from_string_list<'a>(
     &self,
+    py: Python<'a>,
     option_id: &PyOptionId,
-    default: Vec<&str>,
-  ) -> PyResult<(Vec<String>, String)> {
+    default: Vec<&'a PyAny>,
+    member_parser: &'a PyFunction,
+  ) -> PyResult<(Vec<&'a PyAny>, String)> {
+    let default = default
+      .into_iter()
+      .map(|s| Key::from_value(s.extract()?))
+      .collect::<Result<Vec<Key>, _>>()?;
     let opt_val = self
       .0
-      .parse_string_list(&option_id.0, &default)
+      .parse_from_string_list(&option_id.0, &default, |s| {
+        member_parser
+          .call((s,), None)
+          .and_then(|s| Key::from_value(s.extract()?))
+          .map_err(|e| e.to_string())
+      })
+      .map_err(exceptions::PyException::new_err)?;
+    let value = opt_val
+      .value
+      .into_iter()
+      .map(|k| k.value.consume_into_py_object(py).into_ref(py))
+      .collect();
+    Ok((value, format!("{:?}", opt_val.source)))
+  }
+
+  fn parse_from_string_dict<'a>(
+    &self,
+    py: Python,
+    option_id: &'a PyOptionId,
+    default: &'a PyDict,
+    member_parser: &'a PyFunction,
+    literal_parser: &'a PyFunction,
+  ) -> PyResult<(HashMap<String, &'a PyAny>, String)> {
+    let default = default
+      .items()
+      .into_iter()
+      .map(|kv_pair| kv_pair.extract::<(String, &'a PyAny)>())
+      .collect::<Result<HashMap<_, _>, _>>()?;
+    let opt_val = self
+      .0
+      .parse_from_string_dict(
+        &option_id.0,
+        &default,
+        |v| {
+          let py_obj =
+            toml_value_to_py_object(py, v).map_err(|e| format!("Could not decode toml: {e}"))?;
+          member_parser
+            .call((py_obj,), None)
+            .map_err(|e| e.to_string())
+        },
+        |s| {
+          literal_parser
+            .call((s,), None)
+            .and_then(|v| v.extract::<HashMap<String, &'a PyAny>>())
+            .map_err(|e| e.to_string())
+        },
+      )
       .map_err(exceptions::PyException::new_err)?;
     Ok((opt_val.value, format!("{:?}", opt_val.source)))
   }

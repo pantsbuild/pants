@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Optional, cast
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase

@@ -85,6 +85,7 @@ time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry = { workspace = true }
 tokio-util = { workspace = true, features = ["io"] }
+toml = { workspace = true }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = { workspace = true }

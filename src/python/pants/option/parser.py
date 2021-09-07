@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, DefaultDict, Iterable, Mapping
+from typing import Any, DefaultDict, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Type
 
 import yaml
 
@@ -216,7 +216,9 @@ class Parser:
             try:
                 val, rank = self._compute_value(dest, kwargs, parse_args_request.passthrough_args)
             except Exception as e:
-                raise ParseError(f"Error computing value for `{dest}` in {self._scope_str()}:\n{e}")
+                raise ParseError(
+                    f"Error computing value for `{dest}` in {self._scope_str()}:\n{e}"
+                ) from e
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
             if rank > Rank.HARDCODED:
@@ -509,6 +511,7 @@ class Parser:
         """
         type_arg = kwargs.get("type", str)
         member_type = kwargs.get("member_type", str)
+        default = kwargs.get("default")
         val: Any
 
         # Helper function to expand a fromfile=True value string, if needed.
@@ -542,18 +545,55 @@ class Parser:
         option_id = PyOptionId(*dest.split("_"), scope=(self._scope or None))
 
         if type_arg == bool:
-            val, source = self._option_parser.parse_bool(option_id, kwargs.get("default", False))
-        elif type_arg == str:
-            val, source = self._option_parser.parse_string(option_id, kwargs.get("default"))
+            val, source = self._option_parser.parse_bool(option_id, default or False)
         elif type_arg == list:
-            val, source = self._option_parser.parse_string_list(
-                option_id, kwargs.get("default", [])
+            val, source = self._option_parser.parse_from_string_list(
+                option_id, default or [], lambda x: member_type(x)
             )
-        elif issubclass(type_arg, Enum):
-            val, source = self._option_parser.parse_string(option_id, kwargs.get("default").name)
-            val = type_arg[val]
+        elif type_arg == dict:
+
+            def parse_dict_literal(x):
+                val = atfile_expand(x)
+                return ast.literal_eval(val) if isinstance(val, str) else val
+
+            val, source = self._option_parser.parse_from_string_dict(
+                option_id,
+                default or {},
+                lambda x: member_type(x),
+                parse_dict_literal,
+            )
+        elif type_arg == Optional[int]:
+            val, source = self._option_parser.parse_int_optional(option_id, default)
+        elif type_arg == Optional[float]:
+            val, source = self._option_parser.parse_float_optional(option_id, default)
+        elif type_arg == int:
+            if default is None:
+                warn_or_error(
+                    "2.20.0.dev0",
+                    f"Option `{dest}` in `{self._scope_str()}` with type `int` and a default of `None`",
+                    "Use `type=Optional[int]` for this option, or give it a default value.",
+                )
+                val, source = self._option_parser.parse_int_optional(option_id, default)
+            else:
+                val, source = self._option_parser.parse_int(option_id, default)
+        elif type_arg == float:
+            if default is None:
+                warn_or_error(
+                    "2.20.0.dev0",
+                    f"Option `{dest}` in `{self._scope_str()}` with type `float` and a default of `None`",
+                    "Use `type=Optional[float]` for this option, or give it a default value.",
+                )
+                val, source = self._option_parser.parse_float_optional(option_id, default)
+            else:
+                val, source = self._option_parser.parse_float(option_id, default)
+        elif inspect.isclass(type_arg) and issubclass(type_arg, Enum):
+            val, source = self._option_parser.parse_from_string(
+                option_id, default, lambda x: type_arg(x)
+            )
         else:
-            val, source = self._option_parser.parse_string(option_id, kwargs.get("default"))
+            val, source = self._option_parser.parse_from_string(
+                option_id, default, lambda x: type_arg(x)
+            )
 
         # Helper function to check various validity constraints on final option values.
         def check_scalar_value(val):

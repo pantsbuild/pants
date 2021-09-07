@@ -10,7 +10,7 @@ use toml::value::Table;
 use toml::Value;
 
 use super::id::{NameTransform, OptionId};
-use super::{ListEdit, ListEditAction, OptionsSource};
+use super::{ListEdit, ListEditAction, OptionsSource, StringDict};
 
 #[derive(Clone)]
 pub(crate) struct Config {
@@ -154,6 +154,18 @@ impl OptionsSource for Config {
     }
   }
 
+  fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+    if let Some(value) = self.get_value(id) {
+      if let Some(float) = value.as_integer() {
+        Ok(Some(float))
+      } else {
+        Err(format!("Expected {} to be an int but given {}.", id, value))
+      }
+    } else {
+      Ok(None)
+    }
+  }
+
   fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
     if let Some(value) = self.get_value(id) {
       if let Some(float) = value.as_float() {
@@ -207,5 +219,32 @@ impl OptionsSource for Config {
       }
     }
     Ok(None)
+  }
+
+  fn get_string_dict(&self, id: &OptionId) -> Result<Option<StringDict>, String> {
+    let section = if let Some(table) = self.config.get(&id.scope()) {
+      table
+    } else {
+      return Ok(None);
+    };
+
+    // Extract a table, or immediately return a string literal for the caller to parse.
+    let option_table = match section.get(&Self::option_name(id)) {
+      Some(Value::String(s)) => return Ok(Some(StringDict::Literal(s.clone()))),
+      Some(Value::Table(t)) => t,
+      None => return Ok(None),
+      Some(v) => {
+        return Err(format!(
+          "Expected {} to be of type string or table, but was a {}: {}",
+          self.display(&id),
+          v.type_str(),
+          v
+        ));
+      }
+    };
+
+    Ok(Some(StringDict::Native(
+      option_table.clone().into_iter().collect(),
+    )))
   }
 }

@@ -1027,6 +1027,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tokio-util 0.7.8",
+ "toml",
  "tryfuture",
  "ui",
  "url",
