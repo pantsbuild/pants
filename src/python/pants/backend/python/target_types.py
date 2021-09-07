@@ -204,7 +204,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n  1) "
         "'app.py', Pants will convert into the module `path.to.app`;\n  2) 'app.py:func', Pants "
         "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
-        "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
+        "arguments to work with this target.\n\nTo leave off an entry point, set to `<none>`."
     )
     required = True
     value: EntryPoint
