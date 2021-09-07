@@ -11,13 +11,13 @@ import pytest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
-    LockfileMetadataV1,
+    LockfileMetadataV0,
     calculate_invalidation_digest,
 )
 
 
 def test_metadata_header_round_trip() -> None:
-    input_metadata = LockfileMetadataV1(
+    input_metadata = LockfileMetadataV0(
         "cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef",
         InterpreterConstraints(["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]),
     )
@@ -40,7 +40,11 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
+<<<<<<< HEAD
 #   "version": 1,
+=======
+#   "version": 0,
+>>>>>>> 755dbd990 (Factors out metadata structure into separate concrete subclasses)
 #   "requirements_invalidation_digest": "000faaafcacacaca",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
@@ -54,7 +58,7 @@ dave==3.1.4 \\
     def line_by_line(b: bytes) -> list[bytes]:
         return [i for i in (j.strip() for j in b.splitlines()) if i]
 
-    metadata = LockfileMetadataV1("000faaafcacacaca", InterpreterConstraints([">=3.7"]))
+    metadata = LockfileMetadataV0("000faaafcacacaca", InterpreterConstraints([">=3.7"]))
     result = metadata.add_header_to_lockfile(input_lockfile, regenerate_command="./pants lock")
     assert line_by_line(result) == line_by_line(expected)
 
@@ -124,7 +128,7 @@ def test_invalidation_digest() -> None:
     ],
 )
 def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
-    m = LockfileMetadataV1(expected_digest, InterpreterConstraints(expected_ic))
+    m = LockfileMetadataV0(expected_digest, InterpreterConstraints(expected_ic))
     assert (
         bool(
             m.is_valid_for(

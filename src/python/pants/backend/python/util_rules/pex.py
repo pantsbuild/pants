@@ -516,9 +516,7 @@ async def build_pex_component(
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
 
-        metadata = LockfileMetadata.from_lockfile(
-            file_content.content, resolve_name=resolve_name
-        )
+        metadata = LockfileMetadata.from_lockfile(file_content.content, resolve_name=resolve_name)
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
@@ -614,6 +612,7 @@ def _validate_metadata(
         requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
+        {},  # TODO: include requirements strings here
     )
 
     if validation:
