@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Optional
 
 import pytest
 
@@ -32,20 +31,14 @@ def rule_runner() -> RuleRunner:
 
 def assert_build_context(
     rule_runner: RuleRunner,
-    context_root: str,
     address: Address,
     expected_files: list[str],
-    organize_context_tree: Optional[bool] = None,
 ) -> None:
     context = rule_runner.request(
         DockerBuildContext,
         [
             DockerBuildContextRequest(
                 address=address,
-                context_root=context_root,
-                organize_context_tree=context_root != "."
-                if organize_context_tree is None
-                else organize_context_tree,
                 build_upstream_images=False,
             )
         ],
@@ -84,23 +77,13 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     # We want files_B in build context for img_B
     assert_build_context(
         rule_runner,
-        "src/b",
         Address("src/b", target_name="img_B"),
-        expected_files=["Dockerfile", "files/b01", "files/b02"],
+        expected_files=["src/b/Dockerfile", "src/b/files/b01", "src/b/files/b02"],
     )
 
     # We want files_A in build context for img_A, but not files_B
     assert_build_context(
         rule_runner,
-        "src/a",
-        Address("src/a", target_name="img_A"),
-        expected_files=["Dockerfile", "files/a01", "files/a02"],
-    )
-
-    # We want files_A in build context for img_A, but not files_B
-    assert_build_context(
-        rule_runner,
-        ".",
         Address("src/a", target_name="img_A"),
         expected_files=["src/a/Dockerfile", "src/a/files/a01", "src/a/files/a02"],
     )
@@ -118,7 +101,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
 
     assert_build_context(
         rule_runner,
-        "src",
         Address("src/c", target_name="img_C"),
         expected_files=[
             "src/c/Dockerfile",
@@ -127,7 +109,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
             "src/b/files/b01",
             "src/b/files/b02",
         ],
-        organize_context_tree=False,
     )
 
 
@@ -155,10 +136,9 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
 
     assert_build_context(
         rule_runner,
-        "src/a",
         Address("src/a", target_name="img_A"),
         expected_files=[
-            "Dockerfile",
+            "src/a/Dockerfile",
             "res/static/s01",
             "res/static/s02",
             "res/static/sub/s03",

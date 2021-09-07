@@ -10,7 +10,7 @@ from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -34,8 +34,6 @@ class DockerBuildContext:
 @dataclass(frozen=True)
 class DockerBuildContextRequest:
     address: Address
-    context_root: str
-    organize_context_tree: bool = True
     build_upstream_images: bool = False
 
 
@@ -92,28 +90,6 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
     all_digests = (dockerfiles.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
-
-    if request.organize_context_tree and request.context_root != ".":
-        # Get all files not in context tree, they are where they should be already.
-        rooted_trees = await MultiGet(
-            Get(Digest, DigestSubset(digest, PathGlobs(["**", f"!{request.context_root}"])))
-            for digest in all_digests
-        )
-
-        # Get all files in context tree, they will be moved up to root.
-        context_trees = await MultiGet(
-            Get(Digest, DigestSubset(digest, PathGlobs([f"{request.context_root}/**"])))
-            for digest in all_digests
-        )
-
-        # Strip context root from all files in context tree.
-        organized_trees = await MultiGet(
-            Get(Digest, RemovePrefix(digest, request.context_root)) for digest in context_trees
-        )
-
-        # The result is the newly organized tree, along with the files that weren't in the context
-        # root tree.
-        all_digests = (*organized_trees, *rooted_trees)
 
     # Merge all digests to get the final docker build context.
     context = await Get(

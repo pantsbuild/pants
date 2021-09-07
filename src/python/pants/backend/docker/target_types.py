@@ -20,31 +20,10 @@ class DockerDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class DockerContextRoot(StringField):
-    alias = "context_root"
-    default = None
-    help = (
-        "By default, the required files are assembled into a build context as follows:\n"
-        "\n"
-        " * The sources of `files` targets are assembled at their relative path from the "
-        "repo root.\n"
-        " * The sources of `resources` targets are assembled at their relative path from "
-        "their source roots.\n"
-        " * The artifacts of any packageable targets are built, as if by running "
-        "`./pants package`, and placed in the context under a subdirectory named for the "
-        "target's path from the repo root.\n"
-        "\n"
-        "[Advanced] By overriding with a custom value, the files will not be assembled, "
-        "but rather left at their default locations, which may be outside of the Docker "
-        "build context, and thus unusable for ADD/COPY commands in the `Dockerfile`."
-    )
-
-
 class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        DockerContextRoot,
         DockerDependencies,
         DockerImageSources,
         DockerImageVersion,
