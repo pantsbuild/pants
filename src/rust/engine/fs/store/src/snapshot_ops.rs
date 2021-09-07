@@ -408,7 +408,7 @@ impl IntermediateGlobbedFilesAndDirectories {
             // a whole directory is to end in '/**' or '/**/*'.
 
             if exclude.maybe_is_parent_of_ignored_path(&directory_path) {
-              // leave this directory in todo_directories, so we process ignore patterns correctly..
+              // Leave this directory in todo_directories, so we process ignore patterns correctly.
               continue;
             }
 
