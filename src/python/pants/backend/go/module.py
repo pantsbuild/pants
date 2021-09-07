@@ -167,7 +167,7 @@ async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> Resolve
         return ResolvedOwningGoModule(module_address=None)
 
 
-# TODO: Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
+# TODO(12764): Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
 # tool to help update go.sum while developing the Go plugin and will probably change.
 class GoResolveSubsystem(GoalSubsystem):
     name = "go-resolve"
