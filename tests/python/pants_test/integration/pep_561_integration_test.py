@@ -1,10 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from glob import glob
 from textwrap import dedent
 
-from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
@@ -49,7 +49,7 @@ def test_typecheck_works() -> None:
 
 
 def test_type_stubs() -> None:
-    wheel = glob(f"{get_buildroot()}/pantsbuild.pants.testutil-*.whl")[0]
+    wheel = glob(f"{os.getcwd()}/pantsbuild.pants.testutil-*.whl")[0]
     project = {
         "proj1/BUILD": dedent(
             f"""\
