@@ -26,6 +26,7 @@ function activate_venv() {
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "$(venv_dir)/bin/activate"
+  pip3 install setuptools==57.5.0
 }
 
 function remove_venv() {
