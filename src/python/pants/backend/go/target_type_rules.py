@@ -93,7 +93,7 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoPackageSources
 
 
-# TODO: Refactor this rule so as much as possible is memoized by invoking other rules. Consider
+# TODO(12761): Refactor this rule so as much as possible is memoized by invoking other rules. Consider
 # for example `FirstPartyPythonModuleMapping` and `ThirdPartyPythonModuleMapping`.
 @rule
 async def infer_go_dependencies(
@@ -173,7 +173,7 @@ class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
     inject_for = GoExtModPackageDependencies
 
 
-# TODO: This duplicates first-party dependency inference but that other rule cannot operate on _go_ext_mod_package
+# TODO(12761): This duplicates first-party dependency inference but that other rule cannot operate on_go_ext_mod_package
 # targets since there is no sources field in a _go_ext_mod_package. Consider how to merge the inference/injection
 # rules into one. Maybe use a private Sources field?
 @rule

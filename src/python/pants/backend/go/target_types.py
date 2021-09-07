@@ -24,7 +24,6 @@ class GoPackageSources(GoSources):
 
 
 class GoImportPath(StringField):
-    # TODO: Infer the import path from the closest ancestor `go_module` target once that target is supported.
     alias = "import_path"
     help = "Import path in Go code to import this package or module."
 
@@ -103,7 +102,8 @@ class GoExtModPackageDependencies(Dependencies):
 
 
 # Represents a Go package within a third-party Go package.
-# TODO: Create this target synthetically instead of relying on `./pants tailor` to create.
+# TODO(12763): Create this target synthetically (or remove the need for it) instead of relying on
+# `./pants tailor` to create.
 class GoExtModPackage(Target):
     alias = "_go_ext_mod_package"
     core_fields = (
@@ -133,7 +133,7 @@ class GoBinaryMainAddress(StringField):
     help = "Address of the main Go package for this binary."
 
 
-# TODO: This should register `OutputPathField` instead of `GoBinaryName`. (And then update build.py.)
+# TODO(11911): This should register `OutputPathField` instead of `GoBinaryName`. (And then update build.py.)
 class GoBinary(Target):
     alias = "go_binary"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoBinaryName, GoBinaryMainAddress)

@@ -232,7 +232,7 @@ async def build_target(
 
     # If there are any .s assembly files to be built, then generate a "symabis" file for consumption by Go compiler.
     # See https://github.com/bazelbuild/rules_go/issues/1893 (rules_go)
-    # TODO: Refactor to separate rule to improve readability.
+    # TODO(12762): Refactor to separate rule to improve readability.
     symabis_digest = None
     if resolved_package.s_files:
         # From Go tooling comments:
@@ -297,6 +297,7 @@ async def build_target(
     output_digest = result.output_digest
 
     # Assemble any .s files and merge into the package archive.
+    # TODO(12762): Refactor to separate rule to improve readability.
     if resolved_package.s_files:
         # Assemble
         asm_requests = [
