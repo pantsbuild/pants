@@ -21,6 +21,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 
@@ -29,6 +30,7 @@ async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
     pex_env: PexEnvironment,
+    python_setup: PythonSetup,
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
@@ -43,7 +45,11 @@ async def create_pex_binary_run_request(
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements([field_set.address], internal_only=True),
+        PexFromTargetsRequest.for_requirements(
+            [field_set.address],
+            internal_only=True,
+            resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
+        ),
     )
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)

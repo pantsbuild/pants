@@ -9,11 +9,11 @@ from pants.backend.python.goals.lockfile import (
     AmbiguousResolveNamesError,
     PythonLockfileRequest,
     PythonToolLockfileSentinel,
-    UnrecognizedResolveNamesError,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
 from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
+from pants.backend.python.target_types import UnrecognizedResolveNamesError
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -66,24 +66,6 @@ def test_determine_tool_sentinels_to_generate() -> None:
         determine_resolves_to_generate(
             {"ambiguous": "lockfile.txt"}, [AmbiguousTool], ["ambiguous"]
         )
-
-
-@pytest.mark.parametrize(
-    "unrecognized,bad_entry_str,name_str",
-    (
-        (["fake"], "fake", "name"),
-        (["fake1", "fake2"], "['fake1', 'fake2']", "names"),
-    ),
-)
-def test_unrecognized_resolve_names_error(
-    unrecognized: list[str], bad_entry_str: str, name_str: str
-) -> None:
-    with pytest.raises(UnrecognizedResolveNamesError) as exc:
-        raise UnrecognizedResolveNamesError(unrecognized, ["valid1", "valid2", "valid3"])
-    assert (
-        f"Unrecognized resolve {name_str} from the option `--generate-lockfiles-resolve`: "
-        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
-    ) in str(exc.value)
 
 
 def test_filter_tool_lockfile_requests() -> None:
