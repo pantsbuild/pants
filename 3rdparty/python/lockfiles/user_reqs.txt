@@ -4,6 +4,7 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
+#   "version": 1,
 #   "requirements_invalidation_digest": "19770133e0608f747845bc429b61942d2f79b3cad46790962ade28db07e2b4fd",
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.7"
