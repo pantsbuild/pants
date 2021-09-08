@@ -215,7 +215,7 @@ async def coursier_resolve_lockfile(
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             description=(
-                "Running `coursier fetch` against"
+                "Running `coursier fetch` against "
                 f"{pluralize(len(maven_requirements), 'requirement')}: "
                 f"{', '.join(maven_requirements)}"
             ),
