@@ -483,11 +483,11 @@ async def build_pex_component(
     constraint_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
 
-    lockfile_scope_name: str | None
-    if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile)):
-        lockfile_scope_name = request.requirements.options_scope_name
-    else:
-        lockfile_scope_name = None
+    lockfile_scope_name = (
+        request.requirements.options_scope_name
+        if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
+        else None
+    )
 
     if isinstance(request.requirements, Lockfile):
         argv.extend(["--requirement", request.requirements.file_path])
@@ -500,8 +500,11 @@ async def build_pex_component(
         )
 
         requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
+
         metadata = LockfileMetadata.from_lockfile(
-            requirements_file_digest_contents[0].content, lockfile_scope_name
+            requirements_file_digest_contents[0].content,
+            request.requirements.file_path,
+            lockfile_scope_name,
         )
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
@@ -512,7 +515,9 @@ async def build_pex_component(
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
 
-        metadata = LockfileMetadata.from_lockfile(file_content.content, lockfile_scope_name)
+        metadata = LockfileMetadata.from_lockfile(
+            file_content.content, resolve_name=lockfile_scope_name
+        )
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))

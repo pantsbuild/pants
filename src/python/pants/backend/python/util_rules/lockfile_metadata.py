@@ -29,7 +29,7 @@ class LockfileMetadata:
 
     @classmethod
     def from_lockfile(
-        cls, lockfile: bytes, lockfile_scope_name: str | None = None
+        cls, lockfile: bytes, lockfile_path: str | None = None, resolve_name: str | None = None
     ) -> LockfileMetadata:
         """Parse all relevant metadata from the lockfile's header."""
         in_metadata_block = False
@@ -43,21 +43,22 @@ class LockfileMetadata:
                 metadata_lines.append(line[2:])
 
         error_suffix = "To resolve this error, you will need to regenerate the lockfile by running `./pants generate-lockfiles"
-
-        if lockfile_scope_name:
+        if resolve_name:
             error_suffix += "--resolve={tool_name}"
-
         error_suffix += "`."
 
-        lockfile_description: str = ""
-        if lockfile_scope_name:
-            lockfile_description = f"the lockfile for `{lockfile_scope_name}`"
+        if lockfile_path is not None and resolve_name is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}` for `{resolve_name}`"
+        elif lockfile_path is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}`"
+        elif resolve_name is not None:
+            lockfile_description = f"the lockfile for `{resolve_name}`"
         else:
-            """this lockfile."""
+            lockfile_description = "this lockfile"
 
         if not metadata_lines:
             raise InvalidLockfileError(
-                f"Could not find a pants metadata block in this {lockfile_scope_name}. {error_suffix}"
+                f"Could not find a pants metadata block in {lockfile_description}. {error_suffix}"
             )
 
         try:
