@@ -171,7 +171,7 @@ def run_test_rule(
             coverage_data.address.spec for coverage_data in coverage_data_collection
         )
         console_report = ConsoleCoverageReport(
-            fail_build=False, report=f"Ran coverage on {addresses}"
+            coverage_insufficient=False, report=f"Ran coverage on {addresses}"
         )
         return CoverageReports(reports=(console_report,))
 

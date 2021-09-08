@@ -505,7 +505,7 @@ async def generate_coverage_reports(
                 FilesystemCoverageReport(
                     # We don't know yet if the coverage is sufficient, so we let some other report
                     # trigger the failure if necessary.
-                    fail_build=False,
+                    coverage_insufficient=False,
                     report_type=CoverageReportType.RAW.value,
                     result_snapshot=result_snapshot,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
@@ -568,12 +568,12 @@ async def generate_coverage_reports(
 def _get_coverage_report(
     output_dir: PurePath,
     report_type: CoverageReportType,
-    fail_build: bool,
+    coverage_insufficient: bool,
     result_stdout: bytes,
     result_snapshot: Snapshot,
 ) -> CoverageReport:
     if report_type == CoverageReportType.CONSOLE:
-        return ConsoleCoverageReport(fail_build, result_stdout.decode())
+        return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
     report_file: Optional[PurePath]
     if report_type == CoverageReportType.HTML:
@@ -586,7 +586,7 @@ def _get_coverage_report(
         raise ValueError(f"Invalid coverage report type: {report_type}")
 
     return FilesystemCoverageReport(
-        fail_build=fail_build,
+        coverage_insufficient=coverage_insufficient,
         report_type=report_type.value,
         result_snapshot=result_snapshot,
         directory_to_materialize_to=output_dir,

@@ -181,8 +181,9 @@ class CoverageDataCollection(Collection[_CD]):
 class CoverageReport(ABC):
     """Represents a code coverage report that can be materialized to the terminal or disk."""
 
-    # Should the build fail because of insufficient coverage.
-    fail_build: bool
+    # Some coverage systems can determine, based on a configurable threshold, whether coverage
+    # was sufficient or not. The test goal will fail the build if coverage was deemed insufficient.
+    coverage_insufficient: bool
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         """Materialize this code coverage report to the terminal or disk.
@@ -236,9 +237,9 @@ class CoverageReports(EngineAwareReturnType):
     reports: Tuple[CoverageReport, ...]
 
     @property
-    def fail_build(self) -> bool:
+    def coverage_insufficient(self) -> bool:
         """Whether to fail the build due to insufficient coverage."""
-        return any(report.fail_build for report in self.reports)
+        return any(report.coverage_insufficient for report in self.reports)
 
     def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
         report_paths = []
@@ -454,7 +455,7 @@ async def run_tests(
                 interactive_runner.run(process)
 
         for coverage_reports in coverage_reports_collections:
-            if coverage_reports.fail_build:
+            if coverage_reports.coverage_insufficient:
                 logger.error(
                     "Test goal failed due to insufficient coverage. "
                     "See coverage reports for details."
