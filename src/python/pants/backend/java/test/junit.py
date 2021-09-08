@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaTestsSources
-from pants.core.goals.test import TestFieldSet, TestResult
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
@@ -116,6 +116,12 @@ async def run_junit_test(
         process_result,
         address=field_set.address,
     )
+
+
+# Required by standard test rules. Do nothing for now.
+@rule(level=LogLevel.DEBUG)
+async def setup_junit_debug_request(_field_set: JavaTestFieldSet) -> TestDebugRequest:
+    raise NotImplementedError("TestDebugResult is not implemented for JUnit (yet?).")
 
 
 def rules():
