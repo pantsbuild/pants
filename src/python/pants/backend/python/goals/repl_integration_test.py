@@ -55,7 +55,7 @@ def run_repl(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
                 "--backend-packages=pants.backend.codegen.protobuf.python",
                 *(extra_args or ()),
             ],
-            args=["src/python/lib.py", *(extra_args or ())],
+            args=["src/python/lib.py"],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
 
