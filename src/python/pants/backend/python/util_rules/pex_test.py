@@ -766,7 +766,9 @@ def test_validate_metadata(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
     )
 
-    metadata = LockfileMetadata(expected_digest, InterpreterConstraints([expected_constraints]))
+    metadata = LockfileMetadata.new(
+        expected_digest, InterpreterConstraints([expected_constraints]), set()
+    )
     requirements = _prepare_pex_requirements(
         rule_runner,
         lockfile_type,
