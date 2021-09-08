@@ -41,7 +41,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
@@ -177,6 +177,21 @@ class CoverageSubsystem(PythonToolBase):
                 "by the tests that were run."
             ),
         )
+        register(
+            "--fail-under",
+            type=float,
+            default=None,
+            help=(
+                "Fail if the total combined coverage percentage for all tests is less than this "
+                "number.\n\nUse this instead of setting fail_under in a coverage.py config file, "
+                "as the config will apply to each test separately, while you typically want this "
+                "to apply to the combined coverage for all tests run."
+                "\n\nNote that you must generate at least one (non-raw) coverage report for this "
+                "check to trigger.\n\nNote also that if you specify a non-integral value, you must "
+                "also set [report] precision properly in the coverage.py config file to make use "
+                "of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html ."
+            ),
+        )
 
     @property
     def filter(self) -> Tuple[str, ...]:
@@ -212,6 +227,10 @@ class CoverageSubsystem(PythonToolBase):
     @property
     def global_report(self) -> bool:
         return cast(bool, self.options.global_report)
+
+    @property
+    def fail_under(self) -> int:
+        return cast(int, self.options.fail_under)
 
 
 class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
@@ -484,6 +503,9 @@ async def generate_coverage_reports(
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(
+                    # We don't know yet if the coverage is sufficient, so we let some other report
+                    # trigger the failure if necessary.
+                    coverage_insufficient=False,
                     report_type=CoverageReportType.RAW.value,
                     result_snapshot=result_snapshot,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
@@ -491,16 +513,20 @@ async def generate_coverage_reports(
                 )
             )
             continue
+
         report_types.append(report_type)
         output_file = (
             f"coverage.{report_type.value}"
             if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
             else None
         )
+        args = [report_type.report_name, f"--rcfile={coverage_config.path}"]
+        if coverage_subsystem.fail_under is not None:
+            args.append(f"--fail-under={coverage_subsystem.fail_under}")
         pex_processes.append(
             VenvPexProcess(
                 coverage_setup.pex,
-                argv=(report_type.report_name, f"--rcfile={coverage_config.path}"),
+                argv=tuple(args),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=(output_file,) if output_file else None,
@@ -509,14 +535,31 @@ async def generate_coverage_reports(
             )
         )
     results = await MultiGet(
-        Get(ProcessResult, VenvPexProcess, process) for process in pex_processes
+        Get(FallibleProcessResult, VenvPexProcess, process) for process in pex_processes
     )
+    for proc, res in zip(pex_processes, results):
+        if res.exit_code not in {0, 2}:
+            # coverage.py uses exit code 2 if --fail-under triggers, in which case the
+            # reports are still generated.
+            raise ProcessExecutionFailure(
+                res.exit_code,
+                res.stdout,
+                res.stderr,
+                proc.description,
+            )
+
+    # In practice if one result triggers --fail-under, they all will, but no need to rely on that.
+    result_exit_codes = tuple(res.exit_code for res in results)
     result_stdouts = tuple(res.stdout for res in results)
     result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
 
     coverage_reports.extend(
-        _get_coverage_report(coverage_subsystem.output_dir, report_type, stdout, snapshot)
-        for (report_type, stdout, snapshot) in zip(report_types, result_stdouts, result_snapshots)
+        _get_coverage_report(
+            coverage_subsystem.output_dir, report_type, exit_code != 0, stdout, snapshot
+        )
+        for (report_type, exit_code, stdout, snapshot) in zip(
+            report_types, result_exit_codes, result_stdouts, result_snapshots
+        )
     )
 
     return CoverageReports(tuple(coverage_reports))
@@ -525,11 +568,12 @@ async def generate_coverage_reports(
 def _get_coverage_report(
     output_dir: PurePath,
     report_type: CoverageReportType,
+    coverage_insufficient: bool,
     result_stdout: bytes,
     result_snapshot: Snapshot,
 ) -> CoverageReport:
     if report_type == CoverageReportType.CONSOLE:
-        return ConsoleCoverageReport(result_stdout.decode())
+        return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
     report_file: Optional[PurePath]
     if report_type == CoverageReportType.HTML:
@@ -542,6 +586,7 @@ def _get_coverage_report(
         raise ValueError(f"Invalid coverage report type: {report_type}")
 
     return FilesystemCoverageReport(
+        coverage_insufficient=coverage_insufficient,
         report_type=report_type.value,
         result_snapshot=result_snapshot,
         directory_to_materialize_to=output_dir,
