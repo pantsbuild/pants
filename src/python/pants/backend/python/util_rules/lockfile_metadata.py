@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Iterable, Type, TypeVar
+from typing import Any, Callable, Iterable, Set, Type, TypeVar
 
 from pkg_resources import Requirement
 
@@ -16,8 +16,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
-
-LOCKFILE_VERSION = 1
 
 
 _concrete_metadata_classes: dict[int, Type[LockfileMetadata]] = {}
@@ -211,7 +209,7 @@ class LockfileMetadataV1(LockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[Requirement],
+        _: Iterable[Requirement],  # User requirements are not used by V1
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 
@@ -251,7 +249,7 @@ class LockfileMetadataV2(LockfileMetadata):
 
         requirements_digest = metadata("requirements_invalidation_digest", str, None)
         requirements = metadata(
-            "requirements", set[Requirement], lambda l: {Requirement.parse(i) for i in l}
+            "requirements", Set[Requirement], lambda l: {Requirement.parse(i) for i in l}
         )
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints

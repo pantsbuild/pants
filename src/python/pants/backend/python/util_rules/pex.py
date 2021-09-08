@@ -612,7 +612,7 @@ def _validate_metadata(
         requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
-        {},  # TODO: include requirements strings here
+        {},  # TODO(chrisjrn): include requirements strings here
     )
 
     if validation:
