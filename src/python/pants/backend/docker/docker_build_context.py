@@ -42,12 +42,6 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     # Get all targets to include in context.
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
 
-    # Get all dependencies from those root targets.
-    all_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(target.get(Dependencies)))
-        for target in transitive_targets.roots
-    )
-
     # Get the Dockerfile from the root target.
     dockerfiles_request = Get(
         SourceFiles,
@@ -57,11 +51,17 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         ),
     )
 
-    # Get all sources from all dependencies (i.e. files).
+    # Get all dependencies for the root target.
+    root_dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(target.get(Dependencies)))
+        for target in transitive_targets.roots
+    )
+
+    # Get all sources from the root dependencies (i.e. files).
     sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(Sources) for t in chain(*all_dependencies)],
+            sources_fields=[t.get(Sources) for t in chain(*root_dependencies)],
             for_sources_types=(FilesSources,),
         ),
     )
