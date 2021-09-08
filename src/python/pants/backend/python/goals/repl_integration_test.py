@@ -1,5 +1,7 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
 
 import pytest
 
@@ -12,7 +14,9 @@ from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.engine.process import Process
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.python.python_setup import PythonSetup
+from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
+from pants.testutil.rule_runner import GoalRuleResult, QueryRule, RuleRunner, mock_console
 
 
 @pytest.fixture
@@ -39,44 +43,40 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_repl_with_targets(rule_runner: RuleRunner) -> None:
+def run_repl(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -> GoalRuleResult:
     # TODO(#9108): Expand `mock_console` to allow for providing input for the repl to verify
     # that, e.g., the generated protobuf code is available. Right now this test prepares for
     # that by including generated code, but cannot actually verify it.
     with mock_console(rule_runner.options_bootstrapper):
-        result = rule_runner.run_goal_rule(
+        return rule_runner.run_goal_rule(
             Repl,
             global_args=[
                 "--backend-packages=pants.backend.python",
                 "--backend-packages=pants.backend.codegen.protobuf.python",
+                *(extra_args or ()),
             ],
-            args=["src/python/lib.py"],
+            args=["src/python/lib.py", *(extra_args or ())],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
-    assert result.exit_code == 0
 
 
-def test_repl_ipython(rule_runner: RuleRunner) -> None:
-    with mock_console(rule_runner.options_bootstrapper):
-        result = rule_runner.run_goal_rule(
-            Repl,
-            global_args=[
-                "--backend-packages=pants.backend.python",
-                "--backend-packages=pants.backend.codegen.protobuf.python",
+def test_default_repl(rule_runner: RuleRunner) -> None:
+    assert run_repl(rule_runner).exit_code == 0
+
+
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+)
+def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+    assert (
+        run_repl(
+            rule_runner,
+            extra_args=[
+                "--repl-shell=ipython",
+                f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']",
             ],
-            args=["--shell=ipython", "src/python/lib.py"],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        )
-    assert result.exit_code == 0
-
-
-def test_repl_bogus_repl_name(rule_runner: RuleRunner) -> None:
-    with mock_console(rule_runner.options_bootstrapper):
-        result = rule_runner.run_goal_rule(
-            Repl,
-            global_args=["--backend-packages=pants.backend.python"],
-            args=["--shell=bogus-repl", "src/python/lib.py"],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        )
-    assert result.exit_code == -1
-    assert "'bogus-repl' is not a registered REPL. Available REPLs" in result.stderr
+        ).exit_code
+        == 0
+    )
