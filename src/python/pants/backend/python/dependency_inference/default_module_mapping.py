@@ -34,6 +34,7 @@ DEFAULT_MODULE_MAPPING = {
     "pycrypto": ("Crypto",),
     "pyopenssl": ("OpenSSL",),
     "python-dateutil": ("dateutil",),
+    "python-docx": ("docx",),
     "python-dotenv": ("dotenv",),
     "python-jose": ("jose",),
     "pyyaml": ("yaml",),
