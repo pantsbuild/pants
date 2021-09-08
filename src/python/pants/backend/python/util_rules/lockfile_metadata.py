@@ -17,6 +17,7 @@ END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 LOCKFILE_VERSION = 1
 
+
 class InvalidLockfileError(Exception):
     pass
 
@@ -27,12 +28,16 @@ class LockfileMetadata:
     valid_for_interpreter_constraints: InterpreterConstraints
 
     @staticmethod
-    def new(requirements_invalidation_digest: str, valid_for_interpreter_constraints: InterpreterConstraints) -> LockfileMetadata:
-        """Call the most recent version of the `LockfileMetadata` class to construct a concrete instance.
-        
+    def new(
+        requirements_invalidation_digest: str,
+        valid_for_interpreter_constraints: InterpreterConstraints,
+    ) -> LockfileMetadata:
+        """Call the most recent version of the `LockfileMetadata` class to construct a concrete
+        instance.
+
         This static method should be used in place of the `LockfileMetadata` constructor.
         """
-        
+
         return LockfileMetadata(requirements_invalidation_digest, valid_for_interpreter_constraints)
 
     @classmethod
@@ -48,35 +53,47 @@ class LockfileMetadata:
             elif in_metadata_block:
                 metadata_lines.append(line[2:])
 
+        error_suffix = "To resolve this error, you will need to regenerate the lockfile."
+
         if not metadata_lines:
             # TODO(#12314): Add a good error.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                "Could not find a pants metadata block in this lockfile. " + error_suffix
+            )
 
         try:
             metadata = json.loads(b"\n".join(metadata_lines))
         except json.decoder.JSONDecodeError:
-            # TODO(#12314): Add a good error.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                "Lockfile metadata header is not a valid JSON string and can't be decoded. "
+                + error_suffix
+            )
 
         def get_or_raise(key: str) -> Any:
             try:
                 return metadata[key]
             except KeyError:
-                # TODO(#12314): Add a good error about the key not being defined.
-                raise InvalidLockfileError("")
+                raise InvalidLockfileError(
+                    f"Required key `{key}` is not present in lockfile metadata header. "
+                    + error_suffix
+                )
 
         requirements_digest = get_or_raise("requirements_invalidation_digest")
         if not isinstance(requirements_digest, str):
-            # TODO(#12314): Add a good error about invalid data type.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                "Lockfile metadata value `requirements_invalidation_digest` must be a string. "
+                + error_suffix
+            )
 
         try:
             interpreter_constraints = InterpreterConstraints(
                 get_or_raise("valid_for_interpreter_constraints")
             )
         except TypeError:
-            # TODO(#12314): Add a good error about invalid data type.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                "Lockfile metadata value `valid_for_interpreter_constraints` must be a list of "
+                "valid Python interpreter constraints strings. " + error_suffix
+            )
 
         return LockfileMetadata(requirements_digest, interpreter_constraints)
 
