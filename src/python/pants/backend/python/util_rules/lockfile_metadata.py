@@ -15,6 +15,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
+LOCKFILE_VERSION = 1
 
 class InvalidLockfileError(Exception):
     pass
@@ -24,6 +25,15 @@ class InvalidLockfileError(Exception):
 class LockfileMetadata:
     requirements_invalidation_digest: str
     valid_for_interpreter_constraints: InterpreterConstraints
+
+    @staticmethod
+    def new(requirements_invalidation_digest: str, valid_for_interpreter_constraints: InterpreterConstraints) -> LockfileMetadata:
+        """Call the most recent version of the `LockfileMetadata` class to construct a concrete instance.
+        
+        This static method should be used in place of the `LockfileMetadata` constructor.
+        """
+        
+        return LockfileMetadata(requirements_invalidation_digest, valid_for_interpreter_constraints)
 
     @classmethod
     def from_lockfile(cls, lockfile: bytes) -> LockfileMetadata:
@@ -72,6 +82,7 @@ class LockfileMetadata:
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
         metadata_dict = {
+            "version": LOCKFILE_VERSION,
             "requirements_invalidation_digest": self.requirements_invalidation_digest,
             "valid_for_interpreter_constraints": [
                 str(ic) for ic in self.valid_for_interpreter_constraints
