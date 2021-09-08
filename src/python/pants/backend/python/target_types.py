@@ -532,6 +532,7 @@ class PythonTests(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
+        PythonResolveField,
         PythonTestsSources,
         PythonTestsDependencies,
         PythonTestsTimeout,
