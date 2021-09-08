@@ -7,19 +7,28 @@ import itertools
 from typing import Iterable
 
 import pytest
+from pkg_resources import Requirement
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
     LockfileMetadataV1,
+    LockfileMetadataV2,
     calculate_invalidation_digest,
 )
 
+INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+
+
+def reqset(*a) -> set[Requirement]:
+    return {Requirement.parse(i) for i in a}
+
 
 def test_metadata_header_round_trip() -> None:
-    input_metadata = LockfileMetadataV1(
+    input_metadata = LockfileMetadata.new(
         "cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef",
         InterpreterConstraints(["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]),
+        reqset("ansicolors==0.1.0"),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock"
@@ -40,10 +49,13 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
+#   "version": 2,
 #   "requirements_invalidation_digest": "000faaafcacacaca",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
+#   ],
+#   "requirements": [
+#     "ansicolors==0.1.0"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -54,7 +66,9 @@ dave==3.1.4 \\
     def line_by_line(b: bytes) -> list[bytes]:
         return [i for i in (j.strip() for j in b.splitlines()) if i]
 
-    metadata = LockfileMetadataV1("000faaafcacacaca", InterpreterConstraints([">=3.7"]))
+    metadata = LockfileMetadata.new(
+        "000faaafcacacaca", InterpreterConstraints([">=3.7"]), reqset("ansicolors==0.1.0")
+    )
     result = metadata.add_header_to_lockfile(input_lockfile, regenerate_command="./pants lock")
     assert line_by_line(result) == line_by_line(expected)
 
@@ -123,16 +137,55 @@ def test_invalidation_digest() -> None:
         ),  # Excluded version from expected ICs is not in a range specified
     ],
 )
-def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
+def test_is_valid_for_v1_and_v2(
+    user_digest, expected_digest, user_ic, expected_ic, matches
+) -> None:
+    m: LockfileMetadata
     m = LockfileMetadataV1(expected_digest, InterpreterConstraints(expected_ic))
     assert (
         bool(
             m.is_valid_for(
                 user_digest,
                 InterpreterConstraints(user_ic),
-                ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+                INTERPRETER_UNIVERSE,
                 set(),
             )
         )
         == matches
+    )
+
+    reqs = reqset("ansicolors==0.1.0")
+    m = LockfileMetadataV2(expected_digest, InterpreterConstraints(expected_ic), reqs)
+    assert (
+        bool(
+            m.is_valid_for(user_digest, InterpreterConstraints(user_ic), INTERPRETER_UNIVERSE, reqs)
+        )
+        == matches
+    )
+
+
+@pytest.mark.parametrize(
+    "user_digest, expected_digest, user_reqs, expected_reqs, matches",
+    [
+        # Exact requirements match
+        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], True],
+        # Digest mismatch
+        ["yes", "no", ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], False],
+        # Version mismatch
+        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors==0.1.1"], False],
+        # Range specifier mismatch
+        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors>=0.1.0"], False],
+        # Strict subset
+        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors==0.1.0", "requests==1.0.0"], True],
+        # User reqs are superset
+        ["yes", "yes", ["ansicolors==0.1.0", "requests==1.0.0"], ["ansicolors==0.1.0"], False],
+    ],
+)
+def test_is_valid_for_v2_only(
+    user_digest, expected_digest, user_reqs, expected_reqs, matches
+) -> None:
+    ic = InterpreterConstraints(["CPython==3.6.1"])
+    m = LockfileMetadataV2(expected_digest, ic, reqset(*expected_reqs))
+    assert (
+        bool(m.is_valid_for(user_digest, ic, INTERPRETER_UNIVERSE, reqset(*user_reqs))) == matches
     )
