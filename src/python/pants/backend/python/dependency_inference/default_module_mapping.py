@@ -37,6 +37,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-dateutil": ("dateutil",),
     "python-dotenv": ("dotenv",),
     "python-jose": ("jose",),
+    "python-pptx": ("pptx",),
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs"),
     "pymupdf": ("fitz",),
