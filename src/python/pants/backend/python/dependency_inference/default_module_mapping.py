@@ -27,6 +27,7 @@ DEFAULT_MODULE_MAPPING = {
     "google-cloud-pubsub": ("google.cloud.pubsub_v1", "google.cloud.pubsub"),
     "google-cloud-secret-manager": ("google.cloud.secretmanager",),
     "google-cloud-storage": ("google.cloud.storage",),
+    "opencv-python": ("cv2",),
     "paho-mqtt": ("paho",),
     "pillow": ("PIL",),
     "psycopg2-binary": ("psycopg2",),
