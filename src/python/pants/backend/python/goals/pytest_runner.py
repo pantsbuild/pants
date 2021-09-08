@@ -178,7 +178,11 @@ async def setup_pytest_for_target(
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
+        PexFromTargetsRequest.for_requirements(
+            [request.field_set.address],
+            internal_only=True,
+            resolve_and_lockfile=request.field_set.resolve.resolve_and_lockfile(python_setup),
+        ),
     )
     pytest_pex_get = Get(
         Pex,
