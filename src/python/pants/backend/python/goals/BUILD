@@ -30,6 +30,14 @@ python_tests(
 )
 
 python_tests(
+    name="repl_integration",
+    sources=["repl_integration_test.py"],
+    # We want to make sure the default lockfile works for both macOS and Linux.
+    tags=["platform_specific_behavior"],
+    timeout=120,
+)
+
+python_tests(
     name="run_pex_binary_integration",
     sources=["run_pex_binary_integration_test.py"],
     timeout=120,
