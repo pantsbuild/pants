@@ -683,6 +683,7 @@ def _run_pex_for_lockfile_test(
     lockfile = f"""
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {{
+#   "version": 1,
 #   "requirements_invalidation_digest": "{actual_digest}",
 #   "valid_for_interpreter_constraints": [
 #     "{ actual_constraints }"
