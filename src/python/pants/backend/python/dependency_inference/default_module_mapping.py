@@ -38,6 +38,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-jose": ("jose",),
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs"),
+    "pymupdf": ("fitz",),
     "pytest-runner": ("ptr",),
     "scikit-image": ("skimage",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
