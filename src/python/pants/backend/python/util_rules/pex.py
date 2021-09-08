@@ -483,7 +483,8 @@ async def build_pex_component(
     constraint_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
 
-    lockfile_scope_name = (
+    # TODO(#12314): Capture the resolve name for multiple user lockfiles.
+    resolve_name = (
         request.requirements.options_scope_name
         if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
         else None
@@ -504,7 +505,7 @@ async def build_pex_component(
         metadata = LockfileMetadata.from_lockfile(
             requirements_file_digest_contents[0].content,
             request.requirements.file_path,
-            lockfile_scope_name,
+            resolve_name,
         )
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
@@ -516,7 +517,7 @@ async def build_pex_component(
         argv.append("--no-transitive")
 
         metadata = LockfileMetadata.from_lockfile(
-            file_content.content, resolve_name=lockfile_scope_name
+            file_content.content, resolve_name=resolve_name
         )
         _validate_metadata(metadata, request, request.requirements, python_setup)
 

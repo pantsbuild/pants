@@ -42,7 +42,10 @@ class LockfileMetadata:
             elif in_metadata_block:
                 metadata_lines.append(line[2:])
 
-        error_suffix = "To resolve this error, you will need to regenerate the lockfile by running `./pants generate-lockfiles"
+        error_suffix = (
+            "To resolve this error, you will need to regenerate the lockfile by running "
+            "`./pants generate-lockfiles"
+        )
         if resolve_name:
             error_suffix += "--resolve={tool_name}"
         error_suffix += "`."
