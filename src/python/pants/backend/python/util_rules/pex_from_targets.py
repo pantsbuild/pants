@@ -45,6 +45,7 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import path_safe
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
+    resolve_and_lockfile: tuple[str, str] | None
     hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
@@ -82,6 +84,7 @@ class PexFromTargetsRequest:
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
+        resolve_and_lockfile: tuple[str, str] | None = None,
         direct_deps_only: bool = False,
         description: str | None = None,
     ) -> None:
@@ -112,6 +115,7 @@ class PexFromTargetsRequest:
             directly in the Pex, but should be present in the environment when building the Pex.
         :param hardcoded_interpreter_constraints: Use these constraints rather than resolving the
             constraints from the input.
+        :param resolve_and_lockfile: if set, use this "named resolve" and lockfile.
         :param direct_deps_only: Only consider the input addresses and their direct dependencies,
             rather than the transitive closure.
         :param description: A human-readable description to render in the dynamic UI when building
@@ -128,6 +132,7 @@ class PexFromTargetsRequest:
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
+        self.resolve_and_lockfile = resolve_and_lockfile
         self.direct_deps_only = direct_deps_only
         self.description = description
 
@@ -140,6 +145,7 @@ class PexFromTargetsRequest:
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
+        resolve_and_lockfile: tuple[str, str] | None = None,
     ) -> PexFromTargetsRequest:
         """Create an instance that can be used to get a requirements pex.
 
@@ -160,6 +166,7 @@ class PexFromTargetsRequest:
             hardcoded_interpreter_constraints=hardcoded_interpreter_constraints,
             internal_only=internal_only,
             direct_deps_only=direct_deps_only,
+            resolve_and_lockfile=resolve_and_lockfile,
         )
 
 
@@ -246,11 +253,33 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 "`[python-setup].resolve_all_constraints` is enabled, so "
                 "`[python-setup].requirement_constraints` must also be set."
             )
+        elif request.resolve_and_lockfile:
+            resolve, lockfile = request.resolve_and_lockfile
+            resolved_dists = await Get(
+                ResolvedDistributions,
+                PexRequest(
+                    description=f"Installing {lockfile} for the resolve `{resolve}`",
+                    output_filename=f"{path_safe(resolve)}_lockfile.pex",
+                    internal_only=request.internal_only,
+                    requirements=Lockfile(
+                        file_path=lockfile,
+                        file_path_description_of_origin=(
+                            f"the resolve `{resolve}` (from "
+                            "`[python-setup].experimental_resolves_to_lockfiles`)"
+                        ),
+                        # TODO(#12314): Hook up lockfile staleness check.
+                        lockfile_hex_digest=None,
+                    ),
+                    interpreter_constraints=interpreter_constraints,
+                    platforms=request.platforms,
+                    additional_args=request.additional_args,
+                ),
+            )
         elif python_setup.lockfile:
             resolved_dists = await Get(
                 ResolvedDistributions,
                 PexRequest(
-                    description=f"Resolving {python_setup.lockfile}",
+                    description=f"Installing {python_setup.lockfile}",
                     output_filename="lockfile.pex",
                     internal_only=request.internal_only,
                     requirements=Lockfile(

@@ -25,6 +25,8 @@ class ListSubsystem(LineOriented, GoalSubsystem):
             type=bool,
             default=False,
             help="List only targets that provide an artifact.",
+            removal_version="2.9.0.dev0",
+            removal_hint="Filter on python distributions instead: ./pants filter --target-type=python_distribution ::\n",
         )
         register(
             "--documented",

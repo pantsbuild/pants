@@ -16,6 +16,7 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
+    PythonResolveField,
     PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -49,6 +50,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars
+    resolve: PythonResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

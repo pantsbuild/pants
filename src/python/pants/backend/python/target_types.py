@@ -86,6 +86,60 @@ class InterpreterConstraintsField(StringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
+class UnrecognizedResolveNamesError(Exception):
+    def __init__(
+        self,
+        unrecognized_resolve_names: list[str],
+        all_valid_names: Iterable[str],
+        *,
+        description_of_origin: str,
+    ) -> None:
+        # TODO(#12314): maybe implement "Did you mean?"
+        if len(unrecognized_resolve_names) == 1:
+            unrecognized_str = unrecognized_resolve_names[0]
+            name_description = "name"
+        else:
+            unrecognized_str = str(sorted(unrecognized_resolve_names))
+            name_description = "names"
+        super().__init__(
+            f"Unrecognized resolve {name_description} from {description_of_origin}: "
+            f"{unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}"
+        )
+
+
+class PythonResolveField(StringField, AsyncFieldMixin):
+    alias = "experimental_resolve"
+    # TODO(#12314): Figure out how to model the default and disabling lockfile, e.g. if we
+    #  hardcode to `default` or let the user set it.
+    help = (
+        "The resolve from `[python-setup].experimental_resolves_to_lockfiles` to use, if any.\n\n"
+        "This field is highly experimental and may change without the normal deprecation policy."
+    )
+
+    def validate(self, python_setup: PythonSetup) -> None:
+        """Check that the resolve name is recognized."""
+        if not self.value:
+            return None
+        if self.value not in python_setup.resolves_to_lockfiles:
+            raise UnrecognizedResolveNamesError(
+                [self.value],
+                python_setup.resolves_to_lockfiles.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
+
+    def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
+        """If configured, return the resolve name with its lockfile.
+
+        Error if the resolve name is invalid.
+        """
+        self.validate(python_setup)
+        return (
+            (self.value, python_setup.resolves_to_lockfiles[self.value])
+            if self.value is not None
+            else None
+        )
+
+
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` target
 # -----------------------------------------------------------------------------------------------
@@ -204,7 +258,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n  1) "
         "'app.py', Pants will convert into the module `path.to.app`;\n  2) 'app.py:func', Pants "
         "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
-        "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
+        "arguments to work with this target.\n\nTo leave off an entry point, set to `<none>`."
     )
     required = True
     value: EntryPoint
@@ -383,6 +437,7 @@ class PexBinary(Target):
         *COMMON_TARGET_FIELDS,
         OutputPathField,
         InterpreterConstraintsField,
+        PythonResolveField,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,
@@ -477,6 +532,7 @@ class PythonTests(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
+        PythonResolveField,
         PythonTestsSources,
         PythonTestsDependencies,
         PythonTestsTimeout,
