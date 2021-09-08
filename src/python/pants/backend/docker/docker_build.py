@@ -57,10 +57,9 @@ async def build_docker_image(
         ProcessResult,
         Process,
         docker.build_image(
-            field_set.image_tag,
-            context.digest,
-            ".",
-            field_set.dockerfile_path,
+            tag=field_set.image_tag,
+            digest=context.digest,
+            dockerfile=field_set.dockerfile_path,
         ),
     )
 

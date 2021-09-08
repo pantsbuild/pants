@@ -7,7 +7,7 @@ from itertools import chain
 
 from pants.backend.docker.target_types import DockerImageSources
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
@@ -44,11 +44,11 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     # Get all dependencies from those root targets.
     all_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(target.get(Dependencies), include_special_cased_deps=True))
+        Get(Targets, DependenciesRequest(target.get(Dependencies)))
         for target in transitive_targets.roots
     )
 
-    # Get Dockerfiles from all roots.
+    # Get the Dockerfile from the root target.
     dockerfiles_request = Get(
         SourceFiles,
         SourceFilesRequest(
@@ -56,12 +56,13 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             for_sources_types=(DockerImageSources,),
         ),
     )
-    # Get all sources from all dependencies (i.e. files and resources).
+
+    # Get all sources from all dependencies (i.e. files).
     sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[t.get(Sources) for t in chain(*all_dependencies)],
-            for_sources_types=(FilesSources, ResourcesSources),
+            for_sources_types=(FilesSources,),
         ),
     )
 

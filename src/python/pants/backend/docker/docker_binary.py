@@ -24,7 +24,7 @@ class DockerBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
     def build_image(
-        self, tag: str, digest: Digest, context_root: str, dockerfile: Optional[str] = None
+        self, tag: str, digest: Digest, context_root: str = ".", dockerfile: Optional[str] = None
     ) -> Process:
         args = [self.path, "build", "-t", tag]
         if dockerfile:
