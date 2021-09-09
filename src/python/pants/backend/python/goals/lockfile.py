@@ -37,6 +37,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, union
+from pants.python.python_repos import PythonRepos
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -69,7 +70,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "generate the lockfile for those two tools.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
                 "possible values.\n\n"
-                "If not specified, will generate for all resolves."
+                "If not specified, Pants will generate for all resolves."
             ),
         )
         register(
@@ -245,7 +246,13 @@ async def generate_lockfiles_goal(
     workspace: Workspace,
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    python_repos: PythonRepos,
 ) -> GenerateLockfilesGoal:
+    if python_repos.repos:
+        warn_python_repos("repos")
+    if python_repos.indexes != [python_repos.pypi_index]:
+        warn_python_repos("indexes")
+
     specified_tool_requests = await MultiGet(
         Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
         for sentinel in determine_tool_sentinels_to_generate(
@@ -267,6 +274,19 @@ async def generate_lockfiles_goal(
         logger.info(f"Wrote lockfile to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+def warn_python_repos(option: str) -> None:
+    logger.warning(
+        f"The option `[python-repos].{option}` is configured, but it does not currently work "
+        "with lockfile generation. Lockfile generation will fail if the relevant requirements "
+        "cannot be located on PyPI.\n\n"
+        "If lockfile generation fails, you can disable lockfiles by setting "
+        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
+        "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
+        "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
+        "lockfiles, set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+    )
 
 
 class UnrecognizedResolveNamesError(Exception):
