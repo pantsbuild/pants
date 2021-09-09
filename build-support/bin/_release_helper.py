@@ -598,7 +598,6 @@ def build_pex(fetch: bool) -> None:
                 str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
                 "--no-strip-pex-env",
                 "--console-script=pants",
-                "--unzip",
                 *extra_pex_args,
                 f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
             ],
