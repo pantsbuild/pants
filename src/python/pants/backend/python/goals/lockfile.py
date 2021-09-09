@@ -371,10 +371,11 @@ def warn_python_repos(option: str) -> None:
         f"The option `[python-repos].{option}` is configured, but it does not currently work "
         "with lockfile generation. Lockfile generation will fail if the relevant requirements "
         "cannot be located on PyPI.\n\n"
-        "If lockfile generation fails, you can either disable lockfiles by setting "
-        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`, or you can manually "
-        "generate lockfiles, e.g. by using pip-compile or `pip freeze`. If manually generating "
-        "lockfiles, you should set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+        "If lockfile generation fails, you can disable lockfiles by setting "
+        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
+        "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
+        "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
+        "lockfiles, set `[python-setup].invalid_lockfile_behavior = 'ignore'."
     )
 
 
