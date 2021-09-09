@@ -15,6 +15,8 @@ from pants.util.ordered_set import FrozenOrderedSet
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
 END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
+LOCKFILE_VERSION = 1
+
 
 class InvalidLockfileError(Exception):
     pass
@@ -26,7 +28,9 @@ class LockfileMetadata:
     valid_for_interpreter_constraints: InterpreterConstraints
 
     @classmethod
-    def from_lockfile(cls, lockfile: bytes) -> LockfileMetadata:
+    def from_lockfile(
+        cls, lockfile: bytes, lockfile_path: str | None = None, resolve_name: str | None = None
+    ) -> LockfileMetadata:
         """Parse all relevant metadata from the lockfile's header."""
         in_metadata_block = False
         metadata_lines = []
@@ -38,40 +42,67 @@ class LockfileMetadata:
             elif in_metadata_block:
                 metadata_lines.append(line[2:])
 
+        error_suffix = (
+            "To resolve this error, you will need to regenerate the lockfile by running "
+            "`./pants generate-lockfiles"
+        )
+        if resolve_name:
+            error_suffix += "--resolve={tool_name}"
+        error_suffix += "`."
+
+        if lockfile_path is not None and resolve_name is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}` for `{resolve_name}`"
+        elif lockfile_path is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}`"
+        elif resolve_name is not None:
+            lockfile_description = f"the lockfile for `{resolve_name}`"
+        else:
+            lockfile_description = "this lockfile"
+
         if not metadata_lines:
-            # TODO(#12314): Add a good error.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                f"Could not find a pants metadata block in {lockfile_description}. {error_suffix}"
+            )
 
         try:
             metadata = json.loads(b"\n".join(metadata_lines))
         except json.decoder.JSONDecodeError:
-            # TODO(#12314): Add a good error.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                f"Metadata header in {lockfile_description} is not a valid JSON string and can't "
+                "be decoded. " + error_suffix
+            )
 
         def get_or_raise(key: str) -> Any:
             try:
                 return metadata[key]
             except KeyError:
-                # TODO(#12314): Add a good error about the key not being defined.
-                raise InvalidLockfileError("")
+                raise InvalidLockfileError(
+                    f"Required key `{key}` is not present in metadata header for "
+                    f"{lockfile_description}. {error_suffix}"
+                )
 
         requirements_digest = get_or_raise("requirements_invalidation_digest")
         if not isinstance(requirements_digest, str):
-            # TODO(#12314): Add a good error about invalid data type.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                f"Metadata value `requirements_invalidation_digest` in {lockfile_description} must "
+                "be a string. " + error_suffix
+            )
 
         try:
             interpreter_constraints = InterpreterConstraints(
                 get_or_raise("valid_for_interpreter_constraints")
             )
         except TypeError:
-            # TODO(#12314): Add a good error about invalid data type.
-            raise InvalidLockfileError("")
+            raise InvalidLockfileError(
+                f"Metadata value `valid_for_interpreter_constraints` in {lockfile_description} "
+                "must be a list of valid Python interpreter constraints strings. " + error_suffix
+            )
 
         return LockfileMetadata(requirements_digest, interpreter_constraints)
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
         metadata_dict = {
+            "version": LOCKFILE_VERSION,
             "requirements_invalidation_digest": self.requirements_invalidation_digest,
             "valid_for_interpreter_constraints": [
                 str(ic) for ic in self.valid_for_interpreter_constraints
