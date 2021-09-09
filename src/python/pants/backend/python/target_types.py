@@ -424,7 +424,7 @@ class PexExecutionModeField(StringField):
         "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in a "
         f"modified {PexExecutionMode.ZIPAPP.value!r} mode (See: "
         "https://www.python.org/dev/peps/pep-0441/) where zipped internal code and dependencies "
-        "are first unpacked to disk. This mode achieves the fasted cold start times and may, for "
+        "are first unpacked to disk. This mode achieves the fastest cold start times and may, for "
         "example be the best choice for cloud lambda functions.\n\nThe fastest execution mode in "
         f"the steady state is {PexExecutionMode.VENV.value!r}, which generates a virtual "
         "environment from the PEX file on first run, but then achieves near native virtual "
