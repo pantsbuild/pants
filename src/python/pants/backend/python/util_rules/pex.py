@@ -483,6 +483,13 @@ async def build_pex_component(
     constraint_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
 
+    # TODO(#12314): Capture the resolve name for multiple user lockfiles.
+    resolve_name = (
+        request.requirements.options_scope_name
+        if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
+        else None
+    )
+
     if isinstance(request.requirements, Lockfile):
         argv.extend(["--requirement", request.requirements.file_path])
         argv.append("--no-transitive")
@@ -494,7 +501,12 @@ async def build_pex_component(
         )
 
         requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
-        metadata = LockfileMetadata.from_lockfile(requirements_file_digest_contents[0].content)
+
+        metadata = LockfileMetadata.from_lockfile(
+            requirements_file_digest_contents[0].content,
+            request.requirements.file_path,
+            resolve_name,
+        )
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
@@ -504,7 +516,7 @@ async def build_pex_component(
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
 
-        metadata = LockfileMetadata.from_lockfile(file_content.content)
+        metadata = LockfileMetadata.from_lockfile(file_content.content, resolve_name=resolve_name)
         _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
