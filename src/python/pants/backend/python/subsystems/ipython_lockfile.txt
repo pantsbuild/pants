@@ -51,9 +51,9 @@ ptyprocess==0.7.0; sys_platform != "win32" and python_version >= "3.6" \
 pygments==2.10.0; python_version >= "3.6" \
     --hash=sha256:b8e67fe6af78f492b3c4b3e2970c0624cbf08beb1e493b2c99b9fa1b67a20380 \
     --hash=sha256:f398865f7eb6874156579fdf36bc840a03cab64d1cde9e93d68f46a425ec52c6
-setuptools==58.0.3; python_version >= "3.6" \
-    --hash=sha256:1ceadf3ea9a821ef305505db995f2e21550ea62500900164278c4b23109204f3 \
-    --hash=sha256:5e4c36f55012a46c1b3e4b67a8236d1d73856a90fc7b3207d29bedb7d2bac417
+setuptools==58.0.4; python_version >= "3.6" \
+    --hash=sha256:69cc739bc2662098a68a9bc575cd974a57969e70c1d58ade89d104ab73d79770 \
+    --hash=sha256:f10059f0152e0b7fb6b2edd77bcb1ecd4c9ed7048a826eb2d79f72fd2e6e237b
 six==1.16.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6" \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926
