@@ -34,7 +34,7 @@ python_tests(
     sources=["repl_integration_test.py"],
     # We want to make sure the default lockfile works for both macOS and Linux.
     tags=["platform_specific_behavior"],
-    timeout=120,
+    timeout=240,
 )
 
 python_tests(
