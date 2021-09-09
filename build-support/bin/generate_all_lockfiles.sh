@@ -4,7 +4,11 @@
 
 set -euo pipefail
 
-source $(dirname $0)/../common.sh
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 1
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 # To solve the chicken and egg problem of https://github.com/pantsbuild/pants/issues/12457, we
 # temporarily disable the lockfile. This means that `./pants run` will ignore the lockfile. While
@@ -15,9 +19,7 @@ if is_macos_arm; then
   # Generate the lockfiles with the correct notated interpreter constraints, but make
   # Pants execute with a version of Python that actually runs on MacOS ARM
   unset PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS
-  MAYBE_INTERPRETER_CONSTRAINTS=--python-setup-interpreter-constraints=[\'==3.9.*\']
+  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py --python-setup-interpreter-constraints="['==3.9.*']"
 else
-  MAYBE_INTERPRETER_CONSTRAINTS=
+  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py
 fi
-
-exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py $MAYBE_INTERPRETER_CONSTRAINTS
