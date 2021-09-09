@@ -30,7 +30,6 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
     PexResolveInfo,
-    ResolvedDistributions,
     ToolCustomLockfile,
     ToolDefaultLockfile,
     VenvPex,
@@ -75,12 +74,11 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+    return RuleRunner(
         rules=[
             *pex_rules(),
             QueryRule(Pex, (PexRequest,)),
             QueryRule(VenvPex, (PexRequest,)),
-            QueryRule(ResolvedDistributions, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
@@ -89,11 +87,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(PexPEX, ()),
         ],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
-    return rule_runner
 
 
 def create_pex_and_get_all_data(
@@ -121,6 +114,7 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
+        apply_requirement_constraints=True,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -135,7 +129,7 @@ def create_pex_and_get_all_data(
             Process,
             [
                 PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=()),
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
                     argv=["-m", "pex.tools", pex.name, "info"],
                     input_digest=pex.digest,
                     extra_env=dict(PEX_INTERPRETER="1"),
@@ -396,7 +390,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps, apply_constraints=False)
+        rule_runner, requirements=PexRequirements(direct_deps)
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -411,7 +405,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps, apply_constraints=True),
+        requirements=PexRequirements(direct_deps),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -496,7 +490,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     venv_pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
+        requirements=PexRequirements(["requests==2.23.0"]),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
@@ -526,23 +520,21 @@ def test_build_pex_description() -> None:
         )
         assert _build_pex_description(request) == expected
 
-    resolved_dists = ResolvedDistributions(
-        Pex(digest=EMPTY_DIGEST, name="repo.pex", python=None, pex_path=())
-    )
+    repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
     assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(resolved_dists=resolved_dists), description="Custom!", expected="Custom!"
+        PexRequirements(repository_pex=repo_pex), description="Custom!", expected="Custom!"
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(resolved_dists=resolved_dists), expected="Building new.pex")
+    assert_description(PexRequirements(repository_pex=repo_pex), expected="Building new.pex")
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
-        PexRequirements(["req"], resolved_dists=resolved_dists),
+        PexRequirements(["req"], repository_pex=repo_pex),
         expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
@@ -551,7 +543,7 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"], resolved_dists=resolved_dists),
+        PexRequirements(["req1", "req2"], repository_pex=repo_pex),
         expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 
