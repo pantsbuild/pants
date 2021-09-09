@@ -50,12 +50,10 @@ class LockfileMetadata:
     To construct an instance of the most recent concrete subclass, call `LockfileMetadata.new()`.
     """
 
-    requirements_invalidation_digest: str | None
     valid_for_interpreter_constraints: InterpreterConstraints
 
     @staticmethod
     def new(
-        requirements_invalidation_digest: str | None,
         valid_for_interpreter_constraints: InterpreterConstraints,
         requirements: set[Requirement],
     ) -> LockfileMetadata:
@@ -65,9 +63,7 @@ class LockfileMetadata:
         This static method should be used in place of the `LockfileMetadata` constructor.
         """
 
-        return LockfileMetadataV2(
-            requirements_invalidation_digest, valid_for_interpreter_constraints, requirements
-        )
+        return LockfileMetadataV2(valid_for_interpreter_constraints, requirements)
 
     @staticmethod
     def from_lockfile(
@@ -163,7 +159,6 @@ class LockfileMetadata:
 
         return {
             "version": version,
-            "requirements_invalidation_digest": self.requirements_invalidation_digest,
             "valid_for_interpreter_constraints": [
                 str(ic) for ic in self.valid_for_interpreter_constraints
             ],
@@ -174,7 +169,7 @@ class LockfileMetadata:
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[Requirement],
+        user_requirements: Iterable[Requirement] | None,
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `LockfileMetadata` can be used in the current execution
         context."""
@@ -202,14 +197,19 @@ class LockfileMetadataV1(LockfileMetadata):
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
         )
 
-        return LockfileMetadataV1(requirements_digest, interpreter_constraints)
+        return LockfileMetadataV1(interpreter_constraints, requirements_digest)
+
+    def _header_dict(self) -> dict[Any, Any]:
+        d = super()._header_dict()
+        d["requirements_invalidation_digest"] = self.requirements_invalidation_digest
+        return d
 
     def is_valid_for(
         self,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        _: Iterable[Requirement],  # User requirements are not used by V1
+        _: Iterable[Requirement] | None,  # User requirements are not used by V1
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 
@@ -230,13 +230,13 @@ class LockfileMetadataV1(LockfileMetadata):
 @_lockfile_metadata_version(2)
 @dataclass
 class LockfileMetadataV2(LockfileMetadata):
-    """Lockfile version that permits specifying a requirements set instead of a requirements digest.
+    """Lockfile version that permits specifying a requirements as a set rather than a digest.
 
-    When a requirements digest is not set, validity is tested by checking whether the expected
-    requirements are a subset of the requirements specified in this metadata.
+    Validity is tested by the set of requirements strings being the same in the user requirements as
+    those in the stored requirements.
     """
 
-    requirements: set[Requirement] | None
+    requirements: set[Requirement]
 
     @classmethod
     def _from_json_dict(
@@ -247,7 +247,6 @@ class LockfileMetadataV2(LockfileMetadata):
     ) -> LockfileMetadataV2:
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
 
-        requirements_digest = metadata("requirements_invalidation_digest", str, None)
         requirements = metadata(
             "requirements", Set[Requirement], lambda l: {Requirement.parse(i) for i in l}
         )
@@ -255,7 +254,7 @@ class LockfileMetadataV2(LockfileMetadata):
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
         )
 
-        return LockfileMetadataV2(requirements_digest, interpreter_constraints, requirements)
+        return LockfileMetadataV2(interpreter_constraints, requirements)
 
     def _header_dict(self) -> dict[Any, Any]:
         out = super()._header_dict()
@@ -272,17 +271,14 @@ class LockfileMetadataV2(LockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[Requirement],
+        user_requirements: Iterable[Requirement] | None,
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 
-        if not expected_invalidation_digest and not user_requirements:
+        if user_requirements is None:
             return LockfileMetadataValidation(failure_reasons)
 
-        if self.requirements_invalidation_digest != expected_invalidation_digest:
-            failure_reasons.add(InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH)
-
-        if self.requirements is not None and not self.requirements.issuperset(user_requirements):
+        if self.requirements != set(user_requirements):
             failure_reasons.add(InvalidLockfileReason.REQUIREMENTS_MISMATCH)
 
         if not self.valid_for_interpreter_constraints.contains(

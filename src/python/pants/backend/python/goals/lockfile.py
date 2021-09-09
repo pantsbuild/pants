@@ -235,7 +235,6 @@ async def generate_lockfile(
         DigestContents, Digest, poetry_export_result.output_digest
     )
     metadata = LockfileMetadata.new(
-        req.requirements_hex_digest,
         req.interpreter_constraints,
         {Requirement.parse(i) for i in req.requirements},
     )

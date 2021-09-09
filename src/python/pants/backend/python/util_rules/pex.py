@@ -24,6 +24,7 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
+    InvalidLockfileError,
     InvalidLockfileReason,
     LockfileMetadata,
 )
@@ -71,12 +72,14 @@ class Lockfile:
     file_path: str
     file_path_description_of_origin: str
     lockfile_hex_digest: str | None
+    req_strings: FrozenOrderedSet[str] | None
 
 
 @dataclass(frozen=True)
 class LockfileContent:
     file_content: FileContent
     lockfile_hex_digest: str | None
+    req_strings: FrozenOrderedSet[str] | None
 
 
 @dataclass(frozen=True)
@@ -608,11 +611,17 @@ def _validate_metadata(
     python_setup: PythonSetup,
 ) -> None:
 
+    req_strings = (
+        {Requirement.parse(i) for i in requirements.req_strings}
+        if requirements.req_strings is not None
+        else None
+    )
+
     validation = metadata.is_valid_for(
         requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
-        {},  # TODO(chrisjrn): include requirements strings here
+        req_strings,
     )
 
     if validation:
@@ -692,8 +701,8 @@ def _validate_metadata(
     if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
         message = "".join(tool_message_parts(requirements)).strip()
     else:
-        # TODO: Replace with an actual value once user lockfiles are supported
-        assert False
+        # TODO: Improve this message
+        raise InvalidLockfileError(f"{validation.failure_reasons}")
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)

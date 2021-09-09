@@ -19,7 +19,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import LockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import LockfileMetadataV1
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     LockfileContent,
@@ -565,13 +565,17 @@ def test_build_pex_description() -> None:
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
             lockfile_hex_digest=None,
+            req_strings=None,
         ),
         expected="Resolving new.pex from lock.txt",
     )
 
     assert_description(
         Lockfile(
-            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+            file_path="lock.txt",
+            file_path_description_of_origin="foo",
+            lockfile_hex_digest=None,
+            req_strings=None,
         ),
         expected="Resolving new.pex from lock.txt",
     )
@@ -767,9 +771,7 @@ def test_validate_metadata(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
     )
 
-    metadata = LockfileMetadata.new(
-        expected_digest, InterpreterConstraints([expected_constraints]), set()
-    )
+    metadata = LockfileMetadataV1(InterpreterConstraints([expected_constraints]), expected_digest)
     requirements = _prepare_pex_requirements(
         rule_runner,
         lockfile_type,
@@ -875,6 +877,7 @@ def _prepare_pex_requirements(
             file_path=file_path,
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected_digest,
+            req_strings=None,  # TODO: actually test requirement strings
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
@@ -884,6 +887,7 @@ def _prepare_pex_requirements(
         return ToolDefaultLockfile(
             file_content=content,
             lockfile_hex_digest=expected_digest,
+            req_strings=None,  # TODO: actually test requirement strings
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
