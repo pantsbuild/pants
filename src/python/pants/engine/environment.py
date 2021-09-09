@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
+interpolation_re = re.compile(r"^\$\{([A-Za-z_]{1,}[A-Za-z0-9]{0,})\}$")
 
 
 class CompleteEnvironment(FrozenDict):
@@ -84,6 +85,21 @@ class EnvironmentRequest:
         self.allowed = None if allowed is None else FrozenOrderedSet(allowed)
 
 
+class InterpolatedEnvironmentRequest(FrozenDict[str, str]):
+    """Request a map of key:values w/ simple environment variable interpolation.
+
+    e.g.
+
+        {
+            "FOO_BAR": "${FOO_BAR}",
+            "WIZ_BOING": "WIZ_BOING"
+        } == {
+            "FOO_BAR": os.getenv("FOO_BAR", None),
+            "WIZ_BOING": "WIZ_BOING",
+        }
+    """
+
+
 class Environment(FrozenDict[str, str]):
     """A subset of the variables set in the environment."""
 
@@ -103,6 +119,27 @@ def environment_subset(session_values: SessionValues, request: EnvironmentReques
         )
         .items()
     )
+
+
+@rule
+def interpolated_subset(
+    session_values: SessionValues, request: InterpolatedEnvironmentRequest
+) -> Environment:
+    env = session_values[CompleteEnvironment]
+    values = {}
+
+    for key, value in request.items():
+        match = interpolation_re.match(value)
+        if match:
+            env_key = match.groups()[0]
+            try:
+                values[key] = env[env_key]
+            except KeyError:
+                pass
+        else:
+            values[key] = value
+
+    return Environment(values)
 
 
 def rules():
