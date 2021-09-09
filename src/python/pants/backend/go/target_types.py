@@ -20,6 +20,7 @@ class GoSources(Sources):
 
 
 class GoPackageSources(GoSources):
+    alias = "_sources"
     default = ("*.go",)
 
 
