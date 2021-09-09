@@ -4,10 +4,18 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
+#   "version": 2,
 #   "requirements_invalidation_digest": "a2057d396be0480d2586be2da25a021149a4f96276b853dd92cc63cfc3ae8503",
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.7"
+#   ],
+#   "requirements": [
+#     "ipdb",
+#     "pygments",
+#     "pytest-cov<2.13,>=2.12.1",
+#     "pytest-html",
+#     "pytest-icdiff",
+#     "pytest<6.3,>=6.2.4"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -99,9 +107,9 @@ ipython==7.27.0; python_version >= "3.7" \
 jedi==0.18.0; python_version >= "3.7" \
     --hash=sha256:18456d83f65f400ab0c2d3319e48520420ef43b23a086fdc05dff34132f0fb93 \
     --hash=sha256:92550a404bad8afed881a137ec9a461fed49eca661414be45059329614ed0707
-matplotlib-inline==0.1.2; python_version >= "3.7" \
-    --hash=sha256:f41d5ff73c9f5385775d5c0bc13b424535c8402fe70ea8210f93e11f3683993e \
-    --hash=sha256:5cf1176f554abb4fa98cb362aa2b55c500147e4bdbb07e3fda359143e1da0811
+matplotlib-inline==0.1.3; python_version >= "3.7" \
+    --hash=sha256:a04bfba22e0d1395479f866853ec1ee28eea1485c1d69a6faf00dc3e24ff34ee \
+    --hash=sha256:aed605ba3b72462d64d475a21a9296f400a19c4f74a31b59103d2a99ffd5aa5c
 packaging==21.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6" \
     --hash=sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14 \
     --hash=sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7
@@ -149,9 +157,9 @@ pytest-metadata==1.11.0; python_version >= "3.6" and python_full_version < "3.0.
 pytest==6.2.5; python_version >= "3.6" \
     --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134 \
     --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89
-setuptools==57.4.0; python_version >= "3.7" \
-    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
-    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465
+setuptools==58.0.4; python_version >= "3.7" \
+    --hash=sha256:69cc739bc2662098a68a9bc575cd974a57969e70c1d58ade89d104ab73d79770 \
+    --hash=sha256:f10059f0152e0b7fb6b2edd77bcb1ecd4c9ed7048a826eb2d79f72fd2e6e237b
 toml==0.10.2; python_version > "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version > "3.6" \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

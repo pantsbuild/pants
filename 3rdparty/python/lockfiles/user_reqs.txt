@@ -4,10 +4,33 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
+#   "version": 2,
 #   "requirements_invalidation_digest": "19770133e0608f747845bc429b61942d2f79b3cad46790962ade28db07e2b4fd",
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.7"
+#   ],
+#   "requirements": [
+#     "PyYAML<5.5,>=5.4",
+#     "ansicolors==1.1.8",
+#     "fasteners==0.16",
+#     "freezegun==1.1.0",
+#     "humbug==0.2.6",
+#     "ijson==3.1.4",
+#     "packaging==21.0",
+#     "pex==2.1.47",
+#     "psutil==5.8.0",
+#     "pystache==0.5.4",
+#     "pytest<6.3,>=6.0.1",
+#     "requests[security]>=2.25.1",
+#     "setproctitle==1.2.2",
+#     "setuptools<58.0,>=56.0.0",
+#     "toml==0.10.2",
+#     "types-PyYAML==5.4.3",
+#     "types-freezegun==0.1.4",
+#     "types-requests==2.25.0",
+#     "types-setuptools==57.0.0",
+#     "types-toml==0.1.3",
+#     "typing-extensions==3.7.4.3"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -217,9 +240,9 @@ setproctitle==1.2.2; python_version >= "3.6" \
     --hash=sha256:249526a06f16d493a2cb632abc1b1fdfaaa05776339a50dd9f27c941f6ff1383 \
     --hash=sha256:4fc5bebd34f451dc87d2772ae6093adea1ea1dc29afc24641b250140decd23bb \
     --hash=sha256:7dfb472c8852403d34007e01d6e3c68c57eb66433fb8a5c77b13b89a160d97df
-setuptools==57.4.0; python_version >= "3.6" \
-    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6 \
-    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465
+setuptools==57.5.0; python_version >= "3.6" \
+    --hash=sha256:60d78588f15b048f86e35cdab73003d8b21dd45108ee61a6693881a427f22073 \
+    --hash=sha256:d9d3266d50f59c6967b9312844470babbdb26304fe740833a5f8d89829ba3a24
 six==1.16.0; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.5" \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926

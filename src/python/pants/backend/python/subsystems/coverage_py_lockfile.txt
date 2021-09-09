@@ -4,10 +4,13 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
+#   "version": 2,
 #   "requirements_invalidation_digest": "ed5d33bbada4d1d96c7d57e100c72bdb5f26d6fed4f1e77b0e74f2ea5e43e642",
 #   "valid_for_interpreter_constraints": [
 #     "CPython<4,>=3.6"
+#   ],
+#   "requirements": [
+#     "coverage[toml]<5.6,>=5.5"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
