@@ -11,7 +11,6 @@ from pants.backend.python.dependency_inference.import_parser import (
     ParsePythonImportsRequest,
 )
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
-from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
@@ -144,14 +143,13 @@ async def infer_python_dependencies_via_imports(
             ),
         ),
     )
-    relevant_imports = detected_imports - combined_stdlib
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModule(imported_module))
-        for imported_module in relevant_imports
+        for imported_module in detected_imports
     )
     merged_result: set[Address] = set()
-    for owners, imp in zip(owners_per_import, relevant_imports):
+    for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
         address = wrapped_tgt.target.address
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
