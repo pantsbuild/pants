@@ -47,6 +47,7 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
 from pants.engine.unions import UnionMembership, union
+from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -327,7 +328,28 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
 ) -> GenerateLockfilesGoal:
+    failure_instructions = (
+        "If lockfile generation fails, you can either disable lockfiles by setting "
+        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`, or you can manually "
+        "generate lockfiles, e.g. by using pip-compile or `pip freeze`. If manually generating "
+        "lockfiles, you should set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+    )
+    if python_repos.repos:
+        logger.warning(
+            "The option `[python-repos].repos` is configured, but it does not currently work with "
+            "lockfile generation because Pants is currently using Poetry for lockfile generation "
+            "and Poetry does not support `--find-links`. Lockfile generation may fail.\n\n"
+            f"{failure_instructions}"
+        )
+    if python_repos.indexes != [python_repos.pypi_index]:
+        logger.warning(
+            "The option `[python-repos].indexes` is configured, but is not currently wired up to "
+            "lockfile generation. Lockfile generation may fail.\n\n"
+            f"{failure_instructions}"
+        )
+
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
         python_setup.resolves_to_lockfiles.keys(),
         union_membership[PythonToolLockfileSentinel],

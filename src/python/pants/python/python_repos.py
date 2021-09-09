@@ -13,6 +13,8 @@ class PythonRepos(Subsystem):
         "custom cheeseshops when resolving requirements."
     )
 
+    pypi_index = "https://pypi.org/simple/"
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -30,7 +32,7 @@ class PythonRepos(Subsystem):
             "--indexes",
             advanced=True,
             type=list,
-            default=["https://pypi.org/simple/"],
+            default=[cls.pypi_index],
             help=(
                 "URLs of code repository indexes to look for requirements. If set to an empty "
                 "list, then Pex will use no indices (meaning it will not use PyPI). The values "
