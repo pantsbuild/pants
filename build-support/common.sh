@@ -67,5 +67,5 @@ function determine_python() {
 }
 
 function is_macos_arm() {
-  [[ `uname -sm` == "Darwin arm64" ]]
+  [[ $(uname -sm) == "Darwin arm64" ]]
 }
