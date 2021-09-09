@@ -330,25 +330,10 @@ async def generate_lockfiles_goal(
     python_setup: PythonSetup,
     python_repos: PythonRepos,
 ) -> GenerateLockfilesGoal:
-    failure_instructions = (
-        "If lockfile generation fails, you can either disable lockfiles by setting "
-        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`, or you can manually "
-        "generate lockfiles, e.g. by using pip-compile or `pip freeze`. If manually generating "
-        "lockfiles, you should set `[python-setup].invalid_lockfile_behavior = 'ignore'."
-    )
     if python_repos.repos:
-        logger.warning(
-            "The option `[python-repos].repos` is configured, but it does not currently work with "
-            "lockfile generation because Pants is currently using Poetry for lockfile generation "
-            "and Poetry does not support `--find-links`. Lockfile generation may fail.\n\n"
-            f"{failure_instructions}"
-        )
+        warn_python_repos("repos")
     if python_repos.indexes != [python_repos.pypi_index]:
-        logger.warning(
-            "The option `[python-repos].indexes` is configured, but is not currently wired up to "
-            "lockfile generation. Lockfile generation may fail.\n\n"
-            f"{failure_instructions}"
-        )
+        warn_python_repos("indexes")
 
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
         python_setup.resolves_to_lockfiles.keys(),
@@ -379,6 +364,18 @@ async def generate_lockfiles_goal(
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+def warn_python_repos(option: str) -> None:
+    logger.warning(
+        f"The option `[python-repos].{option}` is configured, but it does not currently work "
+        "with lockfile generation. Lockfile generation will fail if the relevant requirements "
+        "cannot be located on PyPI.\n\n"
+        "If lockfile generation fails, you can either disable lockfiles by setting "
+        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`, or you can manually "
+        "generate lockfiles, e.g. by using pip-compile or `pip freeze`. If manually generating "
+        "lockfiles, you should set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+    )
 
 
 class AmbiguousResolveNamesError(Exception):
