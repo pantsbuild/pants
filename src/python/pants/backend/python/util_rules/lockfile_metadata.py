@@ -349,7 +349,6 @@ def _get_metadata(
             if isinstance(val, type_):
                 return val
 
-            # TODO(#12314): Add a good error about invalid data type.
             raise InvalidLockfileError(
                 f"Metadata value `{key}` in {lockfile_description} must "
                 f"be a {type(type_).__name__}. {error_suffix}"
@@ -358,7 +357,6 @@ def _get_metadata(
             try:
                 return coerce(val)
             except Exception:
-                # TODO(#12314): Add a good error about invalid data type.
                 raise InvalidLockfileError(
                     f"Metadata value `{key}` in {lockfile_description} must be able to "
                     f"be converted to a {type(type_).__name__}. {error_suffix}"
