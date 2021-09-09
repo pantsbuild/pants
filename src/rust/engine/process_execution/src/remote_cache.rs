@@ -349,7 +349,6 @@ impl CommandRunner {
     &self,
     context: Context,
     cache_lookup_start: Instant,
-    command: &Command,
     action_digest: Digest,
     request: &Process,
     mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
@@ -358,7 +357,7 @@ impl CommandRunner {
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
         action_digest,
-        command,
+        &request.description,
         &self.metadata,
         self.platform,
         &context,
@@ -391,7 +390,6 @@ impl CommandRunner {
       "remote_cache_read_speculation".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
-        desc: Some(format!("Remote cache lookup: {}", request.description)),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
@@ -562,7 +560,6 @@ impl crate::CommandRunner for CommandRunner {
         .speculate_read_action_cache(
           context.clone(),
           cache_lookup_start,
-          &command,
           action_digest,
           &request,
           self.underlying.run(context.clone(), workunit, req),
