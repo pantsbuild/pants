@@ -143,7 +143,6 @@ class PexFromTargetsRequest:
         *,
         internal_only: bool,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
-        zip_safe: bool = False,
         direct_deps_only: bool = False,
         resolve_and_lockfile: tuple[str, str] | None = None,
     ) -> PexFromTargetsRequest:
@@ -151,18 +150,11 @@ class PexFromTargetsRequest:
 
         Useful to ensure that these requests are uniform (e.g., the using the same output filename),
         so that the underlying pexes are more likely to be reused instead of re-resolved.
-
-        We default to zip_safe=False because there are various issues with running zipped pexes
-        directly, and it's best to only use those if you're sure it's the right thing to do.
-        Also, pytest must use zip_safe=False for performance reasons (see comment in
-        pytest_runner.py) and we get more re-use of pexes if other uses follow suit.
-        This default is a helpful nudge in that direction.
         """
         return PexFromTargetsRequest(
             addresses=sorted(addresses),
             output_filename="requirements.pex",
             include_source_files=False,
-            additional_args=() if zip_safe else ("--not-zip-safe",),
             hardcoded_interpreter_constraints=hardcoded_interpreter_constraints,
             internal_only=internal_only,
             direct_deps_only=direct_deps_only,
