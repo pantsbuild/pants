@@ -185,6 +185,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         *,
         direct_deps_only: bool = False,
         additional_args: Iterable[str] = (),
+        additional_lockfile_args: Iterable[str] = (),
     ) -> PexRequest:
         args = ["--backend-packages=pants.backend.python"]
         request = PexFromTargetsRequest(
@@ -193,6 +194,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             internal_only=True,
             direct_deps_only=direct_deps_only,
             additional_args=additional_args,
+            additional_lockfile_args=additional_lockfile_args,
         )
         if resolve_all_constraints is not None:
             args.append(f"--python-setup-resolve-all-constraints={resolve_all_constraints!r}")
@@ -205,13 +207,10 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         assert OrderedSet(additional_args).issubset(OrderedSet(pex_request.additional_args))
         return pex_request
 
-    additional_args = ["--no-strip-pex-env"]
+    additional_args = ["--strip-pex-env"]
+    additional_lockfile_args = ["--no-strip-pex-env"]
 
-    pex_req1 = get_pex_request(
-        "constraints1.txt",
-        resolve_all_constraints=False,
-        additional_args=additional_args,
-    )
+    pex_req1 = get_pex_request("constraints1.txt", resolve_all_constraints=False)
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req], apply_constraints=True
     )
@@ -225,6 +224,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         "constraints1.txt",
         resolve_all_constraints=True,
         additional_args=additional_args,
+        additional_lockfile_args=additional_lockfile_args,
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
@@ -241,6 +241,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         resolve_all_constraints=True,
         direct_deps_only=True,
         additional_args=additional_args,
+        additional_lockfile_args=additional_lockfile_args,
     )
     pex_req2_reqs = pex_req2_direct.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
@@ -249,9 +250,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert not info(rule_runner, pex_req2_reqs.resolved_dists.pex)["strip_pex_env"]
 
     pex_req3_direct = get_pex_request(
-        "constraints1.txt",
-        resolve_all_constraints=True,
-        direct_deps_only=True,
+        "constraints1.txt", resolve_all_constraints=True, direct_deps_only=True
     )
     pex_req3_reqs = pex_req3_direct.requirements
     assert isinstance(pex_req3_reqs, PexRequirements)

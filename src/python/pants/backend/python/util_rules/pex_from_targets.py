@@ -58,6 +58,7 @@ class PexFromTargetsRequest:
     main: MainSpecification | None
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
+    additional_lockfile_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
     additional_sources: Digest | None
@@ -77,6 +78,7 @@ class PexFromTargetsRequest:
         main: MainSpecification | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
+        additional_lockfile_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
         additional_sources: Digest | None = None,
@@ -101,6 +103,10 @@ class PexFromTargetsRequest:
             interpreter constraints to not be used because platforms already constrain the valid
             Python versions, e.g. by including `cp36m` in the platform string.
         :param additional_args: Any additional Pex flags.
+        :param additional_lockfile_args: Any additional Pex flags that should be used with the lockfile.pex.
+            Many Pex args like `--emit-warnings` do not impact the lockfile, and setting them
+            would reduce reuse with other call sites. Generally, this should only be flags that
+            impact lockfile resolution like `--manylinux`.
         :param additional_requirements: Additional requirements to install, in addition to any
             requirements used by the transitive closure of the given addresses.
         :param include_source_files: Whether to include source files in the built Pex or not.
@@ -123,6 +129,7 @@ class PexFromTargetsRequest:
         self.main = main
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
+        self.additional_lockfile_args = tuple(additional_lockfile_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
         self.additional_sources = additional_sources
@@ -174,7 +181,7 @@ class _ConstraintsResolvedDistributionsRequest:
     platforms: PexPlatforms
     interpreter_constraints: InterpreterConstraints
     internal_only: bool
-    additional_args: tuple[str, ...]
+    additional_lockfile_args: tuple[str, ...]
 
 
 @rule(level=LogLevel.DEBUG)
@@ -234,7 +241,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     request.platforms,
                     interpreter_constraints,
                     request.internal_only,
-                    request.additional_args,
+                    request.additional_lockfile_args,
                 ),
             )
             resolved_dists = constraints_resolved_dists.maybe_resolved_dists
@@ -264,7 +271,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     ),
                     interpreter_constraints=interpreter_constraints,
                     platforms=request.platforms,
-                    additional_args=request.additional_args,
+                    additional_args=request.additional_lockfile_args,
                 ),
             )
         requirements = dataclasses.replace(requirements, resolved_dists=resolved_dists)
@@ -356,7 +363,7 @@ async def _setup_constraints_repository_pex(
             requirements=PexRequirements(all_constraints, apply_constraints=True),
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
-            additional_args=request.additional_args,
+            additional_args=request.additional_lockfile_args,
         ),
     )
     return _ConstraintsResolvedDistributions(resolved_dists)
