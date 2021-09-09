@@ -39,6 +39,7 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
+#   "version": 1,
 #   "requirements_invalidation_digest": "000faaafcacacaca",
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
