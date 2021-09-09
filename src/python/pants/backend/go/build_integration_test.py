@@ -51,11 +51,11 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
                 package main
 
                 import (
-                \t"fmt"
+                    "fmt"
                 )
 
                 func main() {
-                \tfmt.Println("Hello world!")
+                    fmt.Println("Hello world!")
                 }
                 """
             ),
@@ -83,11 +83,11 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
                 package lib
 
                 import (
-                \t"fmt"
+                    "fmt"
                 )
 
                 func Quote(s string) string {
-                \treturn fmt.Sprintf(">> %s <<", s)
+                    return fmt.Sprintf(">> %s <<", s)
                 }
                 """
             ),
@@ -97,12 +97,12 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
                 package main
 
                 import (
-                \t"fmt"
-                \t"example.com/lib"
+                    "fmt"
+                    "example.com/lib"
                 )
 
                 func main() {
-                \tfmt.Println(lib.Quote("Hello world!"))
+                    fmt.Println(lib.Quote("Hello world!"))
                 }
                 """
             ),
