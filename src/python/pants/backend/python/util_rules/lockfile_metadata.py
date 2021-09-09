@@ -276,9 +276,8 @@ class LockfileMetadataV2(LockfileMetadata):
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 
-        # TODO: Confirm behaviour when there's no digest -- if there's no case where we will not
-        # supply requirements, then we don't need a way to bail out here. (cf. v0 where we bail out
-        # if there is no expected digest.)
+        if not expected_invalidation_digest and not user_requirements:
+            return LockfileMetadataValidation(failure_reasons)
 
         if self.requirements_invalidation_digest != expected_invalidation_digest:
             failure_reasons.add(InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH)
