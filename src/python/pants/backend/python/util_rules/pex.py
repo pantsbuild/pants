@@ -476,6 +476,15 @@ async def build_pex(
         ),
     )
 
+    output_files: Iterable[str] | None = None
+    output_directories: Iterable[str] | None = None
+    if request.internal_only:
+        # This is a much friendlier layout for the CAS than the default zipapp.
+        argv.extend(["--layout", "packed"])
+        output_directories = [request.output_filename]
+    else:
+        output_files = [request.output_filename]
+
     process = await Get(
         Process,
         PexCliProcess(
@@ -483,7 +492,8 @@ async def build_pex(
             argv=argv,
             additional_input_digest=merged_digest,
             description=_build_pex_description(request),
-            output_files=[request.output_filename],
+            output_files=output_files,
+            output_directories=output_directories,
         ),
     )
 
@@ -806,10 +816,10 @@ async def create_venv_pex(
     # file startup overhead.
     #
     # To achieve the minimal overhead (on the order of 1ms) we discard:
-    # 1. Using Pex `--unzip` mode:
-    #    Although this does reduce steady-state overhead, it still leaves a minimum O(100ms) of
-    #    overhead per tool invocation. Fundamentally, Pex still needs to execute its `sys.path`
-    #    isolation bootstrap code in this case.
+    # 1. Using Pex default mode:
+    #    Although this does reduce initial tool execution overhead, it still leaves a minimum
+    #    O(100ms) of overhead per subsequent tool invocation. Fundamentally, Pex still needs to
+    #    execute its `sys.path` isolation bootstrap code in this case.
     # 2. Using the Pex `venv` tool:
     #    The idea here would be to create a tool venv as a Process output and then use the tool
     #    venv as an input digest for all tool invocations. This was tried and netted ~500ms of

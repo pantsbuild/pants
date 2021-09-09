@@ -335,6 +335,7 @@ class PexInheritPathField(StringField):
         return super().compute_value(raw_value, address)
 
 
+# TODO(John Sirois): Deprecate: https://github.com/pantsbuild/pants/issues/12803
 class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
@@ -358,6 +359,7 @@ class PexStripEnvField(BoolField):
     )
 
 
+# TODO(John Sirois): Deprecate: https://github.com/pantsbuild/pants/issues/12803
 class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
@@ -402,6 +404,7 @@ class PexExecutionMode(Enum):
     VENV = "venv"
 
 
+# TODO(John Sirois): Deprecate UNZIP mode: https://github.com/pantsbuild/pants/issues/12803
 class PexExecutionModeField(StringField):
     alias = "execution_mode"
     valid_choices = PexExecutionMode
