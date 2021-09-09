@@ -18,6 +18,7 @@ from pants.backend.python.goals import (
     setup_py,
     tailor,
 )
+from pants.backend.python.macros import python_requirements_new
 from pants.backend.python.macros.pants_requirement import PantsRequirement
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
 from pants.backend.python.macros.poetry_requirements import PoetryRequirements
@@ -30,6 +31,7 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
     PythonRequirementsFile,
+    PythonRequirementsMacro,
     PythonTests,
 )
 from pants.backend.python.util_rules import (
@@ -77,6 +79,7 @@ def rules():
         *setuptools.rules(),
         *ipython.rules(),
         *pytest.rules(),
+        *python_requirements_new.rules(),
     )
 
 
@@ -87,5 +90,6 @@ def target_types():
         PythonLibrary,
         PythonRequirementLibrary,
         PythonRequirementsFile,
+        PythonRequirementsMacro,
         PythonTests,
     ]

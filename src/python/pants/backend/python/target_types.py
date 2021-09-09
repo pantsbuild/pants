@@ -727,6 +727,54 @@ class PythonRequirementLibrary(Target):
 
 
 # -----------------------------------------------------------------------------------------------
+# `python_requirements` macro
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonRequirementsRelpath(StringField):
+    alias = "requirements_relpath"
+    default = "requirements.txt"
+    help = (
+        "The relpath from this BUILD file to the requirements file.\n\n"
+        "Defaults to a `requirements.txt` file sibling to the BUILD file."
+    )
+    value: str
+
+
+class PythonRequirementsModuleMapping(DictStringToStringSequenceField):
+    alias = "module_mapping"
+    help = (
+        "A mapping of requirement names to a list of the modules they provide."
+        "\n\nFor example, `{'ansicolors': ['colors']}`.\n\n"
+        "Any unspecified requirements will use the requirement name as the default module, e.g. "
+        "'Django' will default to `modules=['django']`."
+    )
+
+
+class PythonRequirementsTypeStubsModuleMapping(DictStringToStringSequenceField):
+    alias = "type_stubs_module_mapping"
+    help = (
+        "A mapping of requirement names for type-stub dependencies to a list of the modules they "
+        "provide type stubs for."
+        "\n\nFor example, `{'types-pillow': ['PIL']}`.\n\n"
+        "Any unspecified requirements that start with `types-` or `stubs-`, or end with "
+        "`-types` or `-stubs`, will default to the project name without the prefix/suffix. For "
+        "example, `types-requests` defaults to `requests`. "
+    )
+
+
+class PythonRequirementsMacro(Target):
+    alias = "python_requirements_new"
+    help = "Macro to convert `requirements.txt` into `python_requirement_library` targets."
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PythonRequirementsRelpath,
+        PythonRequirementsModuleMapping,
+        PythonRequirementsTypeStubsModuleMapping,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
 # `_python_requirements_file` target
 # -----------------------------------------------------------------------------------------------
 
