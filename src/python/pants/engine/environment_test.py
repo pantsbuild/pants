@@ -5,7 +5,11 @@ from typing import Dict, List
 
 import pytest
 
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import (
+    CompleteEnvironment,
+    InterpolatedEnvironmentRequest,
+    interpolated_subset,
+)
 
 
 @pytest.mark.parametrize(
@@ -37,3 +41,22 @@ def test_invalid_variable() -> None:
         "An invalid variable was requested via the --test-extra-env-var mechanism: 3INVALID"
         in str(exc)
     )
+
+
+@pytest.mark.parametrize(
+    "input_dict, environment, expected",
+    [
+        ({"foo": "FOO"}, {}, {"foo": "FOO"}),
+        ({"foo": "$FOO"}, {}, {"foo": "$FOO"}),
+        ({"foo": "${FOO}"}, {}, {}),
+        ({"foo": "${FOO}"}, {"FOO": "bar"}, {"foo": "bar"}),
+        ({"foo": "${FOO}", "bar": "BAR"}, {"FOO": "bar"}, {"foo": "bar", "bar": "BAR"}),
+    ],
+)
+def test_interpolated_subset(input_dict, environment, expected):
+    session_values = {CompleteEnvironment: environment}
+    request = InterpolatedEnvironmentRequest(input_dict)
+
+    subset = interpolated_subset(session_values, request)
+
+    assert dict(subset) == expected
