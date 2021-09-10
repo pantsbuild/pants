@@ -36,6 +36,9 @@ mod build_root;
 mod build_root_tests;
 
 mod config;
+#[cfg(test)]
+mod config_tests;
+
 mod env;
 #[cfg(test)]
 mod env_tests;

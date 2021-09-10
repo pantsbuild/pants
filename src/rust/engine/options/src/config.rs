@@ -3,6 +3,7 @@
 
 use std::collections::HashSet;
 use std::fs;
+use std::mem;
 use std::path::Path;
 
 use toml::value::Table;
@@ -38,16 +39,30 @@ impl Config {
         e
       )
     })?;
-    if config.is_table() {
-      Ok(Config { config })
-    } else {
-      Err(format!(
+    if !config.is_table() {
+      return Err(format!(
         "Expected the config file {} to contain a table but contained a {}: {}",
         file.as_ref().display(),
         config.type_str(),
         config
-      ))
+      ));
     }
+    if let Some((key, section)) = config
+      .as_table()
+      .unwrap()
+      .iter()
+      .find(|(_, section)| !section.is_table())
+    {
+      return Err(format!(
+        "Expected the config file {} to contain tables per section, but section {} contained a {}: {}",
+        file.as_ref().display(),
+        key,
+        section.type_str(),
+        section
+      ));
+    }
+
+    Ok(Config { config })
   }
 
   pub(crate) fn merged<P: AsRef<Path>>(files: &[P]) -> Result<Config, String> {
@@ -92,16 +107,20 @@ impl Config {
       .and_then(|table| table.get(Self::option_name(id)))
   }
 
-  pub(crate) fn merge(self, other: Config) -> Config {
-    let mut map = self.config.as_table().unwrap().to_owned();
-    map.extend(
-      other
-        .config
-        .as_table()
-        .unwrap()
-        .iter()
-        .map(|(k, v)| (k.to_owned(), v.to_owned())),
-    );
+  pub(crate) fn merge(mut self, mut other: Config) -> Config {
+    let mut map = mem::take(self.config.as_table_mut().unwrap());
+    let mut other = mem::take(other.config.as_table_mut().unwrap());
+    // Merge overlapping sections.
+    for (scope, table) in &mut map {
+      if let Some(mut other_table) = other.remove(scope) {
+        table
+          .as_table_mut()
+          .unwrap()
+          .extend(mem::take(other_table.as_table_mut().unwrap()));
+      }
+    }
+    // And then extend non-overlapping sections.
+    map.extend(other);
     Config {
       config: Value::Table(map),
     }
