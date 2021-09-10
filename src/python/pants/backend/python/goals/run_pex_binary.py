@@ -49,9 +49,7 @@ async def create_pex_binary_run_request(
             include_source_files=False,
             # Note that the file for first-party entry points is not in the PEX itself. In that
             # case, it's loaded by setting `PEX_EXTRA_SYS_PATH`.
-            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
-            #  https://github.com/pantsbuild/pants/issues/11619
-            main=entry_point.val,
+            main=entry_point.val or field_set.script.value,
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             additional_args=(
                 *field_set.generate_additional_args(pex_binary_defaults),

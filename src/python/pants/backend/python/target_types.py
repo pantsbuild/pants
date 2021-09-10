@@ -253,22 +253,36 @@ class ConsoleScript(MainSpecification):
 
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
+    default = None
     help = (
-        "The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.\n\n"
+        "Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a module.\n\n"
         "You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a "
-        "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n  1) "
-        "'app.py', Pants will convert into the module `path.to.app`;\n  2) 'app.py:func', Pants "
-        "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
-        "arguments to work with this target.\n\nTo leave off an entry point, set to `<none>`."
+        "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n"
+        "  1) 'app.py', Pants will convert into the module `path.to.app`;\n"
+        "  2) 'app.py:func', Pants will convert into `path.to.app:func`.\n\n"
+        "You must use the file name shorthand for file arguments to work with this target.\n\n"
+        "You may either set this field or the `script` field, but not both. Leave off both fields "
+        "to have no entry point."
     )
-    required = True
-    value: EntryPoint
+    value: EntryPoint | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> EntryPoint:
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[EntryPoint]:
         value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
+        if value in {"<none>", "<None>"}:
+            warn_or_error(
+                "2.9.0.dev0",
+                "using `<none>` for the `entry_point` field",
+                (
+                    "Rather than setting `entry_point='<none>' for the pex_binary target "
+                    f"{address}, simply leave off the field."
+                ),
+            )
+            return None
         try:
             return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
@@ -276,7 +290,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
 
     @property
     def filespec(self) -> Filespec:
-        if not self.value.module.endswith(".py"):
+        if self.value is None or not self.value.module.endswith(".py"):
             return {"includes": []}
         full_glob = os.path.join(self.address.spec_path, self.value.module)
         return {"includes": [full_glob]}
@@ -285,7 +299,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
-    val: Optional[EntryPoint]
+    val: EntryPoint | None
     file_name_used: bool
 
 
@@ -294,6 +308,27 @@ class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
     entry_point_field: PexEntryPointField
+
+
+class PexScriptField(Field):
+    alias = "script"
+    default = None
+    help = (
+        "Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a script or "
+        "console_script as defined by any of the distributions in the PEX.\n\n"
+        "You may either set this field or the `entry_point` field, but not both. Leave off both "
+        "fields to have no entry point."
+    )
+    value: ConsoleScript | None
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[ConsoleScript]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
+        return ConsoleScript(value)
 
 
 class PexPlatformsField(StringSequenceField):
@@ -468,6 +503,7 @@ class PexBinary(Target):
         PythonResolveField,
         PexBinaryDependencies,
         PexEntryPointField,
+        PexScriptField,
         PexPlatformsField,
         PexInheritPathField,
         PexZipSafeField,
