@@ -49,6 +49,7 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
 from pants.engine.unions import UnionMembership, union
+from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -332,7 +333,13 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
 ) -> GenerateLockfilesGoal:
+    if python_repos.repos:
+        warn_python_repos("repos")
+    if python_repos.indexes != [python_repos.pypi_index]:
+        warn_python_repos("indexes")
+
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
         python_setup.resolves_to_lockfiles.keys(),
         union_membership[PythonToolLockfileSentinel],
@@ -362,6 +369,19 @@ async def generate_lockfiles_goal(
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+def warn_python_repos(option: str) -> None:
+    logger.warning(
+        f"The option `[python-repos].{option}` is configured, but it does not currently work "
+        "with lockfile generation. Lockfile generation will fail if the relevant requirements "
+        "cannot be located on PyPI.\n\n"
+        "If lockfile generation fails, you can disable lockfiles by setting "
+        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
+        "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
+        "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
+        "lockfiles, set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+    )
 
 
 class AmbiguousResolveNamesError(Exception):

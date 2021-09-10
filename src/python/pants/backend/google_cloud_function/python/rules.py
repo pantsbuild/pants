@@ -59,7 +59,6 @@ async def package_python_google_cloud_function(
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
-        field_set.address,
         # Cloud Functions typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
     )
@@ -73,19 +72,20 @@ async def package_python_google_cloud_function(
     if py_major <= 3 and py_minor < 8:
         platform += "m"
 
+    additional_pex_args = (
+        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+        "--manylinux=manylinux2014",
+        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+        # available and matching the AMI platform.
+        "--resolve-local-platforms",
+    )
     pex_request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
-        main=None,
         output_filename=output_filename,
         platforms=PexPlatforms([platform]),
-        additional_args=[
-            # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
-            "--manylinux=manylinux2014",
-            # When we're executing Pex on Linux, allow a local interpreter to be resolved if
-            # available and matching the AMI platform.
-            "--resolve-local-platforms",
-        ],
+        additional_args=additional_pex_args,
+        additional_lockfile_args=additional_pex_args,
     )
 
     lambdex_request = PexRequest(

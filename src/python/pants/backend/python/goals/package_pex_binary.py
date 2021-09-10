@@ -74,8 +74,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
-        if self.always_write_cache.value is True:
-            args.append("--always-write-cache")
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
@@ -84,12 +82,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
-        if self.zip_safe.value is False:
-            args.append("--not-zip-safe")
         if self.strip_env.value is False:
             args.append("--no-strip-pex-env")
-        if self._execution_mode is PexExecutionMode.UNZIP:
-            args.append("--unzip")
         if self._execution_mode is PexExecutionMode.VENV:
             args.extend(("--venv", "prepend"))
         if self.include_tools.value is True:
@@ -126,7 +120,7 @@ async def package_pex_binary(
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
-    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
+    output_filename = field_set.output_path.value_or_default(file_ending="pex")
     pex = await Get(
         Pex,
         PexFromTargetsRequest(

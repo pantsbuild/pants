@@ -111,7 +111,11 @@ class PythonToolRequirementsBase(Subsystem):
                     "To use a custom lockfile, set this option to a file path relative to the "
                     f"build root, then run `./pants generate-lockfiles "
                     f"--resolve={cls.options_scope}`.\n\n"
-                    ""
+                    "Lockfile generation currently does not wire up the `[python-repos]` options. "
+                    "If lockfile generation fails, you can manually generate a lockfile, such as "
+                    "by using pip-compile or `pip freeze`. Set this option to the path to your "
+                    "manually generated lockfile. When manually maintaining lockfiles, set "
+                    "`[python-setup].invalid_lockfile_behavior = 'ignore'`."
                 ),
             )
 

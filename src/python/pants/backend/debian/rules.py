@@ -43,7 +43,7 @@ async def package_debian_package(field_set: DebianPackageFieldSet) -> BuiltPacka
     if not dpkg_deb_path.first_path:
         raise EnvironmentError("Could not find the `touch` program on search paths ")
 
-    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="deb")
+    output_filename = field_set.output_path.value_or_default(file_ending="deb")
 
     # TODO(alexey): add Debian packaging logic
     result = await Get(
