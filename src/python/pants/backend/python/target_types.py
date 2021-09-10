@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Iterator, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -20,6 +20,7 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address, Addresses
@@ -335,6 +336,7 @@ class PexInheritPathField(StringField):
         return super().compute_value(raw_value, address)
 
 
+# TODO(John Sirois): Deprecate: https://github.com/pantsbuild/pants/issues/12803
 class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
@@ -342,6 +344,11 @@ class PexZipSafeField(BoolField):
         "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
         "not zip safe, it will be written to disk prior to execution. You may need to mark "
         "`zip_safe=False` if you're having issues loading your code."
+    )
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "All PEX binaries now unpack your code to disk prior to first execution; so this option no "
+        "longer needs to be specified."
     )
 
 
@@ -364,6 +371,12 @@ class PexAlwaysWriteCacheField(BoolField):
     help = (
         "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
         "can use less memory in RAM-constrained environments."
+    )
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "This option never had any effect when passed to Pex and the Pex option is now removed "
+        "altogether. PEXes always write all their internal dependencies out to disk as part of "
+        "first execution bootstrapping."
     )
 
 
@@ -408,17 +421,32 @@ class PexExecutionModeField(StringField):
     expected_type = str
     default = PexExecutionMode.ZIPAPP.value
     help = (
-        "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in "
-        f"{PexExecutionMode.ZIPAPP.value!r} mode (See: https://www.python.org/dev/peps/pep-0441/). "
-        f"In general, faster cold start times can be attained using the "
-        f"{PexExecutionMode.UNZIP.value!r} mode which also has the benefit of allowing standard "
-        "use of `__file__` and filesystem APIs to access code and resources in the PEX.\n\nThe "
-        f"fastest execution mode in the steady state is {PexExecutionMode.VENV.value!r}, which "
-        "generates a virtual environment from the PEX file on first run, but then achieves near "
-        "native virtual environment start times. This mode also benefits from a traditional "
-        "virtual environment `sys.path`, giving maximum compatibility with stdlib and third party "
-        "APIs."
+        "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in a "
+        f"modified {PexExecutionMode.ZIPAPP.value!r} mode (See: "
+        "https://www.python.org/dev/peps/pep-0441/) where zipped internal code and dependencies "
+        "are first unpacked to disk. This mode achieves the fastest cold start times and may, for "
+        "example be the best choice for cloud lambda functions.\n\nThe fastest execution mode in "
+        f"the steady state is {PexExecutionMode.VENV.value!r}, which generates a virtual "
+        "environment from the PEX file on first run, but then achieves near native virtual "
+        "environment start times. This mode also benefits from a traditional virtual environment "
+        "`sys.path`, giving maximum compatibility with stdlib and third party APIs.\n\nThe "
+        f"{PexExecutionMode.UNZIP.value!r} mode is deprecated since the default "
+        f"{PexExecutionMode.ZIPAPP.value!r} mode now executes this way."
     )
+
+    @classmethod
+    def _check_deprecated(cls, raw_value: Optional[Any], address_: Address) -> None:
+        if PexExecutionMode.UNZIP.value == raw_value:
+            warn_or_error(
+                removal_version="2.9.0.dev0",
+                entity=f"the {cls.alias!r} field {PexExecutionMode.UNZIP.value!r} value",
+                hint=(
+                    f"The {PexExecutionMode.UNZIP.value!r} mode is now the default PEX execution "
+                    "mode; so you can remove this field setting or explicitly choose the default "
+                    f"of {PexExecutionMode.ZIPAPP.value!r} and get the same benefits you already "
+                    "enjoy from this mode."
+                ),
+            )
 
 
 class PexIncludeToolsField(BoolField):

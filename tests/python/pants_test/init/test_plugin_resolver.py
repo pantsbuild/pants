@@ -20,7 +20,7 @@ from pants.core.util_rules import archive, external_tool
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -45,8 +45,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *archive.rules(),
             QueryRule(Pex, [PexRequest]),
-            QueryRule(Process, [PexProcess]),
-            QueryRule(ProcessResult, [Process]),
+            QueryRule(ProcessResult, [PexProcess]),
         ]
     )
     rule_runner.set_options(
@@ -94,11 +93,9 @@ def _run_setup_py(
     )
     merged_digest = rule_runner.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
 
-    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
-    # works.
-    process = Process(
-        argv=("./setup-py-runner.pex", "setup.py", *setup_py_args),
-        env={k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ},
+    process = PexProcess(
+        pex=pex_obj,
+        argv=("setup.py", *setup_py_args),
         input_digest=merged_digest,
         description="Run setup.py",
         output_directories=("dist/",),
