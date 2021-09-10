@@ -45,8 +45,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "go.mod": "module foo.example.com\n",
-            "BUILD": "go_module(name='root')\n",
-            "project/main.go": dedent(
+            "main.go": dedent(
                 """\
                 package main
 
@@ -59,26 +58,25 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "project/BUILD": dedent(
+            "BUILD": dedent(
                 """\
-                go_package(name='main', import_path='main')
+                go_module(name='go_mod')
+                go_package(name='main')
                 go_binary(name='bin', binary_name='foo', main=':main')
                 """
             ),
         }
     )
-    binary_tgt = rule_runner.get_target(Address("project", target_name="bin"))
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "project/foo"
+    assert built_package.artifacts[0].relpath == "foo"
 
 
 def test_package_with_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "go.mod": "module foo.example.com\n",
-            "BUILD": "go_module(name='root')\n",
-            "project/lib/lib.go": dedent(
+            "lib/lib.go": dedent(
                 """\
                 package lib
 
@@ -91,14 +89,14 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "project/lib/BUILD": "go_package(import_path='example.com/lib')",
-            "project/main.go": dedent(
+            "lib/BUILD": "go_package()",
+            "main.go": dedent(
                 """\
                 package main
 
                 import (
                     "fmt"
-                    "example.com/lib"
+                    "foo.example.com/lib"
                 )
 
                 func main() {
@@ -106,15 +104,17 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "project/BUILD": dedent(
+            "go.mod": "module foo.example.com\n",
+            "BUILD": dedent(
                 """\
-                go_package(name='main', import_path='main', dependencies=['project/lib'])
+                go_module(name='go_mod')
+                go_package(name='main')
                 go_binary(name='bin', binary_name='foo', main=':main')
                 """
             ),
         }
     )
-    binary_tgt = rule_runner.get_target(Address("project", target_name="bin"))
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "project/foo"
+    assert built_package.artifacts[0].relpath == "foo"
