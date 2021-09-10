@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
+    PexScriptField,
     PexShebangField,
     PexStripEnvField,
     PexZipSafeField,
@@ -54,6 +55,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PexEntryPointField,)
 
     entry_point: PexEntryPointField
+    script: PexScriptField
 
     output_path: OutputPathField
     always_write_cache: PexAlwaysWriteCacheField
@@ -126,9 +128,7 @@ async def package_pex_binary(
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
-            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
-            #  https://github.com/pantsbuild/pants/issues/11619
-            main=resolved_entry_point.val,
+            main=resolved_entry_point.val or field_set.script.value,
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,

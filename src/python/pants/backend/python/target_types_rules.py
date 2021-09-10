@@ -61,21 +61,18 @@ logger = logging.getLogger(__name__)
 @rule(desc="Determining the entry point for a `pex_binary` target", level=LogLevel.DEBUG)
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
+    if ep_val is None:
+        return ResolvedPexEntryPoint(None, file_name_used=False)
     address = request.entry_point_field.address
 
     # We support several different schemes:
-    #  1) `<none>` or `<None>` => set to `None`.
-    #  2) `path.to.module` => preserve exactly.
-    #  3) `path.to.module:func` => preserve exactly.
-    #  4) `app.py` => convert into `path.to.app`.
-    #  5) `app.py:func` => convert into `path.to.app:func`.
+    #  1) `path.to.module` => preserve exactly.
+    #  2) `path.to.module:func` => preserve exactly.
+    #  3) `app.py` => convert into `path.to.app`.
+    #  4) `app.py:func` => convert into `path.to.app:func`.
 
-    # Case #1.
-    if ep_val.module in ("<none>", "<None>"):
-        return ResolvedPexEntryPoint(None, file_name_used=False)
-
-    # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
-    # into a module path (cases #4 and #5).
+    # If it's already a module (cases #1 and #2), simply use that. Otherwise, convert the file name
+    # into a module path (cases #3 and #4).
     if not ep_val.module.endswith(".py"):
         return ResolvedPexEntryPoint(ep_val, file_name_used=False)
 
@@ -123,12 +120,13 @@ async def inject_pex_binary_entry_point_dependency(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    entry_point_field = original_tgt.target[PexEntryPointField]
+    if entry_point_field.value is None:
+        return InjectedDependencies()
+
     explicitly_provided_deps, entry_point = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
-        Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
-        ),
+        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(entry_point_field)),
     )
     if entry_point.val is None:
         return InjectedDependencies()
@@ -143,7 +141,7 @@ async def inject_pex_binary_entry_point_dependency(
         import_reference="module",
         context=(
             f"The pex_binary target {address} has the field "
-            f"`entry_point={repr(original_tgt.target[PexEntryPointField].value.spec)}`, which "
+            f"`entry_point={repr(entry_point_field.value.spec)}`, which "
             f"maps to the Python module `{entry_point.val.module}`"
         ),
     )
