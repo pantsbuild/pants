@@ -130,7 +130,6 @@ class LockfileMetadata:
         be read by the user to figure out which lockfile is broken in case of an error.
 
         `error_suffix` is a string describing how to fix the lockfile.
-
         """
 
         raise NotImplementedError(
@@ -266,7 +265,7 @@ class LockfileMetadataV2(LockfileMetadata):
     def _header_dict(self) -> dict[Any, Any]:
         out = super()._header_dict()
 
-        # Requirements need to be stringified then sorted so that tests are deterministic. Sorting 
+        # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
         out["requirements"] = (
             sorted([str(i) for i in self.requirements]) if self.requirements is not None else None

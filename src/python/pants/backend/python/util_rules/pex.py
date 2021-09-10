@@ -567,7 +567,11 @@ def _validate_metadata(
             "\n\n"
         )
 
-        if InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH in validation.failure_reasons:
+        if any(
+            i == InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH
+            or i == InvalidLockfileReason.REQUIREMENTS_MISMATCH
+            for i in validation.failure_reasons
+        ):
             yield (
                 "- You have set different requirements than those used to generate the lockfile. "
                 f"You can fix this by not setting `[{tool_name}].version`, "
