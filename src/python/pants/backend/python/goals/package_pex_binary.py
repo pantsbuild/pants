@@ -120,7 +120,7 @@ async def package_pex_binary(
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
-    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
+    output_filename = field_set.output_path.value_or_default(file_ending="pex")
     pex = await Get(
         Pex,
         PexFromTargetsRequest(

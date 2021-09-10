@@ -59,7 +59,6 @@ async def package_python_google_cloud_function(
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
-        field_set.address,
         # Cloud Functions typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
     )

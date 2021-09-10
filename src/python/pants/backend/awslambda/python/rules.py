@@ -55,7 +55,6 @@ async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
-        field_set.address,
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
     )
