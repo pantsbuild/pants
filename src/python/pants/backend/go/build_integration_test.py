@@ -62,7 +62,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
                 """\
                 go_module(name='go_mod')
                 go_package(name='main')
-                go_binary(name='bin', binary_name='foo', main=':main')
+                go_binary(name='bin', main=':main')
                 """
             ),
         }
@@ -70,7 +70,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "foo"
+    assert built_package.artifacts[0].relpath == "bin"
 
 
 def test_package_with_dependency(rule_runner: RuleRunner) -> None:
@@ -109,7 +109,7 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
                 """\
                 go_module(name='go_mod')
                 go_package(name='main')
-                go_binary(name='bin', binary_name='foo', main=':main')
+                go_binary(name='bin', main=':main')
                 """
             ),
         }
@@ -117,4 +117,4 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
     binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "foo"
+    assert built_package.artifacts[0].relpath == "bin"

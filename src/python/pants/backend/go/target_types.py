@@ -3,6 +3,7 @@
 import os
 from typing import Sequence
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -121,22 +122,15 @@ class GoExtModPackage(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoBinaryName(StringField):
-    alias = "binary_name"
-    required = True
-    help = "Name of the Go binary to output."
-
-
 class GoBinaryMainAddress(StringField):
     alias = "main"
     required = True
     help = "Address of the main Go package for this binary."
 
 
-# TODO(11911): This should register `OutputPathField` instead of `GoBinaryName`. (And then update build.py.)
 class GoBinary(Target):
     alias = "go_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoBinaryName, GoBinaryMainAddress)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, OutputPathField, GoBinaryMainAddress)
     help = "A Go binary."
 
 
