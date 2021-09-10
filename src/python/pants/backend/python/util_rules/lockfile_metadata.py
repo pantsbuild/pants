@@ -20,7 +20,7 @@ END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 _concrete_metadata_classes: dict[int, Type[LockfileMetadata]] = {}
 
-LockfileSubclass = TypeVar("LockfileSubclass")
+_T = TypeVar("_T")
 
 
 def _lockfile_metadata_version(
@@ -116,14 +116,21 @@ class LockfileMetadata:
 
     @classmethod
     def _from_json_dict(
-        cls: Type[LockfileSubclass],
+        cls: Type[_T],
         json_dict: dict[Any, Any],
         lockfile_description: str,
         error_suffix: str,
-    ) -> LockfileSubclass:
+    ) -> _T:
         """Construct a `LockfileMetadata` subclass from the supplied JSON dict.
 
-        Not implemented. Subclasses should override.
+        *** Not implemented. Subclasses should override. ***
+
+
+        `lockfile_description` is a detailed, human-readable description of the lockfile, which can
+        be read by the user to figure out which lockfile is broken in case of an error.
+
+        `error_suffix` is a string describing how to fix the lockfile.
+
         """
 
         raise NotImplementedError(
@@ -192,10 +199,10 @@ class LockfileMetadataV1(LockfileMetadata):
     ) -> LockfileMetadataV1:
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
 
-        requirements_digest = metadata("requirements_invalidation_digest", str, None)
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
         )
+        requirements_digest = metadata("requirements_invalidation_digest", str, None)
 
         return LockfileMetadataV1(interpreter_constraints, requirements_digest)
 
@@ -259,8 +266,8 @@ class LockfileMetadataV2(LockfileMetadata):
     def _header_dict(self) -> dict[Any, Any]:
         out = super()._header_dict()
 
-        # Requirements need to be stringified then sorted (in that order) so that tests are
-        # deterministic.
+        # Requirements need to be stringified then sorted so that tests are deterministic. Sorting 
+        # followed by stringifying does not produce a meaningful result.
         out["requirements"] = (
             sorted([str(i) for i in self.requirements]) if self.requirements is not None else None
         )
@@ -268,7 +275,7 @@ class LockfileMetadataV2(LockfileMetadata):
 
     def is_valid_for(
         self,
-        expected_invalidation_digest: str | None,
+        _: str | None,  # Validation digests are not used by V2; this param will be deprecated
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[Requirement] | None,
