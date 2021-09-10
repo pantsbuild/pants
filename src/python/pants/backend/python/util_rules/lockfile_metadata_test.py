@@ -177,7 +177,7 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
             True,
         ],
         # Exact requirements match, non-matching ICs (user includes 3.7 range and above)
-        [[">=3.5.5"], [">=3.5, <=3.6"], ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], True],
+        [[">=3.5.5"], [">=3.5, <=3.6"], ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], False],
     ],
 )
 def test_is_valid_for_v2_only(
