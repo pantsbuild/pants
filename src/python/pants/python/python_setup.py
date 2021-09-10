@@ -128,6 +128,19 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--experimental-resolves-to-lockfiles",
+            advanced=True,
+            type=dict,
+            help=(
+                "A mapping of logical names to lockfile paths used in your project, e.g. "
+                "`{ default = '3rdparty/default_lockfile.txt', py2 = '3rdparty/py2.txt' }`.\n\n"
+                "To generate a lockfile, run `./pants generate-lockfiles --resolve=<name>` or "
+                "`./pants generate-lockfiles` to generate for all resolves (including tool "
+                "lockfiles).\n\n"
+                "This is highly experimental and will likely change."
+            ),
+        )
+        register(
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
@@ -219,6 +232,10 @@ class PythonSetup(Subsystem):
     @property
     def lockfile(self) -> str | None:
         return cast("str | None", self.options.experimental_lockfile)
+
+    @property
+    def resolves_to_lockfiles(self) -> dict[str, str]:
+        return cast("dict[str, str]", self.options.experimental_resolves_to_lockfiles)
 
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:

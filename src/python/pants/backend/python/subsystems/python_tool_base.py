@@ -9,7 +9,13 @@ from typing import ClassVar, Iterable, Sequence, cast
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.backend.python.util_rules.pex import Lockfile, LockfileContent, PexRequirements
+from pants.backend.python.util_rules.pex import (
+    Lockfile,
+    LockfileContent,
+    PexRequirements,
+    ToolCustomLockfile,
+    ToolDefaultLockfile,
+)
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
@@ -38,6 +44,7 @@ class PythonToolRequirementsBase(Subsystem):
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
+    uses_requirements_from_source_plugins: ClassVar[bool] = False
 
     @classmethod
     def register_options(cls, register):
@@ -103,7 +110,11 @@ class PythonToolRequirementsBase(Subsystem):
                     "To use a custom lockfile, set this option to a file path relative to the "
                     f"build root, then run `./pants generate-lockfiles "
                     f"--resolve={cls.options_scope}`.\n\n"
-                    ""
+                    "Lockfile generation currently does not wire up the `[python-repos]` options. "
+                    "If lockfile generation fails, you can manually generate a lockfile, such as "
+                    "by using pip-compile or `pip freeze`. Set this option to the path to your "
+                    "manually generated lockfile. When manually maintaining lockfiles, set "
+                    "`[python-setup].invalid_lockfile_behavior = 'ignore'`."
                 ),
             )
 
@@ -143,17 +154,23 @@ class PythonToolRequirementsBase(Subsystem):
 
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            return LockfileContent(
+            return ToolDefaultLockfile(
                 file_content=FileContent(
                     f"{self.options_scope}_default_lockfile.txt",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
+                options_scope_name=self.options_scope,
+                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
+                uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
-        return Lockfile(
+        return ToolCustomLockfile(
             file_path=self.lockfile,
             file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
             lockfile_hex_digest=hex_digest,
+            options_scope_name=self.options_scope,
+            uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
+            uses_source_plugins=self.uses_requirements_from_source_plugins,
         )
 
     @property

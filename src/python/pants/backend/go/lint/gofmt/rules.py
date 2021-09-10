@@ -87,7 +87,7 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoLangDistribution) -
         argv=argv,
         input_digest=input_digest,
         output_files=source_files_snapshot.files,
-        description=f"Run gofmt on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+        description=f"Run gofmt on {pluralize(len(source_files_snapshot.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
 

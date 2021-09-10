@@ -16,6 +16,7 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
+    PythonResolveField,
     PythonTestsExtraEnvVars,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -23,7 +24,6 @@ from pants.backend.python.target_types import (
     format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -39,7 +39,7 @@ from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_method
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars
+    resolve: PythonResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -87,20 +88,6 @@ class PyTest(PythonToolBase):
             member_type=shell_str,
             passthrough=True,
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
-        )
-        register(
-            "--pytest-plugins",
-            type=list,
-            advanced=True,
-            default=PyTest.default_extra_requirements,
-            help=(
-                "Requirement strings for any plugins or additional requirements you'd like to use."
-            ),
-            removal_version="2.8.0.dev0",
-            removal_hint=(
-                "Use `[pytest].extra_requirements` instead, which behaves the same. (The option is "
-                "being renamed for uniformity with other Python tools.)"
-            ),
         )
         register(
             "--timeouts",
@@ -168,21 +155,9 @@ class PyTest(PythonToolBase):
             ),
         )
 
-    @memoized_property
-    def _extra_requirements(self) -> tuple[str, ...]:
-        result = resolve_conflicting_options(
-            old_option="pytest_plugins",
-            new_option="extra_requirements",
-            old_scope=self.options_scope,
-            new_scope=self.options_scope,
-            old_container=self.options,
-            new_container=self.options,
-        )
-        return cast("tuple[str, ...]", result)
-
     @property
     def all_requirements(self) -> tuple[str, ...]:
-        return (self.version, *self._extra_requirements)
+        return (self.version, *self.extra_requirements)
 
     @property
     def timeouts_enabled(self) -> bool:
@@ -215,7 +190,7 @@ class PyTest(PythonToolBase):
 
     @memoized_method
     def validate_pytest_cov_included(self) -> None:
-        for s in self._extra_requirements:
+        for s in self.extra_requirements:
             try:
                 req = Requirement.parse(s).project_name
             except Exception as e:

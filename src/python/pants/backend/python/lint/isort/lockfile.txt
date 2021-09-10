@@ -4,16 +4,17 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "requirements_invalidation_digest": "5a5a4656fa40e55318512198b5e583a8b773d057f643f5f83be9b7b34ab51ae5",
+#   "version": 1,
+#   "requirements_invalidation_digest": "56fe21a2ac24d6f257d95eb97829e8c3cb65e2156cd987348ce837c055763302",
 #   "valid_for_interpreter_constraints": [
-#     "CPython<4,>=3.6"
+#     "CPython<4,>=3.7"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
-colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.6" and python_version < "4.0" and python_full_version >= "3.5.0" \
+colorama==0.4.4; python_full_version >= "3.6.1" and python_version < "4.0" \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
-isort==5.5.5; python_version >= "3.6" and python_version < "4.0" \
-    --hash=sha256:87355bbc3465bf096a8bf09c4dd949b6b9294958c478740442fd9fbd01b817f2 \
-    --hash=sha256:47e0fdc03aed3a9ba507284f90e4b3b6f2a4725d919816a7b547675befc38ffb
+isort==5.9.3; python_full_version >= "3.6.1" and python_version < "4.0" \
+    --hash=sha256:e17d6e2b81095c9db0a03a8025a957f334d6ea30b26f9ec70805411e5c7c81f2 \
+    --hash=sha256:9c2ea1e62d871267b78307fe511c0838ba0da28698c5732d54e2790bf3ba9899

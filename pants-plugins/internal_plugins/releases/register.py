@@ -98,12 +98,12 @@ async def pants_setup_kwargs(
     ]
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
-    # Determine the long description by reading from ABOUT.rst and the release notes.
+    # Determine the long description by reading from ABOUT.md and the release notes.
     notes_file = pants_releases.notes_file_for_version(PANTS_SEMVER)
     digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            ["src/python/pants/ABOUT.rst", notes_file],
+            ["src/python/pants/ABOUT.md", notes_file],
             description_of_origin="Pants release files",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
         ),
@@ -122,6 +122,8 @@ async def pants_setup_kwargs(
             "Tracker": "https://github.com/pantsbuild/pants/issues",
             "Changelog": "https://www.pantsbuild.org/docs/changelog",
             "Twitter": "https://twitter.com/pantsbuild",
+            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,

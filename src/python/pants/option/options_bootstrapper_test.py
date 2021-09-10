@@ -51,7 +51,6 @@ class OptionsBootstrapperTest(unittest.TestCase):
             env: Optional[Dict[str, str]] = None,
             args: Optional[List[str]] = None,
             workdir: Optional[str] = None,
-            supportdir: Optional[str] = None,
             distdir: Optional[str] = None,
         ) -> None:
             self.assert_bootstrap_options(
@@ -59,7 +58,6 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 env=env,
                 args=args,
                 pants_workdir=workdir or os.path.join(get_buildroot(), ".pants.d"),
-                pants_supportdir=supportdir or os.path.join(get_buildroot(), "build-support"),
                 pants_distdir=distdir or os.path.join(get_buildroot(), "dist"),
             )
 
@@ -71,23 +69,16 @@ class OptionsBootstrapperTest(unittest.TestCase):
             config={"pants_workdir": "/from_config/.pants.d"},
             workdir="/from_config/.pants.d",
         )
-        assert_seed_values(
-            env={"PANTS_SUPPORTDIR": "/from_env/build-support"},
-            supportdir="/from_env/build-support",
-        )
         assert_seed_values(args=["--pants-distdir=/from_args/dist"], distdir="/from_args/dist")
 
         # Check that args > env > config.
         assert_seed_values(
             config={
                 "pants_workdir": "/from_config/.pants.d",
-                "pants_supportdir": "/from_config/build-support",
                 "pants_distdir": "/from_config/dist",
             },
-            env={"PANTS_SUPPORTDIR": "/from_env/build-support", "PANTS_DISTDIR": "/from_env/dist"},
             args=["--pants-distdir=/from_args/dist"],
             workdir="/from_config/.pants.d",
-            supportdir="/from_env/build-support",
             distdir="/from_args/dist",
         )
 
@@ -95,18 +86,15 @@ class OptionsBootstrapperTest(unittest.TestCase):
         assert_seed_values(
             config={
                 "pants_workdir": "/from_config/.pants.d",
-                "pants_supportdir": "/from_config/build-support",
                 "pants_distdir": "/from_config/dist",
                 "unrelated": "foo",
             },
             env={
-                "PANTS_SUPPORTDIR": "/from_env/build-support",
                 "PANTS_DISTDIR": "/from_env/dist",
                 "PANTS_NO_RELATIONSHIP": "foo",
             },
             args=["--pants-distdir=/from_args/dist", "--foo=bar", "--baz"],
             workdir="/from_config/.pants.d",
-            supportdir="/from_env/build-support",
             distdir="/from_args/dist",
         )
 
@@ -130,14 +118,14 @@ class OptionsBootstrapperTest(unittest.TestCase):
                     bar = "%(pants_workdir)s/baz"
 
                     [fruit]
-                    apple = "%(pants_supportdir)s/banana"
+                    apple = "%(pants_distdir)s/banana"
                     """
                 )
             )
             fp.close()
             args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(
-                env={"PANTS_SUPPORTDIR": "/pear"}, args=args, allow_pantsrc=False
+                env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False
             )
             opts = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
@@ -156,7 +144,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         self.assertEqual("/pear/banana", opts.for_scope("fruit").apple)
 
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
-        included = "PANTS_SUPPORTDIR"
+        included = "PANTS_DISTDIR"
         excluded = "NON_PANTS_ENV"
         bootstrapper = OptionsBootstrapper.create(
             env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
@@ -183,18 +171,18 @@ class OptionsBootstrapperTest(unittest.TestCase):
             options = options_bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
-                    ScopeInfo("compile.apt"),
+                    ScopeInfo("compile_apt"),
                     ScopeInfo("fruit"),
                 ],
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
             options.register("", "--config-override", type=list)
-            options.register("compile.apt", "--worker-count")
+            options.register("compile_apt", "--worker-count")
             options.register("fruit", "--apple")
 
             self.assertEqual(
-                str(expected_worker_count), options.for_scope("compile.apt").worker_count
+                str(expected_worker_count), options.for_scope("compile_apt").worker_count
             )
             self.assertEqual("red", options.for_scope("fruit").apple)
 
@@ -202,7 +190,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp1.write(
                 dedent(
                     """\
-                    [compile.apt]
+                    [compile_apt]
                     worker_count = 1
 
                     [fruit]
@@ -213,7 +201,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp2.write(
                 dedent(
                     """\
-                    [compile.apt]
+                    [compile_apt]
                     worker_count = 2
                     """
                 )

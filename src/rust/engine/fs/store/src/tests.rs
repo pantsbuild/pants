@@ -9,28 +9,15 @@ use testutil::data::{TestData, TestDirectory};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
-use fs::RelativePath;
+use fs::{DigestEntry, FileEntry};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use maplit::btreemap;
 use mock::StubCAS;
 
-use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
-};
+use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
-
-impl LoadMetadata {
-  fn is_remote(&self) -> bool {
-    match self {
-      LoadMetadata::Local => false,
-      LoadMetadata::Remote(_) => true,
-    }
-  }
-}
 
 pub fn big_file_fingerprint() -> Fingerprint {
   Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
@@ -68,10 +55,9 @@ pub fn extra_big_file_bytes() -> Bytes {
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-  let option = store
+  store
     .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
-    .await?;
-  Ok(option.map(|(bytes, _metadata)| bytes))
+    .await
 }
 
 ///
@@ -149,8 +135,7 @@ async fn load_directory_prefers_local() {
       .load_directory(testdir.digest(),)
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir.directory()
   );
   assert_eq!(0, cas.read_request_count());
@@ -193,8 +178,7 @@ async fn load_directory_falls_back_and_backfills() {
       .load_directory(testdir.digest(),)
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir.directory()
   );
   assert_eq!(1, cas.read_request_count());
@@ -246,8 +230,7 @@ async fn load_recursive_directory() {
       .load_directory(testdir_digest,)
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir_directory
   );
   assert_eq!(
@@ -255,8 +238,7 @@ async fn load_recursive_directory() {
       .load_directory(recursive_testdir_digest,)
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     recursive_testdir_directory
   );
 }
@@ -890,8 +872,7 @@ async fn instance_name_download() {
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     TestData::roland().bytes()
   )
 }
@@ -974,8 +955,7 @@ async fn auth_download() {
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     TestData::roland().bytes()
   )
 }
@@ -1241,6 +1221,111 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   );
 }
 
+#[tokio::test]
+async fn entries_for_directory() {
+  let roland = TestData::roland();
+  let catnip = TestData::catnip();
+  let testdir = TestDirectory::containing_roland();
+  let recursive_testdir = TestDirectory::recursive();
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  store
+    .record_directory(&recursive_testdir.directory(), false)
+    .await
+    .expect("Error saving recursive Directory");
+  store
+    .record_directory(&testdir.directory(), false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(roland.bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(catnip.bytes(), false)
+    .await
+    .expect("Error saving catnip file bytes");
+
+  let digest_entries = store
+    .entries_for_directory(recursive_testdir.digest())
+    .await
+    .expect("Getting FileContents");
+
+  assert_same_digest_entries(
+    digest_entries,
+    vec![
+      DigestEntry::File(FileEntry {
+        path: PathBuf::from("cats").join("roland.ext"),
+        digest: roland.digest(),
+        is_executable: false,
+      }),
+      DigestEntry::File(FileEntry {
+        path: PathBuf::from("treats.ext"),
+        digest: catnip.digest(),
+        is_executable: false,
+      }),
+    ],
+  );
+}
+
+fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
+  assert_eq!(
+    left.len(),
+    right.len(),
+    "DigestEntry vectors did not match, different lengths: left: {:?} right: {:?}",
+    left,
+    right
+  );
+
+  let mut success = true;
+  for (index, (l, r)) in left.iter().zip(right.iter()).enumerate() {
+    match (l, r) {
+      (DigestEntry::File(l), DigestEntry::File(r)) => {
+        if l.path != r.path {
+          success = false;
+          eprintln!(
+            "Paths did not match for index {}: {:?}, {:?}",
+            index, l.path, r.path
+          );
+        }
+        if l.digest != r.digest {
+          success = false;
+          eprintln!(
+            "Digest did not match for index {}: {:?}, {:?}",
+            index, l.digest, r.digest
+          );
+        }
+        if l.is_executable != r.is_executable {
+          success = false;
+          eprintln!(
+            "Executable bit did not match for index {}: {:?}, {:?}",
+            index, l.is_executable, r.is_executable
+          );
+        }
+      }
+      (DigestEntry::EmptyDirectory(path_left), DigestEntry::EmptyDirectory(path_right)) => {
+        if path_left != path_right {
+          success = false;
+          eprintln!(
+            "Paths did not match for empty directory at index {}: {:?}, {:?}",
+            index, path_left, path_right
+          );
+        }
+      }
+      (l, r) => {
+        success = false;
+        eprintln!("Differing types at index {}: {:?}, {:?}", index, l, r)
+      }
+    }
+  }
+  assert!(
+    success,
+    "FileEntry vectors did not match: Left: {:?}, Right: {:?}",
+    left, right
+  );
+}
+
 fn list_dir(path: &Path) -> Vec<String> {
   let mut v: Vec<_> = std::fs::read_dir(path)
     .expect("Listing dir")
@@ -1387,114 +1472,6 @@ async fn summary_does_not_count_things_in_cas() {
 }
 
 #[tokio::test]
-async fn materialize_directory_metadata_all_local() {
-  let outer_dir = TestDirectory::double_nested();
-  let nested_dir = TestDirectory::nested();
-  let inner_dir = TestDirectory::containing_roland();
-  let file = TestData::roland();
-
-  let dir = tempfile::tempdir().unwrap();
-  let store = new_local_store(dir.path());
-  store
-    .record_directory(&outer_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&nested_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&inner_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .store_file_bytes(file.bytes(), false)
-    .await
-    .expect("Error storing file locally");
-
-  let mat_dir = tempfile::tempdir().unwrap();
-  let metadata = store
-    .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .await
-    .unwrap();
-
-  let local = LoadMetadata::Local;
-
-  let want = DirectoryMaterializeMetadata {
-    metadata: local.clone(),
-    child_directories: btreemap! {
-      "pets".to_owned() => DirectoryMaterializeMetadata {
-        metadata: local.clone(),
-        child_directories: btreemap!{
-          "cats".to_owned() => DirectoryMaterializeMetadata {
-            metadata: local.clone(),
-            child_directories: btreemap!{},
-            child_files: btreemap!{
-              "roland.ext".to_owned() => local.clone(),
-            },
-          }
-        },
-        child_files: btreemap!{},
-      }
-    },
-    child_files: btreemap! {},
-  };
-
-  assert_eq!(want, metadata);
-}
-
-#[tokio::test]
-async fn materialize_directory_metadata_mixed() {
-  let outer_dir = TestDirectory::double_nested(); // /pets/cats/roland
-  let nested_dir = TestDirectory::nested(); // /cats/roland
-  let inner_dir = TestDirectory::containing_roland();
-  let file = TestData::roland();
-
-  let cas = StubCAS::builder().directory(&nested_dir).build();
-
-  let dir = tempfile::tempdir().unwrap();
-  let store = new_store(dir.path(), &cas.address());
-  store
-    .record_directory(&outer_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&inner_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .store_file_bytes(file.bytes(), false)
-    .await
-    .expect("Error storing file locally");
-
-  let mat_dir = tempfile::tempdir().unwrap();
-  let metadata = store
-    .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .await
-    .unwrap();
-
-  assert!(metadata
-    .child_directories
-    .get("pets")
-    .unwrap()
-    .metadata
-    .is_remote());
-  assert_eq!(
-    LoadMetadata::Local,
-    *metadata
-      .child_directories
-      .get("pets")
-      .unwrap()
-      .child_directories
-      .get("cats")
-      .unwrap()
-      .child_files
-      .get("roland.ext")
-      .unwrap()
-  );
-}
-
-#[tokio::test]
 async fn explicitly_overwrites_already_existing_file() {
   fn test_file_with_arbitrary_content(filename: &str, content: &TestData) -> TestDirectory {
     let digest = content.digest();
@@ -1535,90 +1512,4 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
-}
-
-fn create_empty_directory_materialize_metadata() -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    metadata: LoadMetadata::Local,
-    child_directories: Default::default(),
-    child_files: Default::default(),
-  }
-}
-
-fn create_files_directory_materialize_metadata<S: AsRef<str>, F: IntoIterator<Item = S>>(
-  child_files: F,
-) -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    child_files: child_files
-      .into_iter()
-      .map(|c| (c.as_ref().to_string(), LoadMetadata::Local))
-      .collect(),
-    ..create_empty_directory_materialize_metadata()
-  }
-}
-
-fn create_directories_directory_materialize_metadata<
-  S: AsRef<str>,
-  F: IntoIterator<Item = (S, DirectoryMaterializeMetadata)>,
->(
-  child_dirs: F,
-) -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    child_directories: child_dirs
-      .into_iter()
-      .map(|(c, d)| (c.as_ref().to_string(), d))
-      .collect(),
-    ..create_empty_directory_materialize_metadata()
-  }
-}
-
-#[test]
-fn directory_materialize_metadata_empty_contains_file_empty() {
-  let md = create_empty_directory_materialize_metadata();
-  assert!(!md.contains_file(&RelativePath::new("").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_empty_contains_file() {
-  let md = create_empty_directory_materialize_metadata();
-  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_contains_file() {
-  let md = create_files_directory_materialize_metadata(vec!["script.sh"]);
-  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_un_normalized_contains_file() {
-  let md = create_files_directory_materialize_metadata(vec!["./script.sh"]);
-  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_contains_subdir_file() {
-  let subdir_md = create_files_directory_materialize_metadata(vec!["script.sh"]);
-  let md = create_directories_directory_materialize_metadata(vec![
-    ("subdir", subdir_md),
-    ("script", create_empty_directory_materialize_metadata()),
-  ]);
-
-  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(!md.contains_file(&RelativePath::new("script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("./subdir/script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("subdir/script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_empty_dir() {
-  let md = create_directories_directory_materialize_metadata(vec![(
-    "script",
-    create_empty_directory_materialize_metadata(),
-  )]);
-
-  assert!(!md.contains_file(&RelativePath::new("./script").unwrap()));
-  assert!(!md.contains_file(&RelativePath::new("script").unwrap()));
 }

@@ -1111,8 +1111,7 @@ async fn ensure_inline_stdio_is_stored() {
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
         .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stdout.bytes()
     );
     assert_eq!(
@@ -1120,8 +1119,7 @@ async fn ensure_inline_stdio_is_stored() {
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
         .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stderr.bytes()
     );
   }
@@ -2192,16 +2190,14 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .unwrap();
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
+    .unwrap();
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2250,16 +2246,14 @@ async fn run_command_remote(
     .run(Context::default(), &mut workunit, request)
     .await?;
 
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .unwrap();
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?
-    .unwrap()
-    .0;
+    .unwrap();
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2307,18 +2301,16 @@ async fn extract_execute_response(
     .await?;
 
   let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
     .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   Ok(RemoteTestResult {
     original,

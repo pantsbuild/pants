@@ -8,7 +8,7 @@ python_tests(
   sources=["coverage_py_integration_test.py"],
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
-  timeout=210,
+  timeout=480,
 )
 
 python_tests(name="coverage_py_test", sources=["coverage_py_test.py"], timeout=20)
@@ -27,6 +27,14 @@ python_tests(
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
   timeout=480,
+)
+
+python_tests(
+    name="repl_integration",
+    sources=["repl_integration_test.py"],
+    # We want to make sure the default lockfile works for both macOS and Linux.
+    tags=["platform_specific_behavior"],
+    timeout=240,
 )
 
 python_tests(

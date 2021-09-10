@@ -34,6 +34,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     TypeStubsModuleMappingField,
+    UnrecognizedResolveNamesError,
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
@@ -411,7 +412,12 @@ def test_inject_python_distribution_dependencies() -> None:
                 name="dist-a",
                 provides=setup_py(
                     name='my-dist-a'
-                ).with_binaries({"my_cmd": ":my_binary"})
+                ),
+                entry_points={
+                    "console_scripts":{
+                        "my_cmd": ":my_binary",
+                    },
+                },
             )
 
             python_distribution(
@@ -531,3 +537,23 @@ def test_type_stub_module_mapping_field(
 ) -> None:
     actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
     assert actual_value == FrozenDict({**DEFAULT_TYPE_STUB_MODULE_MAPPING, **expected})
+
+
+@pytest.mark.parametrize(
+    "unrecognized,bad_entry_str,name_str",
+    (
+        (["fake"], "fake", "name"),
+        (["fake1", "fake2"], "['fake1', 'fake2']", "names"),
+    ),
+)
+def test_unrecognized_resolve_names_error(
+    unrecognized: list[str], bad_entry_str: str, name_str: str
+) -> None:
+    with pytest.raises(UnrecognizedResolveNamesError) as exc:
+        raise UnrecognizedResolveNamesError(
+            unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
+        )
+    assert (
+        f"Unrecognized resolve {name_str} from foo: "
+        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
+    ) in str(exc.value)

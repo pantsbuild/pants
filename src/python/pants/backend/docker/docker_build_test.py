@@ -17,41 +17,11 @@ from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
     "target_values, expected_features",
     [
         (
-            dict(),
-            dict(
-                context_root="docker/test/.",
-            ),
-        ),
-        (
             dict(
                 version="1.2.3",
             ),
             dict(
                 version="1.2.3",
-            ),
-        ),
-        (
-            dict(
-                context_root="/",
-            ),
-            dict(
-                context_root=".",
-            ),
-        ),
-        (
-            dict(
-                context_root="foo/bar",
-            ),
-            dict(
-                context_root="docker/test/foo/bar",
-            ),
-        ),
-        (
-            dict(
-                context_root="/foo/bar",
-            ),
-            dict(
-                context_root="foo/bar",
             ),
         ),
     ],
@@ -65,9 +35,6 @@ def test_build_docker_image_rule(target_values, expected_features):
     field_set = DockerFieldSet.create(image)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
-        if "context_root" in expected_features:
-            assert expected_features["context_root"] == request.context_root
-
         return DockerBuildContext(digest=EMPTY_DIGEST)
 
     result = run_rule_with_mocks(

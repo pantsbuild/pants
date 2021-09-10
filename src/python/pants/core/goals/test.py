@@ -177,8 +177,13 @@ class CoverageDataCollection(Collection[_CD]):
     element_type: ClassVar[type[_CD]]
 
 
+@dataclass(frozen=True)
 class CoverageReport(ABC):
     """Represents a code coverage report that can be materialized to the terminal or disk."""
+
+    # Some coverage systems can determine, based on a configurable threshold, whether coverage
+    # was sufficient or not. The test goal will fail the build if coverage was deemed insufficient.
+    coverage_insufficient: bool
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         """Materialize this code coverage report to the terminal or disk.
@@ -230,6 +235,11 @@ class FilesystemCoverageReport(CoverageReport):
 @dataclass(frozen=True)
 class CoverageReports(EngineAwareReturnType):
     reports: Tuple[CoverageReport, ...]
+
+    @property
+    def coverage_insufficient(self) -> bool:
+        """Whether to fail the build due to insufficient coverage."""
+        return any(report.coverage_insufficient for report in self.reports)
 
     def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
         report_paths = []
@@ -426,7 +436,7 @@ async def run_tests(
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
             collection_cls = coverage_types_to_collection_types[data_cls]
             coverage_collections.append(collection_cls(data))
-        # We can create multiple reports for each coverage data (console, xml and html)
+        # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(
             Get(CoverageReports, CoverageDataCollection, coverage_collection)
             for coverage_collection in coverage_collections
@@ -443,6 +453,16 @@ async def run_tests(
             )
             for process in open_files.processes:
                 interactive_runner.run(process)
+
+        for coverage_reports in coverage_reports_collections:
+            if coverage_reports.coverage_insufficient:
+                logger.error(
+                    "Test goal failed due to insufficient coverage. "
+                    "See coverage reports for details."
+                )
+                # coverage.py uses 2 to indicate failure due to insufficient coverage.
+                # We may as well follow suit in the general case, for all languages.
+                exit_code = 2
 
     return Test(exit_code)
 

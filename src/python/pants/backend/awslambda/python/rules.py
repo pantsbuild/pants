@@ -4,13 +4,13 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -55,7 +55,6 @@ async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
-        field_set.address,
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
     )
@@ -71,19 +70,20 @@ async def package_python_awslambda(
     if (py_major, py_minor) == (2, 7):
         platform += "u"
 
+    additional_pex_args = (
+        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+        "--manylinux=manylinux2014",
+        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+        # available and matching the AMI platform.
+        "--resolve-local-platforms",
+    )
     pex_request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
-        main=None,
         output_filename=output_filename,
         platforms=PexPlatforms([platform]),
-        additional_args=[
-            # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
-            "--manylinux=manylinux2014",
-            # When we're executing Pex on Linux, allow a local interpreter to be resolved if
-            # available and matching the AMI platform.
-            "--resolve-local-platforms",
-        ],
+        additional_args=additional_pex_args,
+        additional_lockfile_args=additional_pex_args,
     )
 
     lambdex_request = PexRequest(

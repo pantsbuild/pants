@@ -14,6 +14,7 @@ from pants.backend.go.pkg import (
 from pants.backend.go.target_types import GoExternalModule, GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -103,7 +104,9 @@ def test_resolve_packages_of_go_external_module(rule_runner: RuleRunner) -> None
         ResolveExternalGoModuleToPackagesResult,
         [
             ResolveExternalGoModuleToPackagesRequest(
-                path="github.com/google/go-cmp", version="v0.5.6"
+                path="github.com/google/go-cmp",
+                version="v0.5.6",
+                go_sum_digest=EMPTY_DIGEST,
             )
         ],
     )

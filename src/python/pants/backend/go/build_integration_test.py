@@ -1,17 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
-from typing import Iterable, List
+
+from __future__ import annotations
+
+from textwrap import dedent
 
 import pytest
 
-from pants.backend.go import build, import_analysis, sdk
+from pants.backend.go import build, import_analysis, module, pkg, sdk, target_type_rules
 from pants.backend.go.build import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinary, GoPackage
+from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import external_tool, source_files
-from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -20,122 +21,100 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[GoBinary, GoPackage],
+        target_types=[GoBinary, GoPackage, GoModule],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
             *build.rules(),
+            *pkg.rules(),
+            *module.rules(),
+            *target_type_rules.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
     )
 
 
-MAIN_SOURCE = FileContent(
-    "main.go",
-    textwrap.dedent(
-        """\
-    package main
+def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:
+    field_set = GoBinaryFieldSet.create(binary_target)
+    return rule_runner.request(BuiltPackage, [field_set])
 
-    import (
-    \t"fmt"
+
+def test_package_simple(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": "module foo.example.com\n",
+            "main.go": dedent(
+                """\
+                package main
+
+                import (
+                    "fmt"
+                )
+
+                func main() {
+                    fmt.Println("Hello world!")
+                }
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_module(name='go_mod')
+                go_package(name='main')
+                go_binary(name='bin', main=':main')
+                """
+            ),
+        }
     )
-
-    func main() {
-    \tfmt.Println("Hello world!")
-    }
-    """
-    ).encode("utf-8"),
-)
-
-LIB_SOURCE = FileContent(
-    "lib.go",
-    textwrap.dedent(
-        """\
-    package lib
-
-    import (
-    \t"fmt"
-    )
-
-    func Quote(s string) string {
-    \treturn fmt.Sprintf(">> %s <<", s)
-    }
-    """
-    ).encode("utf-8"),
-)
-
-MAIN_USING_LIB_SOURCE = FileContent(
-    "main.go",
-    textwrap.dedent(
-        """\
-    package main
-
-    import (
-    \t"fmt"
-    \t"example.com/lib"
-    )
-
-    func main() {
-    \tfmt.Println(lib.Quote("Hello world!"))
-    }
-    """
-    ).encode("utf-8"),
-)
-
-
-def make_target(
-    rule_runner: RuleRunner,
-    source_files: List[FileContent],
-    *,
-    import_path: str,
-    dependencies: Iterable[Address] = (),
-    target_name: str = "target",
-) -> Target:
-    for source_file in source_files:
-        rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
-    source_files_str = ", ".join(f'"{sf.path}"' for sf in source_files)
-    deps_str = ", ".join(f'"{addr.spec}"' for addr in dependencies)
-    rule_runner.add_to_build_file(
-        "",
-        f"go_package(name='{target_name}', import_path='{import_path}', sources=[{source_files_str}], dependencies=[{deps_str}])\n",
-    )
-    return rule_runner.get_target(Address("", target_name=target_name))
-
-
-def build_package(
-    rule_runner: RuleRunner,
-    main_target: Target,
-) -> BuiltPackage:
-    args = ["--backend-packages=pants.backend.go"]
-    rule_runner.set_options(args)
-    rule_runner.add_to_build_file(
-        "", f"go_binary(name='bin', binary_name='foo', main='{main_target.address.spec}')\n"
-    )
-    go_binary_target = rule_runner.get_target(Address("", target_name="bin"))
-    built_package = rule_runner.request(BuiltPackage, (GoBinaryFieldSet.create(go_binary_target),))
-    return built_package
-
-
-def test_package_one_target(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [MAIN_SOURCE], import_path="main")
-    built_package = build_package(rule_runner, target)
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "foo"
+    assert built_package.artifacts[0].relpath == "bin"
 
 
-def test_package_with_depenedency(rule_runner: RuleRunner) -> None:
-    lib_target = make_target(
-        rule_runner, [LIB_SOURCE], import_path="example.com/lib", target_name="lib"
+def test_package_with_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "lib/lib.go": dedent(
+                """\
+                package lib
+
+                import (
+                    "fmt"
+                )
+
+                func Quote(s string) string {
+                    return fmt.Sprintf(">> %s <<", s)
+                }
+                """
+            ),
+            "lib/BUILD": "go_package()",
+            "main.go": dedent(
+                """\
+                package main
+
+                import (
+                    "fmt"
+                    "foo.example.com/lib"
+                )
+
+                func main() {
+                    fmt.Println(lib.Quote("Hello world!"))
+                }
+                """
+            ),
+            "go.mod": "module foo.example.com\n",
+            "BUILD": dedent(
+                """\
+                go_module(name='go_mod')
+                go_package(name='main')
+                go_binary(name='bin', main=':main')
+                """
+            ),
+        }
     )
-    main_target = make_target(
-        rule_runner,
-        [MAIN_SOURCE],
-        import_path="main",
-        dependencies=(lib_target.address,),
-        target_name="main",
-    )
-    built_package = build_package(rule_runner, main_target)
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "foo"
+    assert built_package.artifacts[0].relpath == "bin"

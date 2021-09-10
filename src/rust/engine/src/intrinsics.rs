@@ -70,6 +70,13 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        product: types.digest_entries,
+        inputs: vec![types.directory_digest],
+      },
+      Box::new(directory_digest_to_digest_entries),
+    );
+    intrinsics.insert(
+      Intrinsic {
         product: types.directory_digest,
         inputs: vec![types.merge_digests],
       },
@@ -162,32 +169,28 @@ fn multi_platform_process_request_to_process_result(
       .await
       .map_err(|s| throw(&s))?;
 
-    let stdout_bytes = maybe_stdout
-      .map(|(bytes, _load_metadata)| bytes)
-      .ok_or_else(|| {
-        throw(&format!(
-          "Bytes from stdout Digest {:?} not found in store",
-          result.stdout_digest
-        ))
-      })?;
+    let stdout_bytes = maybe_stdout.ok_or_else(|| {
+      throw(&format!(
+        "Bytes from stdout Digest {:?} not found in store",
+        result.stdout_digest
+      ))
+    })?;
 
-    let stderr_bytes = maybe_stderr
-      .map(|(bytes, _load_metadata)| bytes)
-      .ok_or_else(|| {
-        throw(&format!(
-          "Bytes from stderr Digest {:?} not found in store",
-          result.stderr_digest
-        ))
-      })?;
+    let stderr_bytes = maybe_stderr.ok_or_else(|| {
+      throw(&format!(
+        "Bytes from stderr Digest {:?} not found in store",
+        result.stderr_digest
+      ))
+    })?;
 
     let platform_name: String = result.platform.into();
     Ok(externs::unsafe_call(
       context.core.types.process_result,
       &[
         externs::store_bytes(&stdout_bytes),
-        Snapshot::store_file_digest(&context.core, &result.stdout_digest),
+        Snapshot::store_file_digest(&context.core.types, &result.stdout_digest),
         externs::store_bytes(&stderr_bytes),
-        Snapshot::store_file_digest(&context.core, &result.stderr_digest),
+        Snapshot::store_file_digest(&context.core.types, &result.stderr_digest),
         externs::store_i64(result.exit_code.into()),
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
@@ -212,6 +215,24 @@ fn directory_digest_to_digest_contents(
       .contents_for_directory(digest)
       .await
       .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
+      .map_err(|s| throw(&s))?;
+    Ok(snapshot)
+  }
+  .boxed()
+}
+
+fn directory_digest_to_digest_entries(
+  context: Context,
+  args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
+    let snapshot = context
+      .core
+      .store()
+      .entries_for_directory(digest)
+      .await
+      .and_then(move |digest_entries| Snapshot::store_digest_entries(&context, &digest_entries))
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
   }
@@ -339,24 +360,31 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_contents_and_directories = externs::collect_iterable(&args[0]).unwrap();
-  let digests: Vec<_> = file_contents_and_directories
+  let file_items = externs::collect_iterable(&args[0]).unwrap();
+  let digests: Vec<_> = file_items
     .into_iter()
-    .map(|file_content_or_directory| {
-      let path = externs::getattr_as_string(&file_content_or_directory, "path");
+    .map(|file_item| {
+      let path = externs::getattr_as_string(&file_item, "path");
       let store = context.core.store();
       async move {
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(&file_content_or_directory, "content") {
-          let bytes = bytes::Bytes::from(
-            externs::getattr::<Vec<u8>>(&file_content_or_directory, "content").unwrap(),
-          );
-          let is_executable: bool =
-            externs::getattr(&file_content_or_directory, "is_executable").unwrap();
+        if externs::hasattr(&file_item, "content") {
+          let bytes =
+            bytes::Bytes::from(externs::getattr::<Vec<u8>>(&file_item, "content").unwrap());
+          let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
 
           let digest = store.store_file_bytes(bytes, true).await?;
+          let snapshot = store
+            .snapshot_of_one_file(path, digest, is_executable)
+            .await?;
+          let res: Result<_, String> = Ok(snapshot.digest);
+          res
+        } else if externs::hasattr(&file_item, "file_digest") {
+          let digest_obj = externs::getattr(&file_item, "file_digest")?;
+          let digest = Snapshot::lift_file_digest(&digest_obj)?;
+          let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
           let snapshot = store
             .snapshot_of_one_file(path, digest, is_executable)
             .await?;

@@ -88,7 +88,6 @@ def test_run_sample_script(
         result = run("--", "info", PEX_TOOLS="1")
         assert result.exit_code == 0
         pex_info = json.loads(result.stdout)
-        assert (execution_mode is PexExecutionMode.UNZIP) == pex_info["unzip"]
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"

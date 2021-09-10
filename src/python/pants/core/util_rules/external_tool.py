@@ -209,7 +209,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
                     f"Bad value for --known-versions (see {self.options.pants_bin_name} "
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
-            if plat.matches(plat_val) and ver == self.version:
+            if plat.value == plat_val and ver == self.version:
                 digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
                     url = self.generate_url(plat)
@@ -315,17 +315,7 @@ class TemplatedExternalTool(ExternalTool):
 
     @property
     def url_platform_mapping(self) -> Optional[Dict[str, str]]:
-        upm = self.options.url_platform_mapping
-        if "linux" in upm or "darwin" in upm:
-            Platform.deprecated_due_to_no_architecture()
-            if "linux" in upm:
-                upm["linux_x86_64"] = upm["linux"]
-                del upm["linux"]
-            if "darwin" in upm:
-                upm["macos_x86_64"] = upm["darwin"]
-                del upm["darwin"]
-
-        return cast(Optional[Dict[str, str]], upm)
+        return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
 
     def generate_url(self, plat: Platform):
         platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""

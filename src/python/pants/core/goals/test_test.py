@@ -170,7 +170,9 @@ def run_test_rule(
         addresses = ", ".join(
             coverage_data.address.spec for coverage_data in coverage_data_collection
         )
-        console_report = ConsoleCoverageReport(f"Ran coverage on {addresses}")
+        console_report = ConsoleCoverageReport(
+            coverage_insufficient=False, report=f"Ran coverage on {addresses}"
+        )
         return CoverageReports(reports=(console_report,))
 
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):

@@ -311,7 +311,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     )
 
     output_filename = field_set.output_path.value_or_default(
-        field_set.address, file_ending=field_set.format_field.value
+        file_ending=field_set.format_field.value
     )
     archive = await Get(
         Digest,

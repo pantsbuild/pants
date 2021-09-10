@@ -349,6 +349,7 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, ByteStoreError> {
+    let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -438,6 +439,10 @@ impl ByteStore {
     };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      workunit_store_handle.store.record_observation(
+        ObservationMetric::RemoteStoreReadBlobTimeMicros,
+        start.elapsed().as_micros() as u64,
+      );
       in_workunit!(
         workunit_store_handle.store,
         workunit_name,

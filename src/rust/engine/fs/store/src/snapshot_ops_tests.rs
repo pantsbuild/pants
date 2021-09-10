@@ -95,7 +95,7 @@ async fn subset_single_files() {
 async fn subset_recursive_wildcard() {
   let (store, tempdir, posix_fs, digester) = setup();
 
-  let (merged_digest, _, _) = get_duplicate_rolands(
+  let (merged_digest, snapshot1, _) = get_duplicate_rolands(
     store.clone(),
     store.clone(),
     tempdir.path(),
@@ -120,6 +120,24 @@ async fn subset_recursive_wildcard() {
     .await
     .unwrap();
   assert_eq!(merged_digest, subset_roland2);
+
+  // ** should not include explicitly excluded files
+  let subset_params3 = make_subset_params(&["!subdir/roland2", "subdir/**"]);
+  let subset_roland3 = store
+    .clone()
+    .subset(merged_digest, subset_params3)
+    .await
+    .unwrap();
+  assert_eq!(subset_roland3, snapshot1.digest);
+
+  // ** should not include explicitly excluded files
+  let subset_params4 = make_subset_params(&["!subdir/roland2", "**"]);
+  let subset_roland4 = store
+    .clone()
+    .subset(merged_digest, subset_params4)
+    .await
+    .unwrap();
+  assert_eq!(subset_roland4, snapshot1.digest);
 }
 
 #[derive(Clone)]
@@ -135,11 +153,7 @@ impl StoreWrapper for LoadTrackingStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    Ok(
-      Store::load_file_bytes_with(&self.store, digest, f)
-        .await?
-        .map(|(value, _)| value),
-    )
+    Ok(Store::load_file_bytes_with(&self.store, digest, f).await?)
   }
 
   async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
@@ -148,11 +162,7 @@ impl StoreWrapper for LoadTrackingStore {
       let entry = counts.entry(digest).or_insert(0);
       *entry += 1;
     }
-    Ok(
-      Store::load_directory(&self.store, digest)
-        .await?
-        .map(|(dir, _)| dir),
-    )
+    Ok(Store::load_directory(&self.store, digest).await?)
   }
 
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {

@@ -220,9 +220,7 @@ impl Snapshot {
     digest: Digest,
   ) -> Result<remexec::Directory, String> {
     let maybe_dir = store.load_directory(digest).await?;
-    maybe_dir
-      .map(|(dir, _metadata)| dir)
-      .ok_or_else(|| format!("{:?} was not known", digest))
+    maybe_dir.ok_or_else(|| format!("{:?} was not known", digest))
   }
 
   ///

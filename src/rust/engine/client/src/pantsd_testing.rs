@@ -5,14 +5,14 @@ use std::fs;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
 
-use tempdir::TempDir;
+use tempfile::TempDir;
 
-use crate::build_root::BuildRoot;
+use options::BuildRoot;
 
 pub(crate) fn launch_pantsd() -> (BuildRoot, TempDir) {
   let build_root = BuildRoot::find()
     .expect("Expected test to be run inside the Pants repo but no build root was detected.");
-  let pants_subprocessdir = TempDir::new("pants_subproccessdir").unwrap();
+  let pants_subprocessdir = TempDir::new().unwrap();
   let mut cmd = Command::new(build_root.join("pants"));
   cmd
     .current_dir(build_root.as_path())

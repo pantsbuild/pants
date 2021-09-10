@@ -14,13 +14,7 @@ from pants.backend.python.goals.coverage_py import (
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    VenvPex,
-    VenvPexProcess,
-    pex_path_closure,
-)
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -179,7 +173,11 @@ async def setup_pytest_for_target(
     requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
+        PexFromTargetsRequest.for_requirements(
+            [request.field_set.address],
+            internal_only=True,
+            resolve_and_lockfile=request.field_set.resolve.resolve_and_lockfile(python_setup),
+        ),
     )
     local_dists_get = Get(
         LocalDistsPex,
@@ -231,7 +229,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=pex_path_closure([pytest_pex, requirements_pex, local_dists.pex]),
+            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(

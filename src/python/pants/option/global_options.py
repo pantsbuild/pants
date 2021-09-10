@@ -23,7 +23,6 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -630,11 +629,10 @@ class GlobalOptions(Subsystem):
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
-            deprecation_start_version="2.8.0.dev0",
             removal_version="2.9.0.dev0",
             removal_hint="Unused: this option has no necessary equivalent in v2.",
             default=os.path.join(buildroot, "build-support"),
-            help="Used only for templating in `pants.toml`.",
+            help="Does not do anything.",
         )
         register(
             "--pants-distdir",
@@ -834,18 +832,6 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             help="Print the full exception stack trace for any errors.",
-        )
-        register(
-            "--native-engine-visualize-to",
-            advanced=True,
-            default=None,
-            type=dir_option,
-            removal_version="2.8.0.dev0",
-            removal_hint="Use `--engine-visualize-to` instead.",
-            help=(
-                "A directory to write execution and rule graphs to as `dot` files. The contents "
-                "of the directory will be overwritten if any filenames collide."
-            ),
         )
         register(
             "--engine-visualize-to",
@@ -1542,18 +1528,6 @@ class GlobalOptions(Subsystem):
         )
 
     @staticmethod
-    def compute_engine_visualize_to(bootstrap_options: OptionValueContainer) -> str | None:
-        result = resolve_conflicting_options(
-            old_option="native_engine_visualize_to",
-            new_option="engine_visualize_to",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
-        )
-        return cast("str | None", result)
-
-    @staticmethod
     def compute_pants_ignore(buildroot, global_options):
         """Computes the merged value of the `--pants-ignore` flag.
 
@@ -1611,6 +1585,7 @@ class GlobalOptions(Subsystem):
             (
                 "!*.pyc",
                 "!__pycache__/",
+                ".gitignore",
                 # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
                 # macros should be adapted to allow this dependency to be automatically detected.
                 "requirements.txt",
