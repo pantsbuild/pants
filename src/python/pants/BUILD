@@ -16,6 +16,7 @@ python_distribution(
     ':dummy_c',
     ':entry_point',
     ':version',
+    ':py_typed',
   ],
   # Because we have native code, this will cause the wheel to use whatever the ABI is for the
   # interpreter used to run setup.py, e.g. `cp36m-macosx_10_15_x86_64`.
@@ -62,4 +63,9 @@ python_library(
 resources(
   name='version-resource',
   sources=['VERSION'],
+)
+
+resources(
+  name="py_typed",
+  sources=["py.typed"],
 )
