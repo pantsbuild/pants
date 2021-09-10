@@ -4,14 +4,14 @@
 use std::fs;
 use std::path::PathBuf;
 
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use crate::build_root::BuildRoot;
 use std::ops::Deref;
 
 #[test]
 fn test_find_cwd() {
-  let buildroot = TempDir::new("buildroot").unwrap();
+  let buildroot = TempDir::new().unwrap();
   let buildroot_path = buildroot.path().to_path_buf();
   let mut sentinel: Option<PathBuf> = None;
 
@@ -37,7 +37,7 @@ fn test_find_cwd() {
 
 #[test]
 fn test_find_subdir() {
-  let buildroot = TempDir::new("buildroot").unwrap();
+  let buildroot = TempDir::new().unwrap();
   let buildroot_path = buildroot.path().to_path_buf();
   let subdir = buildroot_path.join("foo").join("bar");
 
