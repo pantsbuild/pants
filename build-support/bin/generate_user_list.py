@@ -13,6 +13,11 @@ To add new companies or make other changes, edit and run this script, then paste
 into that block instead of its current content. Be sure to check that the page renders properly
 and be prepared to revert (via the "Page history" link) if necessary.
 
+On MacOS it's useful to pipe the output of this script into pbcopy, so it's in the clipboard
+ready to be pasted:
+
+./pants run build-support/bin/generate_user_list.py | pbcopy
+
 NOTE: Please consider adding your company/organization to this list! If you wish to do so then
   thank you, and please follow the guidance at https://pantsbuild.org/register.
 """
@@ -35,11 +40,27 @@ class Org:
 _orgs = (
     Org("Chartbeat", "https://chartbeat.com", "https://files.readme.io/d4c9d71-chartbeat.png"),
     Org(
+        "Coinbase",
+        "https://www.coinbase.com/",
+        "https://files.readme.io/a213f0f-coinbase-small.png",
+    ),
+    Org(
         "ESL Gaming",
         "https://about.eslgaming.com/",
         "https://files.readme.io/b63d33d-esl-small.png",
     ),
-    Org("iManage", "https://imanage.com/", "https://files.readme.io/949a4fc-imanage.png"),
+    Org(
+        "Foursquare",
+        "https://foursquare.com/",
+        "https://files.readme.io/aa53b52-foursquare-small.png",
+    ),
+    Org("HousingAnywhere", "https://housinganywhere.com/", ""),
+    Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
+    Org(
+        "People Data Labs",
+        "https://www.peopledatalabs.com/",
+        "https://files.readme.io/8c4f5cd-peopledatalabs-small.png",
+    ),
     Org(
         "Rippling",
         "https://www.rippling.com/",
@@ -48,7 +69,7 @@ _orgs = (
     Org(
         "Snowfall",
         "https://snowfalltravel.com/",
-        "https://files.readme.io/62f79c1-snowfall-small.png",
+        "https://files.readme.io/13e796f-snowfall-small.png",
     ),
     Org(
         "Toolchain",
@@ -68,7 +89,7 @@ def main():
     orgs = sorted(list(_orgs), key=lambda x: x.name.lower())
     # Ensure an even number of cells, leaving one to render blankly if necessary.
     if len(orgs) % 2 == 1:
-        orgs += Org("", "", "")
+        orgs.append(Org("", "", ""))
     org_pairs = tuple(OrgPair(orgs[i], orgs[i + 1]) for i in range(0, len(orgs), 2))
     buf = pkgutil.get_data("generate_user_list", "user_list_templates/table.html.mustache")
     print(pystache.render(buf.decode(), context={"org_pairs": org_pairs}))

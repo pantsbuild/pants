@@ -9,12 +9,22 @@ can be finicky, so be sure to test out changes!
         <tr>
             <td width="50%">
                 <a href="{{ a.website }}" target="_blank">
-                    <img src="{{ a.image }}">
+                    {{#a.image}}
+                        <img src="{{ a.image }}">
+                    {{/a.image}}
+                    {{^a.image}}
+                        <span class="org-bigname">{{ a.name }}</span>
+                    {{/a.image}}
                 </a>
             </td>
             <td width="50%">
                 <a href="{{ b.website }}" target="_blank">
-                    <img src="{{ b.image }}">
+                    {{#b.image}}
+                        <img src="{{ b.image }}">
+                    {{/b.image}}
+                    {{^b.image}}
+                        <span class="org-bigname">{{ b.name }}</span>
+                    {{/b.image}}
                 </a>
             </td>
         </tr>
@@ -53,9 +63,12 @@ can be finicky, so be sure to test out changes!
         font-size: 18px;
         text-align: center;
     }
+    .markdown-body .org-bigname {
+        font-size: 48px;
+        text-align: center;
+    }
     .markdown-body table a[href] {
         text-decoration: none;
         color: black;
     }
 </style>
-
