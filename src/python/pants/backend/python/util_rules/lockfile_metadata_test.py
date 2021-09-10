@@ -98,7 +98,7 @@ def test_invalidation_digest() -> None:
             [">=3.5.5"],
             [">=3.5, <=3.6"],
             False,
-        ),  # User ICs contain versions in the 3.6 range
+        ),  # User ICs contain versions in the 3.7 range
         ("yes", "yes", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], True),
         ("yes", "no", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], False),  # Digests do not match
         (
@@ -150,19 +150,40 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
 
 
 @pytest.mark.parametrize(
-    "ignore1, ignore2, user_reqs, expected_reqs, matches",
+    "user_ics_iter, expected_ics_iter, user_reqs, expected_reqs, matches",
     [
         # Exact requirements match
-        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], True],
+        [[">=3.5"], [">=3.5"], ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], True],
         # Version mismatch
-        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors==0.1.1"], False],
+        [[">=3.5"], [">=3.5"], ["ansicolors==0.1.0"], ["ansicolors==0.1.1"], False],
         # Range specifier mismatch
-        ["yes", "yes", ["ansicolors==0.1.0"], ["ansicolors>=0.1.0"], False],
+        [[">=3.5"], [">=3.5"], ["ansicolors==0.1.0"], ["ansicolors>=0.1.0"], False],
         # Requirements mismatch
-        ["yes", "yes", ["requests==1.0.0"], ["ansicolors==0.1.0"], False],
+        [[">=3.5"], [">=3.5"], ["requests==1.0.0"], ["ansicolors==0.1.0"], False],
+        # Multiple requirements
+        [
+            [">=3.5"],
+            [">=3.5"],
+            ["ansicolors==0.1.0", "requests==1.0.0"],
+            ["ansicolors==0.1.0", "requests==1.0.0"],
+            True,
+        ],
+        # Multiple requirements, order mismatch still passes
+        [
+            [">=3.5"],
+            [">=3.5"],
+            ["ansicolors==0.1.0", "requests==1.0.0"],
+            ["requests==1.0.0", "ansicolors==0.1.0"],
+            True,
+        ],
+        # Exact requirements match, non-matching ICs (user includes 3.7 range and above)
+        [[">=3.5.5"], [">=3.5, <=3.6"], ["ansicolors==0.1.0"], ["ansicolors==0.1.0"], True],
     ],
 )
-def test_is_valid_for_v2_only(ignore1, ignore2, user_reqs, expected_reqs, matches) -> None:
-    ic = InterpreterConstraints(["CPython==3.6.1"])
-    m = LockfileMetadataV2(ic, reqset(*expected_reqs))
-    assert bool(m.is_valid_for("", ic, INTERPRETER_UNIVERSE, reqset(*user_reqs))) == matches
+def test_is_valid_for_v2_only(
+    user_ics_iter, expected_ics_iter, user_reqs, expected_reqs, matches
+) -> None:
+    user_ic = InterpreterConstraints(user_ics_iter)
+    expected_ic = InterpreterConstraints(expected_ics_iter)
+    m = LockfileMetadataV2(expected_ic, reqset(*expected_reqs))
+    assert bool(m.is_valid_for("", user_ic, INTERPRETER_UNIVERSE, reqset(*user_reqs))) == matches
