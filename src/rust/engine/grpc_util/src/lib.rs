@@ -97,7 +97,7 @@ pub fn create_endpoint(
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
-  let http_headers = headers
+  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = headers
     .iter()
     .map(|(key, value)| {
       let header_name =
@@ -108,10 +108,6 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
 
       Ok((header_name, header_value))
     })
-    .collect::<Vec<Result<(HeaderName, HeaderValue), String>>>();
-
-  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = http_headers
-    .into_iter()
     .partition_map(|result| match result {
       Ok(v) => Either::Left(v),
       Err(err) => Either::Right(err),
