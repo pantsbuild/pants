@@ -20,7 +20,6 @@ from pants.backend.go.pkg import (
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
     GoBinaryMainAddress,
-    GoBinaryName,
     GoExternalModulePath,
     GoExternalModuleVersion,
     GoImportPath,
@@ -93,9 +92,8 @@ class BuiltGoPackage:
 
 @dataclass(frozen=True)
 class GoBinaryFieldSet(PackageFieldSet):
-    required_fields = (GoBinaryName, GoBinaryMainAddress)
+    required_fields = (GoBinaryMainAddress,)
 
-    binary_name: GoBinaryName
     main_address: GoBinaryMainAddress
     output_path: OutputPathField
 
@@ -393,14 +391,7 @@ async def package_go_binary(
         Digest, MergeDigests([gathered_imports.digest, built_main_go_package.object_digest])
     )
 
-    output_filename_str = field_set.output_path.value
-    if output_filename_str:
-        output_filename = PurePath(output_filename_str)
-    else:
-        # TODO: Figure out default for binary_name. Had to do `or "name-not-set"` to satisfy mypy.
-        binary_name = field_set.binary_name.value or "name-not-set"
-        output_filename = PurePath(field_set.address.spec_path.replace(os.sep, ".")) / binary_name
-
+    output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -421,10 +412,10 @@ async def package_go_binary(
     )
 
     renamed_output_digest = await Get(
-        Digest, AddPrefix(result.output_digest, output_filename.parent.as_posix())
+        Digest, AddPrefix(result.output_digest, str(output_filename.parent))
     )
 
-    artifact = BuiltPackageArtifact(relpath=output_filename.as_posix())
+    artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
 
 
