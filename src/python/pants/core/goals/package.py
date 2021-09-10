@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 from abc import ABCMeta
@@ -56,11 +58,15 @@ class OutputPathField(StringField, AsyncFieldMixin):
         "collisions with other package targets you may have."
     )
 
-    def value_or_default(self, *, file_ending: str) -> str:
-        assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-        return self.value or os.path.join(
-            self.address.spec_path.replace(os.sep, "."), f"{self.address.target_name}.{file_ending}"
-        )
+    def value_or_default(self, *, file_ending: str | None) -> str:
+        if self.value:
+            return self.value
+        if file_ending is None:
+            file_name = self.address.target_name
+        else:
+            assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
+            file_name = f"{self.address.target_name}.{file_ending}"
+        return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 
 class PackageSubsystem(GoalSubsystem):
