@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import shutil
 from glob import glob
 from textwrap import dedent
 
@@ -59,12 +60,18 @@ def test_typecheck_works() -> None:
 )
 def test_type_stubs(wheel_glob, import_package, member) -> None:
     wheel = glob(f"{os.getcwd()}/{wheel_glob}")[0]
+    # Pip does not yet support MacOS Big Sur properly: Specifically, it doesn't recognize
+    # macosx_11_0 as a platform, but will happily consume maxosx_10_16.
+    # Until all that is figured out, we do some renaming here so that the test passes on Big Sur.
+    fixed_wheel = wheel.replace("macosx_11_0", "macosx_10_16")
+    if fixed_wheel != wheel:
+        shutil.copy(wheel, fixed_wheel)
     project = {
         "proj1/BUILD": dedent(
             f"""\
             python_requirement_library(
                 name="pants",
-                requirements=["Pants @ file://{wheel}"],
+                requirements=["Pants @ file://{fixed_wheel}"],
             )
             python_library()
             """
