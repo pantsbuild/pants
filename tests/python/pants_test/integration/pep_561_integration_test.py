@@ -5,6 +5,8 @@ import os
 from glob import glob
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
@@ -48,8 +50,15 @@ def test_typecheck_works() -> None:
     err_result.assert_failure()
 
 
-def test_type_stubs() -> None:
-    wheel = glob(f"{os.getcwd()}/pantsbuild.pants.testutil-*.whl")[0]
+@pytest.mark.parametrize(
+    "wheel_glob, import_package, member",
+    [
+        ("pantsbuild.pants.testutil-*.whl", "pants.testutil.option_util", "create_subsystem"),
+        ("pantsbuild.pants-*.whl", "pants.engine.unions", "is_union"),
+    ],
+)
+def test_type_stubs(wheel_glob, import_package, member) -> None:
+    wheel = glob(f"{os.getcwd()}/{wheel_glob}")[0]
     project = {
         "proj1/BUILD": dedent(
             f"""\
@@ -61,16 +70,16 @@ def test_type_stubs() -> None:
             """
         ),
         "proj1/ok.py": dedent(
-            """\
-            from pants.testutil.option_util import create_subsystem
+            f"""\
+            from {import_package} import {member}
             """
         ),
         "proj1/err.py": dedent(
-            """\
-            from pants.testutil.option_util import create_subsystem
+            f"""\
+            from {import_package} import {member}
 
             def dummy() -> None:
-                create_subsystem()
+                {member}()
             """
         ),
     }

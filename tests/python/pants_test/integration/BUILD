@@ -61,6 +61,9 @@ python_tests(
 python_tests(
   name = 'pep_561_integration',
   sources = ['pep_561_integration_test.py'],
-  timeout = 180,
-  runtime_package_dependencies=['src/python/pants/testutil:testutil_wheel'],
+  timeout = 300,
+  runtime_package_dependencies=[
+      'src/python/pants:pants-packaged',
+      'src/python/pants/testutil:testutil_wheel',
+  ],
 )
