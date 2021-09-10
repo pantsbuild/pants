@@ -71,7 +71,10 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
 
     assert result.pex is not None
     contents = rule_runner.request(DigestContents, [result.pex.digest])
-    assert len(contents) == 1
-    with io.BytesIO(contents[0].content) as fp:
-        with zipfile.ZipFile(fp, "r") as pex:
-            assert ".deps/foo-9.8.7-py3-none-any.whl/foo/bar.py" in pex.namelist()
+    whl_content = None
+    for content in contents:
+        if content.path == "local_dists.pex/.deps/foo-9.8.7-py3-none-any.whl":
+            whl_content = content
+    with io.BytesIO(whl_content.content) as fp:
+        with zipfile.ZipFile(fp, "r") as whl:
+            assert "foo/bar.py" in whl.namelist()
