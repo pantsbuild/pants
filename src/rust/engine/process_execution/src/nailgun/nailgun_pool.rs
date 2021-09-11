@@ -1,7 +1,7 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Read};
 use std::net::SocketAddr;
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,6 @@ use hashing::{Digest, Fingerprint};
 use lazy_static::lazy_static;
 use log::{debug, info};
 use regex::Regex;
-use sha2::{Digest as Sha256Digest, Sha256};
 use store::Store;
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -76,14 +75,7 @@ impl NailgunPool {
     nailgun_req_digest: Digest,
     store: Store,
   ) -> Result<BorrowedNailgunProcess, String> {
-    let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
-      format!(
-        "jdk_home is not set for nailgun server startup request {:#?}",
-        &startup_options
-      )
-    })?;
-    let requested_fingerprint =
-      NailgunProcessFingerprint::new(name.clone(), nailgun_req_digest, jdk_path.clone())?;
+    let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), nailgun_req_digest)?;
     let mut processes = self.processes.lock().await;
 
     // Start by seeing whether there are any idle processes with a matching fingerprint.
@@ -231,22 +223,41 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
   let stdout = child
     .stdout
     .as_mut()
-    .ok_or_else(|| "No Stdout found!".to_string());
-  stdout.and_then(|stdout| {
+    .ok_or_else(|| "No stdout found!".to_string());
+  let port_line = stdout.and_then(|stdout| {
     let reader = io::BufReader::new(stdout);
-    let line = reader
+    reader
       .lines()
       .next()
       .ok_or("There is no line ready in the child's output")?
-      .map_err(|err| format!("{}", err))?;
-    let port = &NAILGUN_PORT_REGEX
-      .captures_iter(&line)
-      .next()
-      .ok_or("Output for nailgun server didn't match the regex!")?[1];
-    port
-      .parse::<Port>()
-      .map_err(|e| format!("Error parsing port {}! {}", &port, e))
-  })
+      .map_err(|e| e.to_string())
+  });
+
+  // If we failed to read a port line and the child has exited, report that.
+  if port_line.is_err() {
+    if let Some(exit_status) = child.try_wait().map_err(|e| e.to_string())? {
+      let mut stderr = String::new();
+      child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .map_err(|e| e.to_string())?;
+      return Err(format!(
+        "Nailgun failed to start: exited with {}, stderr:\n{}",
+        exit_status, stderr
+      ));
+    }
+  }
+  let port_line = port_line?;
+
+  let port = &NAILGUN_PORT_REGEX
+    .captures_iter(&port_line)
+    .next()
+    .ok_or("Output for nailgun server didn't match the regex!")?[1];
+  port
+    .parse::<Port>()
+    .map_err(|e| format!("Error parsing port {}! {}", &port, e))
 }
 
 impl NailgunProcess {
@@ -329,22 +340,10 @@ struct NailgunProcessFingerprint {
 }
 
 impl NailgunProcessFingerprint {
-  pub fn new(
-    name: String,
-    nailgun_server_req_digest: Digest,
-    jdk_path: PathBuf,
-  ) -> Result<Self, String> {
-    let jdk_realpath = jdk_path
-      .canonicalize()
-      .map_err(|err| format!("Error getting the realpath of the jdk home: {}", err))?;
-
-    let mut hasher = Sha256::default();
-    hasher.update(nailgun_server_req_digest.hash);
-    hasher.update(jdk_realpath.to_string_lossy().as_bytes());
-
+  pub fn new(name: String, nailgun_server_req_digest: Digest) -> Result<Self, String> {
     Ok(NailgunProcessFingerprint {
       name,
-      fingerprint: Fingerprint::from_bytes(hasher.finalize()),
+      fingerprint: nailgun_server_req_digest.hash,
     })
   }
 }

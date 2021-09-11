@@ -42,7 +42,6 @@ static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
-  jdk: PathBuf,
   platform_constraint: Option<Platform>,
   nailgun_digest: Digest,
 ) -> Process {
@@ -61,7 +60,7 @@ fn construct_nailgun_server_request(
     description: format!("Start a nailgun server for {}", nailgun_name),
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
-    jdk_home: Some(jdk),
+    jdk_home: None,
     platform_constraint,
     use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
@@ -144,15 +143,9 @@ impl super::CommandRunner for CommandRunner {
     } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
 
-    let jdk_home = original_request
-      .jdk_home
-      .clone()
-      .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
-      jdk_home,
       original_request.platform_constraint,
       original_request.use_nailgun,
     );
