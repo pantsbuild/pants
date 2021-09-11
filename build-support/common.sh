@@ -69,3 +69,7 @@ function determine_python() {
 function is_macos_arm() {
   [[ $(uname -sm) == "Darwin arm64" ]]
 }
+
+function is_macos_big_sur() {
+  [[ $(uname) == "Darwin" && $(sw_vers -productVersion) = 11\.* ]]
+}
