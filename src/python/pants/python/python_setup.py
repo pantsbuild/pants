@@ -209,6 +209,14 @@ class PythonSetup(Subsystem):
         )
 
         register(
+            "--tailor-requirements-targets",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Tailor python_requirements() targets for requirements files.",
+        )
+
+        register(
             "--tailor-pex-binary-targets",
             type=bool,
             default=True,
@@ -276,6 +284,10 @@ class PythonSetup(Subsystem):
     @property
     def tailor_ignore_solitary_init_files(self) -> bool:
         return cast(bool, self.options.tailor_ignore_solitary_init_files)
+
+    @property
+    def tailor_requirements_targets(self) -> bool:
+        return cast(bool, self.options.tailor_requirements_targets)
 
     @property
     def tailor_pex_binary_targets(self) -> bool:

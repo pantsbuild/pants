@@ -97,6 +97,26 @@ async def find_putative_targets(
                 )
             )
 
+    if python_setup.tailor_requirements_targets:
+        # Find requirements files.
+        all_requirements_files_globs: PathGlobs = req.search_paths.path_globs("*requirements*.txt")
+        all_requirements_files = await Get(Paths, PathGlobs, all_requirements_files_globs)
+        unowned_requirements_files = set(all_requirements_files.files) - set(all_owned_sources)
+        for req_file in unowned_requirements_files:
+            path, name = os.path.split(req_file)
+            pts.append(
+                PutativeTarget(
+                    path=path,
+                    # python_requirements is a macro and doesn't take a name argument, but the
+                    # PutativeTarget still needs a name so it can participate in de-duping logic.
+                    name=name,
+                    type_alias="python_requirements",
+                    triggering_sources=[req_file],
+                    owned_sources=[req_file],
+                    kwargs={} if name == "requirements.txt" else {"requirements_relpath": name},
+                )
+            )
+
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
 
