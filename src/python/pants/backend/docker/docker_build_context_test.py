@@ -4,29 +4,59 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Callable
 
 import pytest
 
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
-from pants.backend.docker.rules import rules
+from pants.backend.docker.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextPlugin,
+    DockerBuildContextRequest,
+)
+from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImage
 from pants.core.target_types import Files
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestSubset,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
+from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.target import Target
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            *rules(),
-            *source_files_rules(),
-            QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
-        ],
-        target_types=[DockerImage, Files],
-    )
+def rules():
+    return [
+        *docker_rules(),
+        *source_files_rules(),
+        QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
+    ]
+
+
+@pytest.fixture
+def rule_runner_factory(rules) -> Callable[..., RuleRunner]:
+    def create_rule_runner(**kwargs) -> RuleRunner:
+        if "rules" not in kwargs:
+            kwargs["rules"] = rules
+        if "target_types" not in kwargs:
+            kwargs["target_types"] = [DockerImage, Files]
+        return RuleRunner(**kwargs)
+
+    return create_rule_runner
+
+
+@pytest.fixture
+def rule_runner(rule_runner_factory: Callable[..., RuleRunner]) -> RuleRunner:
+    return rule_runner_factory()
 
 
 def assert_build_context(
@@ -142,5 +172,63 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
             "res/static/s01",
             "res/static/s02",
             "res/static/sub/s03",
+        ],
+    )
+
+
+class CustomizeDockerBuildContext(DockerBuildContextPlugin):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether the build context plugin should be used for this target or not."""
+        return True
+
+
+@rule
+async def customize_context(request: CustomizeDockerBuildContext) -> DockerBuildContext:
+    droped_res2, res_injected = await MultiGet(
+        # PathGlobs for subsetting is a little broken, so we use a really verbose set of patterns
+        # here, to get around that. See issue #12863
+        Get(
+            Digest,
+            DigestSubset(
+                request.snapshot.digest,
+                PathGlobs(["src/a/Dockerfile", "src/a/res/**", "!src/a/res/res2"]),
+            ),
+        ),
+        Get(Digest, CreateDigest([FileContent("src/a/res/injected", b"stuffin")])),
+    )
+    context = await Get(Digest, MergeDigests([droped_res2, res_injected]))
+    return DockerBuildContext(context)
+
+
+def test_customize_context(rule_runner_factory: Callable[..., RuleRunner], rules) -> None:
+    rule_runner = rule_runner_factory(
+        rules=rules
+        + [
+            customize_context,
+            UnionRule(DockerBuildContextPlugin, CustomizeDockerBuildContext),
+        ],
+    )
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+            docker_image(name="a", dependencies=[":resources"])
+            files(name="resources", sources=["res/**"])
+            """
+            ),
+            "src/a/Dockerfile": "FROM python:3.8",
+            "src/a/res/res1": "res1",
+            "src/a/res/res2": "res2",
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/a", target_name="a"),
+        expected_files=[
+            "src/a/Dockerfile",
+            "src/a/res/res1",
+            "src/a/res/injected",
         ],
     )
