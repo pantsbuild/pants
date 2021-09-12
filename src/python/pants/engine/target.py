@@ -333,6 +333,8 @@ class Target:
             )
         )
 
+        self.validate()
+
     @final
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
@@ -557,6 +559,9 @@ class Target:
         citizen. Plugins can use this new field like any other.
         """
         return UnionRule(cls._plugin_field_cls, field)
+
+    def validate(self) -> None:
+        """Validate the target, such as checking for mutually exclusive fields."""
 
 
 @dataclass(frozen=True)
@@ -954,6 +959,15 @@ class FieldSetsPerTargetRequest(Generic[_FS]):
 # -----------------------------------------------------------------------------------------------
 # Exception messages
 # -----------------------------------------------------------------------------------------------
+
+
+class InvalidTargetException(Exception):
+    """Use when there's an issue with the target, e.g. mutually exclusive fields set.
+
+    Suggested template:
+
+         f"The `{repr(alias)}` target {address} ..."
+    """
 
 
 class InvalidFieldException(Exception):

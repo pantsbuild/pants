@@ -22,6 +22,7 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidTargetException,
     NestedDictStringToStringField,
     RequiredFieldMissingException,
     ScalarField,
@@ -77,6 +78,10 @@ class UnrelatedField(BoolField):
 class FortranTarget(Target):
     alias = "fortran"
     core_fields = (FortranExtensions, FortranVersion)
+
+    def validate(self) -> None:
+        if self[FortranVersion].value == "bad":
+            raise InvalidTargetException("Bad!")
 
 
 def test_field_and_target_eq() -> None:
@@ -415,6 +420,11 @@ def test_async_field_mixin() -> None:
     subclass = Subclass(None, addr)
     assert field != subclass
     assert hash(field) != hash(subclass)
+
+
+def test_target_validate() -> None:
+    with pytest.raises(InvalidTargetException):
+        FortranTarget({FortranVersion.alias: "bad"}, Address("", target_name="t"))
 
 
 # -----------------------------------------------------------------------------------------------
