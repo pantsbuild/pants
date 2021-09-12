@@ -179,12 +179,6 @@ async def setup_pytest_for_target(
             resolve_and_lockfile=request.field_set.resolve.resolve_and_lockfile(python_setup),
         ),
     )
-    local_dists_get = Get(
-        LocalDistsPex,
-        LocalDistsPexRequest(
-            [request.field_set.address], interpreter_constraints=interpreter_constraints
-        ),
-    )
     pytest_pex_get = Get(
         Pex,
         PexRequest(
@@ -209,17 +203,24 @@ async def setup_pytest_for_target(
     (
         pytest_pex,
         requirements_pex,
-        local_dists,
         prepared_sources,
         field_set_source_files,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
-        local_dists_get,
         prepared_sources_get,
         field_set_source_files_get,
         extra_output_directory_digest_get,
+    )
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [request.field_set.address],
+            interpreter_constraints=interpreter_constraints,
+            sources=prepared_sources,
+        ),
     )
 
     pytest_runner_pex_get = Get(
@@ -244,7 +245,7 @@ async def setup_pytest_for_target(
         MergeDigests(
             (
                 coverage_config.digest,
-                prepared_sources.source_files.snapshot.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
                 *(plugin_setup.digest for plugin_setup in plugin_setups),

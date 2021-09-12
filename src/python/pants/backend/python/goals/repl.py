@@ -94,14 +94,6 @@ async def create_ipython_repl_request(
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
 
-    local_dists_request = Get(
-        LocalDistsPex,
-        LocalDistsPexRequest(
-            [tgt.address for tgt in repl.targets],
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
-        ),
-    )
-
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
     )
@@ -117,16 +109,26 @@ async def create_ipython_repl_request(
         ),
     )
 
-    requirements_pex, local_dists, sources, ipython_pex = await MultiGet(
-        requirements_request, local_dists_request, sources_request, ipython_request
+    requirements_pex, sources, ipython_pex = await MultiGet(
+        requirements_request, sources_request, ipython_request
     )
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [tgt.address for tgt in repl.targets],
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            sources=sources,
+        ),
+    )
+
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
                 requirements_pex.digest,
                 local_dists.pex.digest,
-                sources.source_files.snapshot.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
                 ipython_pex.digest,
             )
         ),

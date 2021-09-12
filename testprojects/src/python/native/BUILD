@@ -27,6 +27,5 @@ python_library(
 pex_binary(
     name="main",
     entry_point='main.py',
-    # Force-exclude any source dependency on name.py, so that it has to come from the dist.
-    dependencies=[":dist", ":main_lib", "!!:lib"],
+    dependencies=[":dist", ":main_lib"],
 )

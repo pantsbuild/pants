@@ -67,16 +67,26 @@ async def create_pex_binary_run_request(
     sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
-    local_dists_get = Get(
+    pex, sources = await MultiGet(pex_get, sources_get)
+
+    local_dists = await Get(
         LocalDistsPex,
         LocalDistsPexRequest(
             [field_set.address],
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            sources=sources,
         ),
     )
-    pex, local_dists, sources = await MultiGet(pex_get, local_dists_get, sources_get)
+
     merged_digest = await Get(
-        Digest, MergeDigests([pex.digest, local_dists.pex.digest, sources.source_files.snapshot.digest])
+        Digest,
+        MergeDigests(
+            [
+                pex.digest,
+                local_dists.pex.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
+            ]
+        ),
     )
 
     def in_chroot(relpath: str) -> str:
