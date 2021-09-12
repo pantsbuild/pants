@@ -26,7 +26,6 @@ mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
-use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::net::SocketAddr;
@@ -93,7 +92,6 @@ fn construct_nailgun_client_request(
 pub struct CommandRunner {
   inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
-  async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ProcessMetadata,
   workdir_base: PathBuf,
   executor: task_executor::Executor,
@@ -109,7 +107,6 @@ impl CommandRunner {
     CommandRunner {
       inner: runner,
       nailgun_pool: NailgunPool::new(),
-      async_semaphore: AsyncSemaphore::new(1),
       metadata,
       workdir_base,
       executor,
@@ -226,56 +223,50 @@ impl CapturedWorkdir for CommandRunner {
       &self.metadata,
     );
 
-    let nailgun_pool = self.nailgun_pool.clone();
-    let req2 = req.clone();
     let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
-    let build_id = context.build_id;
-    let store = self.inner.store.clone();
 
-    let mut child = self
-      .async_semaphore
-      .clone()
-      .with_acquired(move |_id| {
-        // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool.connect(
-          nailgun_name.clone(),
-          nailgun_req,
-          workdir_for_this_nailgun,
-          nailgun_req_digest,
-          build_id,
-          store,
-          req.input_files,
-        )
-      })
-      .map_err(|e| format!("Failed to connect to nailgun! {}", e))
-      .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
-      .and_then(move |nailgun_port| {
-        // Run the client request in the nailgun we have active.
-        debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
-        let cmd = Command {
-          command: client_req.argv[0].clone(),
-          args: client_req.argv[1..].to_vec(),
-          env: client_req
-            .env
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
-          working_dir: client_workdir,
-        };
-        trace!("Client request: {:#?}", client_req);
-        let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
-        debug!("Connecting to server at {}...", addr);
-        TcpStream::connect(addr)
-          .and_then(move |stream| {
-            nails::client::handle_connection(nails::Config::default(), stream, cmd, async {
-              let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-              stdin_read
-            })
+    // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
+    let nailgun_port = self
+      .nailgun_pool
+      .connect(
+        nailgun_name.clone(),
+        nailgun_req,
+        workdir_for_this_nailgun,
+        nailgun_req_digest,
+        context.build_id,
+        self.inner.store.clone(),
+        req.input_files,
+      )
+      .await
+      .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
+    debug!("Connected to nailgun instance {}", &nailgun_name3);
+    let mut child = {
+      // Run the client request in the nailgun we have active.
+      debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
+      let client_req = construct_nailgun_client_request(req, client_main_class, client_args);
+      let cmd = Command {
+        command: client_req.argv[0].clone(),
+        args: client_req.argv[1..].to_vec(),
+        env: client_req
+          .env
+          .iter()
+          .map(|(k, v)| (k.clone(), v.clone()))
+          .collect(),
+        working_dir: client_workdir,
+      };
+      trace!("Client request: {:#?}", client_req);
+      let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
+      debug!("Connecting to server at {}...", addr);
+      TcpStream::connect(addr)
+        .and_then(move |stream| {
+          nails::client::handle_connection(nails::Config::default(), stream, cmd, async {
+            let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+            stdin_read
           })
-          .map_err(|e| format!("Error communicating with server: {}", e))
-      })
-      .await?;
+        })
+        .map_err(|e| format!("Error communicating with server: {}", e))
+        .await?
+    };
 
     let output_stream = child
       .output_stream
