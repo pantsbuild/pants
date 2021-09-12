@@ -9,12 +9,14 @@ from itertools import chain
 
 from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.target_types import JavaSources
+from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Sources, Targets
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Sources, Targets
+from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
@@ -25,6 +27,17 @@ from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class JavacFieldSet(FieldSet):
+    required_fields = (JavaSources,)
+
+    sources: JavaSources
+
+
+class JavacCheckRequest(CheckRequest):
+    field_set_type = JavacFieldSet
 
 
 @dataclass(frozen=True)
@@ -156,7 +169,29 @@ async def compile_java_source(
     return CompiledClassfiles(digest=stripped_classfiles_digest)
 
 
+@rule(desc="Check compilation for javac", level=LogLevel.DEBUG)
+async def javac_check(request: JavacCheckRequest) -> CheckResults:
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
+    )
+
+    # TODO: This should be fallible so that we exit cleanly.
+    _ = await MultiGet(
+        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t)) for t in coarsened_targets
+    )
+
+    # TODO: non-mock stdout/stderr.
+    return CheckResults(
+        [
+            CheckResult(0, stdout="", stderr="", partition_description=field_set.address.spec)
+            for field_set in request.field_sets
+        ],
+        checker_name="javac",
+    )
+
+
 def rules():
     return [
         *collect_rules(),
+        UnionRule(CheckRequest, JavacCheckRequest),
     ]
