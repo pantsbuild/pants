@@ -216,6 +216,16 @@ class PythonSetup(Subsystem):
             help="Tailor pex_binary() targets for Python entry point files.",
         )
 
+        register(
+            "--macos-big-sur-compatibility",
+            type=bool,
+            default=False,
+            help="If set, and if running on MacOS Big Sur, use macosx_10_16 as the platform "
+            "when building wheels. Otherwise, the default of macosx_11_0 will be used. "
+            "This may be required for pip to be able to install the resulting distribution "
+            "on Big Sur.",
+        )
+
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
@@ -270,6 +280,10 @@ class PythonSetup(Subsystem):
     @property
     def tailor_pex_binary_targets(self) -> bool:
         return cast(bool, self.options.tailor_pex_binary_targets)
+
+    @property
+    def macos_big_sur_compatibility(self) -> bool:
+        return cast(bool, self.options.macos_big_sur_compatibility)
 
     @property
     def scratch_dir(self):
