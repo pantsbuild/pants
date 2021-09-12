@@ -182,6 +182,9 @@ impl Core {
           process_execution_metadata.clone(),
           local_execution_root_dir.to_path_buf(),
           executor.clone(),
+          // TODO: The nailgun pool size should almost certainly be configurable independent
+          // of concurrency, along with per-instance memory usage.
+          exec_strategy_opts.local_parallelism,
         ))
       } else {
         Box::new(local_command_runner)

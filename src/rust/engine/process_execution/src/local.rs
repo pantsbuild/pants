@@ -273,6 +273,7 @@ impl super::CommandRunner for CommandRunner {
             self.executor.clone(),
             self.cleanup_local_dirs,
             &self.work_dir_base,
+            (),
             self.platform(),
           )
           .map_err(|msg| {
@@ -295,6 +296,8 @@ impl super::CommandRunner for CommandRunner {
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
+  type WorkdirToken = ();
+
   fn named_caches(&self) -> &NamedCaches {
     &self.named_caches
   }
@@ -302,6 +305,7 @@ impl CapturedWorkdir for CommandRunner {
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
+    _workdir_token: (),
     req: Process,
     _context: Context,
     exclusive_spawn: bool,
@@ -410,6 +414,8 @@ impl CapturedWorkdir for CommandRunner {
 
 #[async_trait]
 pub trait CapturedWorkdir {
+  type WorkdirToken: Send;
+
   async fn run_and_capture_workdir(
     &self,
     req: Process,
@@ -418,6 +424,7 @@ pub trait CapturedWorkdir {
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
     workdir_base: &Path,
+    workdir_token: Self::WorkdirToken,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
@@ -558,7 +565,13 @@ pub trait CapturedWorkdir {
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
-          .run_in_workdir(&workdir_path, req.clone(), context, exclusive_spawn)
+          .run_in_workdir(
+            &workdir_path,
+            workdir_token,
+            req.clone(),
+            context,
+            exclusive_spawn,
+          )
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
@@ -676,6 +689,7 @@ pub trait CapturedWorkdir {
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
+    workdir_token: Self::WorkdirToken,
     req: Process,
     context: Context,
     exclusive_spawn: bool,
