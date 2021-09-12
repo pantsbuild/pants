@@ -34,6 +34,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidTargetException,
     NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
@@ -520,6 +521,14 @@ class PexBinary(Target):
         "self-contained executable files that contain a complete Python environment capable of "
         f"running the target. For more information, see {doc_url('pex-files')}."
     )
+
+    def validate(self) -> None:
+        if self[PexEntryPointField].value is not None and self[PexScriptField].value is not None:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target {self.address} cannot set both the "
+                f"`{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at "
+                "the same time. To fix, please remove one."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
