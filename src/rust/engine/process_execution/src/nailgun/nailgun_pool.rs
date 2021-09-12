@@ -71,7 +71,6 @@ impl NailgunPool {
     startup_options: Process,
     nailgun_req_digest: Digest,
     store: Store,
-    input_files: Digest,
   ) -> Result<MutexGuardArc<NailgunProcess>, String> {
     let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
@@ -108,7 +107,6 @@ impl NailgunPool {
         &self.workdir_base,
         store,
         requested_fingerprint.clone(),
-        input_files,
       )
       .await?,
     ));
@@ -256,16 +254,14 @@ impl NailgunProcess {
     workdir_base: &Path,
     store: Store,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
-    input_files: Digest,
   ) -> Result<NailgunProcess, String> {
     let workdir = tempfile::Builder::new()
       .prefix("process-execution")
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
-    // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
     store
-      .materialize_directory(workdir.path().to_owned(), input_files)
+      .materialize_directory(workdir.path().to_owned(), startup_options.input_files)
       .await?;
 
     let cmd = startup_options.argv[0].clone();
@@ -310,8 +306,10 @@ impl NailgunProcess {
 impl Drop for NailgunProcess {
   fn drop(&mut self) {
     debug!("Exiting nailgun server process {:?}", self.name);
-    // TODO: Probably needs to `wait` to avoid zombies.
-    let _ = self.handle.kill();
+    if self.handle.kill().is_ok() {
+      // NB: This is blocking, but should be a short wait in general.
+      let _ = self.handle.wait();
+    }
   }
 }
 

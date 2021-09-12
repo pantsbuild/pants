@@ -86,7 +86,7 @@ async fn make_execute_request() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
+    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -163,7 +163,7 @@ async fn make_execute_request_with_instance_name() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
+    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -253,7 +253,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
+    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -490,7 +490,7 @@ async fn make_execute_request_with_timeout() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
+    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };

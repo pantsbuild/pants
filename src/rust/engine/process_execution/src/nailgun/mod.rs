@@ -6,6 +6,7 @@ use async_lock::MutexGuardArc;
 use async_trait::async_trait;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
+use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
 use tokio::net::TcpStream;
@@ -37,12 +38,12 @@ static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 /// Constructs the Process that would be used
 /// to start the nailgun servers if we needed to.
 ///
-// TODO(#8481) We should calculate the input_files by deeply fingerprinting the classpath.
 fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
   platform_constraint: Option<Platform>,
+  nailgun_digest: Digest,
 ) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -52,7 +53,7 @@ fn construct_nailgun_server_request(
     argv: full_args,
     env: BTreeMap::new(),
     working_directory: None,
-    input_files: hashing::EMPTY_DIGEST,
+    input_files: nailgun_digest,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::new(1000, 0)),
@@ -61,7 +62,7 @@ fn construct_nailgun_server_request(
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
     platform_constraint,
-    is_nailgunnable: true,
+    use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::PerSession,
   }
@@ -128,7 +129,7 @@ impl super::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
-    if !original_request.is_nailgunnable {
+    if original_request.use_nailgun == hashing::EMPTY_DIGEST {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;
     }
@@ -152,6 +153,7 @@ impl super::CommandRunner for CommandRunner {
       nailgun_args,
       jdk_home,
       original_request.platform_constraint,
+      original_request.use_nailgun,
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
@@ -168,7 +170,6 @@ impl super::CommandRunner for CommandRunner {
         nailgun_req,
         nailgun_req_digest,
         self.inner.store.clone(),
-        original_request.input_files,
       )
       .await
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;

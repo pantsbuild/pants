@@ -38,14 +38,6 @@ fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
     .expect("Error making tempdir for local process execution: {:?}")
 }
 
-fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
-  let mut process = Process::new(vec![]);
-  process.jdk_home = jdk_home;
-  process.is_nailgunnable = true;
-  process.platform_constraint = Some(Platform::Macos_x86_64);
-  process
-}
-
 #[tokio::test]
 async fn get_workdir_creates_directory_if_it_doesnt_exist() {
   let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
@@ -90,13 +82,6 @@ async fn creating_nailgun_server_request_updates_the_cli() {
   );
   assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
   assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
-}
-
-#[tokio::test]
-async fn creating_nailgun_client_request_removes_jdk_home() {
-  let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
-  let req = super::construct_nailgun_client_request(original_req, "".to_string(), vec![]);
-  assert_eq!(req.jdk_home, None);
 }
 
 #[tokio::test]
