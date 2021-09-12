@@ -290,7 +290,6 @@ class Target:
         self,
         unhydrated_values: Dict[str, Any],
         address: Address,
-        *,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
@@ -717,6 +716,46 @@ def generate_subtarget_address(build_target_address: Address, *, full_file_name:
 _Tgt = TypeVar("_Tgt", bound=Target)
 
 
+def generate_file_level_target(
+    generated_target_cls: type[_Tgt],
+    generator: Target,
+    # NB: Should only ever be set to `None` in tests.
+    union_membership: UnionMembership | None,
+    *,
+    file_path: str,
+) -> _Tgt:
+    """Generate a new target with the same fields as the generator target, except for the `sources`
+    field only referring to the `file_path` and using a new address."""
+    if not generator.has_field(Dependencies) or not generator.has_field(Sources):
+        raise AssertionError(
+            f"The `{generator.alias}` target {generator.address.spec} does "
+            "not have both a `dependencies` and `sources` field, and thus cannot generate a "
+            f"`{generated_target_cls.alias}` target for the file {file_path}."
+        )
+
+    relativized_file_name = str(PurePath(file_path).relative_to(generator.address.spec_path))
+
+    generated_target_fields = {}
+    for field in generator.field_values.values():
+        value: Optional[ImmutableValue]
+        if isinstance(field, Sources):
+            if not bool(matches_filespec(field.filespec, paths=[file_path])):
+                raise AssertionError(
+                    f"Target {generator.address.spec}'s `sources` field does not match a file "
+                    f"{file_path}."
+                )
+            value = (relativized_file_name,)
+        else:
+            value = field.value
+        generated_target_fields[field.alias] = value
+
+    return generated_target_cls(
+        generated_target_fields,
+        generate_subtarget_address(generator.address, full_file_name=file_path),
+        union_membership,
+    )
+
+
 def generate_subtarget(
     build_target: _Tgt,
     *,
@@ -733,36 +772,8 @@ def generate_subtarget(
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
-    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
-        raise ValueError(
-            f"Target {build_target.address.spec} of type {type(build_target).__qualname__} does "
-            "not have both a `dependencies` and `sources` field, and thus cannot generate a "
-            f"subtarget for the file {full_file_name}."
-        )
-
-    relativized_file_name = (
-        PurePath(full_file_name).relative_to(build_target.address.spec_path).as_posix()
-    )
-
-    generated_target_fields = {}
-    for field in build_target.field_values.values():
-        value: Optional[ImmutableValue]
-        if isinstance(field, Sources):
-            if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
-                raise ValueError(
-                    f"Target {build_target.address.spec}'s `sources` field does not match a file "
-                    f"{full_file_name}."
-                )
-            value = (relativized_file_name,)
-        else:
-            value = field.value
-        generated_target_fields[field.alias] = value
-
-    target_cls = type(build_target)
-    return target_cls(
-        generated_target_fields,
-        generate_subtarget_address(build_target.address, full_file_name=full_file_name),
-        union_membership=union_membership,
+    return generate_file_level_target(
+        type(build_target), build_target, union_membership, file_path=full_file_name
     )
 
 

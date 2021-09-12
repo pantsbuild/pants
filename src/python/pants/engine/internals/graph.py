@@ -105,7 +105,6 @@ async def generate_subtargets(address: Address) -> Subtargets:
     wrapped_build_target = await Get(WrappedTarget, Address, address)
     build_target = wrapped_build_target.target
 
-    supports_subtargets = True
     if build_target.has_field(Sources):
         sources_field = build_target.get(Sources)
         supports_subtargets = not sources_field.indivisible
