@@ -7,6 +7,7 @@ python_distribution(
     ':testutil',
     ':pants_integration_test',
     ':rule_runner',
+    ':py_typed',
   ],
   setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38.py39", "sdist"],
   provides=setup_py(
@@ -46,4 +47,9 @@ python_library(
 python_tests(
   name='tests',
   sources=['*_test.py', '!pants_integration_test.py']
+)
+
+resources(
+  name="py_typed",
+  sources=["py.typed"],
 )
