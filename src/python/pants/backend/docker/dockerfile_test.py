@@ -135,3 +135,53 @@ def test_dockerfile__iter_command_lines(contents, expect):
     else:
         with expect:
             list(Dockerfile._iter_command_lines(contents))
+
+
+def test_dockerfile_stages():
+    df = Dockerfile.parse(
+        dedent(
+            """\
+        FROM baseimage AS base
+        RUN command
+
+        FROM otherimage AS other
+        COPY stuff /
+        """
+        )
+    )
+
+    assert len(df.stages) == 2
+    assert len(df.stage) == 2
+    assert all(stage.parent == df for stage in df.stages)
+
+    assert df.stages[0].stage_index == 0
+    assert df.stages[1].stage_index == 1
+
+    assert df.stages[0] == df.stage["base"]
+    assert df.stages[1] == df.stage["other"]
+
+    assert df.stages[0].commands[0] == BaseImage(image="baseimage", name="base")
+    assert df.stages[1].commands[1] == Copy(src=("stuff",), dest="/")
+
+
+def test_get_commands():
+    df = Dockerfile.parse(
+        dedent(
+            """\
+        FROM baseimage
+        COPY this /
+        COPY that /
+
+        FROM other
+        COPY those /here
+        """
+        )
+    )
+
+    assert df.get(Copy) == Copy(src=("this",), dest="/")
+    assert df.get_all(Copy) == (
+        Copy(src=("this",), dest="/"),
+        Copy(src=("that",), dest="/"),
+        Copy(src=("those",), dest="/here"),
+    )
+    assert df.stages[1].get_all(Copy) == (Copy(src=("those",), dest="/here"),)
