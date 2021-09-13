@@ -265,7 +265,9 @@ class LockfileMetadataV2(LockfileMetadata):
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
 
         requirements = metadata(
-            "generated_with_requirements", Set[Requirement], lambda l: {Requirement.parse(i) for i in l}
+            "generated_with_requirements",
+            Set[Requirement],
+            lambda l: {Requirement.parse(i) for i in l},
         )
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
