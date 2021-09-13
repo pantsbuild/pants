@@ -265,7 +265,7 @@ class LockfileMetadataV2(LockfileMetadata):
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
 
         requirements = metadata(
-            "requirements", Set[Requirement], lambda l: {Requirement.parse(i) for i in l}
+            "generated_with_requirements", Set[Requirement], lambda l: {Requirement.parse(i) for i in l}
         )
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
@@ -278,7 +278,7 @@ class LockfileMetadataV2(LockfileMetadata):
 
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
-        out["requirements"] = (
+        out["generated_with_requirements"] = (
             sorted(str(i) for i in self.requirements) if self.requirements is not None else None
         )
         return out

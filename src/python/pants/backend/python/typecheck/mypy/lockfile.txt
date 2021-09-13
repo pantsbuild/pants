@@ -8,7 +8,7 @@
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.6"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "mypy==0.910"
 #   ]
 # }

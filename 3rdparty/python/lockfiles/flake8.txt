@@ -8,7 +8,7 @@
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.7"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "flake8-2020<1.7.0,>=1.6.0",
 #     "flake8-pantsbuild<3,>=2.0",
 #     "flake8<4.0,>=3.9.2"

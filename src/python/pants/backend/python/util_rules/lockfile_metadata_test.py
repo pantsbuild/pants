@@ -52,7 +52,7 @@ def test_add_header_to_lockfile() -> None:
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "ansicolors==0.1.0"
 #   ]
 # }

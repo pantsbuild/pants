@@ -8,7 +8,7 @@
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.7"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "PyYAML<5.5,>=5.4",
 #     "ansicolors==1.1.8",
 #     "fasteners==0.16",
@@ -16,7 +16,7 @@
 #     "humbug==0.2.6",
 #     "ijson==3.1.4",
 #     "packaging==21.0",
-#     "pex==2.1.47",
+#     "pex==2.1.48",
 #     "psutil==5.8.0",
 #     "pystache==0.5.4",
 #     "pytest<6.3,>=6.0.1",

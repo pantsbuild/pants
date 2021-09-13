@@ -8,7 +8,7 @@
 #   "valid_for_interpreter_constraints": [
 #     "CPython<4,>=3.6"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "setuptools<58.0,>=50.3.0",
 #     "wheel<0.38,>=0.35.1"
 #   ]

@@ -8,7 +8,7 @@
 #   "valid_for_interpreter_constraints": [
 #     "CPython<4,>=3.6"
 #   ],
-#   "requirements": [
+#   "generated_with_requirements": [
 #     "pytest-cov<2.13,>=2.12.1",
 #     "pytest<6.3,>=6.2.4"
 #   ]
