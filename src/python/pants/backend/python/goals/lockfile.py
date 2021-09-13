@@ -235,6 +235,7 @@ async def generate_lockfile(
     initial_lockfile_digest_contents = await Get(
         DigestContents, Digest, poetry_export_result.output_digest
     )
+    # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = LockfileMetadata.new(
         req.interpreter_constraints,
         {Requirement.parse(i) for i in req.requirements},
