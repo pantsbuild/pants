@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from pants.base.deprecated import warn_or_error
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -90,7 +91,7 @@ class ArgSplitter:
             "help-advanced",
             "help-all",
         }
-        self._known_goal_scopes = {si.scope for si in known_scope_infos if si.is_goal}
+        self._known_goal_scopes = {si.scope: si for si in known_scope_infos if si.is_goal}
         self._unconsumed_args: List[
             str
         ] = []  # In reverse order, for efficient popping off the end.
@@ -200,6 +201,16 @@ class ArgSplitter:
 
         if not goals and not self._help_request:
             self._help_request = NoGoalHelp()
+
+        for goal in goals:
+            si = self._known_goal_scopes[goal]
+            if si.deprecated_scope and goal == si.deprecated_scope:
+                assert si.deprecated_scope_removal_version
+                warn_or_error(
+                    si.deprecated_scope_removal_version,
+                    f"the {si.deprecated_scope} goal",
+                    f"The {si.deprecated_scope} goal was renamed to {si.scope}",
+                )
 
         if isinstance(self._help_request, ThingHelp):
             self._help_request = dataclasses.replace(

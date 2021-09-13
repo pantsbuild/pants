@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -88,7 +89,7 @@ class Options:
             original_scopes[si.scope] = si
             ret.add(si)
             if si.deprecated_scope:
-                ret.add(ScopeInfo(si.deprecated_scope, si.subsystem_cls))
+                ret.add(dataclasses.replace(si, scope=si.deprecated_scope))
                 original_scopes[si.deprecated_scope] = si
         return FrozenOrderedSet(ret)
 

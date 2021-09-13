@@ -21,12 +21,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.typecheck import (
-    REPORT_DIR,
-    TypecheckRequest,
-    TypecheckResult,
-    TypecheckResults,
-)
+from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
@@ -57,7 +52,7 @@ class MyPyPartition:
     interpreter_constraints: InterpreterConstraints
 
 
-class MyPyRequest(TypecheckRequest):
+class MyPyRequest(CheckRequest):
     field_set_type = MyPyFieldSet
 
 
@@ -103,7 +98,7 @@ async def mypy_typecheck_partition(
     first_party_plugins: MyPyFirstPartyPlugins,
     mypy: MyPy,
     python_setup: PythonSetup,
-) -> TypecheckResult:
+) -> CheckResult:
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -222,7 +217,7 @@ async def mypy_typecheck_partition(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return TypecheckResult.from_fallible_process_result(
+    return CheckResult.from_fallible_process_result(
         result,
         partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
         report=report,
@@ -233,9 +228,9 @@ async def mypy_typecheck_partition(
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
-) -> TypecheckResults:
+) -> CheckResults:
     if mypy.skip:
-        return TypecheckResults([], typechecker_name="MyPy")
+        return CheckResults([], checker_name="MyPy")
 
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
@@ -273,14 +268,14 @@ async def mypy_typecheck(
         )
 
     partitioned_results = await MultiGet(
-        Get(TypecheckResult, MyPyPartition, partition) for partition in partitions
+        Get(CheckResult, MyPyPartition, partition) for partition in partitions
     )
-    return TypecheckResults(partitioned_results, typechecker_name="MyPy")
+    return CheckResults(partitioned_results, checker_name="MyPy")
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TypecheckRequest, MyPyRequest),
+        UnionRule(CheckRequest, MyPyRequest),
         *pex_from_targets.rules(),
     ]
