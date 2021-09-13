@@ -5,15 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.fs import (
-    Digest,
-    DigestEntries,
-    DigestSubset,
-    Directory,
-    FileDigest,
-    FileEntry,
-    PathGlobs,
-)
+from pants.engine.fs import Digest, DigestEntries, DigestSubset, FileDigest, FileEntry, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 
 
@@ -26,11 +18,10 @@ class ExtractFileDigest:
 @rule
 async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
     digest = await Get(Digest, DigestSubset(request.digest, PathGlobs([request.file_path])))
-    digest_entries = await Get(DigestEntries, Digest, digest)
+    files_or_directories = await Get(DigestEntries, Digest, digest)
+    digest_entries = [entry for entry in files_or_directories if isinstance(entry, FileEntry)]
 
-    if len(digest_entries) == 0 or (
-        len(digest_entries) == 1 and digest_entries[0] == Directory("")
-    ):
+    if len(digest_entries) == 0:
         raise Exception(f"ExtractFileDigest: '{request.file_path}' not found in {request.digest}.")
     elif len(digest_entries) > 1:
         raise Exception(
@@ -38,11 +29,6 @@ async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
         )
 
     file_info = digest_entries[0]
-    if not isinstance(file_info, FileEntry):
-        raise Exception(
-            f"ExtractFileDigest: '{request.file_path}' referred to a directory and not a file."
-        )
-
     return file_info.file_digest
 
 
