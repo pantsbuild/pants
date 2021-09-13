@@ -26,9 +26,20 @@ _T = TypeVar("_T")
 def _lockfile_metadata_version(
     version: int,
 ) -> Callable[[Type[LockfileMetadata]], Type[LockfileMetadata]]:
-    """Decorator to register a Lockfile metadata version subclass with a given version number."""
+    """Decorator to register a Lockfile metadata version subclass with a given version number.
+
+    The class must be a frozen dataclass
+    """
 
     def _dec(cls: Type[LockfileMetadata]) -> Type[LockfileMetadata]:
+
+        # Only frozen dataclasses may be registered as lockfile metadata:
+        cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
+        if not cls_dataclass_params or not cls_dataclass_params.frozen:
+            raise ValueError(
+                "Classes registered with `_lockfile_metadata_version` may only be "
+                "frozen dataclasses"
+            )
         _concrete_metadata_classes[version] = cls
         return cls
 
@@ -39,7 +50,7 @@ class InvalidLockfileError(Exception):
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class LockfileMetadata:
     """Base class for metadata that is attached to a given lockfiles.
 
@@ -184,7 +195,7 @@ class LockfileMetadata:
 
 
 @_lockfile_metadata_version(1)
-@dataclass
+@dataclass(frozen=True)
 class LockfileMetadataV1(LockfileMetadata):
 
     requirements_invalidation_digest: str
@@ -234,7 +245,7 @@ class LockfileMetadataV1(LockfileMetadata):
 
 
 @_lockfile_metadata_version(2)
-@dataclass
+@dataclass(frozen=True)
 class LockfileMetadataV2(LockfileMetadata):
     """Lockfile version that permits specifying a requirements as a set rather than a digest.
 
@@ -268,7 +279,7 @@ class LockfileMetadataV2(LockfileMetadata):
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
         out["requirements"] = (
-            sorted([str(i) for i in self.requirements]) if self.requirements is not None else None
+            sorted(str(i) for i in self.requirements) if self.requirements is not None else None
         )
         return out
 

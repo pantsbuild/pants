@@ -530,6 +530,8 @@ def _validate_metadata(
     python_setup: PythonSetup,
 ) -> None:
 
+    # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
+    # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
     req_strings = (
         {Requirement.parse(i) for i in requirements.req_strings}
         if requirements.req_strings is not None
@@ -572,6 +574,8 @@ def _validate_metadata(
             or i == InvalidLockfileReason.REQUIREMENTS_MISMATCH
             for i in validation.failure_reasons
         ):
+            # TODO(12314): Add message showing _which_ requirements diverged.
+
             yield (
                 "- You have set different requirements than those used to generate the lockfile. "
                 f"You can fix this by not setting `[{tool_name}].version`, "
@@ -624,7 +628,7 @@ def _validate_metadata(
     if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
         message = "".join(tool_message_parts(requirements)).strip()
     else:
-        # TODO: Improve this message
+        # TODO(12314): Improve this message
         raise InvalidLockfileError(f"{validation.failure_reasons}")
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
