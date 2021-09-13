@@ -1,14 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use async_lock::MutexGuardArc;
 use async_trait::async_trait;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
+use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::RunningWorkunit;
 
@@ -27,7 +28,7 @@ mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
-use nailgun_pool::{NailgunPool, NailgunProcess};
+use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 
 // Hardcoded constants for connecting to nailgun
@@ -64,7 +65,7 @@ fn construct_nailgun_server_request(
     platform_constraint,
     use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
-    cache_scope: ProcessCacheScope::PerSession,
+    cache_scope: ProcessCacheScope::Always,
   }
 }
 
@@ -93,7 +94,7 @@ pub struct CommandRunner {
   inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
   metadata: ProcessMetadata,
-  executor: task_executor::Executor,
+  executor: Executor,
 }
 
 impl CommandRunner {
@@ -101,12 +102,12 @@ impl CommandRunner {
     runner: crate::local::CommandRunner,
     metadata: ProcessMetadata,
     workdir_base: PathBuf,
-    executor: task_executor::Executor,
+    executor: Executor,
     nailgun_pool_size: usize,
   ) -> Self {
     CommandRunner {
       inner: runner,
-      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size),
+      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, executor.clone()),
       metadata,
       executor,
     }
@@ -162,8 +163,8 @@ impl super::CommandRunner for CommandRunner {
       &self.metadata,
     );
 
-    // Get an instance of a nailgun server for this fingerprint.
-    let nailgun_process = self
+    // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
+    let mut nailgun_process = self
       .nailgun_pool
       .acquire(
         nailgun_name,
@@ -174,18 +175,23 @@ impl super::CommandRunner for CommandRunner {
       .await
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
 
-    self
+    let res = self
       .run_and_capture_workdir(
         original_request,
         context,
         self.inner.store.clone(),
         self.executor.clone(),
-        true,
-        &nailgun_process.workdir_path().to_owned(),
-        nailgun_process,
+        nailgun_process.workdir_path().to_owned(),
+        (nailgun_process.name().to_owned(), nailgun_process.address()),
         Platform::current().unwrap(),
       )
-      .await
+      .await;
+
+    // NB: We explicitly release the BorrowedNailgunProcess, because when it is Dropped without
+    // release, it assumes that it has been canceled and kills the server.
+    nailgun_process.release().await?;
+
+    res
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
@@ -196,7 +202,7 @@ impl super::CommandRunner for CommandRunner {
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  type WorkdirToken = MutexGuardArc<NailgunProcess>;
+  type WorkdirToken = (String, SocketAddr);
 
   fn named_caches(&self) -> &NamedCaches {
     self.inner.named_caches()
@@ -205,7 +211,7 @@ impl CapturedWorkdir for CommandRunner {
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    nailgun_process: MutexGuardArc<NailgunProcess>,
+    workdir_token: Self::WorkdirToken,
     req: Process,
     _context: Context,
     _exclusive_spawn: bool,
@@ -222,10 +228,9 @@ impl CapturedWorkdir for CommandRunner {
       ..
     } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
 
-    debug!("Connected to nailgun instance {}", &nailgun_process.name);
+    let (name, addr) = workdir_token;
+    debug!("Connected to nailgun instance {} at {}...", name, addr);
     let mut child = {
-      let addr = nailgun_process.address();
-      debug!("Connecting to server at {}...", addr);
       // Run the client request in the nailgun we have active.
       let client_req = construct_nailgun_client_request(req, client_main_class, client_args);
       let cmd = Command {

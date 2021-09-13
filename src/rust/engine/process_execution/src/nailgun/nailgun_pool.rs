@@ -3,6 +3,7 @@
 
 use std::io::{self, BufRead};
 use std::net::SocketAddr;
+use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -15,6 +16,7 @@ use log::{debug, info};
 use regex::Regex;
 use sha2::{Digest as Sha256Digest, Sha256};
 use store::Store;
+use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::Process;
@@ -46,14 +48,16 @@ pub type Port = usize;
 pub struct NailgunPool {
   workdir_base: PathBuf,
   size: usize,
+  executor: Executor,
   processes: Arc<Mutex<Vec<PoolEntry>>>,
 }
 
 impl NailgunPool {
-  pub fn new(workdir_base: PathBuf, size: usize) -> Self {
+  pub fn new(workdir_base: PathBuf, size: usize, executor: Executor) -> Self {
     NailgunPool {
       workdir_base,
       size,
+      executor,
       processes: Arc::default(),
     }
   }
@@ -71,7 +75,7 @@ impl NailgunPool {
     startup_options: Process,
     nailgun_req_digest: Digest,
     store: Store,
-  ) -> Result<MutexGuardArc<NailgunProcess>, String> {
+  ) -> Result<BorrowedNailgunProcess, String> {
     let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
         "jdk_home is not set for nailgun server startup request {:#?}",
@@ -84,7 +88,7 @@ impl NailgunPool {
 
     // Start by seeing whether there are any idle processes with a matching fingerprint.
     if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
-      return Ok(process);
+      return Ok(BorrowedNailgunProcess::new(process));
     }
 
     // There wasn't a matching, valid, available process. We need to start one.
@@ -106,6 +110,7 @@ impl NailgunPool {
         startup_options,
         &self.workdir_base,
         store,
+        self.executor.clone(),
         requested_fingerprint.clone(),
       )
       .await?,
@@ -116,7 +121,7 @@ impl NailgunPool {
       process: process.clone(),
     });
 
-    Ok(process.lock_arc().await)
+    Ok(BorrowedNailgunProcess::new(process.lock_arc().await))
   }
 
   ///
@@ -189,13 +194,17 @@ impl NailgunPool {
         );
         Ok(TryUse::Usable(process))
       }
-      Some(x) => {
+      Some(status) => {
         // The process has exited with some exit code: restart it.
-        log::warn!(
-          "The nailgun server for {} exited with {}. Restarting process...",
-          process.name,
-          x
-        );
+        if status.signal() != Some(9) {
+          // TODO: BorrowedNailgunProcess cancellation uses `kill` currently, so we avoid warning
+          // for that. In future it would be nice to find a better cancellation strategy.
+          log::warn!(
+            "The nailgun server for {} exited with {}.",
+            process.name,
+            status
+          );
+        }
         Ok(TryUse::Dead)
       }
     }
@@ -214,6 +223,7 @@ pub struct NailgunProcess {
   fingerprint: NailgunProcessFingerprint,
   workdir: TempDir,
   port: Port,
+  executor: task_executor::Executor,
   handle: std::process::Child,
 }
 
@@ -240,19 +250,12 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
 }
 
 impl NailgunProcess {
-  pub fn address(&self) -> SocketAddr {
-    format!("127.0.0.1:{:?}", self.port).parse().unwrap()
-  }
-
-  pub fn workdir_path(&self) -> &Path {
-    self.workdir.path()
-  }
-
   async fn start_new(
     name: String,
     startup_options: Process,
     workdir_base: &Path,
     store: Store,
+    executor: Executor,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
     let workdir = tempfile::Builder::new()
@@ -298,6 +301,7 @@ impl NailgunProcess {
       fingerprint: nailgun_server_fingerprint,
       workdir,
       name,
+      executor,
       handle: child,
     })
   }
@@ -342,5 +346,93 @@ impl NailgunProcessFingerprint {
       name,
       fingerprint: Fingerprint::from_bytes(hasher.finalize()),
     })
+  }
+}
+
+///
+/// A wrapper around a NailgunProcess checked out from the pool. If `release` is not called, the
+/// guard assumes cancellation, and kills the underlying process.
+///
+pub struct BorrowedNailgunProcess(Option<MutexGuardArc<NailgunProcess>>);
+
+impl BorrowedNailgunProcess {
+  fn new(process: MutexGuardArc<NailgunProcess>) -> Self {
+    Self(Some(process))
+  }
+
+  pub fn name(&self) -> &str {
+    &self.0.as_ref().unwrap().name
+  }
+
+  pub fn address(&self) -> SocketAddr {
+    let port = self.0.as_ref().unwrap().port;
+    format!("127.0.0.1:{:?}", port).parse().unwrap()
+  }
+
+  pub fn workdir_path(&self) -> &Path {
+    self.0.as_ref().unwrap().workdir.path()
+  }
+
+  ///
+  /// Return the NailgunProcess to the pool.
+  ///
+  /// Clears the working directory for the process before returning it.
+  ///
+  pub async fn release(&mut self) -> Result<(), String> {
+    let process = self.0.as_ref().expect("release may only be called once.");
+
+    // Move all content into a temporary directory.
+    let garbage_dir = tempfile::Builder::new()
+      .prefix("process-execution")
+      .tempdir_in(process.workdir.path().parent().unwrap())
+      .map_err(|err| {
+        format!(
+          "Error making garbage directory for nailgun cleanup: {:?}",
+          err
+        )
+      })?;
+    let mut dir_entries = tokio::fs::read_dir(process.workdir.path())
+      .await
+      .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
+    while let Some(dir_entry) = dir_entries
+      .next_entry()
+      .await
+      .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
+    {
+      tokio::fs::rename(
+        dir_entry.path(),
+        garbage_dir.path().join(dir_entry.file_name()),
+      )
+      .await
+      .map_err(|e| {
+        format!(
+          "Failed to move {} to garbage: {}",
+          dir_entry.path().display(),
+          e
+        )
+      })?;
+    }
+
+    // And drop it in the background.
+    let _ = process
+      .executor
+      .spawn_blocking(move || std::mem::drop(garbage_dir));
+
+    // Once we've successfully cleaned up, remove the process.
+    let _ = self.0.take();
+    Ok(())
+  }
+}
+
+impl Drop for BorrowedNailgunProcess {
+  fn drop(&mut self) {
+    if let Some(mut process) = self.0.take() {
+      // Kill the process, but rely on the pool to notice that it is dead and restart it.
+      debug!(
+        "Killing nailgun process {:?} due to cancellation.",
+        process.name
+      );
+      let _ = process.handle.kill();
+    }
   }
 }

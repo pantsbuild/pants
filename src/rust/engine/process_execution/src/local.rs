@@ -264,15 +264,40 @@ impl super::CommandRunner for CommandRunner {
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
+        // Set up a temporary workdir, which will optionally be preserved.
+        let (workdir_path, maybe_workdir) = {
+          let workdir = tempfile::Builder::new()
+            .prefix("process-execution")
+            .tempdir_in(&self.work_dir_base)
+            .map_err(|err| {
+              format!(
+                "Error making tempdir for local process execution: {:?}",
+                err
+              )
+            })?;
+          if self.cleanup_local_dirs {
+            // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
+            (workdir.path().to_owned(), Some(workdir))
+          } else {
+            // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+            // that the temporary directory will no longer be automatically deleted when dropped.
+            let preserved_path = workdir.into_path();
+            info!(
+              "preserving local process execution dir `{:?}` for {:?}",
+              preserved_path, req.description
+            );
+            (preserved_path, None)
+          }
+        };
+
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
-        self
+        let res = self
           .run_and_capture_workdir(
-            req,
+            req.clone(),
             context,
             self.store.clone(),
             self.executor.clone(),
-            self.cleanup_local_dirs,
-            &self.work_dir_base,
+            workdir_path.clone(),
             (),
             self.platform(),
           )
@@ -287,7 +312,20 @@ impl super::CommandRunner for CommandRunner {
             // error.
             format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
           })
-          .await
+          .await;
+
+        match maybe_workdir {
+          Some(workdir) => {
+            // Dropping the temporary directory will likely involve a lot of IO: do it in the
+            // background.
+            let _background_cleanup = self.executor.spawn_blocking(|| std::mem::drop(workdir));
+          }
+          None => {
+            setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
+          }
+        }
+
+        res
       }
     )
     .await
@@ -422,38 +460,11 @@ pub trait CapturedWorkdir {
     context: Context,
     store: Store,
     executor: task_executor::Executor,
-    cleanup_local_dirs: bool,
-    workdir_base: &Path,
+    workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
-
-    // Set up a temporary workdir, which will optionally be preserved.
-    let (workdir_path, maybe_workdir) = {
-      let workdir = tempfile::Builder::new()
-        .prefix("process-execution")
-        .tempdir_in(workdir_base)
-        .map_err(|err| {
-          format!(
-            "Error making tempdir for local process execution: {:?}",
-            err
-          )
-        })?;
-      if cleanup_local_dirs {
-        // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
-        (workdir.path().to_owned(), Some(workdir))
-      } else {
-        // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-        // that the temporary directory will no longer be automatically deleted when dropped.
-        let preserved_path = workdir.into_path();
-        info!(
-          "preserving local process execution dir `{:?}` for {:?}",
-          preserved_path, req.description
-        );
-        (preserved_path, None)
-      }
-    };
 
     // If named caches are configured, collect the symlinks to create.
     let named_cache_symlinks = self
@@ -612,17 +623,6 @@ pub trait CapturedWorkdir {
       )
       .await?
     };
-
-    match maybe_workdir {
-      Some(workdir) => {
-        // Dropping the temporary directory will likely involve a lot of IO: do it in the
-        // background.
-        let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
-      }
-      None => {
-        setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
-      }
-    }
 
     let elapsed = start_time.elapsed();
     let result_metadata =
