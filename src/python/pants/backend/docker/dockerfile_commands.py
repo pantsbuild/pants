@@ -6,7 +6,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Generator, Optional, Pattern, Tuple, Type
+from typing import Any, ClassVar, Dict, Generator, Optional, Pattern, Tuple, Type
 
 
 class DockerfileError(Exception):
@@ -20,15 +20,12 @@ class InvalidDockerfileCommandArgument(DockerfileError):
 class DockerfileCommand(ABC):
     """Base class for dockerfile commands encoding/decoding."""
 
-    _command = "<OVERRIDE ME>"
-
-    def _append(self, attr: str, dockerfile_attrs: Dict[str, Any]) -> None:
-        dockerfile_attrs[attr] = (*dockerfile_attrs.get(attr, tuple()), self)
+    alias: ClassVar[str]
 
     @classmethod
     def _command_class(cls, command: str) -> Optional[Type["DockerfileCommand"]]:
         for cmd_cls in cls.__subclasses__():
-            if cmd_cls._command == command:
+            if cmd_cls.alias == command:
                 return cmd_cls
         return None
 
@@ -48,7 +45,7 @@ class DockerfileCommand(ABC):
 
     def encode(self) -> str:
         """Convert command to string representation for a Dockerfile."""
-        return " ".join([self._command, *self.encode_arg()])
+        return " ".join([self.alias, *self.encode_arg()])
 
     @staticmethod
     def _decode_arg_regexp(regexp: Pattern, arg: str) -> Dict[str, Optional[str]]:
@@ -66,10 +63,6 @@ class DockerfileCommand(ABC):
     def encode_arg(self) -> Generator[str, None, None]:
         """Convert command arg to string(s)"""
 
-    @abstractmethod
-    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        """Add this command to Dockerfile attrs."""
-
 
 @dataclass(frozen=True)
 class BaseImage(DockerfileCommand):
@@ -83,7 +76,7 @@ class BaseImage(DockerfileCommand):
     https://docs.docker.com/engine/reference/builder/#from
     """
 
-    _command = "FROM"
+    alias = "FROM"
 
     image: str
     name: Optional[str] = None
@@ -115,9 +108,6 @@ class BaseImage(DockerfileCommand):
         """,
         re.VERBOSE,
     )
-
-    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        dockerfile_attrs["baseimage"] = self
 
     def encode_arg(self) -> Generator[str, None, None]:
         if self.platform:
@@ -151,7 +141,7 @@ class EntryPoint(DockerfileCommand):
     https://docs.docker.com/engine/reference/builder/#entrypoint
     """
 
-    _command = "ENTRYPOINT"
+    alias = "ENTRYPOINT"
 
     class Form(Enum):
         EXEC = "exec"
@@ -160,9 +150,6 @@ class EntryPoint(DockerfileCommand):
     executable: str
     arguments: Optional[Tuple[str, ...]] = None
     form: Form = Form.EXEC
-
-    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        dockerfile_attrs["entry_point"] = self
 
     def encode_arg(self) -> Generator[str, None, None]:
         if self.form is EntryPoint.Form.EXEC:
@@ -196,7 +183,7 @@ class Copy(DockerfileCommand):
     https://docs.docker.com/engine/reference/builder/#copy
     """
 
-    _command = "COPY"
+    alias = "COPY"
 
     src: Tuple[str, ...]
     dest: str
@@ -219,9 +206,6 @@ class Copy(DockerfileCommand):
         """,
         re.VERBOSE,
     )
-
-    def register(self, dockerfile_attrs: Dict[str, Any]) -> None:
-        self._append("copy", dockerfile_attrs)
 
     def encode_arg(self) -> Generator[str, None, None]:
         if self.copy_from:

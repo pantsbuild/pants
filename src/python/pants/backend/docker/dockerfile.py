@@ -3,26 +3,30 @@
 
 import re
 from dataclasses import dataclass, fields
-from typing import Any, Dict, Generator, Optional, Tuple
+from typing import Collection, Generator, Tuple
 
-from pants.backend.docker.dockerfile_commands import BaseImage, Copy, DockerfileCommand, EntryPoint
+from pants.backend.docker.dockerfile_commands import DockerfileCommand
+from pants.util.meta import frozen_after_init
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass
 class Dockerfile:
-    baseimage: Optional[BaseImage] = None
-    entry_point: Optional[EntryPoint] = None
-    copy: Tuple[Copy, ...] = tuple()
+    commands: Tuple[DockerfileCommand, ...]
+
+    def __init__(self, commands: Collection[DockerfileCommand]) -> None:
+        super().__init__()
+        self.commands = tuple(commands)
 
     @classmethod
     def parse(cls, dockerfile_source: str) -> "Dockerfile":
-        attrs: Dict[str, Any] = {}
+        commands = []
         for command_line in cls._iter_command_lines(dockerfile_source):
             cmd = DockerfileCommand.decode(command_line)
             if cmd:
-                cmd.register(attrs)
+                commands.append(cmd)
 
-        return Dockerfile(**attrs)
+        return Dockerfile(commands)
 
     def compile(self) -> str:
         return "\n".join(self._encode_fields())
