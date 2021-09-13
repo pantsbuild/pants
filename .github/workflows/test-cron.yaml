@@ -393,6 +393,11 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v2
+      with:
+        distribution: adopt
+        java-version: '11'
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -471,6 +476,11 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v2
+      with:
+        distribution: adopt
+        java-version: '11'
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
