@@ -19,11 +19,13 @@ from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    ConsoleScript,
     EntryPoint,
     ModuleMappingField,
     PexBinary,
     PexBinaryDependencies,
     PexEntryPointField,
+    PexScriptField,
     PythonDistribution,
     PythonDistributionDependencies,
     PythonLibrary,
@@ -52,6 +54,7 @@ from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidTargetException,
 )
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -64,6 +67,19 @@ def test_timeout_validation() -> None:
     with pytest.raises(InvalidFieldException):
         PythonTestsTimeout(0, Address("", target_name="tests"))
     assert PythonTestsTimeout(5, Address("", target_name="tests")).value == 5
+
+
+def test_pex_binary_validation() -> None:
+    def create_tgt(*, script: str | None = None, entry_point: str | None = None) -> PexBinary:
+        return PexBinary(
+            {PexScriptField.alias: script, PexEntryPointField.alias: entry_point},
+            Address("", target_name="t"),
+        )
+
+    with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", entry_point="foo")
+    assert create_tgt(script="foo")[PexScriptField].value == ConsoleScript("foo")
+    assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
 def test_timeout_calculation() -> None:

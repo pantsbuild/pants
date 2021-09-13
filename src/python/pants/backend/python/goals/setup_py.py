@@ -69,6 +69,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.osutil import is_macos_big_sur
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
@@ -410,7 +411,9 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSetupPyResult:
+async def run_setup_py(
+    req: RunSetupPyRequest, setuptools: Setuptools, python_setup: PythonSetup
+) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
@@ -443,12 +446,17 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     setup_script_reldir, setup_script_name = os.path.split(req.chroot.setup_script)
     working_directory = os.path.join(chroot_prefix, setup_script_reldir)
 
+    if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
+        extra_env = {"MACOSX_DEPLOYMENT_TARGET": "10.16"}
+    else:
+        extra_env = {}
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             setuptools_pex,
             argv=(setup_script_name, *req.args),
             input_digest=prefixed_chroot,
+            extra_env=extra_env,
             working_directory=working_directory,
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
