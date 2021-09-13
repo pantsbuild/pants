@@ -17,7 +17,7 @@ from pants.backend.java.util_rules import JdkSetup
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.util.logging import LogLevel
 
@@ -68,56 +68,59 @@ async def analyze_java_source_dependencies(
     source_path = os.path.join(source_prefix, source_files.snapshot.files[0])
     processorcp_relpath = "__processorcp"
 
-    tool_classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__toolcp",
-            artifact_requirements=(java_parser_artifact_requirements(),),
+    (
+        tool_classpath,
+        prefixed_processor_classfiles_digest,
+        prefixed_source_files_digest,
+    ) = await MultiGet(
+        Get(
+            MaterializedClasspath,
+            MaterializedClasspathRequest(
+                prefix="__toolcp",
+                artifact_requirements=(java_parser_artifact_requirements(),),
+            ),
         ),
-    )
-    prefixed_processor_classfiles_digest = await Get(
-        Digest, AddPrefix(processor_classfiles.digest, processorcp_relpath)
-    )
-    prefixed_source_files_digest = await Get(
-        Digest, AddPrefix(source_files.snapshot.digest, source_prefix)
+        Get(Digest, AddPrefix(processor_classfiles.digest, processorcp_relpath)),
+        Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
-    merged_digest = await Get(
+    tool_digest = await Get(
         Digest,
         MergeDigests(
             (
                 prefixed_processor_classfiles_digest,
                 tool_classpath.digest,
-                prefixed_source_files_digest,
                 jdk_setup.digest,
+            )
+        ),
+    )
+    merged_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                tool_digest,
+                prefixed_source_files_digest,
             )
         ),
     )
 
     analysis_output_path = "__source_analysis.json"
 
-    proc = Process(
-        argv=[
-            bash.path,
-            "-c",
-            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
-            "--",
-            "-cp",
-            ":".join([tool_classpath.classpath_arg(), processorcp_relpath]),
-            "org.pantsbuild.javaparser.PantsJavaParserLauncher",
-            analysis_output_path,
-            source_path,
-        ],
-        input_digest=merged_digest,
-        output_files=(analysis_output_path,),
-        description="Run Spoon analysis against Java source",
-        level=LogLevel.DEBUG,
-    )
-
     process_result = await Get(
         FallibleProcessResult,
-        Process,
-        proc,
+        Process(
+            argv=[
+                *jdk_setup.args(bash, [tool_classpath.classpath_arg(), processorcp_relpath]),
+                "org.pantsbuild.javaparser.PantsJavaParserLauncher",
+                analysis_output_path,
+                source_path,
+            ],
+            input_digest=merged_digest,
+            output_files=(analysis_output_path,),
+            use_nailgun=tool_digest,
+            description="Run Spoon analysis against Java source",
+            level=LogLevel.DEBUG,
+        ),
     )
 
     return FallibleJavaSourceDependencyAnalysisResult(process_result=process_result)

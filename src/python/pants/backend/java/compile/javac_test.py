@@ -16,7 +16,6 @@ from pants.backend.java.compile.javac import (
     JavacCheckRequest,
 )
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
@@ -53,7 +52,6 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *javac_rules(),
             *util_rules(),
-            *javac_binary_rules(),
             *target_types_rules(),
             *coursier_rules(),
             *java_util_rules.rules(),
@@ -63,9 +61,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
-        # TODO(#12293): Remove this nonhermetic hack once Coursier JVM boostrapping flakiness
-        # is properly fixed in CI.
-        bootstrap_args=["--javac-jdk=system"],
+        # TODO(#12293): use a fixed JDK version.
+        bootstrap_args=[
+            "--javac-jdk=system",
+        ],
     )
 
 
