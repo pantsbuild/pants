@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
+from pants.base.deprecated import deprecated_conditional
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
@@ -72,11 +73,29 @@ class CheckResults:
     """
 
     results: Tuple[CheckResult, ...]
-    typechecker_name: str
+    checker_name: str
 
-    def __init__(self, results: Iterable[CheckResult], *, typechecker_name: str) -> None:
+    def __init__(
+        self,
+        results: Iterable[CheckResult],
+        *,
+        typechecker_name: str | None = None,
+        checker_name: str | None = None,
+    ) -> None:
+
         self.results = tuple(results)
-        self.typechecker_name = typechecker_name
+
+        # TODO: After deprecation, make `checker_name` required and convert to simple field-set.
+        deprecated_conditional(
+            lambda: typechecker_name is not None,
+            "2.9.0.dev0",
+            entity="the `typechecker_name` argument",
+            hint=("Pass `checker_name` instead."),
+        )
+        checker_name = checker_name if checker_name is not None else typechecker_name
+        if not checker_name:
+            raise ValueError("The `checker_name` argument is required.")
+        self.checker_name = checker_name
 
     @property
     def skipped(self) -> bool:
@@ -101,8 +120,8 @@ class EnrichedCheckResults(CheckResults, EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return f"{self.typechecker_name} skipped."
-        message = self.typechecker_name
+            return f"{self.checker_name} skipped."
+        message = self.checker_name
         message += (
             " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
         )
@@ -185,7 +204,7 @@ async def check(
     )
 
     def get_tool_name(res: CheckResults) -> str:
-        return res.typechecker_name
+        return res.checker_name
 
     write_reports(
         all_results,
@@ -198,7 +217,7 @@ async def check(
     exit_code = 0
     if all_results:
         console.print_stderr("")
-    for results in sorted(all_results, key=lambda results: results.typechecker_name):
+    for results in sorted(all_results, key=lambda results: results.checker_name):
         if results.skipped:
             sigil = console.sigil_skipped()
             status = "skipped"
@@ -209,7 +228,7 @@ async def check(
             sigil = console.sigil_failed()
             status = "failed"
             exit_code = results.exit_code
-        console.print_stderr(f"{sigil} {results.typechecker_name} {status}.")
+        console.print_stderr(f"{sigil} {results.checker_name} {status}.")
 
     return Check(exit_code)
 
@@ -219,7 +238,7 @@ async def check(
 # hit.
 @_uncacheable_rule(desc="check")
 def enrich_typecheck_results(results: CheckResults) -> EnrichedCheckResults:
-    return EnrichedCheckResults(results=results.results, typechecker_name=results.typechecker_name)
+    return EnrichedCheckResults(results=results.results, checker_name=results.checker_name)
 
 
 def rules():

@@ -32,7 +32,7 @@ class MockCheckFieldSet(FieldSet):
 
 class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
     field_set_type = MockCheckFieldSet
-    typechecker_name: ClassVar[str]
+    checker_name: ClassVar[str]
 
     @staticmethod
     @abstractmethod
@@ -40,7 +40,7 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def typecheck_results(self) -> EnrichedCheckResults:
+    def check_results(self) -> EnrichedCheckResults:
         addresses = [config.address for config in self.field_sets]
         return EnrichedCheckResults(
             [
@@ -50,12 +50,12 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
                     "",
                 )
             ],
-            typechecker_name=self.typechecker_name,
+            checker_name=self.checker_name,
         )
 
 
 class SuccessfulRequest(MockCheckRequest):
-    typechecker_name = "SuccessfulChecker"
+    checker_name = "SuccessfulChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -63,7 +63,7 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    typechecker_name = "FailingChecker"
+    checker_name = "FailingChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -71,7 +71,7 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    typechecker_name = "ConditionallySucceedsChecker"
+    checker_name = "ConditionallySucceedsChecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -86,8 +86,8 @@ class SkippedRequest(MockCheckRequest):
         return 0
 
     @property
-    def typecheck_results(self) -> EnrichedCheckResults:
-        return EnrichedCheckResults([], typechecker_name="SkippedChecker")
+    def check_results(self) -> EnrichedCheckResults:
+        return EnrichedCheckResults([], checker_name="SkippedChecker")
 
 
 class InvalidField(Sources):
@@ -100,7 +100,7 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    typechecker_name = "InvalidChecker"
+    checker_name = "InvalidChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -135,7 +135,7 @@ def run_typecheck_rule(
                 MockGet(
                     output_type=EnrichedCheckResults,
                     input_type=CheckRequest,
-                    mock=lambda field_set_collection: field_set_collection.typecheck_results,
+                    mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
                 MockGet(
                     output_type=FieldSetsWithSources,
@@ -190,15 +190,13 @@ def test_summary() -> None:
 
 
 def test_streaming_output_skip() -> None:
-    results = EnrichedCheckResults([], typechecker_name="typechecker")
+    results = EnrichedCheckResults([], checker_name="typechecker")
     assert results.level() == LogLevel.DEBUG
     assert results.message() == "typechecker skipped."
 
 
 def test_streaming_output_success() -> None:
-    results = EnrichedCheckResults(
-        [CheckResult(0, "stdout", "stderr")], typechecker_name="typechecker"
-    )
+    results = EnrichedCheckResults([CheckResult(0, "stdout", "stderr")], checker_name="typechecker")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -212,7 +210,7 @@ def test_streaming_output_success() -> None:
 
 def test_streaming_output_failure() -> None:
     results = EnrichedCheckResults(
-        [CheckResult(18, "stdout", "stderr")], typechecker_name="typechecker"
+        [CheckResult(18, "stdout", "stderr")], checker_name="typechecker"
     )
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
@@ -231,7 +229,7 @@ def test_streaming_output_partitions() -> None:
             CheckResult(21, "", "", partition_description="ghc8.1"),
             CheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
         ],
-        typechecker_name="typechecker",
+        checker_name="typechecker",
     )
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(

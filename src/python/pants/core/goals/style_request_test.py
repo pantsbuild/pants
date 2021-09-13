@@ -13,31 +13,31 @@ from pants.testutil.rule_runner import RuleRunner
 def test_write_reports() -> None:
     rule_runner = RuleRunner()
     report_digest = rule_runner.make_snapshot_of_empty_files(["r.txt"]).digest
-    no_results = CheckResults([], typechecker_name="none")
+    no_results = CheckResults([], checker_name="none")
     _empty_result = CheckResult(0, "", "", report=EMPTY_DIGEST)
-    empty_results = CheckResults([_empty_result], typechecker_name="empty")
+    empty_results = CheckResults([_empty_result], checker_name="empty")
     _single_result = CheckResult(0, "", "", report=report_digest)
-    single_results = CheckResults([_single_result], typechecker_name="single")
+    single_results = CheckResults([_single_result], checker_name="single")
     duplicate_results = CheckResults(
-        [_single_result, _single_result, _empty_result], typechecker_name="duplicate"
+        [_single_result, _single_result, _empty_result], checker_name="duplicate"
     )
     partition_results = CheckResults(
         [
             CheckResult(0, "", "", report=report_digest, partition_description="p1"),
             CheckResult(0, "", "", report=report_digest, partition_description="p2"),
         ],
-        typechecker_name="partition",
+        checker_name="partition",
     )
     partition_duplicate_results = CheckResults(
         [
             CheckResult(0, "", "", report=report_digest, partition_description="p"),
             CheckResult(0, "", "", report=report_digest, partition_description="p"),
         ],
-        typechecker_name="partition_duplicate",
+        checker_name="partition_duplicate",
     )
 
     def get_tool_name(res: CheckResults) -> str:
-        return res.typechecker_name
+        return res.checker_name
 
     write_reports(
         (
