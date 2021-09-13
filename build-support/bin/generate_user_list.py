@@ -39,9 +39,7 @@ class Org:
 # to keep this list in that order too.
 _orgs = (
     Org(
-        "Chartbeat",
-        "https://chartbeat.com",
-        "https://files.readme.io/861ace7-chartbeat-small.png"
+        "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
     ),
     Org(
         "Coinbase",
