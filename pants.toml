@@ -3,9 +3,8 @@ print_stacktrace = true
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
-backend_packages = [
+backend_packages.add = [
   "pants.backend.python",
-  "pants.backend.codegen.protobuf.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",

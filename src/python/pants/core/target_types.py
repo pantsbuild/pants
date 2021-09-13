@@ -20,17 +20,22 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
+    GeneratedTargets,
     GenerateSourcesRequest,
+    GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     SpecialCasedDependencies,
     StringField,
     Target,
     Targets,
     WrappedTarget,
+    generate_file_level_target,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -51,6 +56,21 @@ class Files(Target):
         "outside of code artifacts such as Python wheels or JVM JARs. The sources of a `files` "
         "target are accessed via filesystem APIs, such as Python's `open()`, via paths relative to "
         "the repo root."
+    )
+
+
+class GenerateFilesFromFiles(GenerateTargetsRequest):
+    target_class = Files
+
+
+@rule
+async def generate_files_from_files(
+    request: GenerateFilesFromFiles, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[FilesSources]))
+    return GeneratedTargets(
+        generate_file_level_target(Files, request.target, union_membership, file_path=fp)
+        for fp in paths.files
     )
 
 
@@ -201,6 +221,21 @@ class Resources(Target):
     )
 
 
+class GenerateResourcesFromResources(GenerateTargetsRequest):
+    target_class = Resources
+
+
+@rule
+async def generate_resources_from_resources(
+    request: GenerateResourcesFromResources, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ResourcesSources]))
+    return GeneratedTargets(
+        generate_file_level_target(Resources, request.target, union_membership, file_path=fp)
+        for fp in paths.files
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `target` generic target
 # -----------------------------------------------------------------------------------------------
@@ -327,6 +362,8 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 def rules():
     return (
         *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFilesFromFiles),
+        UnionRule(GenerateTargetsRequest, GenerateResourcesFromResources),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
         UnionRule(PackageFieldSet, ArchiveFieldSet),
     )

@@ -563,6 +563,17 @@ class Target:
         """Validate the target, such as checking for mutually exclusive fields."""
 
 
+@union
+@dataclass(frozen=True)
+class GenerateTargetsRequest:
+    target_class: ClassVar[type[_Tgt]]
+    target: _Tgt
+
+
+class GeneratedTargets(DeduplicatedCollection[Target]):
+    pass
+
+
 @dataclass(frozen=True)
 class Subtargets:
     # The BUILD target from which the subtargets were extracted.
