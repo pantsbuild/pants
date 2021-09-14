@@ -324,6 +324,26 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
 
 
+# -----------------------------------------------------------------------------------------------
+# `gen_rule` target
+# -----------------------------------------------------------------------------------------------
+
+
+class GenRuleCommandField(StringField):
+    alias = "command"
+    required = True
+
+
+class GenRuleTarget(Target):
+    alias = "gen_rule"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GenRuleCommandField,
+        Sources,
+    )
+    help = "Execute any external tool for its side effects."
+
+
 def rules():
     return (
         *collect_rules(),
