@@ -7,7 +7,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.compile.javac import (
+    CompiledClassfiles,
+    CompileJavaSourceRequest,
+    CompileResult,
+    FallibleCompiledClassfiles,
+)
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary
@@ -43,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *util_rules(),
             *javac_binary_rules(),
+            QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
@@ -596,9 +602,9 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="main")
         )
     )
-    expected_exception_msg = r".*?package org.pantsbuild.example.lib does not exist.*?"
-    with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(CompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "package org.pantsbuild.example.lib does not exist" in fallible_result.stderr
 
 
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
@@ -710,6 +716,6 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="main")
         )
     )
-    expected_exception_msg = r".*?package org.joda.time does not exist.*?"
-    with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(CompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "package org.joda.time does not exist" in fallible_result.stderr
