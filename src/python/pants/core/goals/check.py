@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class CheckResult(EngineAwareReturnType):
+class CheckResult:
     exit_code: int
     stdout: str
     stderr: str

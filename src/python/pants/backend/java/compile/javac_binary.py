@@ -67,7 +67,7 @@ async def setup_javac_binary(coursier: Coursier, javac: JavacSubsystem) -> Javac
             fingerprint_comment,
             textwrap.dedent(
                 f"""\
-                set -eux
+                set -eu
                 {javac_path_line}
                 /bin/mkdir -p {JavacBinary.classfiles_relpath}
                 exec "${{javac_path}}" "$@"
