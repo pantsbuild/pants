@@ -12,11 +12,13 @@ from pants.backend.java.compile.javac import (
     CompileJavaSourceRequest,
     CompileResult,
     FallibleCompiledClassfiles,
+    JavacCheckRequest,
 )
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary
 from pants.build_graph.address import Address
+from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
@@ -48,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *util_rules(),
             *javac_binary_rules(),
+            QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
@@ -124,22 +127,29 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [
-            CompileJavaSourceRequest(
-                component=expect_single_expanded_coarsened_target(
-                    rule_runner, Address(spec_path="", target_name="lib")
-                )
-            )
-        ],
+        [CompileJavaSourceRequest(component=coarsened_target)],
     )
 
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
     assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
         ["org/pantsbuild/example/lib/ExampleLib.class"]
     )
+
+    # Additionally validate that `check` works.
+    check_results = rule_runner.request(
+        CheckResults,
+        [JavacCheckRequest([JavacCheckRequest.field_set_type.create(coarsened_target.members[0])])],
+    )
+
+    assert len(check_results.results) == 1
+    check_result = check_results.results[0]
+    assert check_result.partition_description == str(coarsened_target)
 
 
 @pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
