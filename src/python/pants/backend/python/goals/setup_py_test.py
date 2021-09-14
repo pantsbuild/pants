@@ -163,7 +163,7 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
                     ':foo',
                 ],
                 provides=setup_py(
-                    setup_script='src/python/foo/setup.py',
+                    setup_script='setup.py',
                     name='foo', version='1.2.3'
                 )
             )

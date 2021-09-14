@@ -145,7 +145,7 @@ impl fmt::Display for Rule {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
-  pub can_modify_workunit: bool,
+  pub engine_aware_return_type: bool,
   pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
   pub func: Function,
@@ -216,8 +216,8 @@ impl Tasks {
   pub fn task_begin(
     &mut self,
     func: Function,
-    product: TypeId,
-    can_modify_workunit: bool,
+    return_type: TypeId,
+    engine_aware_return_type: bool,
     cacheable: bool,
     name: String,
     desc: Option<String>,
@@ -230,8 +230,8 @@ impl Tasks {
 
     self.preparing = Some(Task {
       cacheable,
-      product,
-      can_modify_workunit,
+      product: return_type,
+      engine_aware_return_type,
       clause: Vec::new(),
       gets: Vec::new(),
       func,

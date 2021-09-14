@@ -604,7 +604,7 @@ class UnexpandedTargets(Collection[Target]):
 
 
 @dataclass(frozen=True)
-class CoarsenedTarget:
+class CoarsenedTarget(EngineAwareParameter):
     """A set of Targets which cyclicly reach one another, and are thus indivisable."""
 
     # The members of the cycle.
@@ -614,6 +614,15 @@ class CoarsenedTarget:
     #
     # To expand these dependencies, request `CoarsenedTargets` for them.
     dependencies: FrozenOrderedSet[Address]
+
+    def debug_hint(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if len(self.members) > 1:
+            others = len(self.members) - 1
+            return f"{self.members[0].address.spec} (and {others} more)"
+        return self.members[0].address.spec
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):
