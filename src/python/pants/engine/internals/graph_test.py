@@ -108,13 +108,13 @@ class MockTargetGenerator(Target):
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
-    target_class = MockTargetGenerator
+    generate_from = MockTargetGenerator
 
 
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Sources]))
-    return generate_file_level_targets(MockGeneratedTarget, request.target, paths.files, None)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
+    return generate_file_level_targets(MockGeneratedTarget, request.generator, paths.files, None)
 
 
 @pytest.fixture
@@ -1488,15 +1488,15 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
 
 
 class GenerateSmallTalkLibraryFromSmallTalkLibraryRequest(GenerateTargetsRequest):
-    target_class = SmalltalkLibrary
+    generate_from = SmalltalkLibrary
 
 
 @rule
 async def generate_smalltalk_library_from_smalltalk_library(
     request: GenerateSmallTalkLibraryFromSmallTalkLibraryRequest,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[SmalltalkSources]))
-    return generate_file_level_targets(SmalltalkLibrary, request.target, paths.files, None)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[SmalltalkSources]))
+    return generate_file_level_targets(SmalltalkLibrary, request.generator, paths.files, None)
 
 
 @pytest.fixture

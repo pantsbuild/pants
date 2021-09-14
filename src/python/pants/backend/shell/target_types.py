@@ -137,15 +137,17 @@ class Shunit2Tests(Target):
 
 
 class GenerateShunit2TestsFromShunit2Tests(GenerateTargetsRequest):
-    target_class = Shunit2Tests
+    generate_from = Shunit2Tests
 
 
 @rule
 async def generate_shunit2_tests_from_shunit2_tests(
     request: GenerateShunit2TestsFromShunit2Tests, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Shunit2TestsSources]))
-    return generate_file_level_targets(Shunit2Tests, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsSources]))
+    return generate_file_level_targets(
+        Shunit2Tests, request.generator, paths.files, union_membership
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -164,15 +166,17 @@ class ShellLibrary(Target):
 
 
 class GenerateShellLibraryFromShellLibrary(GenerateTargetsRequest):
-    target_class = ShellLibrary
+    generate_from = ShellLibrary
 
 
 @rule
 async def generate_shell_library_from_shell_library(
     request: GenerateShellLibraryFromShellLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ShellLibrarySources]))
-    return generate_file_level_targets(ShellLibrary, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ShellLibrarySources]))
+    return generate_file_level_targets(
+        ShellLibrary, request.generator, paths.files, union_membership
+    )
 
 
 def rules():

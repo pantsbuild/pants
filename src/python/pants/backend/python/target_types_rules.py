@@ -69,27 +69,31 @@ logger = logging.getLogger(__name__)
 
 
 class GeneratePythonTestsFromPythonTests(GenerateTargetsRequest):
-    target_class = PythonTests
+    generate_from = PythonTests
 
 
 @rule
 async def generate_python_tests_from_python_tests(
     request: GeneratePythonTestsFromPythonTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[PythonTestsSources]))
-    return generate_file_level_targets(PythonTests, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
+    return generate_file_level_targets(
+        PythonTests, request.generator, paths.files, union_membership
+    )
 
 
 class GeneratePythonLibraryFromPythonLibrary(GenerateTargetsRequest):
-    target_class = PythonLibrary
+    generate_from = PythonLibrary
 
 
 @rule
 async def generate_python_library_from_python_library(
     request: GeneratePythonLibraryFromPythonLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[PythonLibrarySources]))
-    return generate_file_level_targets(PythonLibrary, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
+    return generate_file_level_targets(
+        PythonLibrary, request.generator, paths.files, union_membership
+    )
 
 
 # -----------------------------------------------------------------------------------------------

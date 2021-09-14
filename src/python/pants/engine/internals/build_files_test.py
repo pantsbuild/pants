@@ -128,13 +128,13 @@ class MockTargetGenerator(Target):
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
-    target_class = MockTargetGenerator
+    generate_from = MockTargetGenerator
 
 
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Sources]))
-    return generate_file_level_targets(MockGeneratedTarget, request.target, paths.files, None)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
+    return generate_file_level_targets(MockGeneratedTarget, request.generator, paths.files, None)
 
 
 def test_resolve_address() -> None:

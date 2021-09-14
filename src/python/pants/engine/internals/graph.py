@@ -103,7 +103,7 @@ def target_types_to_generate_targets_requests(
 ) -> TargetTypesToGenerateTargetsRequests:
     return TargetTypesToGenerateTargetsRequests(
         {
-            request_cls.target_class: request_cls  # type: ignore[misc]
+            request_cls.generate_from: request_cls  # type: ignore[misc]
             for request_cls in union_membership.get(GenerateTargetsRequest)
         }
     )

@@ -692,8 +692,8 @@ _Tgt = TypeVar("_Tgt", bound=Target)
 @union
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_Tgt]):
-    target_class: ClassVar[type[_Tgt]]
-    target: _Tgt
+    generate_from: ClassVar[type[_Tgt]]
+    generator: _Tgt
 
 
 class GeneratedTargets(DeduplicatedCollection[Target]):
@@ -713,8 +713,8 @@ def generate_file_level_targets(
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
 ) -> GeneratedTargets:
-    """Generate a new target with the same fields as the generator target, except for the `sources`
-    field only referring to the `file_path` and using a new address."""
+    """Generate one new target for each path, using the same fields as the generator target except
+    for the `sources` field only referring to the path and using a new address."""
     if not generator.has_field(Dependencies) or not generator.has_field(Sources):
         raise AssertionError(
             f"The `{generator.alias}` target {generator.address.spec} does "

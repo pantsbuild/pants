@@ -42,15 +42,15 @@ class JunitTests(Target):
 
 
 class GenerateJunitTestsFromJunitTests(GenerateTargetsRequest):
-    target_class = JunitTests
+    generate_from = JunitTests
 
 
 @rule
 async def generate_junit_tests_from_junit_tests(
     request: GenerateJunitTestsFromJunitTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[JavaTestsSources]))
-    return generate_file_level_targets(JunitTests, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaTestsSources]))
+    return generate_file_level_targets(JunitTests, request.generator, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -73,15 +73,17 @@ class JavaLibrary(Target):
 
 
 class GenerateJavaLibraryFromJavaLibrary(GenerateTargetsRequest):
-    target_class = JavaLibrary
+    generate_from = JavaLibrary
 
 
 @rule
 async def generate_java_library_from_java_library(
     request: GenerateJavaLibraryFromJavaLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[JavaLibrarySources]))
-    return generate_file_level_targets(JavaLibrary, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaLibrarySources]))
+    return generate_file_level_targets(
+        JavaLibrary, request.generator, paths.files, union_membership
+    )
 
 
 def rules():

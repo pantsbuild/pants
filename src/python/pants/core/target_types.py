@@ -60,15 +60,15 @@ class Files(Target):
 
 
 class GenerateFilesFromFiles(GenerateTargetsRequest):
-    target_class = Files
+    generate_from = Files
 
 
 @rule
 async def generate_files_from_files(
     request: GenerateFilesFromFiles, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[FilesSources]))
-    return generate_file_level_targets(Files, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[FilesSources]))
+    return generate_file_level_targets(Files, request.generator, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -219,15 +219,15 @@ class Resources(Target):
 
 
 class GenerateResourcesFromResources(GenerateTargetsRequest):
-    target_class = Resources
+    generate_from = Resources
 
 
 @rule
 async def generate_resources_from_resources(
     request: GenerateResourcesFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ResourcesSources]))
-    return generate_file_level_targets(Resources, request.target, paths.files, union_membership)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ResourcesSources]))
+    return generate_file_level_targets(Resources, request.generator, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------

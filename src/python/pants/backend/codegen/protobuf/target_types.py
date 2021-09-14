@@ -42,16 +42,16 @@ class ProtobufLibrary(Target):
 
 
 class GenerateProtobufLibraryFromProtobufLibrary(GenerateTargetsRequest):
-    target_class = ProtobufLibrary
+    generate_from = ProtobufLibrary
 
 
 @rule
 async def generate_protobuf_library_from_protobuf_library(
     request: GenerateProtobufLibraryFromProtobufLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ProtobufSources]))
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSources]))
     return generate_file_level_targets(
-        ProtobufLibrary, request.target, paths.files, union_membership
+        ProtobufLibrary, request.generator, paths.files, union_membership
     )
 
 
