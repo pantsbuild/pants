@@ -11,6 +11,7 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
 from pants.build_graph.address import Address
@@ -47,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *junit_rules(),
             *javac_binary_rules(),
             *util_rules(),
+            *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],

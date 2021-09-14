@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os.path
 from dataclasses import dataclass
@@ -104,7 +106,7 @@ class MockGeneratedTarget(Target):
 
 class MockTargetGenerator(Target):
     alias = "generator"
-    core_fields = (Sources, Dependencies)
+    core_fields = (Dependencies, Sources)
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
@@ -112,13 +114,9 @@ class MockGenerateTargetsRequest(GenerateTargetsRequest):
 
 
 @rule
-async def generate_mock_generated_target(
-    request: MockGenerateTargetsRequest, union_membership: UnionMembership
-) -> GeneratedTargets:
+async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Sources]))
-    return generate_file_level_targets(
-        MockGeneratedTarget, request.target, paths.files, union_membership
-    )
+    return generate_file_level_targets(MockGeneratedTarget, request.target, paths.files, None)
 
 
 @pytest.fixture
@@ -1496,12 +1494,9 @@ class GenerateSmallTalkLibraryFromSmallTalkLibraryRequest(GenerateTargetsRequest
 @rule
 async def generate_smalltalk_library_from_smalltalk_library(
     request: GenerateSmallTalkLibraryFromSmallTalkLibraryRequest,
-    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[SmalltalkSources]))
-    return generate_file_level_targets(
-        SmalltalkLibrary, request.target, paths.files, union_membership
-    )
+    return generate_file_level_targets(SmalltalkLibrary, request.target, paths.files, None)
 
 
 @pytest.fixture

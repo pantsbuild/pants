@@ -15,6 +15,7 @@ from pants.backend.shell.dependency_inference import (
     ShellMapping,
 )
 from pants.backend.shell.target_types import ShellLibrary, ShellSources
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
@@ -28,6 +29,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dependency_inference.rules(),
             *external_tool.rules(),
+            *target_types_rules,
             QueryRule(ShellMapping, []),
             QueryRule(ParsedShellImports, [ParseShellImportsRequest]),
             QueryRule(InferredDependencies, [InferShellDependencies]),

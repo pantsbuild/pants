@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.mixed_interpreter_constraints.py_constraints import PyConstraintsGoal
 from pants.backend.python.mixed_interpreter_constraints.py_constraints import (
     rules as py_constraints_rules,
@@ -19,7 +20,8 @@ from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=py_constraints_rules(), target_types=[Files, PythonLibrary, PythonTests]
+        rules=(*py_constraints_rules(), *target_types_rules.rules()),
+        target_types=[Files, PythonLibrary, PythonTests],
     )
 
 
