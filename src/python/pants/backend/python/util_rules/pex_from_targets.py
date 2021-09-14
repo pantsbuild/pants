@@ -226,6 +226,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             if tgt.has_field(PythonRequirementsField)
         ),
         additional_requirements=request.additional_requirements,
+        apply_constraints=True,
     )
 
     description = request.description
@@ -309,7 +310,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,
         description=description,
-        apply_requirement_constraints=True,
     )
 
 
@@ -383,11 +383,10 @@ async def _setup_constraints_repository_pex(
             description=f"Resolving {constraints_path}",
             output_filename="repository.pex",
             internal_only=request.internal_only,
-            requirements=PexRequirements(all_constraints),
+            requirements=PexRequirements(all_constraints, apply_constraints=True),
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,
-            apply_requirement_constraints=True,
         ),
     )
     return _ConstraintsRepositoryPex(repository_pex)
