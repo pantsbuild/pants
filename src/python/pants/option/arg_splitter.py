@@ -204,12 +204,16 @@ class ArgSplitter:
 
         for goal in goals:
             si = self._known_goal_scopes[goal]
-            if si.deprecated_scope and goal == si.deprecated_scope:
-                assert si.deprecated_scope_removal_version
+            if (
+                si.deprecated_scope
+                and goal == si.deprecated_scope
+                and si.subsystem_cls
+                and si.deprecated_scope_removal_version
+            ):
                 warn_or_error(
                     si.deprecated_scope_removal_version,
                     f"the {si.deprecated_scope} goal",
-                    f"The {si.deprecated_scope} goal was renamed to {si.scope}",
+                    f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
                 )
 
         if isinstance(self._help_request, ThingHelp):
