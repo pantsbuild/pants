@@ -162,15 +162,15 @@ async def resolve_targets(targets: UnexpandedTargets) -> Targets:
     other_targets = []
     build_targets = []
     for target in targets:
-        if not target.address.is_file_target:
-            build_targets.append(target)
-        else:
+        if target.address.is_file_target:
             other_targets.append(target)
+        else:
+            build_targets.append(target)
 
     build_targets_subtargets = await MultiGet(
         Get(Subtargets, Address, bt.address) for bt in build_targets
     )
-    # Zip the subtargets back to the BUILD targets and replace them.
+    # Replace each build target with its subtargets.
     # NB: If a target had no subtargets, we use the original.
     expanded_targets = OrderedSet(other_targets)
     expanded_targets.update(

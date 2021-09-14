@@ -604,7 +604,7 @@ class Targets(Collection[Target]):
 
 
 class UnexpandedTargets(Collection[Target]):
-    """Like `Targets`, but will not contain the expansion of `TargetAlias` instances."""
+    """Like `Targets`, but will not contain the expansion to subtargets."""
 
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
@@ -613,7 +613,7 @@ class UnexpandedTargets(Collection[Target]):
 
 @dataclass(frozen=True)
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisable."""
+    """A set of Targets which cyclicly reach one another, and are thus indivisible."""
 
     # The members of the cycle.
     members: Tuple[Target, ...]
