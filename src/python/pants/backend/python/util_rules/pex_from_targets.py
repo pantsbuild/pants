@@ -270,6 +270,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         ),
                         # TODO(#12314): Hook up lockfile staleness check.
                         lockfile_hex_digest=None,
+                        req_strings=None,
                     ),
                     interpreter_constraints=interpreter_constraints,
                     platforms=request.platforms,
@@ -291,6 +292,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
                         # are supported.
                         lockfile_hex_digest=None,
+                        req_strings=None,
                     ),
                     interpreter_constraints=interpreter_constraints,
                     platforms=request.platforms,

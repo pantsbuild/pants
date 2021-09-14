@@ -23,6 +23,7 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
+    InvalidLockfileError,
     InvalidLockfileReason,
     LockfileMetadata,
 )
@@ -70,12 +71,14 @@ class Lockfile:
     file_path: str
     file_path_description_of_origin: str
     lockfile_hex_digest: str | None
+    req_strings: FrozenOrderedSet[str] | None
 
 
 @dataclass(frozen=True)
 class LockfileContent:
     file_content: FileContent
     lockfile_hex_digest: str | None
+    req_strings: FrozenOrderedSet[str] | None
 
 
 @dataclass(frozen=True)
@@ -533,10 +536,19 @@ def _validate_metadata(
     python_setup: PythonSetup,
 ) -> None:
 
+    # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
+    # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
+    req_strings = (
+        {Requirement.parse(i) for i in requirements.req_strings}
+        if requirements.req_strings is not None
+        else None
+    )
+
     validation = metadata.is_valid_for(
         requirements.lockfile_hex_digest,
         request.interpreter_constraints,
         python_setup.interpreter_universe,
+        req_strings,
     )
 
     if validation:
@@ -563,7 +575,13 @@ def _validate_metadata(
             "\n\n"
         )
 
-        if InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH in validation.failure_reasons:
+        if any(
+            i == InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH
+            or i == InvalidLockfileReason.REQUIREMENTS_MISMATCH
+            for i in validation.failure_reasons
+        ):
+            # TODO(12314): Add message showing _which_ requirements diverged.
+
             yield (
                 "- You have set different requirements than those used to generate the lockfile. "
                 f"You can fix this by not setting `[{tool_name}].version`, "
@@ -616,8 +634,8 @@ def _validate_metadata(
     if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
         message = "".join(tool_message_parts(requirements)).strip()
     else:
-        # TODO: Replace with an actual value once user lockfiles are supported
-        assert False
+        # TODO(12314): Improve this message
+        raise InvalidLockfileError(f"{validation.failure_reasons}")
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
