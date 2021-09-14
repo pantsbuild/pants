@@ -51,7 +51,7 @@ from pants.engine.target import (
     SourcesPathsRequest,
     Targets,
     WrappedTarget,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -77,10 +77,7 @@ async def generate_python_tests_from_python_tests(
     request: GeneratePythonTestsFromPythonTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[PythonTestsSources]))
-    return GeneratedTargets(
-        generate_file_level_target(PythonTests, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(PythonTests, request.target, paths.files, union_membership)
 
 
 class GeneratePythonLibraryFromPythonLibrary(GenerateTargetsRequest):
@@ -92,10 +89,7 @@ async def generate_python_library_from_python_library(
     request: GeneratePythonLibraryFromPythonLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[PythonLibrarySources]))
-    return GeneratedTargets(
-        generate_file_level_target(PythonLibrary, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(PythonLibrary, request.target, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------

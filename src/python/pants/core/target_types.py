@@ -33,7 +33,7 @@ from pants.engine.target import (
     Target,
     Targets,
     WrappedTarget,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
@@ -68,10 +68,7 @@ async def generate_files_from_files(
     request: GenerateFilesFromFiles, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[FilesSources]))
-    return GeneratedTargets(
-        generate_file_level_target(Files, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(Files, request.target, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -230,10 +227,7 @@ async def generate_resources_from_resources(
     request: GenerateResourcesFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ResourcesSources]))
-    return GeneratedTargets(
-        generate_file_level_target(Resources, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(Resources, request.target, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------

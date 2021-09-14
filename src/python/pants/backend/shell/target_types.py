@@ -23,7 +23,7 @@ from pants.engine.target import (
     SourcesPathsRequest,
     StringField,
     Target,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.enums import match
@@ -145,10 +145,7 @@ async def generate_shunit2_tests_from_shunit2_tests(
     request: GenerateShunit2TestsFromShunit2Tests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Shunit2TestsSources]))
-    return GeneratedTargets(
-        generate_file_level_target(Shunit2Tests, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(Shunit2Tests, request.target, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -175,10 +172,7 @@ async def generate_shell_library_from_shell_library(
     request: GenerateShellLibraryFromShellLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ShellLibrarySources]))
-    return GeneratedTargets(
-        generate_file_level_target(ShellLibrary, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(ShellLibrary, request.target, paths.files, union_membership)
 
 
 def rules():

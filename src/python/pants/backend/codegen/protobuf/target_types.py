@@ -12,7 +12,7 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Target,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url
@@ -50,9 +50,8 @@ async def generate_protobuf_library_from_protobuf_library(
     request: GenerateProtobufLibraryFromProtobufLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[ProtobufSources]))
-    return GeneratedTargets(
-        generate_file_level_target(ProtobufLibrary, request.target, union_membership, file_path=fp)
-        for fp in paths.files
+    return generate_file_level_targets(
+        ProtobufLibrary, request.target, paths.files, union_membership
     )
 
 

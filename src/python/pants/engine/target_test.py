@@ -17,6 +17,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
+    GeneratedTargets,
     GenerateSourcesRequest,
     IntField,
     InvalidFieldChoiceException,
@@ -32,7 +33,7 @@ from pants.engine.target import (
     StringSequenceField,
     Tags,
     Target,
-    generate_file_level_target,
+    generate_file_level_targets,
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
@@ -431,7 +432,7 @@ def test_target_validate() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_file_level_target() -> None:
+def test_generate_file_level_targets() -> None:
     class MockGenerator(Target):
         alias = "generator"
         core_fields = (Dependencies, Tags, Sources)
@@ -440,41 +441,49 @@ def test_generate_file_level_target() -> None:
         alias = "generated"
         core_fields = (Dependencies, Tags, Sources)
 
-    def generate(generator: Target, file_path: str) -> MockGenerated:
-        return generate_file_level_target(MockGenerated, generator, None, file_path=file_path)
+    def generate(generator: Target, files: list[str]) -> GeneratedTargets:
+        return generate_file_level_targets(MockGenerated, generator, files, None)
 
-    single_source_tgt = MockGenerator(
-        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
-        Address("src/fortran", target_name="demo"),
-    )
-    assert generate(single_source_tgt, "src/fortran/demo.f95") == MockGenerated(
-        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
-        Address("src/fortran", target_name="demo", relative_file_path="demo.f95"),
+    tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
+    assert generate(tgt, ["demo/f1.ext", "demo/f2.ext"]) == GeneratedTargets(
+        [
+            MockGenerated(
+                {Sources.alias: ["f1.ext"], Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f1.ext"),
+            ),
+            MockGenerated(
+                {Sources.alias: ["f2.ext"], Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f2.ext"),
+            ),
+        ]
     )
 
     subdir_tgt = MockGenerator(
-        {Sources.alias: ["demo.f95", "subdir/demo.f95"]},
-        Address("src/fortran", target_name="demo"),
+        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, Address("src/fortran", target_name="demo")
     )
-    assert generate(subdir_tgt, "src/fortran/subdir/demo.f95") == MockGenerated(
-        {Sources.alias: ["subdir/demo.f95"]},
-        Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+    assert generate(subdir_tgt, ["src/fortran/subdir/demo.f95"]) == GeneratedTargets(
+        [
+            MockGenerated(
+                {Sources.alias: ["subdir/demo.f95"]},
+                Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+            )
+        ]
     )
 
     # The file path must match the filespec of the generator target's Sources field.
     with pytest.raises(AssertionError) as exc:
-        generate(single_source_tgt, "src/fortran/fake_file.f95")
-    assert "does not match a file src/fortran/fake_file.f95" in str(exc.value)
+        generate(tgt, ["demo/fake.ext"])
+    assert "does not match a file demo/fake.ext" in str(exc.value)
 
     class MissingFieldsTarget(Target):
         alias = "missing_fields"
         core_fields = (Tags,)
 
     missing_fields_tgt = MissingFieldsTarget(
-        {Tags.alias: ["demo"]}, Address("", target_name="missing_fields")
+        {Tags.alias: ["tag"]}, Address("", target_name="missing_fields")
     )
     with pytest.raises(AssertionError) as exc:
-        generate(missing_fields_tgt, "fake.txt")
+        generate(missing_fields_tgt, ["fake.txt"])
     assert "does not have both a `dependencies` and `sources` field" in str(exc.value)
 
 

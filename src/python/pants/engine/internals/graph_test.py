@@ -72,7 +72,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
@@ -116,11 +116,8 @@ async def generate_mock_generated_target(
     request: MockGenerateTargetsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[Sources]))
-    return GeneratedTargets(
-        generate_file_level_target(
-            MockGeneratedTarget, request.target, union_membership, file_path=fp
-        )
-        for fp in paths.files
+    return generate_file_level_targets(
+        MockGeneratedTarget, request.target, paths.files, union_membership
     )
 
 
@@ -1502,9 +1499,8 @@ async def generate_smalltalk_library_from_smalltalk_library(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[SmalltalkSources]))
-    return GeneratedTargets(
-        generate_file_level_target(SmalltalkLibrary, request.target, union_membership, file_path=fp)
-        for fp in paths.files
+    return generate_file_level_targets(
+        SmalltalkLibrary, request.target, paths.files, union_membership
     )
 
 

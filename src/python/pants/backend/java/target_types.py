@@ -13,7 +13,7 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Target,
-    generate_file_level_target,
+    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 
@@ -50,10 +50,7 @@ async def generate_junit_tests_from_junit_tests(
     request: GenerateJunitTestsFromJunitTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[JavaTestsSources]))
-    return GeneratedTargets(
-        generate_file_level_target(JunitTests, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(JunitTests, request.target, paths.files, union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -84,10 +81,7 @@ async def generate_java_library_from_java_library(
     request: GenerateJavaLibraryFromJavaLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.target[JavaLibrarySources]))
-    return GeneratedTargets(
-        generate_file_level_target(JavaLibrary, request.target, union_membership, file_path=fp)
-        for fp in paths.files
-    )
+    return generate_file_level_targets(JavaLibrary, request.target, paths.files, union_membership)
 
 
 def rules():

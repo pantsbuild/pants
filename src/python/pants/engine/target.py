@@ -706,48 +706,50 @@ class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[Generat
         return type(tgt) in self
 
 
-def generate_file_level_target(
-    generated_target_cls: type[_Tgt],
+def generate_file_level_targets(
+    generated_target_cls: type[Target],
     generator: Target,
+    paths: Iterable[str],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
-    *,
-    file_path: str,
-) -> _Tgt:
+) -> GeneratedTargets:
     """Generate a new target with the same fields as the generator target, except for the `sources`
     field only referring to the `file_path` and using a new address."""
     if not generator.has_field(Dependencies) or not generator.has_field(Sources):
         raise AssertionError(
             f"The `{generator.alias}` target {generator.address.spec} does "
             "not have both a `dependencies` and `sources` field, and thus cannot generate a "
-            f"`{generated_target_cls.alias}` target for the file {file_path}."
+            f"`{generated_target_cls.alias}` target."
         )
 
-    relativized_file_name = str(PurePath(file_path).relative_to(generator.address.spec_path))
+    def gen_tgt(fp: str) -> Target:
+        relativized_file_name = str(PurePath(fp).relative_to(generator.address.spec_path))
 
-    generated_target_fields = {}
-    for field in generator.field_values.values():
-        value: Optional[ImmutableValue]
-        if isinstance(field, Sources):
-            if not bool(matches_filespec(field.filespec, paths=[file_path])):
-                raise AssertionError(
-                    f"Target {generator.address.spec}'s `sources` field does not match a file "
-                    f"{file_path}."
-                )
-            value = (relativized_file_name,)
-        else:
-            value = field.value
-        generated_target_fields[field.alias] = value
+        generated_target_fields = {}
+        for field in generator.field_values.values():
+            value: Optional[ImmutableValue]
+            if isinstance(field, Sources):
+                if not bool(matches_filespec(field.filespec, paths=[fp])):
+                    raise AssertionError(
+                        f"Target {generator.address.spec}'s `sources` field does not match a file "
+                        f"{fp}."
+                    )
+                value = (relativized_file_name,)
+            else:
+                value = field.value
+            generated_target_fields[field.alias] = value
 
-    return generated_target_cls(
-        generated_target_fields,
-        Address(
-            generator.address.spec_path,
-            target_name=generator.address.target_name,
-            relative_file_path=relativized_file_name,
-        ),
-        union_membership,
-    )
+        return generated_target_cls(
+            generated_target_fields,
+            Address(
+                generator.address.spec_path,
+                target_name=generator.address.target_name,
+                relative_file_path=relativized_file_name,
+            ),
+            union_membership,
+        )
+
+    return GeneratedTargets(gen_tgt(fp) for fp in paths)
 
 
 # -----------------------------------------------------------------------------------------------
