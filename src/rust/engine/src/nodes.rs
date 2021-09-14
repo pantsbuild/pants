@@ -1201,7 +1201,7 @@ impl WrappedNode for Task {
     let func = self.task.func;
     let entry = self.entry;
     let product = self.product;
-    let can_modify_workunit = self.task.can_modify_workunit;
+    let engine_aware_return_type = self.task.engine_aware_return_type;
 
     let result_val =
       externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
@@ -1213,13 +1213,13 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
+      let (new_level, message, new_artifacts, new_metadata) = if engine_aware_return_type {
         (
-          engine_aware::EngineAwareLevel::retrieve(&result_val),
-          engine_aware::Message::retrieve(&result_val),
-          engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
+          engine_aware::EngineAwareReturnType::level(&result_val),
+          engine_aware::EngineAwareReturnType::message(&result_val),
+          engine_aware::EngineAwareReturnType::artifacts(&context.core.types, &result_val)
             .unwrap_or_else(Vec::new),
-          engine_aware::Metadata::retrieve(&result_val).unwrap_or_else(Vec::new),
+          engine_aware::EngineAwareReturnType::metadata(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new(), Vec::new())
@@ -1562,17 +1562,20 @@ impl Node for NodeKey {
   }
 
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
-    match self {
-      NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
-          ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
-          ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
-            process_result.0.exit_code == 0
-          }
-          ProcessCacheScope::PerSession => false,
-        },
-        _ => true,
+    match (self, output) {
+      (
+        NodeKey::MultiPlatformExecuteProcess(ref mp),
+        NodeOutput::ProcessResult(ref process_result),
+      ) => match mp.cache_scope {
+        ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
+        ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+          process_result.0.exit_code == 0
+        }
+        ProcessCacheScope::PerSession => false,
       },
+      (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
+        engine_aware::EngineAwareReturnType::cacheable(v).unwrap_or(true)
+      }
       _ => true,
     }
   }

@@ -51,6 +51,14 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
+    def cacheable(self) -> bool:
+        """Allows a return type to be conditionally marked uncacheable.
+
+        An uncacheable value is recomputed in each Session: this can be useful if the level or
+        message should be rendered as sideeffects in each Session.
+        """
+        return True
+
     def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
         return the annotated type.
