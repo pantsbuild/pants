@@ -20,8 +20,6 @@ END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 _concrete_metadata_classes: dict[int, Type[LockfileMetadata]] = {}
 
-_T = TypeVar("_T")
-
 
 def _lockfile_metadata_version(
     version: int,
@@ -61,6 +59,8 @@ class LockfileMetadata:
     To construct an instance of the most recent concrete subclass, call `LockfileMetadata.new()`.
     """
 
+    _LockfileMetadataSubclass = TypeVar("_LockfileMetadataSubclass", bound="LockfileMetadata")
+
     valid_for_interpreter_constraints: InterpreterConstraints
 
     @staticmethod
@@ -71,7 +71,9 @@ class LockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
 
-        This static method should be used in place of the `LockfileMetadata` constructor.
+        This static method should be used in place of the `LockfileMetadata` constructor. This gives
+        calling sites a predictable method to call to construct a new `LockfileMetadata` for
+        writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
         return LockfileMetadataV2(valid_for_interpreter_constraints, requirements)
@@ -127,11 +129,11 @@ class LockfileMetadata:
 
     @classmethod
     def _from_json_dict(
-        cls: Type[_T],
+        cls: Type[_LockfileMetadataSubclass],
         json_dict: dict[Any, Any],
         lockfile_description: str,
         error_suffix: str,
-    ) -> _T:
+    ) -> _LockfileMetadataSubclass:
         """Construct a `LockfileMetadata` subclass from the supplied JSON dict.
 
         *** Not implemented. Subclasses should override. ***
@@ -163,7 +165,7 @@ class LockfileMetadata:
     def _header_dict(self) -> dict[Any, Any]:
         """Produce a dictionary to be serialized into the lockfile header.
 
-        Subclasses should call `super` and update the resulting dictionary
+        Subclasses should call `super` and update the resulting dictionary.
         """
 
         version: int
