@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import annotations
-
 import itertools
 import os.path
 from dataclasses import dataclass
@@ -755,7 +753,7 @@ def specs_rule_runner() -> RuleRunner:
 def resolve_filesystem_specs(
     rule_runner: RuleRunner,
     specs: Iterable[FilesystemSpec],
-) -> list[Address]:
+) -> List[Address]:
     result = rule_runner.request(Addresses, [FilesystemSpecs(specs)])
     return sorted(result)
 
@@ -866,11 +864,13 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
 # Test FieldSets. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
+# Must be defined here because `from __future__ import annotations` causes the FieldSet to not be
+# able to find the type..
+class FortranSources(Sources):
+    pass
+
 
 def test_find_valid_field_sets(caplog) -> None:
-    class FortranSources(Sources):
-        pass
-
     class FortranTarget(Target):
         alias = "fortran_target"
         core_fields = (FortranSources, Tags)

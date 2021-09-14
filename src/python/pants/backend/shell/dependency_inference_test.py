@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dependency_inference.rules(),
             *external_tool.rules(),
-            *target_types_rules,
+            *target_types_rules(),
             QueryRule(ShellMapping, []),
             QueryRule(ParsedShellImports, [ParseShellImportsRequest]),
             QueryRule(InferredDependencies, [InferShellDependencies]),

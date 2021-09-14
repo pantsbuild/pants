@@ -31,7 +31,7 @@ def write_files(rule_runner: RuleRunner) -> None:
             "lib1/BUILD": "python_library(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])",
             # We leave off `interpreter_constraints`, which results in using
             # `[python-setup].interpreter_constraints` instead. Also, we create files so that we
-            # can test how file addresses render.
+            # can test how generated file-level targets render.
             "lib2/a.py": "",
             "lib2/b.py": "",
             "lib2/BUILD": "python_library()",
@@ -52,6 +52,7 @@ def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
     return rule_runner.run_goal_rule(
         PyConstraintsGoal,
         env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": "['>=3.6']"},
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         args=args,
     )
 

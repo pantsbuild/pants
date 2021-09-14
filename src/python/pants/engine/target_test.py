@@ -441,7 +441,7 @@ def test_generate_file_level_targets() -> None:
         alias = "generated"
         core_fields = (Dependencies, Tags, Sources)
 
-    def generate(generator: Target, files: list[str]) -> GeneratedTargets:
+    def generate(generator: Target, files: List[str]) -> GeneratedTargets:
         return generate_file_level_targets(MockGenerated, generator, files, None)
 
     tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
