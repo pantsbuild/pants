@@ -100,8 +100,8 @@ def test_constraints_summary(rule_runner: RuleRunner) -> None:
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
         app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",3,0\r
         lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,1\r
-        lib2,CPython>=3.6,CPython>=3.6,2,0\r
-        lib2/a.py,CPython>=3.6,CPython>=3.6,2,3\r
-        lib2/b.py,CPython>=3.6,CPython>=3.6,2,3\r
+        lib2,CPython>=3.6,CPython>=3.6,0,0\r
+        lib2/a.py,CPython>=3.6,CPython>=3.6,0,2\r
+        lib2/b.py,CPython>=3.6,CPython>=3.6,0,2\r
         """
     )
