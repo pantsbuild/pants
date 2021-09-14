@@ -287,6 +287,79 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
+  build_aarch64_wheels_linux:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Build AArch64 wheels and fs_util (Linux)
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Expose Pythons
+      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
+        >> $GITHUB_ENV
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml']
+      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+      name: Build wheels
+      run: 'docker run --rm -v ${{ github.workspace }}:/ws:rw --workdir=/ws quay.io/pypa/manylinux2014_aarch64
+        bash -exc ''curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        -s -- -v -y --default-toolchain none
+
+        export PATH=${PATH}:${HOME}/.cargo/bin
+
+        export MODE=debug
+
+        ./build-support/bin/release.sh build-wheels
+
+        USE_PY38=true ./build-support/bin/release.sh build-wheels
+
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
+
+        ./build-support/bin/release.sh build-fs-util''
+
+        '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-wheels-linux
+        path: .pants.d/pants.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: github.event_name == 'push'
+      name: Deploy to S3
+      run: ./build-support/bin/deploy_to_s3.py
   build_wheels_linux:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:

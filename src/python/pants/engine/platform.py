@@ -15,6 +15,7 @@ class Platform(Enum):
     linux_x86_64 = "linux_x86_64"
     macos_arm64 = "macos_arm64"
     macos_x86_64 = "macos_x86_64"
+    linux_arm64 = "linux_arm64"
 
     @property
     def is_macos(self) -> bool:

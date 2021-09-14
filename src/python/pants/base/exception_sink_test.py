@@ -59,6 +59,10 @@ def test_set_invalid_log_location():
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
             "denied: '/.pids'"
         ),
+        Platform.linux_arm64: (
+            "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
+            "denied: '/.pids'"
+        ),
     }
     assert match(Platform.current, err_str) in str(exc.value)
 

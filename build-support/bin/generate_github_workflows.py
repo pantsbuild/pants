@@ -107,6 +107,11 @@ def checkout() -> Sequence[Step]:
         },
     ]
 
+def setup_qemu() -> Step:
+    return {
+        "name": "Setup QEMU",
+        "uses": "docker/setup-qemu-action@v1",
+    }
 
 def setup_toolchain_auth() -> Step:
     return {
@@ -429,6 +434,28 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "env": env,
                 },
             ]
+        def build_steps_aarch64(*, is_macos: bool) -> list[Step]:
+            env = {"PANTS_CONFIG_FILES": "+['pants.ci.toml']", **(MACOS_ENV if is_macos else {})}
+            return [
+                {
+                    "name": "Build wheels",
+                    "run": dedent(
+                        # We use MODE=debug on PR builds to speed things up, given that those are
+                        # only smoke tests of our release process.
+                        """\
+                        docker run --rm -v ${{ github.workspace }}:/ws:rw --workdir=/ws quay.io/pypa/manylinux2014_aarch64 bash -exc 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
+                        export PATH=${PATH}:${HOME}/.cargo/bin
+                        export MODE=debug
+                        ./build-support/bin/release.sh build-wheels
+                        USE_PY38=true ./build-support/bin/release.sh build-wheels
+                        USE_PY39=true ./build-support/bin/release.sh build-wheels
+                        ./build-support/bin/release.sh build-fs-util'
+                        """
+                    ),
+                    "if": DONT_SKIP_WHEELS,
+                    "env": env,
+                },
+            ]
 
         deploy_to_s3_step = {
             "name": "Deploy to S3",
@@ -462,6 +489,29 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         },
                         setup_toolchain_auth(),
                         *build_steps(is_macos=False),
+                        upload_log_artifacts(name="wheels-linux"),
+                        deploy_to_s3_step,
+                    ],
+                },
+                "build_aarch64_wheels_linux": {
+                    "name": "Build AArch64 wheels and fs_util (Linux)",
+                    "runs-on": LINUX_VERSION,
+                    "env": DISABLE_REMOTE_CACHE_ENV,
+                    "if": IS_PANTS_OWNER,
+                    "steps": [
+                        *checkout(),
+                        setup_qemu(),
+                        {
+                            "name": "Expose Pythons",
+                            "run": (
+                                'echo "PATH=${PATH}:'
+                                "/opt/python/cp37-cp37m/bin:"
+                                "/opt/python/cp38-cp38/bin:"
+                                '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
+                            ),
+                        },
+                        setup_toolchain_auth(),
+                        *build_steps_aarch64(is_macos=False),
                         upload_log_artifacts(name="wheels-linux"),
                         deploy_to_s3_step,
                     ],

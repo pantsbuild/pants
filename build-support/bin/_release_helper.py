@@ -558,7 +558,7 @@ def build_pex(fetch: bool) -> None:
     if fetch:
         extra_pex_args = [
             f"--platform={plat}-{abi}"
-            for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+            for plat in ("linux_x86_64", "linux_aarch64", "macosx_10.15_x86_64")
             for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
@@ -918,10 +918,10 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 6:
+        if is_cross_platform(local_files) and len(local_files) != 9:
             formatted_local_files = ", ".join(f.name for f in local_files)
             missing_packages.append(
-                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}}, "
+                f"{package.name} (expected 9 wheels, {{macosx, linux_x86_64, linux_arm64}} x {{cp37m, cp38, cp39}}, "
                 f"but found {formatted_local_files})"
             )
     if missing_packages:

@@ -52,7 +52,7 @@ class PexBinary(TemplatedExternalTool):
                     "3640830",
                 )
             )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
+            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
         ]
 
 
