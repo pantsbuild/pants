@@ -700,7 +700,7 @@ class GeneratedTargets(DeduplicatedCollection[Target]):
     pass
 
 
-class TargetTypesToGenerateTargetsRequests(FrozenDict[type[Target], type[GenerateTargetsRequest]]):
+class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
         return type(tgt) in self

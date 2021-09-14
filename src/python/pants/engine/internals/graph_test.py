@@ -628,7 +628,7 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
     """Test when a source file belongs to a target, even though the file does not actually exist.
 
     This happens, for example, when the file is deleted and we're computing `--changed-since`. In
-    this case, we can only target generators rather than their generated targets.
+    this case, we can only use target generators rather than their generated targets.
     """
     owners_rule_runner.write_files(
         {
