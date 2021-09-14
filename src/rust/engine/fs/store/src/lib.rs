@@ -1105,7 +1105,11 @@ impl Store {
           // expected to create parent directories for both files and empty leaf
           // directories.)
           if directory.directories.is_empty() {
-            future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
+            if !path_so_far.as_os_str().is_empty() {
+              future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
+            } else {
+              future::ready(Ok(vec![])).boxed()
+            }
           } else {
             future::ready(Ok(vec![])).boxed()
           }
