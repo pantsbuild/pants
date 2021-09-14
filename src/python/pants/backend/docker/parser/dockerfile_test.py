@@ -5,8 +5,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.dockerfile import Dockerfile
-from pants.backend.docker.dockerfile_commands import BaseImage, Copy, EntryPoint
+from pants.backend.docker.parser.dockerfile import Dockerfile
+from pants.backend.docker.parser.dockerfile_commands import BaseImage, Copy, EntryPoint
 
 
 @pytest.mark.parametrize(

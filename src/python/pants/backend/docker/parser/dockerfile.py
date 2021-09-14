@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Collection, Generator, List, Optional, Tuple, Type, TypeVar, Union, cast
 
-from pants.backend.docker.dockerfile_commands import BaseImage, DockerfileCommand
+from pants.backend.docker.parser.dockerfile_commands import BaseImage, DockerfileCommand
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 

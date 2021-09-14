@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.docker.dockerfile_commands import (
+from pants.backend.docker.parser.dockerfile_commands import (
     BaseImage,
     Copy,
     DockerfileCommand,
@@ -16,6 +16,9 @@ from pants.backend.docker.dockerfile_commands import (
     "command_line, expect",
     [
         ("FROM simple", BaseImage(image="simple")),
+        ("FROM simple AS name", BaseImage(image="simple", name="name")),
+        # case insensitive test
+        ("from simple as name", BaseImage(image="simple", name="name")),
         ("FROM repo/proj:latest", BaseImage(image="repo/proj", tag="latest")),
         ("FROM repo/proj@12345", BaseImage(image="repo/proj", digest="12345")),
         ("FROM repo/proj err", pytest.raises(InvalidDockerfileCommandArgument)),

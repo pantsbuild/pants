@@ -38,7 +38,7 @@ class DockerfileCommand(ABC):
     def decode(cls, command_line: str) -> Optional["DockerfileCommand"]:
         """Parse a Dockerfile command."""
         cmd, _, arg = command_line.partition(" ")
-        cmd_cls = cls._command_class(cmd)
+        cmd_cls = cls._command_class(cmd.upper())
         if cmd_cls:
             return cmd_cls.from_arg(arg)
         return None
@@ -47,11 +47,11 @@ class DockerfileCommand(ABC):
         """Convert command to string representation for a Dockerfile."""
         return " ".join([self.alias, *self.encode_arg()])
 
-    @staticmethod
-    def _decode_arg_regexp(regexp: Pattern, arg: str) -> Dict[str, Optional[str]]:
+    @classmethod
+    def _decode_arg_regexp(cls, regexp: Pattern, arg: str) -> Dict[str, Optional[str]]:
         m = regexp.match(arg)
         if not m:
-            raise InvalidDockerfileCommandArgument(arg)
+            raise InvalidDockerfileCommandArgument(f"{cls.alias}: {arg!r}")
         return m.groupdict()
 
     @classmethod
@@ -103,7 +103,7 @@ class BaseImage(DockerfileCommand):
         )?
 
         # optional name
-        (\s+AS\s+(?P<name>\S+))?
+        (\s+[Aa][Ss]\s+(?P<name>\S+))?
         $
         """,
         re.VERBOSE,
