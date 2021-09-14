@@ -57,7 +57,7 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_DIGEST};
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::{ServerCapabilities, Tree};
@@ -1100,16 +1100,14 @@ impl Store {
   ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
     self
       .walk(digest, move |_, path_so_far, _, directory| {
-        if directory.files.is_empty() {
+        if digest == EMPTY_DIGEST {
+          future::ready(Ok(vec![])).boxed()
+        } else if directory.files.is_empty() {
           // Only report an empty directory if the directory is a leaf node. (The caller is
           // expected to create parent directories for both files and empty leaf
           // directories.)
           if directory.directories.is_empty() {
-            if path_so_far.as_os_str().is_empty() {
-              future::ready(Ok(vec![])).boxed()
-            } else {
-              future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
-            }
+            future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
           } else {
             future::ready(Ok(vec![])).boxed()
           }

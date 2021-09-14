@@ -28,7 +28,11 @@ async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
         )
 
     file_info = digest_entries[0]
-    assert isinstance(file_info, FileEntry)
+
+    if not isinstance(file_info, FileEntry):
+        raise AssertionError(
+            f":Unexpected error: '{request.file_path}' refers to a directory, " "not a file."
+        )
 
     return file_info.file_digest
 
