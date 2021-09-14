@@ -563,25 +563,6 @@ class Target:
         """Validate the target, such as checking for mutually exclusive fields."""
 
 
-@union
-@dataclass(frozen=True)
-class GenerateTargetsRequest:
-    target_class: ClassVar[type[_Tgt]]
-    target: _Tgt
-
-
-class GeneratedTargets(DeduplicatedCollection[Target]):
-    pass
-
-
-@dataclass(frozen=True)
-class Subtargets:
-    # The BUILD target from which the subtargets were extracted.
-    base: Target
-    # The subtargets, one per file that was owned by the BUILD target.
-    subtargets: Tuple[Target, ...]
-
-
 @dataclass(frozen=True)
 class WrappedTarget:
     """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
@@ -614,7 +595,8 @@ class Targets(Collection[Target]):
 
 
 class UnexpandedTargets(Collection[Target]):
-    """Like `Targets`, but will not contain the expansion of `TargetAlias` instances."""
+    """Like `Targets`, but will not replace target generators with their generated targets (e.g.
+    replace `python_sources` with `python_source` targets)."""
 
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
@@ -701,30 +683,27 @@ class RegisteredTargetTypes:
 
 
 # -----------------------------------------------------------------------------------------------
-# Generated subtargets
+# Target generation
 # -----------------------------------------------------------------------------------------------
 
-
-def generate_subtarget_address(build_target_address: Address, *, full_file_name: str) -> Address:
-    """Return the address for a new target based on the BUILD target, but with a more precise
-    `sources` field.
-
-    The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
-
-    See generate_subtarget().
-    """
-    if build_target_address.is_file_target:
-        raise ValueError(f"Cannot generate file targets for a file Address: {build_target_address}")
-    original_spec_path = build_target_address.spec_path
-    relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
-    return Address(
-        spec_path=original_spec_path,
-        target_name=build_target_address.target_name,
-        relative_file_path=relative_file_path,
-    )
-
-
 _Tgt = TypeVar("_Tgt", bound=Target)
+
+
+@union
+@dataclass(frozen=True)
+class GenerateTargetsRequest(Generic[_Tgt]):
+    target_class: ClassVar[type[_Tgt]]
+    target: _Tgt
+
+
+class GeneratedTargets(DeduplicatedCollection[Target]):
+    pass
+
+
+class TargetTypesToGenerateTargetsRequests(FrozenDict[type[Target], type[GenerateTargetsRequest]]):
+    def is_generator(self, tgt: Target) -> bool:
+        """Does this target type generate other targets?"""
+        return type(tgt) in self
 
 
 def generate_file_level_target(
@@ -762,29 +741,12 @@ def generate_file_level_target(
 
     return generated_target_cls(
         generated_target_fields,
-        generate_subtarget_address(generator.address, full_file_name=file_path),
+        Address(
+            generator.address.spec_path,
+            target_name=generator.address.target_name,
+            relative_file_path=relativized_file_name,
+        ),
         union_membership,
-    )
-
-
-def generate_subtarget(
-    build_target: _Tgt,
-    *,
-    full_file_name: str,
-    # NB: `union_membership` is only optional to facilitate tests. In production, we should
-    # always provide this parameter. This should be safe to do because production code should
-    # rarely directly instantiate Targets and should instead use the engine to request them.
-    union_membership: Optional[UnionMembership] = None,
-) -> _Tgt:
-    """Generate a new target with the exact same metadata as the BUILD target, except for the
-    `sources` field only referring to the single file `full_file_name` and with a new address.
-
-    This is used for greater precision when using dependency inference and file arguments. When we
-    are able to deduce specifically which files are being used, we can use only the files we care
-    about, rather than the entire `sources` field.
-    """
-    return generate_file_level_target(
-        type(build_target), build_target, union_membership, file_path=full_file_name
     )
 
 
@@ -1321,9 +1283,6 @@ class Sources(StringSequenceField, AsyncFieldMixin):
       is no limit on the number of source files.
     - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files referenced
       by this field.
-    - `indivisible` -- The Target API by default will split targets into per-file subtargets for each source
-      file. Set this property to `True` to opt-out of that spliting by marking the source files as "indivisible"
-      such that the Target API will never split targets containing this field into per-file subtargets.
     """
 
     alias = "sources"
@@ -1331,7 +1290,6 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
-    indivisible: ClassVar[bool] = False
 
     help = (
         "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "

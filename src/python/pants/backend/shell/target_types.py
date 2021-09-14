@@ -185,4 +185,5 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateShunit2TestsFromShunit2Tests),
+        UnionRule(GenerateTargetsRequest, GenerateShellLibraryFromShellLibrary),
     )
