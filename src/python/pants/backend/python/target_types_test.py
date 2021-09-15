@@ -11,6 +11,7 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
@@ -42,10 +43,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import (
     InjectPexBinaryEntryPointDependency,
     InjectPythonDistributionDependencies,
-    inject_pex_binary_entry_point_dependency,
-    inject_python_distribution_dependencies,
     resolve_pex_entry_point,
-    resolve_python_distribution_entry_points,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.engine.addresses import Address
@@ -197,8 +195,7 @@ def test_resolve_pex_binary_entry_point() -> None:
 def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
-            inject_pex_binary_entry_point_dependency,
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             *import_rules(),
             QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
         ],
@@ -393,9 +390,7 @@ def test_resolve_python_distribution_entry_points_required_fields() -> None:
 def test_inject_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
-            inject_python_distribution_dependencies,
-            resolve_pex_entry_point,
-            resolve_python_distribution_entry_points,
+            *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
             QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),

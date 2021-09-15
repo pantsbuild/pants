@@ -3,6 +3,7 @@
 
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
@@ -27,7 +28,11 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_infer_python_imports(caplog) -> None:
     rule_runner = RuleRunner(
-        rules=[*import_rules(), QueryRule(InferredDependencies, [InferPythonImportDependencies])],
+        rules=[
+            *import_rules(),
+            *target_types_rules.rules(),
+            QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+        ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
     rule_runner.add_to_build_file(
@@ -157,6 +162,7 @@ def test_infer_python_inits() -> None:
     rule_runner = RuleRunner(
         rules=[
             *ancestor_files.rules(),
+            *target_types_rules.rules(),
             infer_python_init_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
@@ -201,6 +207,7 @@ def test_infer_python_conftests() -> None:
     rule_runner = RuleRunner(
         rules=[
             *ancestor_files.rules(),
+            *target_types_rules.rules(),
             infer_python_conftest_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),

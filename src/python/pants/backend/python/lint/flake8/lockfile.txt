@@ -4,10 +4,12 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
-#   "requirements_invalidation_digest": "ebd4b2326fca44e0d0b362def86bddc1b57e6f6d6c4f077fef5e1218286d3883",
+#   "version": 2,
 #   "valid_for_interpreter_constraints": [
 #     "CPython<4,>=3.6"
+#   ],
+#   "generated_with_requirements": [
+#     "flake8<4.0,>=3.9.2"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---

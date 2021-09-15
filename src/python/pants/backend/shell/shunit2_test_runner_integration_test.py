@@ -24,6 +24,7 @@ from pants.backend.shell.target_types import (
     Shunit2ShellField,
     Shunit2Tests,
 )
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.test import (
     TestDebugRequest,
     TestResult,
@@ -48,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
             *python_target_type_rules(),
+            *target_types_rules(),
             build_runtime_package_dependencies,
             get_filtered_environment,
             QueryRule(TestResult, [Shunit2FieldSet]),

@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
             *flake8_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, [Flake8Request]),
         ],
         target_types=[PythonLibrary],

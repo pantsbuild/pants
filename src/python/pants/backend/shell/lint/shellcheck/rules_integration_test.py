@@ -10,6 +10,7 @@ import pytest
 from pants.backend.shell.lint.shellcheck.rules import ShellcheckFieldSet, ShellcheckRequest
 from pants.backend.shell.lint.shellcheck.rules import rules as shellcheck_rules
 from pants.backend.shell.target_types import ShellLibrary
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -25,6 +26,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *source_files.rules(),
+            *target_types_rules(),
             QueryRule(LintResults, [ShellcheckRequest]),
         ],
         target_types=[ShellLibrary],

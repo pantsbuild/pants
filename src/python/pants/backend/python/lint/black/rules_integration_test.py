@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *black_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, (BlackRequest,)),
             QueryRule(FmtResult, (BlackRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

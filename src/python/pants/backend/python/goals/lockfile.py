@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import ClassVar, Iterable, Sequence, cast
 
+from pkg_resources import Requirement
+
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
     PoetrySubsystem,
@@ -233,7 +235,11 @@ async def generate_lockfile(
     initial_lockfile_digest_contents = await Get(
         DigestContents, Digest, poetry_export_result.output_digest
     )
-    metadata = LockfileMetadata(req.requirements_hex_digest, req.interpreter_constraints)
+    # TODO(#12314) Improve error message on `Requirement.parse`
+    metadata = LockfileMetadata.new(
+        req.interpreter_constraints,
+        {Requirement.parse(i) for i in req.requirements},
+    )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(

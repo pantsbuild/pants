@@ -17,6 +17,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
+    GeneratedTargets,
     GenerateSourcesRequest,
     IntField,
     InvalidFieldChoiceException,
@@ -32,8 +33,7 @@ from pants.engine.target import (
     StringSequenceField,
     Tags,
     Target,
-    generate_subtarget,
-    generate_subtarget_address,
+    generate_file_level_targets,
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
@@ -428,63 +428,62 @@ def test_target_validate() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test generated subtargets
+# Test file-level target generation
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_subtarget() -> None:
-    class MockTarget(Target):
-        alias = "mock_target"
+def test_generate_file_level_targets() -> None:
+    class MockGenerator(Target):
+        alias = "generator"
         core_fields = (Dependencies, Tags, Sources)
 
-    # When the target already only has a single source, the result should be the same, except for a
-    # different address.
-    single_source_tgt = MockTarget(
-        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
-        Address("src/fortran", target_name="demo"),
-    )
-    expected_single_source_address = Address(
-        "src/fortran", relative_file_path="demo.f95", target_name="demo"
-    )
-    assert generate_subtarget(
-        single_source_tgt, full_file_name="src/fortran/demo.f95"
-    ) == MockTarget(
-        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]}, expected_single_source_address
-    )
-    assert (
-        generate_subtarget_address(single_source_tgt.address, full_file_name="src/fortran/demo.f95")
-        == expected_single_source_address
+    class MockGenerated(Target):
+        alias = "generated"
+        core_fields = (Dependencies, Tags, Sources)
+
+    def generate(generator: Target, files: List[str]) -> GeneratedTargets:
+        return generate_file_level_targets(MockGenerated, generator, files, None)
+
+    tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
+    assert generate(tgt, ["demo/f1.ext", "demo/f2.ext"]) == GeneratedTargets(
+        [
+            MockGenerated(
+                {Sources.alias: ["f1.ext"], Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f1.ext"),
+            ),
+            MockGenerated(
+                {Sources.alias: ["f2.ext"], Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f2.ext"),
+            ),
+        ]
     )
 
-    subdir_tgt = MockTarget(
-        {Sources.alias: ["demo.f95", "subdir/demo.f95"]},
-        Address("src/fortran", target_name="demo"),
+    subdir_tgt = MockGenerator(
+        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, Address("src/fortran", target_name="demo")
     )
-    expected_subdir_address = Address(
-        "src/fortran", relative_file_path="subdir/demo.f95", target_name="demo"
-    )
-    assert generate_subtarget(
-        subdir_tgt, full_file_name="src/fortran/subdir/demo.f95"
-    ) == MockTarget({Sources.alias: ["subdir/demo.f95"]}, expected_subdir_address)
-    assert (
-        generate_subtarget_address(subdir_tgt.address, full_file_name="src/fortran/subdir/demo.f95")
-        == expected_subdir_address
+    assert generate(subdir_tgt, ["src/fortran/subdir/demo.f95"]) == GeneratedTargets(
+        [
+            MockGenerated(
+                {Sources.alias: ["subdir/demo.f95"]},
+                Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+            )
+        ]
     )
 
-    # The full_file_name must match the filespec of the BUILD target's Sources field.
-    with pytest.raises(ValueError) as exc:
-        generate_subtarget(single_source_tgt, full_file_name="src/fortran/fake_file.f95")
-    assert "does not match a file src/fortran/fake_file.f95" in str(exc.value)
+    # The file path must match the filespec of the generator target's Sources field.
+    with pytest.raises(AssertionError) as exc:
+        generate(tgt, ["demo/fake.ext"])
+    assert "does not match a file demo/fake.ext" in str(exc.value)
 
     class MissingFieldsTarget(Target):
-        alias = "missing_fields_tgt"
+        alias = "missing_fields"
         core_fields = (Tags,)
 
     missing_fields_tgt = MissingFieldsTarget(
-        {Tags.alias: ["demo"]}, Address("", target_name="missing_fields")
+        {Tags.alias: ["tag"]}, Address("", target_name="missing_fields")
     )
-    with pytest.raises(ValueError) as exc:
-        generate_subtarget(missing_fields_tgt, full_file_name="fake.txt")
+    with pytest.raises(AssertionError) as exc:
+        generate(missing_fields_tgt, ["fake.txt"])
     assert "does not have both a `dependencies` and `sources` field" in str(exc.value)
 
 
