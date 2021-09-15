@@ -425,14 +425,15 @@ async def build_pex(
     if isinstance(request.requirements, Lockfile):
         argv.extend(["--requirement", request.requirements.file_path])
         argv.append("--no-transitive")
-
         globs = PathGlobs(
             [request.requirements.file_path],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=request.requirements.file_path_description_of_origin,
         )
-
-        if python_setup.invalid_lockfile_behavior in {InvalidLockfileBehavior.warn, InvalidLockfileBehavior.error}:
+        if python_setup.invalid_lockfile_behavior in {
+            InvalidLockfileBehavior.warn,
+            InvalidLockfileBehavior.error,
+        }:
             requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
             metadata = LockfileMetadata.from_lockfile(
                 requirements_file_digest_contents[0].content,
@@ -440,17 +441,20 @@ async def build_pex(
                 resolve_name,
             )
             _validate_metadata(metadata, request, request.requirements, python_setup)
-
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
     elif isinstance(request.requirements, LockfileContent):
         file_content = request.requirements.file_content
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
-
-        metadata = LockfileMetadata.from_lockfile(file_content.content, resolve_name=resolve_name)
-        _validate_metadata(metadata, request, request.requirements, python_setup)
-
+        if python_setup.invalid_lockfile_behavior in {
+            InvalidLockfileBehavior.warn,
+            InvalidLockfileBehavior.error,
+        }:
+            metadata = LockfileMetadata.from_lockfile(
+                file_content.content, resolve_name=resolve_name
+            )
+            _validate_metadata(metadata, request, request.requirements, python_setup)
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
         assert isinstance(request.requirements, PexRequirements)
