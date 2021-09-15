@@ -30,9 +30,9 @@ def test_address_input_parse_spec() -> None:
 
     assert_parsed("a/b/c", path_component="a/b/c")
     assert_parsed("a/b/c:c", path_component="a/b/c", target_component="c")
-    assert_parsed("a/b/c!gen", path_component="a/b/c", generated_component="gen")
+    assert_parsed("a/b/c#gen", path_component="a/b/c", generated_component="gen")
     assert_parsed(
-        "a/b/c:c!gen", path_component="a/b/c", target_component="c", generated_component="gen"
+        "a/b/c:c#gen", path_component="a/b/c", target_component="c", generated_component="gen"
     )
     # The relative_to has no effect because we have a path.
     assert_parsed("a/b/c", relative_to="here", path_component="a/b/c")
@@ -40,9 +40,9 @@ def test_address_input_parse_spec() -> None:
     # Relative address spec
     assert_parsed(":c", path_component="", target_component="c")
     assert_parsed(":c", relative_to="here", path_component="here", target_component="c")
-    assert_parsed("!gen", relative_to="here", path_component="here", generated_component="gen")
+    assert_parsed("#gen", relative_to="here", path_component="here", generated_component="gen")
     assert_parsed(
-        ":c!gen",
+        ":c#gen",
         relative_to="here",
         path_component="here",
         target_component="c",
@@ -50,7 +50,7 @@ def test_address_input_parse_spec() -> None:
     )
     assert_parsed("//:c", relative_to="here", path_component="", target_component="c")
     assert_parsed(
-        "//:c!gen",
+        "//:c#gen",
         relative_to="here",
         path_component="",
         target_component="c",
@@ -78,7 +78,7 @@ def test_address_input_parse_spec() -> None:
         target_component="tgt",
     )
     assert_parsed("subdir/f.txt", relative_to="here", path_component="subdir/f.txt")
-    assert_parsed("a/b/c.txt!gen", path_component="a/b/c.txt", generated_component="gen")
+    assert_parsed("a/b/c.txt#gen", path_component="a/b/c.txt", generated_component="gen")
 
 
 @pytest.mark.parametrize(
@@ -98,7 +98,7 @@ def test_address_bad_target_component(spec: str) -> None:
         AddressInput.parse(spec).dir_to_address()
 
 
-@pytest.mark.parametrize("spec", ["//:t!gen@", "//:t!gen!", "//:t!gen?", "//:t!gen="])
+@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen="])
 def test_address_generated_name(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
         AddressInput.parse(spec).dir_to_address()
@@ -210,7 +210,7 @@ def test_address_validate_build_in_spec_path() -> None:
     # It's fine to use BUILD in the relative_file_path, target_name, or generated_name, though.
     assert Address("a/b", relative_file_path="BUILD").spec == "a/b/BUILD"
     assert Address("a/b", target_name="BUILD").spec == "a/b:BUILD"
-    assert Address("a/b", generated_name="BUILD").spec == "a/b!BUILD"
+    assert Address("a/b", generated_name="BUILD").spec == "a/b#BUILD"
 
 
 def test_address_equality() -> None:
@@ -248,27 +248,27 @@ def test_address_spec() -> None:
 
     assert_spec(
         Address("a/b", generated_name="generated"),
-        expected="a/b!generated",
+        expected="a/b#generated",
         expected_path_spec="a.b@generated",
     )
     assert_spec(
         Address("a/b", generated_name="generated/f.ext"),
-        expected="a/b!generated/f.ext",
+        expected="a/b#generated/f.ext",
         expected_path_spec="a.b@generated.f.ext",
     )
     assert_spec(
         Address("a/b", target_name="generator", generated_name="generated"),
-        expected="a/b:generator!generated",
+        expected="a/b:generator#generated",
         expected_path_spec="a.b.generator@generated",
     )
     assert_spec(
         Address("a/b", target_name="generator", generated_name="generated/f.ext"),
-        expected="a/b:generator!generated/f.ext",
+        expected="a/b:generator#generated/f.ext",
         expected_path_spec="a.b.generator@generated.f.ext",
     )
     assert_spec(
         Address("", target_name="root", generated_name="generated"),
-        expected="//:root!generated",
+        expected="//:root#generated",
         expected_path_spec=".root@generated",
     )
 

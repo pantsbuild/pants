@@ -103,7 +103,7 @@ class AddressInput:
                 dependencies=['//:targetname'],
             )
 
-        The spec may be for a generated file: `dir:generator!generated`.
+        The spec may be for a generated target: `dir:generator#generated`.
 
         The spec may be a file, such as `a/b/c.txt`. It may include a relative address spec at the
         end, such as `a/b/c.txt:original` or `a/b/c.txt:../original`, to disambiguate which target
@@ -127,13 +127,13 @@ class AddressInput:
         path_component = spec_parts[0]
         if len(spec_parts) == 1:
             target_component = None
-            generated_parts = path_component.split("!", maxsplit=1)
+            generated_parts = path_component.split("#", maxsplit=1)
             if len(generated_parts) == 1:
                 generated_component = None
             else:
                 path_component, generated_component = generated_parts
         else:
-            generated_parts = spec_parts[1].split("!", maxsplit=1)
+            generated_parts = spec_parts[1].split("#", maxsplit=1)
             if len(generated_parts) == 1:
                 target_component = generated_parts[0]
                 generated_component = None
@@ -217,7 +217,7 @@ class Address(EngineAwareParameter):
     """The unique address for a `Target`.
 
     Targets explicitly declared in BUILD files use the format `path/to:tgt`, whereas targets
-    generated from other targets use the format `path/to:generator!generated`.
+    generated from other targets use the format `path/to:generator#generated`.
     """
 
     def __init__(
@@ -253,7 +253,7 @@ class Address(EngineAwareParameter):
             if banned_chars:
                 raise InvalidTargetName(
                     f"The generated name `{generated_name}` (defined in directory "
-                    f"{self.spec_path}, the part after `!`) contains banned characters "
+                    f"{self.spec_path}, the part after `#`) contains banned characters "
                     f"(`{'`,`'.join(banned_chars)}`). Please replace "
                     "these characters with another separator character like `_`, `-`, or `/`."
                 )
@@ -327,7 +327,7 @@ class Address(EngineAwareParameter):
                 else f"{file_portion}:{parent_prefix}{self.target_name}"
             )
         target_portion = f":{self._target_name}" if self._target_name is not None else ""
-        generated_portion = f"!{self.generated_name}" if self.generated_name is not None else ""
+        generated_portion = f"#{self.generated_name}" if self.generated_name is not None else ""
         return f"{prefix}{self.spec_path}{target_portion}{generated_portion}"
 
     @property
@@ -362,7 +362,7 @@ class Address(EngineAwareParameter):
 
     def maybe_convert_to_generated_target(self) -> Address:
         """If this address is for a file target, convert it into generated target syntax
-        (dir/f.ext:lib -> dir:lib!f.ext).
+        (dir/f.ext:lib -> dir:lib#f.ext).
 
         Otherwise, return itself unmodified.
         """
@@ -394,16 +394,18 @@ class Address(EngineAwareParameter):
         return self.spec
 
     def __lt__(self, other):
+        # NB: This ordering is intentional so that we match the spec format:
+        # `{spec_path}{relative_file_path}:{tgt_name}#{generated_name}`.
         return (
             self.spec_path,
+            self._relative_file_path or "",
             self._target_name or "",
             self.generated_name or "",
-            self._relative_file_path or "",
         ) < (
             other.spec_path,
+            other._relative_file_path or "",
             other._target_name or "",
             other.generated_name or "",
-            other._relative_file_path or "",
         )
 
     def debug_hint(self) -> str:
