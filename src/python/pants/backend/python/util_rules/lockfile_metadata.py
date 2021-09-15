@@ -47,7 +47,7 @@ class LockfileMetadata:
             "`./pants generate-lockfiles"
         )
         if resolve_name:
-            error_suffix += "--resolve={tool_name}"
+            error_suffix += " --resolve={tool_name}"
         error_suffix += "`."
 
         if lockfile_path is not None and resolve_name is not None:
@@ -61,7 +61,7 @@ class LockfileMetadata:
 
         if not metadata_lines:
             raise InvalidLockfileError(
-                f"Could not find a pants metadata block in {lockfile_description}. {error_suffix}"
+                f"Could not find a Pants metadata block in {lockfile_description}. {error_suffix}"
             )
 
         try:
