@@ -20,6 +20,7 @@ from pants.backend.python.subsystems.lambdex import (
     rules as python_google_cloud_function_subsystem_rules,
 )
 from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import Files, RelocatedFiles, Resources
 from pants.core.target_types import rules as core_target_types_rules
@@ -36,6 +37,7 @@ def rule_runner() -> RuleRunner:
             *python_google_cloud_function_rules(),
             *python_google_cloud_function_subsystem_rules(),
             *target_rules(),
+            *python_target_types_rules(),
             *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
         ],

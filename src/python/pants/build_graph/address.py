@@ -266,7 +266,9 @@ class Address(EngineAwareParameter):
     @property
     def filename(self) -> str:
         if self._relative_file_path is None:
-            raise ValueError("Only a file Address (`self.is_file_target`) has a filename.")
+            raise AssertionError(
+                f"Only a file Address (`self.is_file_target`) has a filename: {self}"
+            )
         return os.path.join(self.spec_path, self._relative_file_path)
 
     @property

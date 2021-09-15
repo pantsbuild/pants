@@ -8,6 +8,7 @@ from typing import Sequence
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *bandit_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, (BanditRequest,)),
         ],
         target_types=[PythonLibrary],

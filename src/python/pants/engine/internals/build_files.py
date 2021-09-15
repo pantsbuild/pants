@@ -173,8 +173,8 @@ async def addresses_from_address_specs(
         Get(TargetAdaptor, Address, addr.maybe_convert_to_build_target())
         for addr in literal_addresses
     )
-    # We convert to targets for the side effect of validating that any file addresses actually
-    # belong to the specified BUILD targets.
+    # We convert to targets for the side effect of validating that any addresses for generated
+    # targets actually belong to their target generator.
     await Get(
         UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
     )

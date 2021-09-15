@@ -11,6 +11,8 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_type_rules
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
@@ -166,6 +168,8 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *module_mapper_rules(),
             *python_protobuf_module_mapper.rules(),
+            *target_types_rules.rules(),
+            *protobuf_target_type_rules(),
             QueryRule(FirstPartyPythonModuleMapping, []),
             QueryRule(ThirdPartyPythonModuleMapping, []),
             QueryRule(PythonModuleOwners, [PythonModule]),

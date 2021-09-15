@@ -17,6 +17,7 @@ from pants.backend.java.compile.javac import (
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary
+from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files
@@ -50,6 +51,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *util_rules(),
             *javac_binary_rules(),
+            *target_types_rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
