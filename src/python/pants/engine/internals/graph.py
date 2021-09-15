@@ -131,6 +131,8 @@ async def resolve_target(
     )
     generator_tgt = wrapped_generator_tgt.target
     if not target_types_to_generate_requests.is_generator(generator_tgt):
+        # TODO: Error in this case. You should not use a generator address (or file address) if
+        #  the generator does not actually generate.
         return wrapped_generator_tgt
 
     generate_request = target_types_to_generate_requests[type(generator_tgt)]
