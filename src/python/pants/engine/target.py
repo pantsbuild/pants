@@ -705,8 +705,11 @@ class GenerateTargetsRequest(Generic[_Tgt]):
     generator: _Tgt
 
 
-class GeneratedTargets(DeduplicatedCollection[Target]):
-    pass
+class GeneratedTargets(FrozenDict[Address, Target]):
+    """A mapping of the address of generated targets to the targets themselves."""
+
+    def __init__(self, generated_targets: Iterable[Target]) -> None:
+        super().__init__({tgt.address: tgt for tgt in generated_targets})
 
 
 class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
