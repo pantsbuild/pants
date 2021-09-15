@@ -18,8 +18,7 @@ class ExtractFileDigest:
 @rule
 async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
     digest = await Get(Digest, DigestSubset(request.digest, PathGlobs([request.file_path])))
-    files_or_directories = await Get(DigestEntries, Digest, digest)
-    digest_entries = [entry for entry in files_or_directories if isinstance(entry, FileEntry)]
+    digest_entries = await Get(DigestEntries, Digest, digest)
 
     if len(digest_entries) == 0:
         raise Exception(f"ExtractFileDigest: '{request.file_path}' not found in {request.digest}.")
@@ -29,6 +28,12 @@ async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
         )
 
     file_info = digest_entries[0]
+
+    if not isinstance(file_info, FileEntry):
+        raise AssertionError(
+            f"Unexpected error: '{request.file_path}' refers to a directory, not a file."
+        )
+
     return file_info.file_digest
 
 
