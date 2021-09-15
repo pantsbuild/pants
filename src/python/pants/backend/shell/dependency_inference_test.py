@@ -136,19 +136,17 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
 
     build_address = Address("a")
     assert run_dep_inference(build_address) == InferredDependencies(
-        [Address("b", relative_file_path="f.sh"), Address("a", relative_file_path="f1.sh")],
-        sibling_dependencies_inferrable=True,
+        [Address("b", relative_file_path="f.sh"), Address("a", relative_file_path="f1.sh")]
     )
 
     file_address = Address("a", relative_file_path="f1.sh")
     assert run_dep_inference(file_address) == InferredDependencies(
-        [Address("b", relative_file_path="f.sh")], sibling_dependencies_inferrable=True
+        [Address("b", relative_file_path="f.sh")]
     )
 
     caplog.clear()
     assert run_dep_inference(Address("ambiguous", target_name="main")) == InferredDependencies(
-        [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")],
-        sibling_dependencies_inferrable=True,
+        [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")]
     )
     assert len(caplog.records) == 1
     assert "The target ambiguous:main sources `ambiguous/dep.sh`" in caplog.text

@@ -872,26 +872,6 @@ async def resolve_dependencies(
         )
         generated_addresses = tuple(generated_targets.keys())
 
-    # For "file targets", inject dependencies on all siblings if that target does not have
-    # dependency inference or the implementations cannot infer dependencies on sibling files.
-    # TODO: Remove this, have the target generation rules set up the dependencies directly.
-    no_sibling_file_deps_inferrable = not inferred or all(
-        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
-    )
-    if (
-        target_types_to_generate_requests.is_generator(tgt)
-        and tgt.address.is_file_target
-        and no_sibling_file_deps_inferrable
-    ):
-        generate_request = target_types_to_generate_requests[type(tgt)]
-        build_tgt = await Get(WrappedTarget, Address, tgt.address.maybe_convert_to_build_target())
-        generated_targets = await Get(
-            GeneratedTargets, GenerateTargetsRequest, generate_request(build_tgt.target)
-        )
-        generated_addresses = tuple(
-            addr for addr in generated_targets if addr != request.field.address
-        )
-
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to

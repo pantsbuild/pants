@@ -139,7 +139,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         InferredDependencies, [InferGoPackageDependenciesRequest(target1[GoPackageSources])]
     )
     assert inferred_deps_1.dependencies == FrozenOrderedSet([Address("foo/pkg")])
-    assert not inferred_deps_1.sibling_dependencies_inferrable
 
     target2 = rule_runner.get_target(Address("foo/pkg"))
     inferred_deps_2 = rule_runner.request(
@@ -148,4 +147,3 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     assert inferred_deps_2.dependencies == FrozenOrderedSet(
         [Address("foo", target_name="github.com_google_go-cmp_0.4.0-_cmp")]
     )
-    assert not inferred_deps_2.sibling_dependencies_inferrable

@@ -74,11 +74,17 @@ class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_python_tests(
-    request: GenerateTargetsFromPythonTests, union_membership: UnionMembership
+    request: GenerateTargetsFromPythonTests,
+    python_infer: PythonInferSubsystem,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
     return generate_file_level_targets(
-        PythonTests, request.generator, paths.files, union_membership
+        PythonTests,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not python_infer.imports,
     )
 
 
@@ -88,11 +94,17 @@ class GenerateTargetsFromPythonLibrary(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_python_library(
-    request: GenerateTargetsFromPythonLibrary, union_membership: UnionMembership
+    request: GenerateTargetsFromPythonLibrary,
+    python_infer: PythonInferSubsystem,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
     return generate_file_level_targets(
-        PythonLibrary, request.generator, paths.files, union_membership
+        PythonLibrary,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not python_infer.imports,
     )
 
 

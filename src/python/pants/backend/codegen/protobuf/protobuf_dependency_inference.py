@@ -95,7 +95,7 @@ async def infer_protobuf_dependencies(
     request: InferProtobufDependencies, protobuf_mapping: ProtobufMapping, protoc: Protoc
 ) -> InferredDependencies:
     if not protoc.dependency_inference:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     address = request.sources_field.address
     wrapped_tgt = await Get(WrappedTarget, Address, address)
@@ -125,7 +125,7 @@ async def infer_protobuf_dependencies(
                 maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
-    return InferredDependencies(sorted(result), sibling_dependencies_inferrable=True)
+    return InferredDependencies(sorted(result))
 
 
 def rules():
