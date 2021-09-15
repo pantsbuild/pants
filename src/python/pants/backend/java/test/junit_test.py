@@ -29,7 +29,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.target_types import JvmDependencyLockfile, JvmArtifact
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaLibrary, JunitTests],
+        target_types=[JvmDependencyLockfile, JvmArtifact, JavaLibrary, JunitTests],
         bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
@@ -109,9 +109,15 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -159,9 +165,15 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -218,9 +230,15 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -381,10 +399,16 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -435,10 +459,16 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -496,10 +526,16 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -575,11 +611,23 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": combined_lockfile.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='junit_junit',
+                  group='junit',
+                  artifact='junit',
+                  version='4.13.2',
+                )
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'junit:junit:4.13.2',
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':junit_junit',
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",

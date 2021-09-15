@@ -7,6 +7,7 @@ import os.path
 from dataclasses import dataclass
 
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -20,14 +21,25 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import Sources, Target, Targets
-from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, CoursierResolvedLockfile
-from pants.jvm.target_types import JvmLockfileSources, MavenRequirementsField
+from pants.engine.target import Sources, Target, Targets, UnexpandedTargets
+from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirements,
+    Coordinate,
+    CoursierResolvedLockfile,
+)
+from pants.jvm.target_types import (
+    JvmArtifactArtifactField,
+    JvmArtifactGroupField,
+    JvmArtifactVersionField,
+    JvmLockfileSources,
+    JvmRequirementsField,
+)
+from pants.util.logging import LogLevel
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
     name = "coursier-resolve"
-    help = "Generate a lockfile by resolving Maven dependencies."
+    help = "Generate a lockfile by resolving JVM dependencies."
 
 
 class CoursierResolve(Goal):
@@ -35,13 +47,53 @@ class CoursierResolve(Goal):
 
 
 @dataclass(frozen=True)
-class CoursierGenerateLockfileRequest:
-    """Regenerate a coursier_lockfile target's lockfile from its Maven requirements.
+class GatherArtifactRequirementsRequest:
+    """Gather the coordinate requirements from a JarRequirementsField."""
 
-    This allows the user to manually regenerate their lockfile.  This is done for a few reasons: to
-    generate the lockfile for the first time, to regenerate it because the input Maven requirements
+    requirements: JvmRequirementsField
+
+
+@rule(level=LogLevel.DEBUG)
+async def gather_artifact_requirements(
+    request: GatherArtifactRequirementsRequest,
+) -> ArtifactRequirements:
+    def from_target(tgt: Target) -> Coordinate:
+        group = tgt[JvmArtifactGroupField].value
+        if not group:
+            raise ValueError("A group field must not be blank.")
+
+        artifact = tgt[JvmArtifactArtifactField].value
+        if not artifact:
+            raise ValueError("A artifact field must not be blank.")
+
+        version = tgt[JvmArtifactVersionField].value
+        if not version:
+            raise ValueError("A version field must not be blank.")
+
+        return Coordinate(
+            group=group,
+            artifact=artifact,
+            version=version,
+        )
+
+    requirements_addresses = await Get(
+        Addresses, UnparsedAddressInputs, request.requirements.to_unparsed_address_inputs()
+    )
+    requirements_targets = await Get(UnexpandedTargets, Addresses, requirements_addresses)
+
+    return ArtifactRequirements(from_target(tgt) for tgt in requirements_targets)
+
+
+@dataclass(frozen=True)
+class CoursierGenerateLockfileRequest:
+    """Regenerate a coursier_lockfile target's lockfile from its JVM requirements.
+
+    This request allows a user to manually regenerate their lockfile. This is done for a few reasons: to
+    generate the lockfile for the first time, to regenerate it because the input JVM requirements
     have changed, or to regenerate it to check if the resolve has changed (e.g. due to newer
     versions of dependencies being published).
+
+    target: The `coursier_lockfile` target to operate on
     """
 
     target: Target
@@ -56,12 +108,14 @@ class CoursierGenerateLockfileResult:
 async def coursier_generate_lockfile(
     request: CoursierGenerateLockfileRequest,
 ) -> CoursierGenerateLockfileResult:
+    artifact_requirements = await Get(
+        ArtifactRequirements,
+        GatherArtifactRequirementsRequest(request.target[JvmRequirementsField]),
+    )
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
         ArtifactRequirements,
-        ArtifactRequirements.create_from_maven_coordinates_fields(
-            fields=(request.target[MavenRequirementsField],),
-        ),
+        artifact_requirements,
     )
     resolved_lockfile_json = resolved_lockfile.to_json()
 
