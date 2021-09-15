@@ -38,31 +38,30 @@ def rule_runner() -> RuleRunner:
 
 
 def test_depgraph_construction(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({
-        "3rdparty/python/BUILD":
-        dedent(
-            """\
+    rule_runner.write_files(
+        {
+            "3rdparty/python/BUILD": dedent(
+                """\
             python_requirement_library(
                 name='extlib',
                 requirements=['extlib==1.2.3'],
             )
             """
-        ),
-        "src/python/foo/BUILD":
-        dedent(
-            """\
+            ),
+            "src/python/foo/BUILD": dedent(
+                """\
             python_library(dependencies=['3rdparty/python:extlib'])
             """
-        ),
-        "src/python/foo/bar.py": "",
-        "src/python/baz/BUILD":
-        dedent(
-            """\
+            ),
+            "src/python/foo/bar.py": "",
+            "src/python/baz/BUILD": dedent(
+                """\
             python_library(name="lib", dependencies=['src/python/foo'])
             """
-        ),
-        "src/python/baz/qux.py": ""
-    })
+            ),
+            "src/python/baz/qux.py": "",
+        }
+    )
 
     dep_graph = rule_runner.request(
         DependencyGraph, [DependencyGraphRequest(granularity=Granularity.FILE)]
