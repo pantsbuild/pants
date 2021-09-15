@@ -1487,13 +1487,13 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     return InferredDependencies(resolved, sibling_dependencies_inferrable=bool(resolved))
 
 
-class GenerateSmallTalkLibraryFromSmallTalkLibraryRequest(GenerateTargetsRequest):
+class GenerateTargetsFromSmallTalkLibraryRequest(GenerateTargetsRequest):
     generate_from = SmalltalkLibrary
 
 
 @rule
-async def generate_smalltalk_library_from_smalltalk_library(
-    request: GenerateSmallTalkLibraryFromSmallTalkLibraryRequest,
+async def generate_targets_from_smalltalk_library(
+    request: GenerateTargetsFromSmallTalkLibraryRequest,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[SmalltalkSources]))
     return generate_file_level_targets(SmalltalkLibrary, request.generator, paths.files, None)
@@ -1506,13 +1506,13 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
-            generate_smalltalk_library_from_smalltalk_library,
+            generate_targets_from_smalltalk_library,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
-            UnionRule(GenerateTargetsRequest, GenerateSmallTalkLibraryFromSmallTalkLibraryRequest),
+            UnionRule(GenerateTargetsRequest, GenerateTargetsFromSmallTalkLibraryRequest),
         ],
         target_types=[SmalltalkLibrary],
     )

@@ -136,13 +136,13 @@ class Shunit2Tests(Target):
     )
 
 
-class GenerateShunit2TestsFromShunit2Tests(GenerateTargetsRequest):
+class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
     generate_from = Shunit2Tests
 
 
 @rule
-async def generate_shunit2_tests_from_shunit2_tests(
-    request: GenerateShunit2TestsFromShunit2Tests, union_membership: UnionMembership
+async def generate_targets_from_shunit2_tests(
+    request: GenerateTargetsFromShunit2Tests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsSources]))
     return generate_file_level_targets(
@@ -165,13 +165,13 @@ class ShellLibrary(Target):
     help = "Bourne-based shell scripts, e.g. Bash scripts."
 
 
-class GenerateShellLibraryFromShellLibrary(GenerateTargetsRequest):
+class GenerateTargetsFromShellLibrary(GenerateTargetsRequest):
     generate_from = ShellLibrary
 
 
 @rule
-async def generate_shell_library_from_shell_library(
-    request: GenerateShellLibraryFromShellLibrary, union_membership: UnionMembership
+async def generate_targets_from_shell_library(
+    request: GenerateTargetsFromShellLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ShellLibrarySources]))
     return generate_file_level_targets(
@@ -182,6 +182,6 @@ async def generate_shell_library_from_shell_library(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateShunit2TestsFromShunit2Tests),
-        UnionRule(GenerateTargetsRequest, GenerateShellLibraryFromShellLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShunit2Tests),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShellLibrary),
     )

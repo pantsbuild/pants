@@ -41,13 +41,13 @@ class ProtobufLibrary(Target):
     help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."
 
 
-class GenerateProtobufLibraryFromProtobufLibrary(GenerateTargetsRequest):
+class GenerateTargetsFromProtobufLibrary(GenerateTargetsRequest):
     generate_from = ProtobufLibrary
 
 
 @rule
-async def generate_protobuf_library_from_protobuf_library(
-    request: GenerateProtobufLibraryFromProtobufLibrary, union_membership: UnionMembership
+async def generate_targets_from_protobuf_library(
+    request: GenerateTargetsFromProtobufLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSources]))
     return generate_file_level_targets(
@@ -58,5 +58,5 @@ async def generate_protobuf_library_from_protobuf_library(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateProtobufLibraryFromProtobufLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromProtobufLibrary),
     )

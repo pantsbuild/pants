@@ -59,13 +59,13 @@ class Files(Target):
     )
 
 
-class GenerateFilesFromFiles(GenerateTargetsRequest):
+class GenerateTargetsFromFiles(GenerateTargetsRequest):
     generate_from = Files
 
 
 @rule
-async def generate_files_from_files(
-    request: GenerateFilesFromFiles, union_membership: UnionMembership
+async def generate_targets_from_files(
+    request: GenerateTargetsFromFiles, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[FilesSources]))
     return generate_file_level_targets(Files, request.generator, paths.files, union_membership)
@@ -218,13 +218,13 @@ class Resources(Target):
     )
 
 
-class GenerateResourcesFromResources(GenerateTargetsRequest):
+class GenerateTargetsFromResources(GenerateTargetsRequest):
     generate_from = Resources
 
 
 @rule
-async def generate_resources_from_resources(
-    request: GenerateResourcesFromResources, union_membership: UnionMembership
+async def generate_targets_from_resources(
+    request: GenerateTargetsFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ResourcesSources]))
     return generate_file_level_targets(Resources, request.generator, paths.files, union_membership)
@@ -356,8 +356,8 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateFilesFromFiles),
-        UnionRule(GenerateTargetsRequest, GenerateResourcesFromResources),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromFiles),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromResources),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
         UnionRule(PackageFieldSet, ArchiveFieldSet),
     )

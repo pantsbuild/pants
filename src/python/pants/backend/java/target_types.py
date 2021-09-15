@@ -41,13 +41,13 @@ class JunitTests(Target):
     help = "Java tests, run with Junit."
 
 
-class GenerateJunitTestsFromJunitTests(GenerateTargetsRequest):
+class GenerateTargetsFromJunitTests(GenerateTargetsRequest):
     generate_from = JunitTests
 
 
 @rule
-async def generate_junit_tests_from_junit_tests(
-    request: GenerateJunitTestsFromJunitTests, union_membership: UnionMembership
+async def generate_targets_from_junit_tests(
+    request: GenerateTargetsFromJunitTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaTestsSources]))
     return generate_file_level_targets(JunitTests, request.generator, paths.files, union_membership)
@@ -72,13 +72,13 @@ class JavaLibrary(Target):
     help = "Java source code."
 
 
-class GenerateJavaLibraryFromJavaLibrary(GenerateTargetsRequest):
+class GenerateTargetsFromJavaLibrary(GenerateTargetsRequest):
     generate_from = JavaLibrary
 
 
 @rule
-async def generate_java_library_from_java_library(
-    request: GenerateJavaLibraryFromJavaLibrary, union_membership: UnionMembership
+async def generate_targets_from_java_library(
+    request: GenerateTargetsFromJavaLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaLibrarySources]))
     return generate_file_level_targets(
@@ -89,6 +89,6 @@ async def generate_java_library_from_java_library(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateJunitTestsFromJunitTests),
-        UnionRule(GenerateTargetsRequest, GenerateJavaLibraryFromJavaLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromJunitTests),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromJavaLibrary),
     )

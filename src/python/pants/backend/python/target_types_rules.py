@@ -68,13 +68,13 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
-class GeneratePythonTestsFromPythonTests(GenerateTargetsRequest):
+class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
     generate_from = PythonTests
 
 
 @rule
-async def generate_python_tests_from_python_tests(
-    request: GeneratePythonTestsFromPythonTests, union_membership: UnionMembership
+async def generate_targets_from_python_tests(
+    request: GenerateTargetsFromPythonTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
     return generate_file_level_targets(
@@ -82,13 +82,13 @@ async def generate_python_tests_from_python_tests(
     )
 
 
-class GeneratePythonLibraryFromPythonLibrary(GenerateTargetsRequest):
+class GenerateTargetsFromPythonLibrary(GenerateTargetsRequest):
     generate_from = PythonLibrary
 
 
 @rule
-async def generate_python_library_from_python_library(
-    request: GeneratePythonLibraryFromPythonLibrary, union_membership: UnionMembership
+async def generate_targets_from_python_library(
+    request: GenerateTargetsFromPythonLibrary, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
     return generate_file_level_targets(
@@ -401,8 +401,8 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(GenerateTargetsRequest, GeneratePythonTestsFromPythonTests),
-        UnionRule(GenerateTargetsRequest, GeneratePythonLibraryFromPythonLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonLibrary),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )
