@@ -107,11 +107,11 @@ class MockTgt(Target):
 
 def test_resolve_address() -> None:
     rule_runner = RuleRunner(rules=[QueryRule(Address, (AddressInput,))])
+    rule_runner.write_files({"a/b/c.txt": "", "f.txt": ""})
 
     def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
-    rule_runner.create_file("a/b/c.txt")
     assert_is_expected(
         AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
     )
@@ -126,7 +126,6 @@ def test_resolve_address() -> None:
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
-    rule_runner.create_file("f.txt")
     assert_is_expected(
         AddressInput("f.txt", target_component="original"),
         Address("", relative_file_path="f.txt", target_name="original"),
@@ -144,23 +143,24 @@ def target_adaptor_rule_runner() -> RuleRunner:
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
-    target_adaptor_rule_runner.add_to_build_file(
-        "helloworld",
-        dedent(
-            """\
-            mock_tgt(
-                fake_field=42,
-                dependencies=[
-                    # Because we don't follow dependencies or even parse dependencies, this
-                    # self-cycle should be fine.
-                    "helloworld",
-                    ":sibling",
-                    "helloworld/util",
-                    "helloworld/util:tests",
-                ],
+    target_adaptor_rule_runner.write_files(
+        {
+            "helloworld/BUILD": dedent(
+                """\
+                mock_tgt(
+                    fake_field=42,
+                    dependencies=[
+                        # Because we don't follow dependencies or even parse dependencies, this
+                        # self-cycle should be fine.
+                        "helloworld",
+                        ":sibling",
+                        "helloworld/util",
+                        "helloworld/util:tests",
+                    ],
+                )
+                """
             )
-            """
-        ),
+        }
     )
     addr = Address("helloworld")
     target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
@@ -182,7 +182,7 @@ def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> Non
         target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
-    target_adaptor_rule_runner.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
+    target_adaptor_rule_runner.write_files({"helloworld/BUILD": "mock_tgt(name='other_tgt')"})
     expected_rx_str = re.escape(
         "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
     )
@@ -194,7 +194,7 @@ def test_build_file_address() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
     )
-    rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
+    rule_runner.write_files({"helloworld/BUILD.ext": "mock_tgt()"})
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
@@ -208,10 +208,7 @@ def test_build_file_address() -> None:
 
 @pytest.fixture
 def address_specs_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(Addresses, (AddressSpecs,))],
-        target_types=[MockTgt],
-    )
+    return RuleRunner(rules=[QueryRule(Addresses, (AddressSpecs,))], target_types=[MockTgt])
 
 
 def resolve_address_specs(
@@ -224,8 +221,9 @@ def resolve_address_specs(
 
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file("demo", "mock_tgt(sources=['f.txt'])")
+    address_specs_rule_runner.write_files(
+        {"demo/f.txt": "", "demo/BUILD": "mock_tgt(sources=['f.txt'])"}
+    )
     # We also include a file address to ensure that that is included in the result.
     specs = [
         AddressLiteralSpec("demo", "demo"),
@@ -242,16 +240,17 @@ def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> N
 
 def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> None:
     address_specs_rule_runner.set_options(["--tag=+integration"])
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name="a", sources=["f.txt"])
-            mock_tgt(name="b", sources=["f.txt"], tags=["integration"])
-            mock_tgt(name="c", sources=["f.txt"], tags=["ignore"])
-            """
-        ),
+    address_specs_rule_runner.write_files(
+        {
+            "demo/f.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                mock_tgt(name="a", sources=["f.txt"])
+                mock_tgt(name="b", sources=["f.txt"], tags=["integration"])
+                mock_tgt(name="c", sources=["f.txt"], tags=["ignore"])
+                """
+            ),
+        }
     )
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
         Address("demo", target_name="b")
@@ -278,15 +277,16 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
 
 def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: RuleRunner) -> None:
     address_specs_rule_runner.set_options(["--exclude-target-regexp=exclude_me.*"])
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name="exclude_me", sources=["f.txt"])
-            mock_tgt(name="not_me", sources=["f.txt"])
-            """
-        ),
+    address_specs_rule_runner.write_files(
+        {
+            "demo/f.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                mock_tgt(name="exclude_me", sources=["f.txt"])
+                mock_tgt(name="not_me", sources=["f.txt"])
+                """
+            ),
+        }
     )
 
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
@@ -312,9 +312,9 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
 
 
 def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> None:
-    address_specs_rule_runner.create_file("real/f.txt")
-    address_specs_rule_runner.add_to_build_file("real", "mock_tgt(sources=['f.txt'])")
-    address_specs_rule_runner.add_to_build_file("empty", "# empty")
+    address_specs_rule_runner.write_files(
+        {"real/f.txt": "", "real/BUILD": "mock_tgt(sources=['f.txt'])", "empty/BUILD": "# empty"}
+    )
 
     def assert_resolve_error(specs: Iterable[AddressSpec], *, expected: str) -> None:
         with pytest.raises(ExecutionError) as exc:
@@ -373,15 +373,16 @@ def test_address_specs_file_does_not_belong_to_target(
 ) -> None:
     """Even if a file's address file exists and target exist, we should validate that the file
     actually belongs to that target."""
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name='owner', sources=['f.txt'])
-            mock_tgt(name='not_owner')
-            """
-        ),
+    address_specs_rule_runner.write_files(
+        {
+            "demo/f.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                mock_tgt(name='owner', sources=['f.txt'])
+                mock_tgt(name='not_owner')
+                """
+            ),
+        }
     )
 
     with pytest.raises(ExecutionError) as exc:
