@@ -20,7 +20,11 @@ from pkg_resources import Requirement
 
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import LockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileMetadata,
+    LockfileMetadataV1,
+    LockfileMetadataV2,
+)
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     LockfileContent,
@@ -46,6 +50,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.python.python_setup import InvalidLockfileBehavior
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.dirutil import safe_rmtree
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -125,7 +130,6 @@ def create_pex_and_get_all_data(
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
-        apply_requirement_constraints=True,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -423,7 +427,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps)
+        rule_runner, requirements=PexRequirements(direct_deps, apply_constraints=False)
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -438,7 +442,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps),
+        requirements=PexRequirements(direct_deps, apply_constraints=True),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -541,7 +545,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"]),
+        requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     ).pex
     dists = rule_runner.request(PexResolveInfo, [pex])
@@ -602,13 +606,17 @@ def test_build_pex_description() -> None:
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
             lockfile_hex_digest=None,
+            req_strings=None,
         ),
         expected="Building new.pex from lock.txt",
     )
 
     assert_description(
         Lockfile(
-            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+            file_path="lock.txt",
+            file_path_description_of_origin="foo",
+            lockfile_hex_digest=None,
+            req_strings=None,
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -694,6 +702,7 @@ def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, capl
 
 LOCKFILE_TYPES = (DEFAULT, FILE)
 BOOLEANS = (True, False)
+VERSIONS = (1, 2)
 
 
 def _run_pex_for_lockfile_test(
@@ -712,6 +721,8 @@ def _run_pex_for_lockfile_test(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_requirements,
+        expected_requirements,
         options_scope_name,
     ) = _metadata_validation_values(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
@@ -735,6 +746,7 @@ ansicolors==1.1.8
         lockfile_type,
         lockfile,
         expected_digest,
+        expected_requirements,
         options_scope_name,
         uses_source_plugins,
         uses_project_ic,
@@ -752,14 +764,15 @@ ansicolors==1.1.8
 
 
 @pytest.mark.parametrize(
-    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic",
+    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic,version",
     [
-        (lft, ir, ic, usp, upi)
+        (lft, ir, ic, usp, upi, v)
         for lft in LOCKFILE_TYPES
         for ir in BOOLEANS
         for ic in BOOLEANS
         for usp in BOOLEANS
         for upi in BOOLEANS
+        for v in VERSIONS
         if (ir or ic)
     ],
 )
@@ -770,6 +783,7 @@ def test_validate_metadata(
     invalid_constraints,
     uses_source_plugins,
     uses_project_ic,
+    version,
     caplog,
 ) -> None:
     class M:
@@ -799,17 +813,29 @@ def test_validate_metadata(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_requirements,
+        expected_requirements_,
         options_scope_name,
     ) = _metadata_validation_values(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
     )
 
-    metadata = LockfileMetadata(expected_digest, InterpreterConstraints([expected_constraints]))
+    metadata: LockfileMetadata
+    if version == 1:
+        metadata = LockfileMetadataV1(
+            InterpreterConstraints([expected_constraints]), expected_digest
+        )
+    elif version == 2:
+        expected_requirements = {Requirement.parse(i) for i in expected_requirements_}
+        metadata = LockfileMetadataV2(
+            InterpreterConstraints([expected_constraints]), expected_requirements
+        )
     requirements = _prepare_pex_requirements(
         rule_runner,
         lockfile_type,
         "lockfile_data_goes_here",
         actual_digest,
+        actual_requirements,
         options_scope_name,
         uses_source_plugins,
         uses_project_ic,
@@ -863,12 +889,15 @@ def test_validate_metadata(
 
 def _metadata_validation_values(
     invalid_reqs: bool, invalid_constraints: bool, uses_source_plugins: bool, uses_project_ic: bool
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, set[str], set[str], str]:
 
     actual_digest = "900d"
     expected_digest = actual_digest
+    actual_reqs = {"ansicolors==0.1.0"}
+    expected_reqs = actual_reqs
     if invalid_reqs:
         expected_digest = "baad"
+        expected_reqs = {"requests==3.0.0"}
 
     actual_constraints = "CPython>=3.6,<3.10"
     expected_constraints = actual_constraints
@@ -890,6 +919,8 @@ def _metadata_validation_values(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_reqs,
+        expected_reqs,
         options_scope_name,
     )
 
@@ -899,6 +930,7 @@ def _prepare_pex_requirements(
     lockfile_type: str,
     lockfile: str,
     expected_digest: str,
+    expected_requirements: set[str],
     options_scope_name: str,
     uses_source_plugins: bool,
     uses_project_interpreter_constraints: bool,
@@ -910,6 +942,7 @@ def _prepare_pex_requirements(
             file_path=file_path,
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected_digest,
+            req_strings=FrozenOrderedSet(expected_requirements),
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
@@ -919,6 +952,7 @@ def _prepare_pex_requirements(
         return ToolDefaultLockfile(
             file_content=content,
             lockfile_hex_digest=expected_digest,
+            req_strings=FrozenOrderedSet(expected_requirements),
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
