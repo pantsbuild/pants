@@ -17,6 +17,7 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
@@ -28,6 +29,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *target_type_rules(),
+            *python_target_types_rules(),
             QueryRule(ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
         ],

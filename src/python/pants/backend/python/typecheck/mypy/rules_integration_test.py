@@ -12,6 +12,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy.rules import (
@@ -47,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # Used for import inference.
             *pants_bin.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],

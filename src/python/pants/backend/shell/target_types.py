@@ -10,15 +10,22 @@ from typing import Optional
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.process import BinaryPathTest
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
     IntField,
     InvalidFieldException,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     StringField,
     Target,
+    generate_file_level_targets,
 )
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.enums import match
 
 
@@ -129,6 +136,20 @@ class Shunit2Tests(Target):
     )
 
 
+class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
+    generate_from = Shunit2Tests
+
+
+@rule
+async def generate_targets_from_shunit2_tests(
+    request: GenerateTargetsFromShunit2Tests, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsSources]))
+    return generate_file_level_targets(
+        Shunit2Tests, request.generator, paths.files, union_membership
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `shell_library` target
 # -----------------------------------------------------------------------------------------------
@@ -142,3 +163,25 @@ class ShellLibrary(Target):
     alias = "shell_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellLibrarySources)
     help = "Bourne-based shell scripts, e.g. Bash scripts."
+
+
+class GenerateTargetsFromShellLibrary(GenerateTargetsRequest):
+    generate_from = ShellLibrary
+
+
+@rule
+async def generate_targets_from_shell_library(
+    request: GenerateTargetsFromShellLibrary, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ShellLibrarySources]))
+    return generate_file_level_targets(
+        ShellLibrary, request.generator, paths.files, union_membership
+    )
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShunit2Tests),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShellLibrary),
+    )

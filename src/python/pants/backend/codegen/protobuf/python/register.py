@@ -16,6 +16,7 @@ from pants.backend.codegen.protobuf.python import (
 )
 from pants.backend.codegen.protobuf.python.rules import rules as python_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_rules
 
 
 def rules():
@@ -27,6 +28,7 @@ def rules():
         *protobuf_dependency_inference.rules(),
         *protobuf_tailor.rules(),
         *export_codegen_goal.rules(),
+        *protobuf_target_rules(),
     ]
 
 
