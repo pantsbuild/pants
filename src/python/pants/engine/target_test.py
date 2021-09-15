@@ -842,40 +842,40 @@ def test_targets_with_sources_types() -> None:
 
 
 def test_explicitly_provided_dependencies_any_are_covered_by_includes() -> None:
-    build_tgt = Address("", target_name="a")
-    file_tgt = Address("", target_name="b", relative_file_path="f.ext")
+    addr = Address("", target_name="a")
+    generated_addr = Address("", target_name="b", generated_name="gen")
     epd = ExplicitlyProvidedDependencies(
         Address("", target_name="input_tgt"),
-        includes=FrozenOrderedSet([build_tgt, file_tgt]),
+        includes=FrozenOrderedSet([addr, generated_addr]),
         ignores=FrozenOrderedSet(),
     )
 
     assert epd.any_are_covered_by_includes(()) is False
-    assert epd.any_are_covered_by_includes((build_tgt,)) is True
-    assert epd.any_are_covered_by_includes((file_tgt,)) is True
-    assert epd.any_are_covered_by_includes((build_tgt, file_tgt)) is True
-    # File addresses are covered if their original BUILD address is in the includes.
+    assert epd.any_are_covered_by_includes((addr,)) is True
+    assert epd.any_are_covered_by_includes((generated_addr,)) is True
+    assert epd.any_are_covered_by_includes((addr, generated_addr)) is True
+    # Generated targets are covered if their original target generator is in the includes.
     assert (
-        epd.any_are_covered_by_includes((Address("", target_name="a", relative_file_path="f.ext"),))
+        epd.any_are_covered_by_includes((Address("", target_name="a", generated_name="gen"),))
         is True
     )
     assert epd.any_are_covered_by_includes((Address("", target_name="x"),)) is False
     assert (
-        epd.any_are_covered_by_includes((Address("", target_name="x", relative_file_path="f.ext"),))
+        epd.any_are_covered_by_includes((Address("", target_name="x", generated_name="gen"),))
         is False
     )
     # Ensure we check for _any_, not _all_.
-    assert epd.any_are_covered_by_includes((Address("", target_name="x"), build_tgt)) is True
+    assert epd.any_are_covered_by_includes((Address("", target_name="x"), addr)) is True
 
 
 def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> None:
     # First check disambiguation via ignores (`!` and `!!`).
-    build_tgt = Address("", target_name="a")
-    file_tgt = Address("", target_name="b", relative_file_path="f.ext")
+    addr = Address("", target_name="a")
+    generated_addr = Address("", target_name="b", generated_name="gen")
     epd = ExplicitlyProvidedDependencies(
         Address("", target_name="input_tgt"),
         includes=FrozenOrderedSet(),
-        ignores=FrozenOrderedSet([build_tgt, file_tgt]),
+        ignores=FrozenOrderedSet([addr, generated_addr]),
     )
 
     def assert_disambiguated_via_ignores(ambiguous: List[Address], expected: Set[Address]) -> None:
@@ -885,19 +885,17 @@ def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> No
         )
 
     assert_disambiguated_via_ignores([], set())
-    assert_disambiguated_via_ignores([build_tgt], set())
-    assert_disambiguated_via_ignores([file_tgt], set())
-    assert_disambiguated_via_ignores([build_tgt, file_tgt], set())
-    # File addresses are covered if their original BUILD address is in the includes.
-    assert_disambiguated_via_ignores(
-        [Address("", target_name="a", relative_file_path="f.ext")], set()
-    )
+    assert_disambiguated_via_ignores([addr], set())
+    assert_disambiguated_via_ignores([generated_addr], set())
+    assert_disambiguated_via_ignores([addr, generated_addr], set())
+    # Generated targets are covered if their original target generator is in the ignores.
+    assert_disambiguated_via_ignores([Address("", target_name="a", generated_name="gen")], set())
 
-    bad_build_tgt = Address("", target_name="x")
-    bad_file_tgt = Address("", target_name="x", relative_file_path="f.ext")
-    assert_disambiguated_via_ignores([bad_build_tgt], {bad_build_tgt})
-    assert_disambiguated_via_ignores([bad_file_tgt], {bad_file_tgt})
-    assert_disambiguated_via_ignores([bad_file_tgt, build_tgt, file_tgt], {bad_file_tgt})
+    bad_tgt = Address("", target_name="x")
+    bad_generated_tgt = Address("", target_name="x", generated_name="gen")
+    assert_disambiguated_via_ignores([bad_tgt], {bad_tgt})
+    assert_disambiguated_via_ignores([bad_generated_tgt], {bad_generated_tgt})
+    assert_disambiguated_via_ignores([bad_generated_tgt, addr, generated_addr], {bad_generated_tgt})
 
     # Check disambiguation via `owners_must_be_ancestors`.
     epd = ExplicitlyProvidedDependencies(
@@ -940,44 +938,44 @@ def test_explicitly_provided_dependencies_disambiguated() -> None:
             tuple(ambiguous), owners_must_be_ancestors=owners_must_be_ancestors
         )
 
-    # A mix of file and BUILD targets.
-    tgt_a = Address("dir", target_name="a", relative_file_path="f")
-    tgt_b = Address("dir", target_name="b", relative_file_path="f")
-    tgt_c = Address("dir", target_name="c")
-    all_tgts = [tgt_a, tgt_b, tgt_c]
+    # A mix of normal and generated addresses.
+    addr_a = Address("dir", target_name="a", generated_name="gen")
+    addr_b = Address("dir", target_name="b", generated_name="gen")
+    addr_c = Address("dir", target_name="c")
+    all_addr = [addr_a, addr_b, addr_c]
 
-    # If 1 target remains, it's disambiguated. Note that ignores can be file targets or BUILD
-    # targets.
-    assert get_disambiguated(all_tgts, ignores=[tgt_b, tgt_c]) == tgt_a
+    # If 1 target remains, it's disambiguated. Note that ignores can be normal or generated targets.
+    assert get_disambiguated(all_addr, ignores=[addr_b, addr_c]) == addr_a
     assert (
-        get_disambiguated(all_tgts, ignores=[tgt_b.maybe_convert_to_build_target(), tgt_c]) == tgt_a
+        get_disambiguated(all_addr, ignores=[addr_b.maybe_convert_to_target_generator(), addr_c])
+        == addr_a
     )
 
-    assert get_disambiguated(all_tgts, ignores=[tgt_a]) is None
-    assert get_disambiguated(all_tgts, ignores=[tgt_a.maybe_convert_to_build_target()]) is None
-    assert get_disambiguated(all_tgts, ignores=all_tgts) is None
+    assert get_disambiguated(all_addr, ignores=[addr_a]) is None
+    assert get_disambiguated(all_addr, ignores=[addr_a.maybe_convert_to_target_generator()]) is None
+    assert get_disambiguated(all_addr, ignores=all_addr) is None
     assert get_disambiguated([]) is None
     # If any includes would disambiguate the ambiguous target, we don't consider disambiguating
     # via excludes as the user has already explicitly disambiguated the module.
-    assert get_disambiguated(all_tgts, ignores=[tgt_a, tgt_b], includes=[tgt_a]) is None
+    assert get_disambiguated(all_addr, ignores=[addr_a, addr_b], includes=[addr_a]) is None
     assert (
         get_disambiguated(
-            ambiguous=all_tgts,
-            ignores=[tgt_a, tgt_b],
-            includes=[tgt_a.maybe_convert_to_build_target()],
+            ambiguous=all_addr,
+            ignores=[addr_a, addr_b],
+            includes=[addr_a.maybe_convert_to_target_generator()],
         )
         is None
     )
 
     # You can also disambiguate via `owners_must_be_ancestors`.
     another_dir = Address("another_dir")
-    assert get_disambiguated([tgt_a, another_dir], owners_must_be_ancestors=True) == tgt_a
-    assert get_disambiguated([tgt_a, another_dir], owners_must_be_ancestors=False) is None
+    assert get_disambiguated([addr_a, another_dir], owners_must_be_ancestors=True) == addr_a
+    assert get_disambiguated([addr_a, another_dir], owners_must_be_ancestors=False) is None
     assert (
         get_disambiguated(
-            [tgt_a, tgt_b, another_dir], ignores=[tgt_b], owners_must_be_ancestors=True
+            [addr_a, addr_b, another_dir], ignores=[addr_b], owners_must_be_ancestors=True
         )
-        == tgt_a
+        == addr_a
     )
 
 
@@ -1008,48 +1006,51 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
     maybe_warn([])
     assert not caplog.records
 
-    # A mix of file and BUILD targets.
-    tgt_a = Address("dir", target_name="a", relative_file_path="f")
-    tgt_b = Address("dir", target_name="b", relative_file_path="f")
-    tgt_c = Address("dir", target_name="c")
-    all_tgts = [tgt_a, tgt_b, tgt_c]
+    # A mix of normal and generated addresses.
+    addr_a = Address("dir", target_name="a", generated_name="gen")
+    addr_b = Address("dir", target_name="b", generated_name="gen")
+    addr_c = Address("dir", target_name="c")
+    all_addr = [addr_a, addr_b, addr_c]
 
-    maybe_warn(all_tgts)
+    maybe_warn(all_addr)
     assert len(caplog.records) == 1
-    assert f"['{tgt_a}', '{tgt_b}', '{tgt_c}']" in caplog.text
+    assert f"['{addr_a}', '{addr_b}', '{addr_c}']" in caplog.text
 
     # Ignored addresses do not show up in the list of ambiguous owners, including for ignores of
     # both file and BUILD targets.
-    maybe_warn(all_tgts, ignores=[tgt_b])
+    maybe_warn(all_addr, ignores=[addr_b])
     assert len(caplog.records) == 1
-    assert f"['{tgt_a}', '{tgt_c}']" in caplog.text
-    maybe_warn(all_tgts, ignores=[tgt_b.maybe_convert_to_build_target()])
+    assert f"['{addr_a}', '{addr_c}']" in caplog.text
+    maybe_warn(all_addr, ignores=[addr_b.maybe_convert_to_target_generator()])
     assert len(caplog.records) == 1
-    assert f"['{tgt_a}', '{tgt_c}']" in caplog.text
+    assert f"['{addr_a}', '{addr_c}']" in caplog.text
 
-    # Disambiguating via ignores turns off the warning, including for ignores of both file and
-    # BUILD targets.
-    maybe_warn(all_tgts, ignores=[tgt_a, tgt_b])
+    # Disambiguating via ignores turns off the warning, including for ignores of both normal and
+    # generated targets.
+    maybe_warn(all_addr, ignores=[addr_a, addr_b])
     assert not caplog.records
     maybe_warn(
-        all_tgts,
-        ignores=[tgt_a.maybe_convert_to_build_target(), tgt_b.maybe_convert_to_build_target()],
+        all_addr,
+        ignores=[
+            addr_a.maybe_convert_to_target_generator(),
+            addr_b.maybe_convert_to_target_generator(),
+        ],
     )
     assert not caplog.records
 
-    # Including a target turns off the warning, including for includes of both file and
-    # BUILD targets.
-    maybe_warn(all_tgts, includes=[tgt_a])
+    # Including a target turns off the warning, including for includes of both normal and generated
+    # targets.
+    maybe_warn(all_addr, includes=[addr_a])
     assert not caplog.records
-    maybe_warn(all_tgts, includes=[tgt_a.maybe_convert_to_build_target()])
+    maybe_warn(all_addr, includes=[addr_a.maybe_convert_to_target_generator()])
     assert not caplog.records
 
     # You can also disambiguate via `owners_must_be_ancestors`.
     another_dir = Address("another_dir")
-    maybe_warn([tgt_a, another_dir], owners_must_be_ancestors=True)
+    maybe_warn([addr_a, another_dir], owners_must_be_ancestors=True)
     assert not caplog.records
-    maybe_warn([tgt_a, another_dir], owners_must_be_ancestors=False)
+    maybe_warn([addr_a, another_dir], owners_must_be_ancestors=False)
     assert len(caplog.records) == 1
-    assert f"['{another_dir}', '{tgt_a}']" in caplog.text
-    maybe_warn([tgt_a, tgt_b, another_dir], ignores=[tgt_b], owners_must_be_ancestors=True)
+    assert f"['{another_dir}', '{addr_a}']" in caplog.text
+    maybe_warn([addr_a, addr_b, another_dir], ignores=[addr_b], owners_must_be_ancestors=True)
     assert not caplog.records

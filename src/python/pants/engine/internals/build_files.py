@@ -115,7 +115,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    owning_address = address.maybe_convert_to_build_target()
+    owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
             bad_name=owning_address.target_name,
@@ -127,17 +127,16 @@ async def find_build_file(address: Address) -> BuildFileAddress:
         for build_file_address in address_family.build_file_addresses
         if build_file_address.address == owning_address
     )
-    return (
-        BuildFileAddress(rel_path=bfa.rel_path, address=address) if address.is_file_target else bfa
-    )
+    return BuildFileAddress(address, bfa.rel_path) if address.is_generated_target else bfa
 
 
 @rule
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
-    if address.is_file_target:
-        raise ValueError(
-            f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
+    if address.is_generated_target:
+        raise AssertionError(
+            "Generated targets are not defined in BUILD files, and so do not have "
+            f"TargetAdaptors: {address}"
         )
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     target_adaptor = address_family.get_target_adaptor(address)
@@ -170,13 +169,13 @@ async def addresses_from_address_specs(
         for spec in address_specs.literals
     )
     literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_build_target())
+        Get(TargetAdaptor, Address, addr.maybe_convert_to_target_generator())
         for addr in literal_addresses
     )
-    # We convert to targets for the side effect of validating that any file addresses actually
-    # belong to the specified BUILD targets.
+    # We convert to targets for the side effect of validating that any generated targets actually
+    # belong to their target generator.
     await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
+        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_generated_target)
     )
     for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors

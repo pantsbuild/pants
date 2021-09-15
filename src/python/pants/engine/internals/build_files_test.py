@@ -194,7 +194,7 @@ def test_build_file_address() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
     )
-    rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
+    rule_runner.write_files({"helloworld/BUILD.ext": "mock_tgt()"})
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
@@ -202,7 +202,8 @@ def test_build_file_address() -> None:
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
-    # File addresses should use their BUILD target to find the BUILD file.
+    # Generated targets should use their target generator's BUILD file.
+    assert_bfa_resolved(Address("helloworld", generated_name="f.txt"))
     assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
 
 
