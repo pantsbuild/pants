@@ -596,7 +596,7 @@ class Targets(Collection[Target]):
 
 class UnexpandedTargets(Collection[Target]):
     """Like `Targets`, but will not replace target generators with their generated targets (e.g.
-    replace `python_sources` with `python_source` targets)."""
+    replace `python_library` "BUILD targets" with generated `python_library` "file targets")."""
 
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
