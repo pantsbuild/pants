@@ -57,29 +57,21 @@ def test_find_putative_targets() -> None:
             [
                 PutativeTarget.for_target_type(
                     TerraformModule,
-                    "src/terraform",
-                    "terraform",
-                    [
-                        "root.tf",
-                    ],
+                    path="src/terraform",
+                    name="mod",
+                    triggering_sources=["root.tf"],
                 ),
                 PutativeTarget.for_target_type(
                     TerraformModule,
-                    "src/terraform/owned-module",
-                    "owned-module",
-                    [
-                        "foo.tf",
-                        "main.tf",
-                    ],
+                    path="src/terraform/owned-module",
+                    name="mod",
+                    triggering_sources=["foo.tf", "main.tf"],
                 ),
                 PutativeTarget.for_target_type(
                     TerraformModule,
-                    "src/terraform/unowned-module",
-                    "unowned-module",
-                    [
-                        "bar.tf",
-                        "main.tf",
-                    ],
+                    path="src/terraform/unowned-module",
+                    name="mod",
+                    triggering_sources=["bar.tf", "main.tf"],
                 ),
             ]
         )

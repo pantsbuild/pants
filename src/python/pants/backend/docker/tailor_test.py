@@ -35,10 +35,9 @@ def test_find_putative_targets() -> None:
             [
                 PutativeTarget.for_target_type(
                     DockerImage,
-                    "src/docker_orphan",
-                    "docker",
-                    ["Dockerfile"],
-                    kwargs={"name": "docker"},
+                    path="src/docker_orphan",
+                    name="docker",
+                    triggering_sources=["Dockerfile"],
                 ),
             ]
         )

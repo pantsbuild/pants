@@ -59,16 +59,20 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget.for_target_type(ShellLibrary, "src/sh/foo", "foo", ["f.sh"]),
                 PutativeTarget.for_target_type(
-                    ShellLibrary, "src/sh/foo/bar", "bar", ["baz2.sh", "baz3.sh"]
+                    ShellLibrary, path="src/sh/foo", name="lib", triggering_sources=["f.sh"]
+                ),
+                PutativeTarget.for_target_type(
+                    ShellLibrary,
+                    path="src/sh/foo/bar",
+                    name="lib",
+                    triggering_sources=["baz2.sh", "baz3.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     Shunit2Tests,
-                    "src/sh/foo/bar",
-                    "tests",
-                    ["baz2_test.sh"],
-                    kwargs={"name": "tests"},
+                    path="src/sh/foo/bar",
+                    name="tests",
+                    triggering_sources=["baz2_test.sh"],
                 ),
             ]
         )
@@ -103,12 +107,13 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
             [
                 PutativeTarget.for_target_type(
                     Shunit2Tests,
-                    "src/sh/foo/bar",
-                    "tests",
-                    ["bar_test.sh"],
-                    kwargs={"name": "tests"},
+                    path="src/sh/foo/bar",
+                    name="tests",
+                    triggering_sources=["bar_test.sh"],
                 ),
-                PutativeTarget.for_target_type(ShellLibrary, "src/sh/foo/qux", "qux", ["qux.sh"]),
+                PutativeTarget.for_target_type(
+                    ShellLibrary, path="src/sh/foo/qux", name="lib", triggering_sources=["qux.sh"]
+                ),
             ]
         )
         == pts

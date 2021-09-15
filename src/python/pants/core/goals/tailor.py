@@ -77,7 +77,8 @@ class PutativeTarget:
 
     # Note that field order is such that the dataclass order will be by address (path+name).
     path: str
-    name: str
+    # The target name. Should only be None for old-style macros (context-aware object factories).
+    name: str | None
     type_alias: str
 
     # The sources that triggered creating of this putative target.
@@ -97,9 +98,9 @@ class PutativeTarget:
     owned_sources: Tuple[str, ...]
 
     # Note that we generate the BUILD file target entry exclusively from these kwargs (plus the
-    # type_alias), not from the fields above, which are broken out for other uses.
-    # This allows the creator of instances of this class to control whether the generated
-    # target should assume default kwarg values or provide them explicitly.
+    # type_alias and `name`), not from the other attributes like `owned_sources` and
+    # `triggering_sources`. This allows the creator of instances of this class to control
+    # whether the generated target should assume default kwarg values or provide them explicitly.
     kwargs: FrozenDict[str, str | int | bool | Tuple[str, ...]]
 
     # Any comment lines to add above the BUILD file stanza we generate for this putative target.
@@ -113,34 +114,37 @@ class PutativeTarget:
     @classmethod
     def for_target_type(
         cls,
-        target_type: Type[Target],
+        target_type: type[Target],
+        *,
         path: str,
-        name: str,
+        name: str | None,
         triggering_sources: Iterable[str],
-        kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
-        comments: Iterable[str] = tuple(),
+        kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
+        comments: Iterable[str] = (),
         build_file_name: str = "BUILD",
-    ):
+    ) -> PutativeTarget:
         explicit_sources = (kwargs or {}).get("sources")
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
-                "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
+                "Explicit sources passed to PutativeTarget.for_target_type must be a "
+                "tuple[str, ...]."
             )
 
         default_sources = default_sources_for_target_type(target_type)
         if (explicit_sources or triggering_sources) and not default_sources:
             raise ValueError(
                 f"A target of type {target_type.__name__} was proposed at "
-                f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
-                "but this target type does not have a `sources` field."
+                f"address {path}:{name} with explicit sources "
+                f"{', '.join(explicit_sources or triggering_sources)}, but this target type does "
+                "not have a `sources` field."
             )
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
-            path,
-            name,
-            target_type.alias,
-            triggering_sources,
-            owned_sources,
+            path=path,
+            name=name,
+            type_alias=target_type.alias,
+            triggering_sources=triggering_sources,
+            owned_sources=owned_sources,
             kwargs=kwargs,
             comments=comments,
             build_file_name=build_file_name,
@@ -148,12 +152,12 @@ class PutativeTarget:
 
     def __init__(
         self,
+        *,
         path: str,
-        name: str,
+        name: str | None,
         type_alias: str,
         triggering_sources: Iterable[str],
         owned_sources: Iterable[str],
-        *,
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
         build_file_name: str = "BUILD",
@@ -166,6 +170,13 @@ class PutativeTarget:
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
         self.build_file_name = build_file_name
+
+        if "name" in self.kwargs:
+            raise ValueError(
+                f"Do not set `name` in the `kwargs` for target type {self.type_alias}. The "
+                "tailor goal will set the `name` for you automatically based on the `name` "
+                "property."
+            )
 
     @property
     def build_file_path(self) -> str:
@@ -188,9 +199,7 @@ class PutativeTarget:
 
     def rename(self, new_name: str) -> PutativeTarget:
         """A copy of this object with the name replaced to the given name."""
-        # We assume that a rename imposes an explicit "name=" kwarg, overriding any previous
-        # explicit "name=" kwarg, even if the rename happens to be to the default name.
-        return dataclasses.replace(self, name=new_name, kwargs={**self.kwargs, "name": new_name})
+        return dataclasses.replace(self, name=new_name)
 
     def restrict_sources(self) -> PutativeTarget:
         """A copy of this object with the sources explicitly set to just the triggering sources."""
@@ -214,12 +223,12 @@ class PutativeTarget:
                 return f"[{val_str}\n{indent}]"
             return repr(v)
 
-        if self.kwargs:
-            kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in self.kwargs.items()]
+        kwargs = {"name": self.name, **self.kwargs} if self.name else self.kwargs  # type: ignore[arg-type]
+        if kwargs:
+            kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in kwargs.items()]
             kwargs_str = ",".join(kwargs_str_parts) + ",\n"
         else:
             kwargs_str = ""
-
         comment_str = ("\n".join(self.comments) + "\n") if self.comments else ""
         return f"{comment_str}{self.type_alias}({kwargs_str})\n"
 
@@ -320,14 +329,13 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
         UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")])
     )
     existing_addrs: Set[str] = {tgt.address.spec for tgt in all_existing_tgts}
-    uniquely_named_putative_targets: List[PutativeTarget] = []
+    uniquely_named_putative_targets: list[PutativeTarget] = []
     for ptgt in ptgts:
         idx = 0
+        if ptgt.name is None:
+            uniquely_named_putative_targets.append(ptgt)
+            continue
         possibly_renamed_ptgt = ptgt
-        # Targets in root-level BUILD files must be named explicitly.
-        if possibly_renamed_ptgt.path == "" and possibly_renamed_ptgt.kwargs.get("name") is None:
-            possibly_renamed_ptgt = possibly_renamed_ptgt.rename("root")
-        # Eliminate any address collisions.
         while possibly_renamed_ptgt.address.spec in existing_addrs:
             possibly_renamed_ptgt = ptgt.rename(f"{ptgt.name}{idx}")
             idx += 1
@@ -479,12 +487,9 @@ async def tailor(
     specs: Specs,
 ) -> Tailor:
     search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
-    putative_target_request_types: Iterable[type[PutativeTargetsRequest]] = union_membership[
-        PutativeTargetsRequest
-    ]
     putative_targets_results = await MultiGet(
         Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
-        for req_type in putative_target_request_types
+        for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)
     putative_targets = PutativeTargets(

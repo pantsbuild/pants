@@ -36,7 +36,7 @@ async def find_putative_targets(
         PutativeTarget.for_target_type(
             ProtobufLibrary,
             path=dirname,
-            name=os.path.basename(dirname),
+            name="protos",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_proto_files).items()

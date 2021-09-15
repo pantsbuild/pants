@@ -47,9 +47,17 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget.for_target_type(ProtobufLibrary, "protos/foo", "foo", ["f.proto"]),
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/bar", "bar", ["baz2.proto", "baz3.proto"]
+                    ProtobufLibrary,
+                    path="protos/foo",
+                    name="protos",
+                    triggering_sources=["f.proto"],
+                ),
+                PutativeTarget.for_target_type(
+                    ProtobufLibrary,
+                    path="protos/foo/bar",
+                    name="protos",
+                    triggering_sources=["baz2.proto", "baz3.proto"],
                 ),
             ]
         )
@@ -80,10 +88,16 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/bar", "bar", ["bar.proto"]
+                    ProtobufLibrary,
+                    path="protos/foo/bar",
+                    name="protos",
+                    triggering_sources=["bar.proto"],
                 ),
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/qux", "qux", ["qux.proto"]
+                    ProtobufLibrary,
+                    path="protos/foo/qux",
+                    name="protos",
+                    triggering_sources=["qux.proto"],
                 ),
             ]
         )

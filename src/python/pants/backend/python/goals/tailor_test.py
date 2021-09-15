@@ -88,25 +88,30 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget(
-                    "3rdparty",
-                    "requirements-test.txt",
-                    "python_requirements",
-                    ("3rdparty/requirements-test.txt",),
-                    ("3rdparty/requirements-test.txt",),
+                    path="3rdparty",
+                    name=None,
+                    type_alias="python_requirements",
+                    triggering_sources=("3rdparty/requirements-test.txt",),
+                    owned_sources=("3rdparty/requirements-test.txt",),
                     kwargs={"requirements_relpath": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo", "foo", ["__init__.py"]
+                    PythonLibrary,
+                    path="src/python/foo",
+                    name="lib",
+                    triggering_sources=["__init__.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/bar", "bar", ["baz2.py", "baz3.py"]
+                    PythonLibrary,
+                    path="src/python/foo/bar",
+                    name="lib",
+                    triggering_sources=["baz2.py", "baz3.py"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonTests,
-                    "src/python/foo/bar",
-                    "tests",
-                    ["baz1_test.py", "baz2_test.py"],
-                    kwargs={"name": "tests"},
+                    path="src/python/foo/bar",
+                    name="tests",
+                    triggering_sources=["baz1_test.py", "baz2_test.py"],
                 ),
             ]
         )
@@ -143,13 +148,15 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
             [
                 PutativeTarget.for_target_type(
                     PythonTests,
-                    "src/python/foo/bar",
-                    "tests",
-                    ["bar_test.py"],
-                    kwargs={"name": "tests"},
+                    path="src/python/foo/bar",
+                    name="tests",
+                    triggering_sources=["bar_test.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonLibrary,
+                    path="src/python/foo/qux",
+                    name="lib",
+                    triggering_sources=["qux.py"],
                 ),
             ]
         )
@@ -187,10 +194,10 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
             [
                 PutativeTarget.for_target_type(
                     PexBinary,
-                    "src/python/foo",
-                    "main3",
-                    [],
-                    kwargs={"name": "main3", "entry_point": "main3.py"},
+                    path="src/python/foo",
+                    name="bin",
+                    triggering_sources=[],
+                    kwargs={"entry_point": "main3.py"},
                 ),
             ]
         )
@@ -222,10 +229,16 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/bar", "bar", ["__init__.py", "bar.py"]
+                    PythonLibrary,
+                    path="src/python/foo/bar",
+                    name="lib",
+                    triggering_sources=["__init__.py", "bar.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonLibrary,
+                    path="src/python/foo/qux",
+                    name="lib",
+                    triggering_sources=["qux.py"],
                 ),
             ]
         )
@@ -237,60 +250,60 @@ def test_is_entry_point_true() -> None:
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note single quotes.
-    if __name__ == '__main__':
-        main()
-    """
+            # Note single quotes.
+            if __name__ == '__main__':
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note double quotes.
-    if __name__ == "__main__":
-        main()
-    """
+            # Note double quotes.
+            if __name__ == "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note weird extra spaces.
-    if __name__  ==    "__main__":
-        main()
-    """
+            # Note weird extra spaces.
+            if __name__  ==    "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__": # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__": # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":# Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":# Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":        # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":        # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
@@ -299,28 +312,28 @@ def test_is_entry_point_false() -> None:
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note commented out.
-    # if __name__ == "__main__":
-    #    main()
-    """
+            # Note commented out.
+            # if __name__ == "__main__":
+            #    main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note weird indent.
-     if __name__ == "__main__":
-         main()
-    """
+            # Note weird indent.
+             if __name__ == "__main__":
+                 main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note some nonsense, as a soundness check.
-     print(__name__)
-    """
+            # Note some nonsense, as a soundness check.
+             print(__name__)
+            """
         ).encode()
     )

@@ -79,8 +79,14 @@ class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
 
 
 @rule
-def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
-    return PutativeTargets([PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])])
+def find_fortran_module(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
+    return PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                FortranModule, path="dir", name="mod", triggering_sources=[]
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -89,7 +95,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
-            infer_fortran_module_dependency,
+            find_fortran_module,
             UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
             QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
@@ -114,26 +120,53 @@ def test_make_content_str() -> None:
         [
             PutativeTarget.for_target_type(
                 FortranTests,
-                "path/to",
-                "tests",
-                ["test1.f90", "test2.f90"],
-                kwargs={"name": "tests", "sources": ("test1.f90", "test2.f90")},
+                path="path/to",
+                name="tests",
+                triggering_sources=["test1.f90", "test2.f90"],
+                kwargs={"sources": ("test1.f90", "test2.f90")},
+            )
+        ],
+    )
+    assert (
+        textwrap.dedent(
+            """\
+            fortran_library()
+
+            fortran_tests(
+                name="tests",
+                sources=[
+                    "test1.f90",
+                    "test2.f90",
+                ],
+            )
+            """
+        )
+        == content
+    )
+
+
+def test_make_content_str_for_old_style_macro() -> None:
+    content = make_content_str(
+        "fortran_library()\n",
+        "    ",
+        [
+            PutativeTarget(
+                path="path/to",
+                name=None,
+                type_alias="fortran_macro",
+                triggering_sources=[],
+                owned_sources=[],
+                kwargs={},
             )
         ],
     )
     assert (
         textwrap.dedent(
             """
-    fortran_library()
+            fortran_library()
 
-    fortran_tests(
-        name="tests",
-        sources=[
-            "test1.f90",
-            "test2.f90",
-        ],
-    )
-    """
+            fortran_macro()
+            """
         ).lstrip()
         == content
     )
@@ -150,7 +183,11 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
         }
     )
     ptgt = PutativeTarget(
-        "src/fortran/foo", "foo", "fortran_library", ["bar3.f90"], FortranLibrarySources.default
+        path="src/fortran/foo",
+        name="foo",
+        type_alias="fortran_library",
+        triggering_sources=["bar3.f90"],
+        owned_sources=FortranLibrarySources.default,
     )
     unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
     ptgts = unpts.putative_targets
@@ -158,34 +195,11 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget(
-                    "src/fortran/foo",
-                    "foo1",
-                    "fortran_library",
-                    ["bar3.f90"],
-                    FortranLibrarySources.default,
-                    kwargs={"name": "foo1"},
-                )
-            ]
-        )
-        == ptgts
-    )
-
-
-def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"foo.f90": ""})
-    ptgt = PutativeTarget("", "", "fortran_library", ["foo.f90"], FortranLibrarySources.default)
-    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
-    ptgts = unpts.putative_targets
-    assert (
-        PutativeTargets(
-            [
-                PutativeTarget(
-                    "",
-                    "root",
-                    "fortran_library",
-                    ["foo.f90"],
-                    FortranLibrarySources.default,
-                    kwargs={"name": "root"},
+                    path="src/fortran/foo",
+                    name="foo1",
+                    type_alias="fortran_library",
+                    triggering_sources=["bar3.f90"],
+                    owned_sources=FortranLibrarySources.default,
                 )
             ]
         )
@@ -204,11 +218,11 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
         }
     )
     ptgt = PutativeTarget(
-        "src/fortran/foo/bar",
-        "bar0",
-        "fortran_library",
-        ["baz3.f90"],
-        FortranLibrarySources.default,
+        path="src/fortran/foo/bar",
+        name="bar0",
+        type_alias="fortran_library",
+        triggering_sources=["baz3.f90"],
+        owned_sources=FortranLibrarySources.default,
     )
     dspt = rule_runner.request(DisjointSourcePutativeTarget, [ptgt])
     ptgt = dspt.putative_target
@@ -229,21 +243,24 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
             [
                 PutativeTarget.for_target_type(
                     FortranTests,
-                    "src/fortran/foo",
-                    "tests",
-                    ["bar1_test.f90"],
-                    kwargs={"name": "tests", "life_the_universe_and_everything": 42},
+                    path="src/fortran/foo",
+                    name="tests",
+                    triggering_sources=["bar1_test.f90"],
+                    kwargs={"life_the_universe_and_everything": 42},
                 ),
                 PutativeTarget.for_target_type(
                     FortranLibrary,
-                    "src/fortran/foo",
-                    "foo0",
-                    ["bar2.f90", "bar3.f90"],
-                    kwargs={"name": "foo0", "sources": ("bar2.f90", "bar3.f90")},
+                    path="src/fortran/foo",
+                    name="foo0",
+                    triggering_sources=["bar2.f90", "bar3.f90"],
+                    kwargs={"sources": ("bar2.f90", "bar3.f90")},
                     comments=["# A comment spread", "# over multiple lines."],
                 ),
                 PutativeTarget.for_target_type(
-                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                    FortranLibrary,
+                    path="src/fortran/baz",
+                    name="lib",
+                    triggering_sources=["qux1.f90"],
                 ),
             ]
         ),
@@ -256,28 +273,37 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
 
     contents = rule_runner.request(DigestContents, [edited_build_files.digest])
     expected = [
-        FileContent("src/fortran/baz/BUILD.pants", "fortran_library()\n".encode()),
+        FileContent(
+            "src/fortran/baz/BUILD.pants",
+            textwrap.dedent(
+                """\
+                fortran_library(
+                    name="lib",
+                )
+                """
+            ).encode(),
+        ),
         FileContent(
             "src/fortran/foo/BUILD",
             textwrap.dedent(
                 """
-            fortran_library(sources=["bar1.f90"])
+                fortran_library(sources=["bar1.f90"])
 
-            # A comment spread
-            # over multiple lines.
-            fortran_library(
-                name="foo0",
-                sources=[
-                    "bar2.f90",
-                    "bar3.f90",
-                ],
-            )
+                # A comment spread
+                # over multiple lines.
+                fortran_library(
+                    name="foo0",
+                    sources=[
+                        "bar2.f90",
+                        "bar3.f90",
+                    ],
+                )
 
-            fortran_tests(
-                name="tests",
-                life_the_universe_and_everything=42,
-            )
-            """
+                fortran_tests(
+                    name="tests",
+                    life_the_universe_and_everything=42,
+                )
+                """
             )
             .lstrip()
             .encode(),
@@ -373,16 +399,22 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
                     mock=lambda req: PutativeTargets(
                         [
                             PutativeTarget.for_target_type(
-                                FortranTests, "src/fortran/foo", "tests", ["bar1_test.f90"]
-                            ),
-                            PutativeTarget.for_target_type(
-                                FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                                FortranTests,
+                                path="src/fortran/foo",
+                                name="tests",
+                                triggering_sources=["bar1_test.f90"],
                             ),
                             PutativeTarget.for_target_type(
                                 FortranLibrary,
-                                "src/fortran/conflict",
-                                "conflict",
-                                ["conflict1.f90", "conflict2.f90"],
+                                path="src/fortran/baz",
+                                name="lib",
+                                triggering_sources=["qux1.f90"],
+                            ),
+                            PutativeTarget.for_target_type(
+                                FortranLibrary,
+                                path="src/fortran/conflict",
+                                name="conflict",
+                                triggering_sources=["conflict1.f90", "conflict2.f90"],
                             ),
                         ]
                     ),
@@ -427,7 +459,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         stdout_str = stdio_reader.get_stdout()
 
     assert (
-        "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target src/fortran/baz"
+        "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target src/fortran/baz:lib"
         in stdout_str
     )
     assert (
@@ -463,13 +495,19 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
     )
     assert putative_targets == PutativeTargets(
-        [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]
+        [
+            PutativeTarget.for_target_type(
+                FortranModule, path="dir", name="mod", triggering_sources=[]
+            )
+        ]
     )
 
     with pytest.raises(ValueError) as excinfo:
-        _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
+        PutativeTarget.for_target_type(
+            FortranModule, path="dir", name="mod", triggering_sources=["a.f90"]
+        )
     expected_msg = (
-        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
+        "A target of type FortranModule was proposed at address dir:mod with explicit sources a.f90, "
         "but this target type does not have a `sources` field."
     )
     assert str(excinfo.value) == expected_msg

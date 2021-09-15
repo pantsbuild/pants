@@ -75,7 +75,6 @@ async def find_putative_targets(
     python_setup: PythonSetup,
 ) -> PutativeTargets:
     # Find library/test targets.
-
     all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
     all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
@@ -83,8 +82,7 @@ async def find_putative_targets(
     pts = []
     for tgt_type, paths in classified_unowned_py_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == PythonTests else {}
+            name = "tests" if tgt_type == PythonTests else "lib"
             if (
                 python_setup.tailor_ignore_solitary_init_files
                 and tgt_type == PythonLibrary
@@ -93,7 +91,7 @@ async def find_putative_targets(
                 continue
             pts.append(
                 PutativeTarget.for_target_type(
-                    tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
+                    tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
                 )
             )
 
@@ -107,9 +105,8 @@ async def find_putative_targets(
             pts.append(
                 PutativeTarget(
                     path=path,
-                    # python_requirements is a macro and doesn't take a name argument, but the
-                    # PutativeTarget still needs a name so it can participate in de-duping logic.
-                    name=name,
+                    # This is an old-style macro (CAOF) without a `name`.
+                    name=None,
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
@@ -161,14 +158,13 @@ async def find_putative_targets(
         for entry_point_module in unowned_entry_point_modules:
             entry_point = module_to_entry_point[entry_point_module]
             path, fname = os.path.split(entry_point)
-            name = os.path.splitext(fname)[0]
             pts.append(
                 PutativeTarget.for_target_type(
                     target_type=PexBinary,
                     path=path,
-                    name=name,
+                    name="bin",
                     triggering_sources=tuple(),
-                    kwargs={"name": name, "entry_point": fname},
+                    kwargs={"entry_point": fname},
                 )
             )
 

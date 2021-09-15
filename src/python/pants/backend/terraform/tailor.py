@@ -38,9 +38,9 @@ async def find_putative_targets(
         putative_targets.append(
             PutativeTarget.for_target_type(
                 TerraformModule,
-                dirname,
-                os.path.basename(dirname),
-                sorted(filenames),
+                path=dirname,
+                name="mod",
+                triggering_sources=sorted(filenames),
             )
         )
 

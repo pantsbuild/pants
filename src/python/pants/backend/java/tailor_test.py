@@ -21,7 +21,6 @@ def test_classify_source_files() -> None:
         "foo/bar/BazTest.java",
     }
     lib_files = {"foo/bar/Baz.java", "foo/SomeClass.java"}
-
     assert {JunitTests: test_files, JavaLibrary: lib_files} == classify_source_files(
         test_files | lib_files
     )
@@ -60,14 +59,16 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    JavaLibrary, "src/java/unowned", "unowned", ["UnownedFile.java"]
+                    JavaLibrary,
+                    path="src/java/unowned",
+                    name="lib",
+                    triggering_sources=["UnownedFile.java"],
                 ),
                 PutativeTarget.for_target_type(
                     JunitTests,
-                    "src/java/unowned",
-                    "tests",
-                    ["UnownedFileTest.java"],
-                    kwargs={"name": "tests"},
+                    path="src/java/unowned",
+                    name="tests",
+                    triggering_sources=["UnownedFileTest.java"],
                 ),
             ]
         )

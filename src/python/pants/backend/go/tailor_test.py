@@ -61,22 +61,16 @@ def test_find_putative_go_package_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativeGoPackageTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(
-                [
-                    "src/go/owned/src.go",
-                ]
-            ),
+            AllOwnedSources(["src/go/owned/src.go"]),
         ],
     )
     assert putative_targets == PutativeTargets(
         [
             PutativeTarget.for_target_type(
                 GoPackage,
-                "src/go/unowned",
-                "unowned",
-                [
-                    "src.go",
-                ],
+                path="src/go/unowned",
+                name="pkg",
+                triggering_sources=["src.go"],
             ),
         ]
     )
@@ -94,22 +88,13 @@ def test_find_putative_go_module_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativeGoModuleTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(
-                [
-                    "src/go/owned/go.mod",
-                ]
-            ),
+            AllOwnedSources(["src/go/owned/go.mod"]),
         ],
     )
     assert putative_targets == PutativeTargets(
         [
             PutativeTarget.for_target_type(
-                GoModule,
-                "src/go/unowned",
-                "unowned",
-                [
-                    "go.mod",
-                ],
+                GoModule, path="src/go/unowned", name="mod", triggering_sources=["go.mod"]
             ),
         ]
     )
@@ -121,12 +106,12 @@ def test_find_putative_go_external_module_targets(rule_runner: RuleRunner) -> No
             "src/go/BUILD": "go_module()\n",
             "src/go/go.mod": textwrap.dedent(
                 """\
-            module example.com/src/go
-            go 1.16
-            require (
-                github.com/google/uuid v1.2.0
-            )
-            """
+                module example.com/src/go
+                go 1.16
+                require (
+                    github.com/google/uuid v1.2.0
+                )
+                """
             ),
             "src/go/go.sum": textwrap.dedent(
                 """\
@@ -140,21 +125,16 @@ def test_find_putative_go_external_module_targets(rule_runner: RuleRunner) -> No
         PutativeTargets,
         [
             PutativeGoExternalModuleTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(
-                [
-                    "src/go/go.mod",
-                    "src/go/go.sum",
-                ]
-            ),
+            AllOwnedSources(["src/go/go.mod", "src/go/go.sum"]),
         ],
     )
     assert putative_targets == PutativeTargets(
         [
             PutativeTarget.for_target_type(
                 GoExternalModule,
-                "src/go",
-                "github.com_google_uuid_v1.2.0",
-                [],
+                path="src/go",
+                name="github.com_google_uuid_v1.2.0",
+                triggering_sources=[],
                 kwargs={
                     "path": "github.com/google/uuid",
                     "version": "v1.2.0",
@@ -166,9 +146,9 @@ def test_find_putative_go_external_module_targets(rule_runner: RuleRunner) -> No
             ),
             PutativeTarget.for_target_type(
                 GoExtModPackage,
-                "src/go",
-                "github.com_google_uuid_v1.2.0-",
-                [],
+                path="src/go",
+                name="github.com_google_uuid_v1.2.0-",
+                triggering_sources=[],
                 kwargs={
                     "path": "github.com/google/uuid",
                     "version": "v1.2.0",
