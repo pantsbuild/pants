@@ -12,7 +12,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
-# # `:` and `!` are used as delimiters already. Others are reserved for possible future needs.
+# `:` is used as a delimiter already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":!@?/\=")
 BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":!@?=")
 
@@ -356,7 +356,7 @@ class Address(EngineAwareParameter):
 
         Otherwise, return itself unmodified.
         """
-        if self.is_generated_target or self.is_file_target:
+        if self.is_generated_target:
             return self.__class__(self.spec_path, target_name=self._target_name)
         return self
 
