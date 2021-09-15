@@ -62,10 +62,12 @@ def assert_files_generated(
     source_roots: List[str],
     mypy: bool = False,
     mypy_plugin_version: Optional[str] = None,
+    extra_args: Optional[List[str]] = None,
 ) -> None:
     options = [
         "--backend-packages=pants.backend.codegen.protobuf.python",
         f"--source-root-patterns={repr(source_roots)}",
+        *(extra_args or ()),
     ]
     if mypy:
         options.append("--python-protobuf-mypy-plugin")
@@ -309,6 +311,7 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
         source_roots=["src/protobuf"],
         mypy=True,
         mypy_plugin_version="mypy-protobuf==1.24",
+        extra_args=["--mypy-protobuf-extra-requirements=six==1.16.0"],
         expected_files=[
             "src/protobuf/dir1/f_pb2.py",
             "src/protobuf/dir1/f_pb2.pyi",
