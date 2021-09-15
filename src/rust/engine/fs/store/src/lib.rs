@@ -1099,7 +1099,7 @@ impl Store {
     digest: Digest,
   ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
     if digest == EMPTY_DIGEST {
-      return future::ready(Ok(vec![])).boxed()
+      return future::ready(Ok(vec![])).boxed();
     }
 
     self
