@@ -343,7 +343,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 native_binaries_download(),
                 {
                     "name": "Lint",
-                    "run": "./pants validate '**'\n./pants lint typecheck ::\n",
+                    "run": "./pants validate '**'\n./pants lint check ::\n",
                 },
                 upload_log_artifacts(name="lint"),
             ],

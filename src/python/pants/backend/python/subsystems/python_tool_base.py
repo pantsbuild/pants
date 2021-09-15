@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.pex import (
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
 NO_TOOL_LOCKFILE = "<none>"
@@ -160,6 +161,7 @@ class PythonToolRequirementsBase(Subsystem):
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
+                req_strings=FrozenOrderedSet(requirements),
                 options_scope_name=self.options_scope,
                 uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
                 uses_source_plugins=self.uses_requirements_from_source_plugins,
@@ -168,6 +170,7 @@ class PythonToolRequirementsBase(Subsystem):
             file_path=self.lockfile,
             file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
             lockfile_hex_digest=hex_digest,
+            req_strings=FrozenOrderedSet(requirements),
             options_scope_name=self.options_scope,
             uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
             uses_source_plugins=self.uses_requirements_from_source_plugins,

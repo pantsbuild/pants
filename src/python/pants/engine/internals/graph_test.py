@@ -116,18 +116,19 @@ def transitive_targets_rule_runner() -> RuleRunner:
 
 
 def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1')
-            target(name='t2', dependencies=[':t1'])
-            target(name='d1', dependencies=[':t1'])
-            target(name='d2', dependencies=[':t2'])
-            target(name='d3')
-            target(name='root', dependencies=[':d1', ':d2', ':d3'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', dependencies=[':t1'])
+                target(name='d1', dependencies=[':t1'])
+                target(name='d2', dependencies=[':t2'])
+                target(name='d3')
+                target(name='root', dependencies=[':d1', ':d2', ':d3'])
+                """
+            ),
+        }
     )
 
     def get_target(name: str) -> Target:
@@ -155,15 +156,16 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='base')
-            target(name='intermediate', dependencies=[':base'])
-            target(name='root', dependencies=[':intermediate', '!!:base'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='base')
+                target(name='intermediate', dependencies=[':base'])
+                target(name='root', dependencies=[':intermediate', '!!:base'])
+                """
+            ),
+        }
     )
 
     def get_target(name: str) -> Target:
@@ -186,27 +188,28 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
 
     # Regression test that we work with deeply nested levels of excludes.
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1')
-            target(name='t2', dependencies=[':t1'])
-            target(name='t3', dependencies=[':t2'])
-            target(name='t4', dependencies=[':t3'])
-            target(name='t5', dependencies=[':t4'])
-            target(name='t6', dependencies=[':t5'])
-            target(name='t7', dependencies=[':t6'])
-            target(name='t8', dependencies=[':t7'])
-            target(name='t9', dependencies=[':t8'])
-            target(name='t10', dependencies=[':t9'])
-            target(name='t11', dependencies=[':t10'])
-            target(name='t12', dependencies=[':t11'])
-            target(name='t13', dependencies=[':t12'])
-            target(name='t14', dependencies=[':t13'])
-            target(name='t15', dependencies=[':t14', '!!:t1', '!!:t5'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', dependencies=[':t1'])
+                target(name='t3', dependencies=[':t2'])
+                target(name='t4', dependencies=[':t3'])
+                target(name='t5', dependencies=[':t4'])
+                target(name='t6', dependencies=[':t5'])
+                target(name='t7', dependencies=[':t6'])
+                target(name='t8', dependencies=[':t7'])
+                target(name='t9', dependencies=[':t8'])
+                target(name='t10', dependencies=[':t9'])
+                target(name='t11', dependencies=[':t10'])
+                target(name='t12', dependencies=[':t11'])
+                target(name='t13', dependencies=[':t12'])
+                target(name='t14', dependencies=[':t13'])
+                target(name='t15', dependencies=[':t14', '!!:t1', '!!:t5'])
+                """
+            ),
+        }
     )
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets, [TransitiveTargetsRequest([get_target("t15").address])]
@@ -236,18 +239,19 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
     This uses the same test setup as `test_transitive_targets`, but does not use the `dependencies`
     field like normal.
     """
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1')
-            target(name='t2', special_cased_deps1=[':t1'])
-            target(name='d1', special_cased_deps1=[':t1'])
-            target(name='d2', special_cased_deps2=[':t2'])
-            target(name='d3')
-            target(name='root', special_cased_deps1=[':d1', ':d2'], special_cased_deps2=[':d3'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', special_cased_deps1=[':t1'])
+                target(name='d1', special_cased_deps1=[':t1'])
+                target(name='d2', special_cased_deps2=[':t2'])
+                target(name='d3')
+                target(name='root', special_cased_deps1=[':d1', ':d2'], special_cased_deps2=[':d3'])
+                """
+            ),
+        }
     )
 
     def get_target(name: str) -> Target:
@@ -293,16 +297,19 @@ def test_transitive_targets_tolerates_subtarget_cycles(
 
     This only works with generated subtargets, so we use explicit file dependencies in this test.
     """
-    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='dep', sources=['dep.txt'])
-            target(name='t1', sources=['t1.txt'], dependencies=['dep.txt:dep', 't2.txt:t2'])
-            target(name='t2', sources=['t2.txt'], dependencies=['t1.txt:t1'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "dep.txt": "",
+            "t1.txt": "",
+            "t2.txt": "",
+            "BUILD": dedent(
+                """\
+                target(name='dep', sources=['dep.txt'])
+                target(name='t1', sources=['t1.txt'], dependencies=['dep.txt:dep', 't2.txt:t2'])
+                target(name='t2', sources=['t2.txt'], dependencies=['t1.txt:t1'])
+                """
+            ),
+        }
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
@@ -320,16 +327,19 @@ def test_transitive_targets_tolerates_subtarget_cycles(
 def test_target_with_indivisible_sources(
     transitive_targets_rule_runner: RuleRunner,
 ) -> None:
-    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='dep', sources=['dep.txt'])
-            indivisible_target(name='t1', sources=['t1.txt'], dependencies=[':dep'])
-            target(name='t2', sources=['t2.txt'], dependencies=[':t1'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "dep.txt": "",
+            "t1.txt": "",
+            "t2.txt": "",
+            "BUILD": dedent(
+                """\
+                target(name='dep', sources=['dep.txt'])
+                indivisible_target(name='t1', sources=['t1.txt'], dependencies=[':dep'])
+                target(name='t2', sources=['t2.txt'], dependencies=[':t1'])
+                """
+            ),
+        }
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
@@ -350,16 +360,19 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
 
     Cycles are only allowed for file targets, so we use explicit file dependencies in this test.
     """
-    transitive_targets_rule_runner.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='dep', sources=['dep.txt'])
-            target(name='t1', sources=['t1.txt'], dependencies=['dep.txt:dep', 't2.txt:t2'])
-            target(name='t2', sources=['t2.txt'], dependencies=['t1.txt:t1'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "dep.txt": "",
+            "t1.txt": "",
+            "t2.txt": "",
+            "BUILD": dedent(
+                """\
+                target(name='dep', sources=['dep.txt'])
+                target(name='t1', sources=['t1.txt'], dependencies=['dep.txt:dep', 't2.txt:t2'])
+                target(name='t2', sources=['t2.txt'], dependencies=['t1.txt:t1'])
+                """
+            ),
+        }
     )
 
     def assert_coarsened(
@@ -439,14 +452,7 @@ def assert_failed_cycle(
 
 
 def test_dep_cycle_self(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1', dependencies=[':t1'])
-            """
-        ),
-    )
+    transitive_targets_rule_runner.write_files({"BUILD": "target(name='t1', dependencies=[':t1'])"})
     assert_failed_cycle(
         transitive_targets_rule_runner,
         root_target_name="t1",
@@ -456,14 +462,15 @@ def test_dep_cycle_self(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 def test_dep_cycle_direct(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1', dependencies=[':t2'])
-            target(name='t2', dependencies=[':t1'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1', dependencies=[':t2'])
+                target(name='t2', dependencies=[':t1'])
+                """
+            )
+        }
     )
     assert_failed_cycle(
         transitive_targets_rule_runner,
@@ -480,15 +487,16 @@ def test_dep_cycle_direct(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 def test_dep_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1', dependencies=[':t2'])
-            target(name='t2', dependencies=[':t3'])
-            target(name='t3', dependencies=[':t2'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1', dependencies=[':t2'])
+                target(name='t2', dependencies=[':t3'])
+                target(name='t3', dependencies=[':t2'])
+                """
+            )
+        }
     )
     assert_failed_cycle(
         transitive_targets_rule_runner,
@@ -505,15 +513,16 @@ def test_dep_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
 
 
 def test_dep_nocycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.create_file("t2.txt")
-    transitive_targets_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            target(name='t1', dependencies=['t2.txt:t2'])
-            target(name='t2', dependencies=[':t1'], sources=['t2.txt'])
-            """
-        ),
+    transitive_targets_rule_runner.write_files(
+        {
+            "t2.txt": "",
+            "BUILD": dedent(
+                """\
+                target(name='t1', dependencies=['t2.txt:t2'])
+                target(name='t2', dependencies=[':t1'], sources=['t2.txt'])
+                """
+            ),
+        }
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
@@ -529,7 +538,7 @@ def test_dep_nocycle_indirect(transitive_targets_rule_runner: RuleRunner) -> Non
 
 def test_resolve_generated_subtarget() -> None:
     rule_runner = RuleRunner(target_types=[MockTarget])
-    rule_runner.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
+    rule_runner.write_files({"demo/BUILD": "target(sources=['f1.txt', 'f2.txt'])"})
     generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
     generated_target = rule_runner.get_target(generated_target_address)
     assert generated_target == MockTarget({Sources.alias: ["f1.txt"]}, generated_target_address)
@@ -545,8 +554,9 @@ def test_resolve_specs_snapshot() -> None:
       so that the file only shows up once.
     """
     rule_runner = RuleRunner(rules=[QueryRule(SpecsSnapshot, (Specs,))], target_types=[MockTarget])
-    rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
-    rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
+    rule_runner.write_files(
+        {"demo/f1.txt": "", "demo/f2.txt": "", "demo/BUILD": "target(sources=['*.txt'])"}
+    )
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         ["demo:demo", "demo/f1.txt", "demo/BUILD"]
     )
@@ -589,12 +599,17 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
     This happens, for example, when the file is deleted and we're computing `--changed-since`. In
     this case, we should use the BUILD target as we can't use a more precise file target.
     """
-    owners_rule_runner.create_file("demo/f.txt")
-    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])\n")
-    owners_rule_runner.add_to_build_file(
-        "demo", "secondary_owner(name='secondary', secondary_owner_field='deleted.txt')"
+    owners_rule_runner.write_files(
+        {
+            "demo/f.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                target(sources=['*.txt'])
+                secondary_owner(name='secondary', secondary_owner_field='deleted.txt')
+                """
+            ),
+        }
     )
-
     assert_owners(
         owners_rule_runner,
         ["demo/deleted.txt"],
@@ -622,16 +637,18 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
 
 def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
     """Even if there are multiple owners of the same file, we still use file targets."""
-    owners_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
-    owners_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            target(name='all', sources=['*.txt'])
-            target(name='f2', sources=['f2.txt'])
-            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
-            """
-        ),
+    owners_rule_runner.write_files(
+        {
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                target(name='all', sources=['*.txt'])
+                target(name='f2', sources=['f2.txt'])
+                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
+                """
+            ),
+        }
     )
     assert_owners(
         owners_rule_runner,
@@ -655,17 +672,19 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
 
 def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
     """A BUILD file owns every target defined in it."""
-    owners_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
-    owners_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            target(name='f1', sources=['f1.txt'])
-            target(name='f2_first', sources=['f2.txt'])
-            target(name='f2_second', sources=['f2.txt'])
-            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
-            """
-        ),
+    owners_rule_runner.write_files(
+        {
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                target(name='f1', sources=['f1.txt'])
+                target(name='f2_first', sources=['f2.txt'])
+                target(name='f2_second', sources=['f2.txt'])
+                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
+                """
+            ),
+        }
     )
     assert_owners(
         owners_rule_runner,
@@ -696,16 +715,26 @@ def resolve_filesystem_specs(
 
 
 def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
-    specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
+    specs_rule_runner.write_files(
+        {
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/BUILD": "target(sources=['*.txt'])",
+        }
+    )
     assert resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("demo/f1.txt")]) == {
         Address("demo", relative_file_path="f1.txt", target_name="demo")
     }
 
 
 def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
-    specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
+    specs_rule_runner.write_files(
+        {
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/BUILD": "target(sources=['*.txt'])",
+        }
+    )
     assert resolve_filesystem_specs(specs_rule_runner, [FilesystemGlobSpec("demo/*.txt")]) == {
         Address("demo", relative_file_path="f1.txt", target_name="demo"),
         Address("demo", relative_file_path="f2.txt", target_name="demo"),
@@ -731,7 +760,7 @@ def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> Non
 
 
 def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.create_file("no_owners/f.txt")
+    specs_rule_runner.write_files({"no_owners/f.txt": ""})
     # Error for literal specs.
     with pytest.raises(ExecutionError) as exc:
         resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("no_owners/f.txt")])
@@ -747,18 +776,23 @@ def test_resolve_addresses_from_specs() -> None:
         rules=[QueryRule(Addresses, (Specs,))],
         target_types=[MockTarget],
     )
-    rule_runner.create_file("fs_spec/f.txt")
-    rule_runner.add_to_build_file("fs_spec", "target(sources=['f.txt'])")
-    rule_runner.create_file("address_spec/f.txt")
-    rule_runner.add_to_build_file("address_spec", "target(sources=['f.txt'])")
+    rule_runner.write_files(
+        {
+            "fs_spec/f.txt": "",
+            "fs_spec/BUILD": "target(sources=['f.txt'])",
+            "address_spec/f.txt": "",
+            "address_spec/BUILD": "target(sources=['f.txt'])",
+            "multiple_files/f1.txt": "",
+            "multiple_files/f2.txt": "",
+            "multiple_files/BUILD": "target(sources=['*.txt'])",
+        }
+    )
     no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
 
     # If a file target's original BUILD target is included via an address spec,
     # we will still include the file target for consistency. When we expand Targets
     # into their BUILD targets this redundancy is removed, but during Address expansion we
     # get literal matches.
-    rule_runner.create_files("multiple_files", ["f1.txt", "f2.txt"])
-    rule_runner.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
 
     specs = SpecsParser(rule_runner.build_root).parse_specs(
@@ -815,15 +849,16 @@ def test_find_valid_field_sets(caplog) -> None:
         target_types=[FortranTarget, InvalidTarget],
     )
 
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            fortran_target(name="valid")
-            fortran_target(name="valid2")
-            invalid_target(name="invalid")
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                fortran_target(name="valid")
+                fortran_target(name="valid2")
+                invalid_target(name="invalid")
+                """
+            )
+        }
     )
     valid_tgt = FortranTarget({}, Address("", target_name="valid"))
     valid_spec = AddressLiteralSpec("", "valid")
@@ -1187,8 +1222,9 @@ def codegen_rule_runner() -> RuleRunner:
 
 
 def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
-    rule_runner.create_files("src/avro", files=["f.avro"])
-    rule_runner.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+    rule_runner.write_files(
+        {"src/avro/f.avro": "", "src/avro/BUILD": "avro_library(name='lib', sources=['*.avro'])"}
+    )
     return Address("src/avro", target_name="lib")
 
 
@@ -1415,8 +1451,8 @@ def dependencies_rule_runner() -> RuleRunner:
 
 def assert_dependencies_resolved(
     rule_runner: RuleRunner,
-    *,
     requested_address: Address,
+    *,
     expected: Iterable[Address],
 ) -> None:
     target = rule_runner.get_target(requested_address)
@@ -1429,24 +1465,26 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
 
     We leave the rest of the parsing to AddressInput and Address.
     """
-    dependencies_rule_runner.create_files("files", ["f.txt", "transitive_exclude.txt"])
-    dependencies_rule_runner.add_to_build_file("files", "smalltalk(sources=['*.txt'])")
-    dependencies_rule_runner.add_to_build_file("a/b/c", "smalltalk()")
-    dependencies_rule_runner.add_to_build_file(
-        "demo/subdir",
-        dedent(
-            """\
-            smalltalk(
-                dependencies=[
-                    'a/b/c',
-                    '!a/b/c',
-                    'files/f.txt',
-                    '!files/f.txt',
-                    '!!files/transitive_exclude.txt',
-                ],
-            )
-            """
-        ),
+    dependencies_rule_runner.write_files(
+        {
+            "files/f.txt": "",
+            "files/transitive_exclude.txt": "",
+            "files/BUILD": "smalltalk(sources=['*.txt'])",
+            "a/b/c/BUILD": "smalltalk()",
+            "demo/subdir/BUILD": dedent(
+                """\
+                smalltalk(
+                    dependencies=[
+                        'a/b/c',
+                        '!a/b/c',
+                        'files/f.txt',
+                        '!files/f.txt',
+                        '!!files/transitive_exclude.txt',
+                    ],
+                )
+                """
+            ),
+        }
     )
     target = dependencies_rule_runner.get_target(Address("demo/subdir"))
     result = dependencies_rule_runner.request(
@@ -1462,59 +1500,56 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
 
 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.add_to_build_file(
-        "src/smalltalk", "smalltalk(dependencies=['//:dep1', '//:dep2', ':sibling'])"
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/BUILD": "smalltalk(dependencies=['//:dep1', '//:dep2', ':sibling'])",
+            "no_deps/BUILD": "smalltalk()",
+            # An ignore should override an include.
+            "ignore/BUILD": (
+                "smalltalk(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
+            ),
+        }
     )
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
+        Address("src/smalltalk"),
         expected=[
             Address("", target_name="dep1"),
             Address("", target_name="dep2"),
             Address("src/smalltalk", target_name="sibling"),
         ],
     )
-
-    # Also test that we handle no dependencies.
-    dependencies_rule_runner.add_to_build_file("no_deps", "smalltalk()")
-    assert_dependencies_resolved(
-        dependencies_rule_runner, requested_address=Address("no_deps"), expected=[]
-    )
-
-    # An ignore should override an include.
-    dependencies_rule_runner.add_to_build_file(
-        "ignore", "smalltalk(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
-    )
-    assert_dependencies_resolved(
-        dependencies_rule_runner, requested_address=Address("ignore"), expected=[]
-    )
+    assert_dependencies_resolved(dependencies_rule_runner, Address("no_deps"), expected=[])
+    assert_dependencies_resolved(dependencies_rule_runner, Address("ignore"), expected=[])
 
 
 def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.create_files(
-        "src/smalltalk/util", ["f1.st", "f2.st", "f3.st", "f4.st"]
-    )
-    dependencies_rule_runner.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
-    dependencies_rule_runner.add_to_build_file(
-        "src/smalltalk",
-        dedent(
-            """\
-            smalltalk(
-              dependencies=[
-                './util/f1.st',
-                'src/smalltalk/util/f2.st',
-                './util/f3.st',
-                './util/f4.st',
-                '!./util/f3.st',
-                '!!./util/f4.st',
-              ]
-            )
-            """
-        ),
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/util/f1.st": "",
+            "src/smalltalk/util/f2.st": "",
+            "src/smalltalk/util/f3.st": "",
+            "src/smalltalk/util/f4.st": "",
+            "src/smalltalk/util/BUILD": "smalltalk(sources=['*.st'])",
+            "src/smalltalk/BUILD": dedent(
+                """\
+                smalltalk(
+                  dependencies=[
+                    './util/f1.st',
+                    'src/smalltalk/util/f2.st',
+                    './util/f3.st',
+                    './util/f4.st',
+                    '!./util/f3.st',
+                    '!!./util/f4.st',
+                  ]
+                )
+                """
+            ),
+        }
     )
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
+        Address("src/smalltalk"),
         expected=[
             Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
             Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
@@ -1523,7 +1558,7 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
 
 
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.add_to_build_file("", "smalltalk(name='target')")
+    dependencies_rule_runner.write_files({"BUILD": "smalltalk(name='target')"})
 
     def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
         provided_deps = ["//:provided"]
@@ -1551,70 +1586,57 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     For consistency, dep inference does not merge generated subtargets with BUILD targets: if both
     are inferred, expansion to Targets will remove the redundancy while converting to subtargets.
     """
-    dependencies_rule_runner.create_files(
-        "",
-        [
-            "inferred1.st",
-            "inferred2.st",
-            "inferred_but_ignored1.st",
-            "inferred_but_ignored2.st",
-            "inferred_and_provided1.st",
-            "inferred_and_provided2.st",
-        ],
-    )
-    dependencies_rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            smalltalk(name='inferred1')
-            smalltalk(name='inferred2')
-            smalltalk(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
-            smalltalk(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
-            smalltalk(name='inferred_and_provided1')
-            smalltalk(name='inferred_and_provided2')
-            """
-        ),
-    )
-    dependencies_rule_runner.create_file(
-        "demo/f1.st",
-        dedent(
-            """\
-            //:inferred1
-            inferred2.st:inferred2
-            """
-        ),
-    )
-    dependencies_rule_runner.create_file(
-        "demo/f2.st",
-        dedent(
-            """\
-            //:inferred_and_provided1
-            inferred_and_provided2.st:inferred_and_provided2
-            inferred_but_ignored1.st:inferred_but_ignored1
-            //:inferred_but_ignored2
-            """
-        ),
-    )
-    dependencies_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            smalltalk(
-              sources=['*.st'],
-              dependencies=[
-                '//:inferred_and_provided1',
-                '//:inferred_and_provided2',
-                '!inferred_but_ignored1.st:inferred_but_ignored1',
-                '!//:inferred_but_ignored2',
-              ],
-            )
-            """
-        ),
+    dependencies_rule_runner.write_files(
+        {
+            "inferred1.st": "",
+            "inferred2.st": "",
+            "inferred_but_ignored1.st": "",
+            "inferred_but_ignored2.st": "",
+            "inferred_and_provided1.st": "",
+            "inferred_and_provided2.st": "",
+            "BUILD": dedent(
+                """\
+                smalltalk(name='inferred1')
+                smalltalk(name='inferred2')
+                smalltalk(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
+                smalltalk(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
+                smalltalk(name='inferred_and_provided1')
+                smalltalk(name='inferred_and_provided2')
+                """
+            ),
+            "demo/f1.st": dedent(
+                """\
+                //:inferred1
+                inferred2.st:inferred2
+                """
+            ),
+            "demo/f2.st": dedent(
+                """\
+                //:inferred_and_provided1
+                inferred_and_provided2.st:inferred_and_provided2
+                inferred_but_ignored1.st:inferred_but_ignored1
+                //:inferred_but_ignored2
+                """
+            ),
+            "demo/BUILD": dedent(
+                """\
+                smalltalk(
+                  sources=['*.st'],
+                  dependencies=[
+                    '//:inferred_and_provided1',
+                    '//:inferred_and_provided2',
+                    '!inferred_but_ignored1.st:inferred_but_ignored1',
+                    '!//:inferred_but_ignored2',
+                  ],
+                )
+                """
+            ),
+        }
     )
 
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("demo"),
+        Address("demo"),
         expected=[
             Address("", target_name="inferred1"),
             Address("", relative_file_path="inferred2.st", target_name="inferred2"),
@@ -1632,7 +1654,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
 
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("demo", relative_file_path="f1.st", target_name="demo"),
+        Address("demo", relative_file_path="f1.st", target_name="demo"),
         expected=[
             Address("", target_name="inferred1"),
             Address("", relative_file_path="inferred2.st", target_name="inferred2"),
@@ -1643,7 +1665,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
 
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("demo", relative_file_path="f2.st", target_name="demo"),
+        Address("demo", relative_file_path="f2.st", target_name="demo"),
         expected=[
             Address("", target_name="inferred_and_provided1"),
             Address("", target_name="inferred_and_provided2"),
@@ -1659,14 +1681,19 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
 def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
     """If the address is a BUILD target, or none of the dependency inference rules can infer
     dependencies on sibling files, then we should depend on all the BUILD target's files."""
-    dependencies_rule_runner.create_file("src/smalltalk/f1.st")
-    dependencies_rule_runner.create_file("src/smalltalk/f2.st")
-    dependencies_rule_runner.add_to_build_file("src/smalltalk", "smalltalk(sources=['*.st'])")
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/f1.st": "",
+            "src/smalltalk/f2.st": "",
+            "src/smalltalk/BUILD": "smalltalk(sources=['*.st'])",
+            "src/smalltalk/util/BUILD": "smalltalk()",
+        }
+    )
 
     # Test that a base address depends on its subtargets.
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
+        Address("src/smalltalk"),
         expected=[
             Address("src/smalltalk", relative_file_path="f1.st"),
             Address("src/smalltalk", relative_file_path="f2.st"),
@@ -1677,18 +1704,16 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
     # or those inference rules do not claim to infer dependencies on siblings.
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+        Address("src/smalltalk", relative_file_path="f1.st"),
         expected=[Address("src/smalltalk", relative_file_path="f2.st")],
     )
 
-    # Now we recreate the files so that the mock dependency inference will have results, which
-    # will cause it to claim to be able to infer dependencies on sibling files.
-    dependencies_rule_runner.add_to_build_file("src/smalltalk/util", "smalltalk()")
-    dependencies_rule_runner.create_file("src/smalltalk/f1.st", "src/smalltalk/util")
+    # Now, recreate f1.st so that inference works. Our mock inference rule will consequently say
+    # that it can now generate dependencies on siblings, whereas it could not before.
+    dependencies_rule_runner.write_files({"src/smalltalk/f1.st": "src/smalltalk/util"})
     assert_dependencies_resolved(
         dependencies_rule_runner,
-        requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
-        # We only expect the inferred address, not any dependencies on sibling files.
+        Address("src/smalltalk", relative_file_path="f1.st"),
         expected=[Address("src/smalltalk/util")],
     )
 
@@ -1697,15 +1722,16 @@ def test_resolve_unparsed_address_inputs() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(Addresses, [UnparsedAddressInputs])], target_types=[MockTarget]
     )
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            target(name="t1")
-            target(name="t2")
-            target(name="t3")
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "project/BUILD": dedent(
+                """\
+                target(name="t1")
+                target(name="t2")
+                target(name="t3")
+                """
+            )
+        }
     )
     addresses = rule_runner.request(
         Addresses,

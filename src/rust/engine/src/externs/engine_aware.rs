@@ -10,30 +10,31 @@ use crate::Types;
 use cpython::{PyDict, PyString, Python};
 use workunit_store::{ArtifactOutput, Level};
 
-pub struct EngineAwareLevel {}
+pub struct EngineAwareReturnType {}
 
-impl EngineAwareLevel {
-  pub fn retrieve(value: &Value) -> Option<Level> {
+impl EngineAwareReturnType {
+  pub fn level(value: &Value) -> Option<Level> {
     let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
     externs::val_to_log_level(&new_level_val).ok()
   }
-}
 
-pub struct Message {}
-
-impl Message {
-  pub fn retrieve(value: &Value) -> Option<String> {
+  pub fn message(value: &Value) -> Option<String> {
     let msg_val = externs::call_method(value, "message", &[]).ok()?;
     let msg_val = externs::check_for_python_none(msg_val)?;
     Some(externs::val_to_str(&msg_val))
   }
-}
 
-pub struct Metadata;
+  pub fn cacheable(value: &Value) -> Option<bool> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    externs::call_method(value, "cacheable", &[])
+      .ok()?
+      .extract(py)
+      .ok()
+  }
 
-impl Metadata {
-  pub fn retrieve(value: &Value) -> Option<Vec<(String, Value)>> {
+  pub fn metadata(value: &Value) -> Option<Vec<(String, Value)>> {
     let metadata_val = match externs::call_method(value, "metadata", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -66,12 +67,8 @@ impl Metadata {
     }
     Some(output)
   }
-}
 
-pub struct Artifacts {}
-
-impl Artifacts {
-  pub fn retrieve(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
+  pub fn artifacts(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
     let artifacts_val = match externs::call_method(value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {

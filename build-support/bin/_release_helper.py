@@ -598,7 +598,6 @@ def build_pex(fetch: bool) -> None:
                 str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
                 "--no-strip-pex-env",
                 "--console-script=pants",
-                "--unzip",
                 *extra_pex_args,
                 f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
             ],
@@ -723,7 +722,11 @@ def check_roles() -> None:
     # Check that the packages we plan to publish are correctly owned.
     banner("Checking current user.")
     username = get_pypi_config("server-login", "username")
-    if username not in _expected_owners and username not in _expected_maintainers:
+    if (
+        username != "__token__"  # See: https://pypi.org/help/#apitoken
+        and username not in _expected_owners
+        and username not in _expected_maintainers
+    ):
         die(f"User {username} not authorized to publish.")
     banner("Checking package roles.")
     validator = PackageAccessValidator()

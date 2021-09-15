@@ -18,17 +18,26 @@ fn env<I: IntoIterator<Item = (&'static str, &'static str)>>(vars: I) -> Env {
 #[test]
 fn test_display() {
   let env = env([]);
-  assert_eq!(
-    "PANTS_GLOBAL".to_owned(),
-    env.display(&option_id!("global"))
-  );
+  assert_eq!("PANTS_NAME".to_owned(), env.display(&option_id!("name")));
   assert_eq!(
     "PANTS_SCOPE_NAME".to_owned(),
-    env.display(&option_id!("scope", "name"))
+    env.display(&option_id!(["scope"], "name"))
   );
   assert_eq!(
     "PANTS_SCOPE_FULL_NAME".to_owned(),
-    env.display(&option_id!(-'f', "scope", "full", "name"))
+    env.display(&option_id!(-'f', ["scope"], "full", "name"))
+  );
+}
+
+#[test]
+fn test_scope() {
+  let env = env([("PANTS_PYTHON_SETUP_EXAMPLE", "true")]);
+  assert_eq!(
+    true,
+    env
+      .get_bool(&option_id!(["python-setup"], "example"))
+      .unwrap()
+      .unwrap()
   );
 }
 

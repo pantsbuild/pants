@@ -22,7 +22,7 @@ from pants.backend.python.typecheck.mypy.rules import (
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
-from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
+from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -47,7 +47,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # Used for import inference.
             *pants_bin.rules(),
             *config_files.rules(),
-            QueryRule(TypecheckResults, (MyPyRequest,)),
+            QueryRule(CheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
@@ -82,13 +82,13 @@ NEEDS_CONFIG_FILE = dedent(
 
 def run_mypy(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
-) -> tuple[TypecheckResult, ...]:
+) -> tuple[CheckResult, ...]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.typecheck.mypy", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     result = rule_runner.request(
-        TypecheckResults,
+        CheckResults,
         [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
     )
     return result.results
@@ -623,7 +623,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def run_mypy_with_plugin(tgt: Target) -> TypecheckResult:
+    def run_mypy_with_plugin(tgt: Target) -> CheckResult:
         result = run_mypy(
             rule_runner,
             [tgt],

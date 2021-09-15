@@ -23,7 +23,7 @@ def test_completed_log_output() -> None:
                 "--no-dynamic-ui",
                 "--backend-packages=['pants.backend.python', 'pants.backend.python.typecheck.mypy']",
                 "-ldebug",
-                "typecheck",
+                "check",
                 f"{tmpdir}/src/python/project",
             ]
         )

@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
+    PexScriptField,
     PexShebangField,
     PexStripEnvField,
     PexZipSafeField,
@@ -54,6 +55,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PexEntryPointField,)
 
     entry_point: PexEntryPointField
+    script: PexScriptField
 
     output_path: OutputPathField
     always_write_cache: PexAlwaysWriteCacheField
@@ -74,8 +76,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
-        if self.always_write_cache.value is True:
-            args.append("--always-write-cache")
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
@@ -84,12 +84,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
-        if self.zip_safe.value is False:
-            args.append("--not-zip-safe")
         if self.strip_env.value is False:
             args.append("--no-strip-pex-env")
-        if self._execution_mode is PexExecutionMode.UNZIP:
-            args.append("--unzip")
         if self._execution_mode is PexExecutionMode.VENV:
             args.extend(("--venv", "prepend"))
         if self.include_tools.value is True:
@@ -126,15 +122,13 @@ async def package_pex_binary(
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
-    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
+    output_filename = field_set.output_path.value_or_default(file_ending="pex")
     pex = await Get(
         Pex,
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
-            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
-            #  https://github.com/pantsbuild/pants/issues/11619
-            main=resolved_entry_point.val,
+            main=resolved_entry_point.val or field_set.script.value,
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,

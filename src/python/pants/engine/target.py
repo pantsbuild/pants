@@ -333,6 +333,8 @@ class Target:
             )
         )
 
+        self.validate()
+
     @final
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
@@ -558,6 +560,9 @@ class Target:
         """
         return UnionRule(cls._plugin_field_cls, field)
 
+    def validate(self) -> None:
+        """Validate the target, such as checking for mutually exclusive fields."""
+
 
 @dataclass(frozen=True)
 class Subtargets:
@@ -607,7 +612,7 @@ class UnexpandedTargets(Collection[Target]):
 
 
 @dataclass(frozen=True)
-class CoarsenedTarget:
+class CoarsenedTarget(EngineAwareParameter):
     """A set of Targets which cyclicly reach one another, and are thus indivisable."""
 
     # The members of the cycle.
@@ -617,6 +622,15 @@ class CoarsenedTarget:
     #
     # To expand these dependencies, request `CoarsenedTargets` for them.
     dependencies: FrozenOrderedSet[Address]
+
+    def debug_hint(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if len(self.members) > 1:
+            others = len(self.members) - 1
+            return f"{self.members[0].address.spec} (and {others} more)"
+        return self.members[0].address.spec
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):
@@ -954,6 +968,15 @@ class FieldSetsPerTargetRequest(Generic[_FS]):
 # -----------------------------------------------------------------------------------------------
 # Exception messages
 # -----------------------------------------------------------------------------------------------
+
+
+class InvalidTargetException(Exception):
+    """Use when there's an issue with the target, e.g. mutually exclusive fields set.
+
+    Suggested template:
+
+         f"The `{repr(alias)}` target {address} ..."
+    """
 
 
 class InvalidFieldException(Exception):

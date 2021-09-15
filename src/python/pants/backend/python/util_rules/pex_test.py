@@ -9,7 +9,8 @@ import re
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, Mapping, Tuple, cast
+from pathlib import PurePath
+from typing import Any, Iterable, Iterator, Mapping, Tuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,7 +20,11 @@ from pkg_resources import Requirement
 
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import LockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileMetadata,
+    LockfileMetadataV1,
+    LockfileMetadataV2,
+)
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     LockfileContent,
@@ -30,7 +35,6 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
     PexResolveInfo,
-    ResolvedDistributions,
     ToolCustomLockfile,
     ToolDefaultLockfile,
     VenvPex,
@@ -46,6 +50,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.python.python_setup import InvalidLockfileBehavior
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.dirutil import safe_rmtree
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -75,12 +80,11 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+    return RuleRunner(
         rules=[
             *pex_rules(),
             QueryRule(Pex, (PexRequest,)),
             QueryRule(VenvPex, (PexRequest,)),
-            QueryRule(ResolvedDistributions, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
@@ -89,11 +93,16 @@ def rule_runner() -> RuleRunner:
             QueryRule(PexPEX, ()),
         ],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
-    return rule_runner
+
+
+@dataclass(frozen=True)
+class PexData:
+    pex: Pex | VenvPex
+    is_zipapp: bool
+    sandbox_path: PurePath
+    local_path: PurePath
+    info: Mapping[str, Any]
+    files: Tuple[str, ...]
 
 
 def create_pex_and_get_all_data(
@@ -110,7 +119,7 @@ def create_pex_and_get_all_data(
     additional_pex_args: Tuple[str, ...] = (),
     env: Mapping[str, str] | None = None,
     internal_only: bool = True,
-) -> Dict:
+) -> PexData:
     request = PexRequest(
         output_filename="test.pex",
         internal_only=internal_only,
@@ -127,15 +136,18 @@ def create_pex_and_get_all_data(
         env=env,
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    pex = rule_runner.request(pex_type, [request])
-    if isinstance(pex, Pex):
+
+    pex: Pex | VenvPex
+    if pex_type == Pex:
+        pex = rule_runner.request(Pex, [request])
         digest = pex.digest
+        sandbox_path = pex.name
         pex_pex = rule_runner.request(PexPEX, [])
         process = rule_runner.request(
             Process,
             [
                 PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python, pex_path=()),
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
                     argv=["-m", "pex.tools", pex.name, "info"],
                     input_digest=pex.digest,
                     extra_env=dict(PEX_INTERPRETER="1"),
@@ -143,8 +155,10 @@ def create_pex_and_get_all_data(
                 )
             ],
         )
-    elif isinstance(pex, VenvPex):
+    else:
+        pex = rule_runner.request(VenvPex, [request])
         digest = pex.digest
+        sandbox_path = pex.pex_filename
         process = rule_runner.request(
             Process,
             [
@@ -156,23 +170,31 @@ def create_pex_and_get_all_data(
                 ),
             ],
         )
-    else:
-        raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
 
     rule_runner.scheduler.write_digest(digest)
-    pex_path = os.path.join(rule_runner.build_root, "test.pex")
+    local_path = PurePath(rule_runner.build_root) / "test.pex"
     result = rule_runner.request(ProcessResult, [process])
     pex_info_content = result.stdout.decode()
 
-    with zipfile.ZipFile(pex_path, "r") as zipfp:
-        pex_list = zipfp.namelist()
+    is_zipapp = zipfile.is_zipfile(local_path)
+    if is_zipapp:
+        with zipfile.ZipFile(local_path, "r") as zipfp:
+            files = tuple(zipfp.namelist())
+    else:
+        files = tuple(
+            os.path.normpath(os.path.relpath(os.path.join(root, path), local_path))
+            for root, dirs, files in os.walk(local_path)
+            for path in dirs + files
+        )
 
-    return {
-        "pex": pex,
-        "local_path": pex_path,
-        "info": json.loads(pex_info_content),
-        "files": pex_list,
-    }
+    return PexData(
+        pex=pex,
+        is_zipapp=is_zipapp,
+        sandbox_path=PurePath(sandbox_path),
+        local_path=local_path,
+        info=json.loads(pex_info_content),
+        files=files,
+    )
 
 
 def create_pex_and_get_pex_info(
@@ -187,25 +209,26 @@ def create_pex_and_get_pex_info(
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
     internal_only: bool = True,
-) -> Dict:
-    return cast(
-        Dict,
-        create_pex_and_get_all_data(
-            rule_runner,
-            pex_type=pex_type,
-            requirements=requirements,
-            main=main,
-            interpreter_constraints=interpreter_constraints,
-            platforms=platforms,
-            sources=sources,
-            additional_pants_args=additional_pants_args,
-            additional_pex_args=additional_pex_args,
-            internal_only=internal_only,
-        )["info"],
-    )
+) -> Mapping[str, Any]:
+    return create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=pex_type,
+        requirements=requirements,
+        main=main,
+        interpreter_constraints=interpreter_constraints,
+        platforms=platforms,
+        sources=sources,
+        additional_pants_args=additional_pants_args,
+        additional_pex_args=additional_pex_args,
+        internal_only=internal_only,
+    ).info
 
 
-def test_pex_execution(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+@pytest.mark.parametrize("internal_only", [True, False])
+def test_pex_execution(
+    rule_runner: RuleRunner, pex_type: type[Pex | VenvPex], internal_only: bool
+) -> None:
     sources = rule_runner.request(
         Digest,
         [
@@ -217,19 +240,29 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, main=EntryPoint("main"), sources=sources)
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=pex_type,
+        internal_only=internal_only,
+        main=EntryPoint("main"),
+        sources=sources,
+    )
 
-    pex_files = pex_output["files"]
-    assert "pex" not in pex_files
-    assert "main.py" in pex_files
-    assert "subdir/sub.py" in pex_files
+    assert "pex" not in pex_data.files
+    assert "main.py" in pex_data.files
+    assert "subdir/sub.py" in pex_data.files
 
-    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
-    # works.
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH`
+    # so that the shebang works.
+    pex_exe = (
+        f"./{pex_data.sandbox_path}"
+        if pex_data.is_zipapp
+        else os.path.join(pex_data.sandbox_path, "__main__.py")
+    )
     process = Process(
-        argv=("./test.pex",),
+        argv=(pex_exe,),
         env={"PATH": os.getenv("PATH", "")},
-        input_digest=pex_output["pex"].digest,
+        input_digest=pex_data.pex.digest,
         description="Run the pex and make sure it works",
     )
     result = rule_runner.request(ProcessResult, [process])
@@ -257,7 +290,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(
+    pex_data = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
         main=EntryPoint("main"),
@@ -270,13 +303,12 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
         env={"LANG": "es_PY.UTF-8"},
     )
 
-    pex = pex_output["pex"]
-    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
+    pex_process_type = PexProcess if isinstance(pex_data.pex, Pex) else VenvPexProcess
     process = rule_runner.request(
         Process,
         [
             pex_process_type(
-                pex,
+                pex_data.pex,
                 description="Run the pex and check its reported environment",
             ),
         ],
@@ -312,7 +344,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         ],
     )
 
-    pex_output = create_pex_and_get_all_data(
+    pex_data = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
         main=EntryPoint("main"),
@@ -320,8 +352,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
     )
 
-    pex = pex_output["pex"]
-    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
+    pex_process_type = PexProcess if isinstance(pex_data.pex, Pex) else VenvPexProcess
 
     dirpath = "foo/bar/baz"
     runtime_files = rule_runner.request(Digest, [CreateDigest([Directory(path=dirpath)])])
@@ -334,7 +365,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
             Process,
             [
                 pex_process_type(
-                    pex,
+                    pex_data.pex,
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,
@@ -347,7 +378,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         # For VenvPexes, run the PEX twice while clearing the venv dir in between. This emulates
         # situations where a PEX creation hits the process cache, while venv seeding misses the PEX
         # cache.
-        if isinstance(pex, VenvPex):
+        if isinstance(pex_data.pex, VenvPex):
             # Request once to ensure that the directory is seeded, and then start a new session so that
             # the second run happens as well.
             _ = rule_runner.request(ProcessResult, [process])
@@ -360,7 +391,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
             named_caches_dir = (
                 rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
             )
-            venv_dir = os.path.join(named_caches_dir, "pex_root", pex.venv_rel_dir)
+            venv_dir = os.path.join(named_caches_dir, "pex_root", pex_data.pex.venv_rel_dir)
             assert os.path.isdir(venv_dir)
             safe_rmtree(venv_dir)
 
@@ -439,8 +470,8 @@ def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
 
 
 def test_additional_args(rule_runner: RuleRunner) -> None:
-    pex_info = create_pex_and_get_pex_info(rule_runner, additional_pex_args=("--not-zip-safe",))
-    assert pex_info["zip_safe"] is False
+    pex_info = create_pex_and_get_pex_info(rule_runner, additional_pex_args=("--no-strip-pex-env",))
+    assert pex_info["strip_pex_env"] is False
 
 
 def test_platforms(rule_runner: RuleRunner) -> None:
@@ -448,7 +479,7 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     # actually used.
     platforms = PexPlatforms(["linux-x86_64-cp-27-cp27mu"])
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
-    pex_output = create_pex_and_get_all_data(
+    pex_data = create_pex_and_get_all_data(
         rule_runner,
         requirements=PexRequirements(["cryptography==2.9"]),
         platforms=platforms,
@@ -456,31 +487,49 @@ def test_platforms(rule_runner: RuleRunner) -> None:
         internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
     )
     assert any(
-        "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_output["files"]
+        "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_data.files
     )
-    assert not any("cryptography-2.9-cp27-cp27m-" in fp for fp in pex_output["files"])
-    assert not any("cryptography-2.9-cp35-abi3" in fp for fp in pex_output["files"])
+    assert not any("cryptography-2.9-cp27-cp27m-" in fp for fp in pex_data.files)
+    assert not any("cryptography-2.9-cp35-abi3" in fp for fp in pex_data.files)
 
     # NB: Platforms override interpreter constraints.
-    assert pex_output["info"]["interpreter_constraints"] == []
+    assert pex_data.info["interpreter_constraints"] == []
 
 
-def test_additional_inputs(rule_runner: RuleRunner) -> None:
-    # We use pex's --preamble-file option to set a custom preamble from a file.
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+@pytest.mark.parametrize("internal_only", [True, False])
+def test_additional_inputs(
+    rule_runner: RuleRunner, pex_type: type[Pex | VenvPex], internal_only: bool
+) -> None:
+    # We use Pex's --sources-directory option to add an extra source file to the PEX.
     # This verifies that the file was indeed provided as additional input to the pex call.
-    preamble_file = "custom_preamble.txt"
-    preamble = "#!CUSTOM PREAMBLE\n"
+    extra_src_dir = "extra_src"
+    data_file = os.path.join("data", "file")
+    data = "42"
     additional_inputs = rule_runner.request(
-        Digest, [CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])]
+        Digest,
+        [
+            CreateDigest(
+                [FileContent(path=os.path.join(extra_src_dir, data_file), content=data.encode())]
+            )
+        ],
     )
-    additional_pex_args = (f"--preamble-file={preamble_file}",)
-    pex_output = create_pex_and_get_all_data(
-        rule_runner, additional_inputs=additional_inputs, additional_pex_args=additional_pex_args
+    additional_pex_args = ("--sources-directory", extra_src_dir)
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=pex_type,
+        internal_only=internal_only,
+        additional_inputs=additional_inputs,
+        additional_pex_args=additional_pex_args,
     )
-    with zipfile.ZipFile(pex_output["local_path"], "r") as zipfp:
-        with zipfp.open("__main__.py", "r") as main:
-            main_content = main.read().decode()
-    assert main_content[: len(preamble)] == preamble
+    if pex_data.is_zipapp:
+        with zipfile.ZipFile(pex_data.local_path, "r") as zipfp:
+            with zipfp.open(data_file, "r") as datafp:
+                data_file_content = datafp.read()
+    else:
+        with open(pex_data.local_path / data_file, "rb") as datafp:
+            data_file_content = datafp.read()
+    assert data == data_file_content.decode()
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
@@ -493,13 +542,13 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         "urllib3==1.25.11",
     ]
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
-    venv_pex = create_pex_and_get_all_data(
+    pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
         requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
-    )["pex"]
-    dists = rule_runner.request(PexResolveInfo, [venv_pex])
+    ).pex
+    dists = rule_runner.request(PexResolveInfo, [pex])
     assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
     assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
     assert dists[2] == PexDistributionInfo(
@@ -515,7 +564,6 @@ def test_build_pex_description() -> None:
     def assert_description(
         requirements: PexRequirements | Lockfile | LockfileContent,
         *,
-        pex_path_length: int = 0,
         description: str | None = None,
         expected: str,
     ) -> None:
@@ -524,32 +572,25 @@ def test_build_pex_description() -> None:
             internal_only=True,
             requirements=requirements,
             description=description,
-            pex_path=(Pex(EMPTY_DIGEST, f"{i}.pex", None, ()) for i in range(0, pex_path_length)),
         )
         assert _build_pex_description(request) == expected
 
-    resolved_dists = ResolvedDistributions(
-        Pex(digest=EMPTY_DIGEST, name="repo.pex", python=None, pex_path=())
-    )
+    repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
     assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(resolved_dists=resolved_dists), description="Custom!", expected="Custom!"
+        PexRequirements(repository_pex=repo_pex), description="Custom!", expected="Custom!"
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(
-        PexRequirements(resolved_dists=resolved_dists),
-        pex_path_length=2,
-        expected="Composing 2 requirements to build new.pex from repo.pex",
-    )
+    assert_description(PexRequirements(repository_pex=repo_pex), expected="Building new.pex")
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
-        PexRequirements(["req"], resolved_dists=resolved_dists),
-        expected="Extracting req from repo.pex",
+        PexRequirements(["req"], repository_pex=repo_pex),
+        expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
     assert_description(
@@ -557,23 +598,27 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1"], resolved_dists=resolved_dists),
-        expected="Extracting req1 from repo.pex",
+        PexRequirements(["req1", "req2"], repository_pex=repo_pex),
+        expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 
     assert_description(
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
             lockfile_hex_digest=None,
+            req_strings=None,
         ),
-        expected="Resolving new.pex from lock.txt",
+        expected="Building new.pex from lock.txt",
     )
 
     assert_description(
         Lockfile(
-            file_path="lock.txt", file_path_description_of_origin="foo", lockfile_hex_digest=None
+            file_path="lock.txt",
+            file_path_description_of_origin="foo",
+            lockfile_hex_digest=None,
+            req_strings=None,
         ),
-        expected="Resolving new.pex from lock.txt",
+        expected="Building new.pex from lock.txt",
     )
 
 
@@ -657,6 +702,7 @@ def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, capl
 
 LOCKFILE_TYPES = (DEFAULT, FILE)
 BOOLEANS = (True, False)
+VERSIONS = (1, 2)
 
 
 def _run_pex_for_lockfile_test(
@@ -675,6 +721,8 @@ def _run_pex_for_lockfile_test(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_requirements,
+        expected_requirements,
         options_scope_name,
     ) = _metadata_validation_values(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
@@ -698,6 +746,7 @@ ansicolors==1.1.8
         lockfile_type,
         lockfile,
         expected_digest,
+        expected_requirements,
         options_scope_name,
         uses_source_plugins,
         uses_project_ic,
@@ -715,14 +764,15 @@ ansicolors==1.1.8
 
 
 @pytest.mark.parametrize(
-    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic",
+    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic,version",
     [
-        (lft, ir, ic, usp, upi)
+        (lft, ir, ic, usp, upi, v)
         for lft in LOCKFILE_TYPES
         for ir in BOOLEANS
         for ic in BOOLEANS
         for usp in BOOLEANS
         for upi in BOOLEANS
+        for v in VERSIONS
         if (ir or ic)
     ],
 )
@@ -733,6 +783,7 @@ def test_validate_metadata(
     invalid_constraints,
     uses_source_plugins,
     uses_project_ic,
+    version,
     caplog,
 ) -> None:
     class M:
@@ -762,17 +813,29 @@ def test_validate_metadata(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_requirements,
+        expected_requirements_,
         options_scope_name,
     ) = _metadata_validation_values(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
     )
 
-    metadata = LockfileMetadata(expected_digest, InterpreterConstraints([expected_constraints]))
+    metadata: LockfileMetadata
+    if version == 1:
+        metadata = LockfileMetadataV1(
+            InterpreterConstraints([expected_constraints]), expected_digest
+        )
+    elif version == 2:
+        expected_requirements = {Requirement.parse(i) for i in expected_requirements_}
+        metadata = LockfileMetadataV2(
+            InterpreterConstraints([expected_constraints]), expected_requirements
+        )
     requirements = _prepare_pex_requirements(
         rule_runner,
         lockfile_type,
         "lockfile_data_goes_here",
         actual_digest,
+        actual_requirements,
         options_scope_name,
         uses_source_plugins,
         uses_project_ic,
@@ -826,12 +889,15 @@ def test_validate_metadata(
 
 def _metadata_validation_values(
     invalid_reqs: bool, invalid_constraints: bool, uses_source_plugins: bool, uses_project_ic: bool
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, set[str], set[str], str]:
 
     actual_digest = "900d"
     expected_digest = actual_digest
+    actual_reqs = {"ansicolors==0.1.0"}
+    expected_reqs = actual_reqs
     if invalid_reqs:
         expected_digest = "baad"
+        expected_reqs = {"requests==3.0.0"}
 
     actual_constraints = "CPython>=3.6,<3.10"
     expected_constraints = actual_constraints
@@ -853,6 +919,8 @@ def _metadata_validation_values(
         expected_digest,
         actual_constraints,
         expected_constraints,
+        actual_reqs,
+        expected_reqs,
         options_scope_name,
     )
 
@@ -862,6 +930,7 @@ def _prepare_pex_requirements(
     lockfile_type: str,
     lockfile: str,
     expected_digest: str,
+    expected_requirements: set[str],
     options_scope_name: str,
     uses_source_plugins: bool,
     uses_project_interpreter_constraints: bool,
@@ -873,6 +942,7 @@ def _prepare_pex_requirements(
             file_path=file_path,
             file_path_description_of_origin="iceland",
             lockfile_hex_digest=expected_digest,
+            req_strings=FrozenOrderedSet(expected_requirements),
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
@@ -882,6 +952,7 @@ def _prepare_pex_requirements(
         return ToolDefaultLockfile(
             file_content=content,
             lockfile_hex_digest=expected_digest,
+            req_strings=FrozenOrderedSet(expected_requirements),
             options_scope_name=options_scope_name,
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,

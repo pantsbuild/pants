@@ -6,6 +6,7 @@ from __future__ import annotations
 import errno
 import logging
 import os
+import platform
 import posix
 from functools import reduce
 from typing import Optional
@@ -93,6 +94,10 @@ def get_normalized_os_name() -> str:
 
 def get_normalized_arch_name() -> str:
     return normalize_arch_name(get_arch_name())
+
+
+def is_macos_big_sur() -> bool:
+    return hasattr(platform, "mac_ver") and platform.mac_ver()[0].startswith("11.")
 
 
 def _values(aliases: dict[str, set[str]]) -> set[str]:
