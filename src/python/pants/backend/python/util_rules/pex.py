@@ -432,14 +432,14 @@ async def build_pex(
             description_of_origin=request.requirements.file_path_description_of_origin,
         )
 
-        requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
-
-        metadata = LockfileMetadata.from_lockfile(
-            requirements_file_digest_contents[0].content,
-            request.requirements.file_path,
-            resolve_name,
-        )
-        _validate_metadata(metadata, request, request.requirements, python_setup)
+        if python_setup.invalid_lockfile_behavior in {InvalidLockfileBehavior.warn, InvalidLockfileBehavior.error}:
+            requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
+            metadata = LockfileMetadata.from_lockfile(
+                requirements_file_digest_contents[0].content,
+                request.requirements.file_path,
+                resolve_name,
+            )
+            _validate_metadata(metadata, request, request.requirements, python_setup)
 
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
@@ -639,7 +639,7 @@ def _validate_metadata(
 
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise ValueError(message)
-    elif python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.warn:
+    else:
         logger.warning("%s", message)
 
 
