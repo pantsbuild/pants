@@ -1101,10 +1101,10 @@ impl Store {
     if digest == EMPTY_DIGEST {
       return future::ready(Ok(vec![])).boxed()
     }
-    
+
     self
       .walk(digest, move |_, path_so_far, _, directory| {
-         if directory.files.is_empty() {
+        if directory.files.is_empty() {
           // Only report an empty directory if the directory is a leaf node. (The caller is
           // expected to create parent directories for both files and empty leaf
           // directories.)
