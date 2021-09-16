@@ -726,6 +726,7 @@ def generate_file_level_targets(
     union_membership: UnionMembership | None,
     *,
     add_dependencies_on_all_siblings: bool,
+    use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -755,6 +756,12 @@ def generate_file_level_targets(
             Address(
                 generator.address.spec_path,
                 target_name=generator.address.target_name,
+                generated_name=relativized_fp,
+            )
+            if use_generated_address_syntax
+            else Address(
+                generator.address.spec_path,
+                target_name=generator.address.target_name,
                 relative_file_path=relativized_fp,
             )
         )
@@ -775,7 +782,7 @@ def generate_file_level_targets(
                         f"Target {generator.address.spec}'s `sources` field does not match a file "
                         f"{full_fp}."
                     )
-                value = (address._relative_file_path,)
+                value = (address._relative_file_path or address.generated_name,)
             elif add_dependencies_on_all_siblings and isinstance(field, Dependencies):
                 value = (field.value or ()) + tuple(all_generated_address_specs - {address.spec})
             else:

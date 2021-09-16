@@ -38,6 +38,20 @@ class CoursierError(Exception):
     """An exception relating to invoking Coursier or processing its output."""
 
 
+@dataclass(frozen=True)
+class Coordinate:
+    """A single Maven-style coordinate for a JVM dependency."""
+
+    # TODO: parse and validate the input into individual coordinate
+    # components, then re-expose the string coordinate as a property
+    # or __str__.
+    coord: str
+
+
+class Coordinates(DeduplicatedCollection[Coordinate]):
+    """An ordered list of Coordinate."""
+
+
 class MavenRequirements(DeduplicatedCollection[str]):
     @classmethod
     def create_from_maven_coordinates_fields(
@@ -50,20 +64,6 @@ class MavenRequirements(DeduplicatedCollection[str]):
             str(maven_coord) for field in fields for maven_coord in (field.value or ())
         )
         return MavenRequirements((*field_requirements, *additional_requirements))
-
-
-@dataclass(frozen=True)
-class MavenCoord:
-    """A single Maven-style coordinate for a JVM dependency."""
-
-    # TODO: parse and validate the input into individual coordinate
-    # components, then re-expose the string coordinate as a property
-    # or __str__.
-    coord: str
-
-
-class MavenCoordinates(DeduplicatedCollection[MavenCoord]):
-    """An ordered list of MavenCoord."""
 
 
 @dataclass(frozen=True)
@@ -104,10 +104,10 @@ class CoursierLockfileEntry:
     ```
     """
 
-    coord: MavenCoord
+    coord: Coordinate
     file_name: str
-    direct_dependencies: MavenCoordinates
-    dependencies: MavenCoordinates
+    direct_dependencies: Coordinates
+    dependencies: Coordinates
     file_digest: FileDigest
 
     @classmethod
@@ -115,12 +115,12 @@ class CoursierLockfileEntry:
         """Construct a CoursierLockfileEntry from its JSON dictionary representation."""
 
         return cls(
-            coord=MavenCoord(coord=entry["coord"]),
+            coord=Coordinate(coord=entry["coord"]),
             file_name=entry["file_name"],
-            direct_dependencies=MavenCoordinates(
-                MavenCoord(coord=d) for d in entry["directDependencies"]
+            direct_dependencies=Coordinates(
+                Coordinate(coord=d) for d in entry["directDependencies"]
             ),
-            dependencies=MavenCoordinates(MavenCoord(coord=d) for d in entry["dependencies"]),
+            dependencies=Coordinates(Coordinate(coord=d) for d in entry["dependencies"]),
             file_digest=FileDigest(
                 fingerprint=entry["file_digest"]["fingerprint"],
                 serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
@@ -247,11 +247,9 @@ async def coursier_resolve_lockfile(
     return CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
-                coord=MavenCoord(dep["coord"]),
-                direct_dependencies=MavenCoordinates(
-                    MavenCoord(dd) for dd in dep["directDependencies"]
-                ),
-                dependencies=MavenCoordinates(MavenCoord(d) for d in dep["dependencies"]),
+                coord=Coordinate(dep["coord"]),
+                direct_dependencies=Coordinates(Coordinate(dd) for dd in dep["directDependencies"]),
+                dependencies=Coordinates(Coordinate(d) for d in dep["dependencies"]),
                 file_name=file_name,
                 file_digest=artifact_file_digest,
             )
@@ -264,7 +262,7 @@ async def coursier_resolve_lockfile(
 
 @dataclass(frozen=True)
 class FetchOneCoordRequest:
-    coord: MavenCoord
+    coord: Coordinate
     expected_digest: FileDigest
 
 
@@ -272,7 +270,7 @@ class FetchOneCoordRequest:
 class ResolvedClasspathEntry:
     """A single classpath entry from a resolver (e.g. Coursier), typically a jar."""
 
-    coord: MavenCoord
+    coord: Coordinate
     file_name: str
     digest: Digest
 
