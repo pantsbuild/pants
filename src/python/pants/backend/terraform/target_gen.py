@@ -14,10 +14,10 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
-    HydratedSources,
-    HydrateSourcesRequest,
     ImmutableValue,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     Target,
 )
 from pants.engine.unions import UnionRule
@@ -31,13 +31,11 @@ class GenerateTerraformModuleTargetsRequest(GenerateTargetsRequest):
 async def generate_terraform_module_targets(
     request: GenerateTerraformModuleTargetsRequest,
 ) -> GeneratedTargets:
-    # Hydrate the sources referenced by the generator.
-    sources = await Get(
-        HydratedSources, HydrateSourcesRequest(request.generator.get(TerraformModulesSources))
+    sources_paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator.get(TerraformModulesSources))
     )
 
-    # Group the sources by directory and find which directories have Terraform files present.
-    dir_to_filenames = group_by_dir(sources.snapshot.files)
+    dir_to_filenames = group_by_dir(sources_paths.files)
     dirs_with_terraform_files = []
     for dir, filenames in dir_to_filenames.items():
         if any(filename.endswith(".tf") for filename in filenames):
@@ -54,6 +52,12 @@ async def generate_terraform_module_targets(
             generated_target_fields[field.alias] = value
         return TerraformModule(
             generated_target_fields,
+            # TODO(12891): Make this be:
+            #   Address(
+            #       request.generator.address.spec_path,
+            #       target_name=request.generator.target_name,
+            #       generated_name=dir
+            #   )
             Address(
                 dir,
                 target_name="tf_mod",

@@ -1,7 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
-
 import pytest
 
 from pants.backend.terraform import target_gen
@@ -36,32 +34,10 @@ def rule_runner() -> RuleRunner:
 def test_target_generation(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": textwrap.dedent(
-                """\
-        terraform_modules(name="tf_mods")
-        """
-            ),
-            "src/tf/versions.tf": textwrap.dedent(
-                """\
-        terraform {
-          required_version = ">= 1.0"
-        }
-        """
-            ),
-            "src/tf/outputs.tf": textwrap.dedent(
-                """\
-        output "foo" {
-          value = 'foo'
-        }
-        """
-            ),
-            "src/tf/foo/versions.tf": textwrap.dedent(
-                """\
-        terraform {
-          required_version = ">= 1.0"
-        }
-        """
-            ),
+            "BUILD": "terraform_modules(name='tf_mods')\n",
+            "src/tf/versions.tf": "",
+            "src/tf/outputs.tf": "",
+            "src/tf/foo/versions.tf": "",
             "src/tf/not-terraform/README.md": "This should not trigger target generation.",
         }
     )
