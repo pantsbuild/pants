@@ -11,7 +11,7 @@ from pants.backend.go.pkg import (
     ResolveExternalGoModuleToPackagesResult,
     ResolveGoPackageRequest,
 )
-from pants.backend.go.target_types import GoExternalModule, GoModule, GoPackage
+from pants.backend.go.target_types import GoModule, GoPackage
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.fs import EMPTY_DIGEST
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
                 ResolveExternalGoModuleToPackagesResult, [ResolveExternalGoModuleToPackagesRequest]
             ),
         ],
-        target_types=[GoPackage, GoModule, GoExternalModule],
+        target_types=[GoPackage, GoModule],
     )
     rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
     return rule_runner

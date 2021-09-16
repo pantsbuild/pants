@@ -12,17 +12,11 @@ from pants.backend.go import (
     target_type_rules,
 )
 from pants.backend.go import target_types as go_target_types
-from pants.backend.go.target_types import (
-    GoBinary,
-    GoExternalModule,
-    GoExtModPackage,
-    GoModule,
-    GoPackage,
-)
+from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
 
 
 def target_types():
-    return [GoBinary, GoPackage, GoModule, GoExternalModule, GoExtModPackage]
+    return [GoBinary, GoPackage, GoModule, GoExternalPackageTarget]
 
 
 def rules():
