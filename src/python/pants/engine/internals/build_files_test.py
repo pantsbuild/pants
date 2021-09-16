@@ -119,12 +119,12 @@ class MockTgt(Target):
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (Dependencies, Sources)
+    core_fields = (Dependencies, Sources, Tags)
 
 
 class MockTargetGenerator(Target):
     alias = "generator"
-    core_fields = (Dependencies, Sources)
+    core_fields = (Dependencies, Sources, Tags)
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
@@ -134,7 +134,21 @@ class MockGenerateTargetsRequest(GenerateTargetsRequest):
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
-    return generate_file_level_targets(MockGeneratedTarget, request.generator, paths.files, None)
+    # Generate using both "file address" and "generated target" syntax.
+    return GeneratedTargets(
+        [
+            *generate_file_level_targets(
+                MockGeneratedTarget, request.generator, paths.files, None
+            ).values(),
+            *generate_file_level_targets(
+                MockGeneratedTarget,
+                request.generator,
+                paths.files,
+                None,
+                use_generated_address_syntax=True,
+            ).values(),
+        ]
+    )
 
 
 def test_resolve_address() -> None:
@@ -264,16 +278,19 @@ def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> N
     address_specs_rule_runner.write_files(
         {"demo/f.txt": "", "demo/BUILD": "mock_tgt(sources=['f.txt'])"}
     )
-    # We also include a file address to ensure that that is included in the result.
     specs = [
-        AddressLiteralSpec("demo", "demo"),
-        AddressLiteralSpec("demo/f.txt", "demo"),
+        AddressLiteralSpec("demo"),
         SiblingAddresses("demo"),
         DescendantAddresses("demo"),
         AscendantAddresses("demo"),
+        # We also include a generated target and file address to ensure that that is included in
+        # the result.
+        AddressLiteralSpec("demo", None, "gen"),
+        AddressLiteralSpec("demo/f.txt"),
     ]
     assert resolve_address_specs(address_specs_rule_runner, specs) == {
         Address("demo"),
+        Address("demo", generated_name="gen"),
         Address("demo", relative_file_path="f.txt"),
     }
 
@@ -285,9 +302,9 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                mock_tgt(name="a", sources=["f.txt"])
-                mock_tgt(name="b", sources=["f.txt"], tags=["integration"])
-                mock_tgt(name="c", sources=["f.txt"], tags=["ignore"])
+                generator(name="a", sources=["f.txt"])
+                generator(name="b", sources=["f.txt"], tags=["integration"])
+                generator(name="c", sources=["f.txt"], tags=["ignore"])
                 """
             ),
         }
@@ -296,8 +313,8 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
         Address("demo", target_name="b")
     }
 
-    # The same filtering should work when given literal addresses, including file addresses.
-    # For file addresses, we look up the `tags` field of the original BUILD target.
+    # The same filtering should work when given literal addresses, including generated targets and
+    # file addresses.
     literals_result = resolve_address_specs(
         address_specs_rule_runner,
         [
@@ -306,12 +323,15 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
             AddressLiteralSpec("demo", "c"),
             AddressLiteralSpec("demo/f.txt", "a"),
             AddressLiteralSpec("demo/f.txt", "b"),
-            AddressLiteralSpec("demo/f.txt", "c"),
+            AddressLiteralSpec("demo", "a", "f.txt"),
+            AddressLiteralSpec("demo", "b", "f.txt"),
+            AddressLiteralSpec("demo", "c", "f.txt"),
         ],
     )
     assert literals_result == {
-        Address("demo", relative_file_path="f.txt", target_name="b"),
         Address("demo", target_name="b"),
+        Address("demo", target_name="b", generated_name="f.txt"),
+        Address("demo", target_name="b", relative_file_path="f.txt"),
     }
 
 
@@ -333,21 +353,24 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
         Address("demo", target_name="not_me")
     }
 
-    # The same filtering should work when given literal addresses, including file addresses.
-    # The filtering will operate against the normalized Address.spec.
+    # The same filtering should work when given literal addresses, including generated targets and
+    # file addresses.
     literals_result = resolve_address_specs(
         address_specs_rule_runner,
         [
             AddressLiteralSpec("demo", "exclude_me"),
             AddressLiteralSpec("demo", "not_me"),
+            AddressLiteralSpec("demo", "exclude_me", "f.txt"),
+            AddressLiteralSpec("demo", "not_me", "f.txt"),
             AddressLiteralSpec("demo/f.txt", "exclude_me"),
             AddressLiteralSpec("demo/f.txt", "not_me"),
         ],
     )
 
     assert literals_result == {
-        Address("demo", relative_file_path="f.txt", target_name="not_me"),
         Address("demo", target_name="not_me"),
+        Address("demo", target_name="not_me", relative_file_path="f.txt"),
+        Address("demo", target_name="not_me", generated_name="f.txt"),
     }
 
 

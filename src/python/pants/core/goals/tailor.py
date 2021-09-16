@@ -456,7 +456,7 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
         *specs.address_specs.globs,
     ]
     for spec in specs.address_specs.literals:
-        if spec.target_component == os.path.basename(spec.path_component):
+        if spec.is_directory_shorthand:
             dir_specs.append(spec)
         else:
             other_specs.append(spec)

@@ -77,10 +77,28 @@ class SpecsParser:
         if spec.endswith(":"):
             spec_path = spec[: -len(":")]
             return SiblingAddresses(directory=self._normalize_spec_path(spec_path))
-        if ":" in spec:
-            spec_parts = spec.rsplit(":", 1)
-            spec_path = self._normalize_spec_path(spec_parts[0])
-            return AddressLiteralSpec(path_component=spec_path, target_component=spec_parts[1])
+        if ":" in spec or "#" in spec:
+            tgt_parts = spec.split(":", maxsplit=1)
+            path_component = tgt_parts[0]
+            if len(tgt_parts) == 1:
+                target_component = None
+                generated_parts = path_component.split("#", maxsplit=1)
+                if len(generated_parts) == 1:
+                    generated_component = None
+                else:
+                    path_component, generated_component = generated_parts
+            else:
+                generated_parts = tgt_parts[1].split("#", maxsplit=1)
+                if len(generated_parts) == 1:
+                    target_component = generated_parts[0]
+                    generated_component = None
+                else:
+                    target_component, generated_component = generated_parts
+            return AddressLiteralSpec(
+                path_component=self._normalize_spec_path(path_component),
+                target_component=target_component,
+                generated_component=generated_component,
+            )
         if spec.startswith("!"):
             return FilesystemIgnoreSpec(spec[1:])
         if "*" in spec:
@@ -92,7 +110,7 @@ class SpecsParser:
             return FilesystemLiteralSpec(spec_path)
         # Else we apply address shorthand, i.e. `src/python/pants/util` ->
         # `src/python/pants/util:util`
-        return AddressLiteralSpec(path_component=spec_path, target_component=PurePath(spec).name)
+        return AddressLiteralSpec(spec_path, None, None)
 
     def parse_specs(self, specs: Iterable[str]) -> Specs:
         address_specs: OrderedSet[AddressSpec] = OrderedSet()

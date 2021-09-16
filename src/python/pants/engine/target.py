@@ -724,6 +724,8 @@ def generate_file_level_targets(
     paths: Iterable[str],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
+    *,
+    use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address."""
@@ -751,15 +753,20 @@ def generate_file_level_targets(
                 value = field.value
             generated_target_fields[field.alias] = value
 
-        return generated_target_cls(
-            generated_target_fields,
+        address = (
             Address(
                 generator.address.spec_path,
                 target_name=generator.address.target_name,
+                generated_name=relativized_file_name,
+            )
+            if use_generated_address_syntax
+            else Address(
+                generator.address.spec_path,
+                target_name=generator.address.target_name,
                 relative_file_path=relativized_file_name,
-            ),
-            union_membership,
+            )
         )
+        return generated_target_cls(generated_target_fields, address, union_membership)
 
     return GeneratedTargets(gen_tgt(fp) for fp in paths)
 
