@@ -70,8 +70,12 @@ class GoModule(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_external_module` target
+# `_go_external_package` target
 # -----------------------------------------------------------------------------------------------
+
+
+class GoExtModPackageDependencies(Dependencies):
+    pass
 
 
 class GoExternalModulePath(StringField):
@@ -81,40 +85,16 @@ class GoExternalModulePath(StringField):
 
 class GoExternalModuleVersion(StringField):
     alias = "version"
-    help = "Version of a Go module"
+    help = "Version of a Go module."
 
 
-class GoExternalModule(Target):
-    alias = "go_external_module"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoExternalModulePath,
-        GoExternalModuleVersion,
-        GoImportPath,
-    )
-    help = "External Go module."
-
-
-# -----------------------------------------------------------------------------------------------
-# `_go_ext_mod_package` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GoExtModPackageDependencies(Dependencies):
-    pass
-
-
-# Represents a Go package within a third-party Go package.
-# TODO(12763): Create this target synthetically (or remove the need for it) instead of relying on
-# `./pants tailor` to create.
-class GoExtModPackage(Target):
-    alias = "_go_ext_mod_package"
+class GoExternalPackageTarget(Target):
+    alias = "_go_external_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoExtModPackageDependencies,
-        GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
-        GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
+        GoExternalModulePath,
+        GoExternalModuleVersion,
         GoImportPath,
     )
     help = "Package in an external Go module."
