@@ -1,6 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Optional
+from __future__ import annotations
 
 from pants.backend.terraform.target_types import (
     TerraformModule,
@@ -44,7 +44,7 @@ async def generate_terraform_module_targets(
     def gen_target(dir: str) -> Target:
         generated_target_fields = {}
         for field in request.generator.field_values.values():
-            value: Optional[ImmutableValue]
+            value: ImmutableValue | None
             if isinstance(field, Sources):
                 value = tuple(dir_to_filenames[dir])
             else:
