@@ -23,6 +23,7 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidGeneratedTargetException,
     InvalidTargetException,
     NestedDictStringToStringField,
     RequiredFieldMissingException,
@@ -454,6 +455,7 @@ def test_generate_file_level_targets() -> None:
 
     tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
     assert generate(tgt, ["demo/f1.ext", "demo/f2.ext"]) == GeneratedTargets(
+        tgt,
         [
             MockGenerated(
                 {Sources.alias: ["f1.ext"], Tags.alias: ["tag"]},
@@ -463,29 +465,31 @@ def test_generate_file_level_targets() -> None:
                 {Sources.alias: ["f2.ext"], Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f2.ext"),
             ),
-        ]
+        ],
     )
 
     subdir_tgt = MockGenerator(
         {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, Address("src/fortran", target_name="demo")
     )
     assert generate(subdir_tgt, ["src/fortran/subdir/demo.f95"]) == GeneratedTargets(
+        subdir_tgt,
         [
             MockGenerated(
                 {Sources.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
             )
-        ]
+        ],
     )
     assert generate(
         subdir_tgt, ["src/fortran/subdir/demo.f95"], use_generated_addr_syntax=True
     ) == GeneratedTargets(
+        subdir_tgt,
         [
             MockGenerated(
                 {Sources.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", generated_name="subdir/demo.f95"),
             )
-        ]
+        ],
     )
 
     # The file path must match the filespec of the generator target's Sources field.
@@ -503,6 +507,58 @@ def test_generate_file_level_targets() -> None:
     with pytest.raises(AssertionError) as exc:
         generate(missing_fields_tgt, ["fake.txt"])
     assert "does not have both a `dependencies` and `sources` field" in str(exc.value)
+
+
+def test_generated_targets_address_validation() -> None:
+    """Ensure that all addresses are well formed."""
+
+    class MockTarget(Target):
+        alias = "tgt"
+        core_fields = ()
+
+    generator = MockTarget({}, Address("dir", target_name="generator"))
+    with pytest.raises(InvalidGeneratedTargetException):
+        GeneratedTargets(
+            generator,
+            [
+                MockTarget(
+                    {}, Address("a_different_dir", target_name="generator", generated_name="gen")
+                )
+            ],
+        )
+    with pytest.raises(InvalidGeneratedTargetException):
+        GeneratedTargets(
+            generator,
+            [
+                MockTarget(
+                    {}, Address("dir", target_name="a_different_generator", generated_name="gen")
+                )
+            ],
+        )
+    with pytest.raises(InvalidGeneratedTargetException):
+        GeneratedTargets(
+            generator,
+            [
+                MockTarget(
+                    {},
+                    Address(
+                        "dir",
+                        target_name="a_different_generator",
+                        generated_name=None,
+                        relative_file_path=None,
+                    ),
+                )
+            ],
+        )
+
+    # These are fine.
+    GeneratedTargets(
+        generator,
+        [
+            MockTarget({}, Address("dir", target_name="generator", generated_name="gen")),
+            MockTarget({}, Address("dir", target_name="generator", relative_file_path="gen")),
+        ],
+    )
 
 
 # -----------------------------------------------------------------------------------------------

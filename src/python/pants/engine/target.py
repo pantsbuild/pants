@@ -708,8 +708,32 @@ class GenerateTargetsRequest(Generic[_Tgt]):
 class GeneratedTargets(FrozenDict[Address, Target]):
     """A mapping of the address of generated targets to the targets themselves."""
 
-    def __init__(self, generated_targets: Iterable[Target]) -> None:
-        super().__init__({tgt.address: tgt for tgt in generated_targets})
+    def __init__(self, generator: Target, generated_targets: Iterable[Target]) -> None:
+        expected_spec_path = generator.address.spec_path
+        expected_tgt_name = generator.address.target_name
+        mapping = {}
+        for tgt in generated_targets:
+            if tgt.address.spec_path != expected_spec_path:
+                raise InvalidGeneratedTargetException(
+                    "All generated targets must have the same `Address.spec_path` as their "
+                    f"target generator. Expected {generator.address.spec_path}, but got "
+                    f"{tgt.address.spec_path} for target generated from {generator.address}: {tgt}"
+                )
+            if tgt.address.target_name != expected_tgt_name:
+                raise InvalidGeneratedTargetException(
+                    "All generated targets must have the same `Address.target_name` as their "
+                    f"target generator. Expected {generator.address.target_name}, but got "
+                    f"{tgt.address.target_name} for target generated from {generator.address}: "
+                    f"{tgt}"
+                )
+            if not tgt.address.is_generated_target:
+                raise InvalidGeneratedTargetException(
+                    "All generated targets must set `Address.generator_name` or "
+                    "`Address.relative_file_path`. Invalid for target generated from "
+                    f"{generator.address}: {tgt}"
+                )
+            mapping[tgt.address] = tgt
+        super().__init__(mapping)
 
 
 class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
@@ -768,7 +792,7 @@ def generate_file_level_targets(
         )
         return generated_target_cls(generated_target_fields, address, union_membership)
 
-    return GeneratedTargets(gen_tgt(fp) for fp in paths)
+    return GeneratedTargets(generator, (gen_tgt(fp) for fp in paths))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -973,6 +997,10 @@ class InvalidTargetException(Exception):
 
          f"The `{repr(alias)}` target {address} ..."
     """
+
+
+class InvalidGeneratedTargetException(InvalidTargetException):
+    pass
 
 
 class InvalidFieldException(Exception):

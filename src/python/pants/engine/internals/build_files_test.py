@@ -136,6 +136,7 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
     # Generate using both "file address" and "generated target" syntax.
     return GeneratedTargets(
+        request.generator,
         [
             *generate_file_level_targets(
                 MockGeneratedTarget, request.generator, paths.files, None
@@ -147,7 +148,7 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
                 None,
                 use_generated_address_syntax=True,
             ).values(),
-        ]
+        ],
     )
 
 
