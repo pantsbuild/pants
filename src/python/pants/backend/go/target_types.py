@@ -74,30 +74,42 @@ class GoModule(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExtModPackageDependencies(Dependencies):
+class GoExternalPackageDependencies(Dependencies):
     pass
 
 
-class GoExternalModulePath(StringField):
+class GoExternalPackagePathField(StringField):
     alias = "path"
-    help = "Module path to a Go module"
+    help = (
+        "The module path of the third-party module this package comes from, "
+        "e.g. `github.com/google/go-cmp`."
+    )
+    required = True
+    value: str
 
 
-class GoExternalModuleVersion(StringField):
+class GoExternalPackageVersionField(StringField):
     alias = "version"
-    help = "Version of a Go module."
+    help = "The version of the third-party module this package comes from, e.g. `v0.4.0`."
+    required = True
+    value: str
+
+
+class GoExternalPackageImportPathField(GoImportPath):
+    required = True
+    value: str
 
 
 class GoExternalPackageTarget(Target):
     alias = "_go_external_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoExtModPackageDependencies,
-        GoExternalModulePath,
-        GoExternalModuleVersion,
-        GoImportPath,
+        GoExternalPackageDependencies,
+        GoExternalPackagePathField,
+        GoExternalPackageVersionField,
+        GoExternalPackageImportPathField,
     )
-    help = "Package in an external Go module."
+    help = "A package from a third-party Go module."
 
 
 # -----------------------------------------------------------------------------------------------
