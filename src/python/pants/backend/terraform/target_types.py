@@ -15,7 +15,11 @@ class TerraformModuleSources(TerraformSources):
 class TerraformModule(Target):
     alias = "terraform_module"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModuleSources)
-    help = """A single Terraform module."""
+    help = (
+        "A single Terraform module corresponding to a directory.\n\n"
+        "There must only be one `terraform_module` in a directory.\n\n"
+        "Use `terraform_modules` to generate `terraform_module` targets for less boilerplate."
+    )
 
 
 class TerraformModulesSources(TerraformSources):
