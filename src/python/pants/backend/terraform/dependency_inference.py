@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
 from typing import Iterable
 
 import hcl2
@@ -21,10 +22,6 @@ from pants.engine.unions import UnionRule
 
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
     infer_from = TerraformModuleSources
-
-
-class PurePath:
-    pass
 
 
 # PurePath does not have the Path.resolve method which resolves ".." components, thus we need to

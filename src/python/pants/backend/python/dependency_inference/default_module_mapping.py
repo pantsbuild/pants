@@ -37,6 +37,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-dateutil": ("dateutil",),
     "python-docx": ("docx",),
     "python-dotenv": ("dotenv",),
+    "python-hcl2": ("hcl2",),
     "python-jose": ("jose",),
     "python-pptx": ("pptx",),
     "pyyaml": ("yaml",),
