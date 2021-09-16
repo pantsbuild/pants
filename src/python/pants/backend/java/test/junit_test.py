@@ -22,16 +22,18 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    MavenCoord,
-    MavenCoordinates,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+# TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
 
 
 @pytest.fixture
@@ -74,22 +76,20 @@ def rule_runner() -> RuleRunner:
 JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="junit:junit:4.13.2"),
+            coord=Coordinate(coord="junit:junit:4.13.2"),
             file_name="junit-4.13.2.jar",
-            direct_dependencies=MavenCoordinates(
-                [MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]
-            ),
-            dependencies=MavenCoordinates([MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]),
+            direct_dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
+            dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
             file_digest=FileDigest(
                 fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                 serialized_bytes_length=384581,
             ),
         ),
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+            coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
             file_name="hamcrest-core-1.3.jar",
-            direct_dependencies=MavenCoordinates([]),
-            dependencies=MavenCoordinates([]),
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
             file_digest=FileDigest(
                 fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                 serialized_bytes_length=45024,
@@ -144,7 +144,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -197,7 +197,12 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     )
     assert test_result.exit_code == 1
     assert (
-        re.search(r"helloTest.*?\[X\].*?java.lang.AssertionError", test_result.stdout) is not None
+        re.search(
+            r"Finished:.*?helloTest.*?Exception: java.lang.AssertionError",
+            test_result.stdout,
+            re.DOTALL,
+        )
+        is not None
     )
     assert re.search(r"1 tests failed", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
@@ -269,7 +274,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -291,30 +296,30 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="org.apiguardian:apiguardian-api:1.1.0"),
+            coord=Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
             file_name="apiguardian-api-1.1.0.jar",
-            direct_dependencies=MavenCoordinates([]),
-            dependencies=MavenCoordinates([]),
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
             file_digest=FileDigest(
                 fingerprint="a9aae9ff8ae3e17a2a18f79175e82b16267c246fbbd3ca9dfbbb290b08dcfdd4",
                 serialized_bytes_length=2387,
             ),
         ),
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="org.junit.jupiter:junit-jupiter-api:5.7.2"),
+            coord=Coordinate(coord="org.junit.jupiter:junit-jupiter-api:5.7.2"),
             file_name="junit-jupiter-api-5.7.2.jar",
-            direct_dependencies=MavenCoordinates(
+            direct_dependencies=Coordinates(
                 [
-                    MavenCoord(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    MavenCoord(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    MavenCoord(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
+                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
+                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
                 ]
             ),
-            dependencies=MavenCoordinates(
+            dependencies=Coordinates(
                 [
-                    MavenCoord(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    MavenCoord(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    MavenCoord(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
+                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
+                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
                 ]
             ),
             file_digest=FileDigest(
@@ -323,24 +328,22 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
             ),
         ),
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="org.junit.platform:junit-platform-commons:1.7.2"),
+            coord=Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
             file_name="junit-platform-commons-1.7.2.jar",
-            direct_dependencies=MavenCoordinates(
-                [MavenCoord(coord="org.apiguardian:apiguardian-api:1.1.0")]
+            direct_dependencies=Coordinates(
+                [Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]
             ),
-            dependencies=MavenCoordinates(
-                [MavenCoord(coord="org.apiguardian:apiguardian-api:1.1.0")]
-            ),
+            dependencies=Coordinates([Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]),
             file_digest=FileDigest(
                 fingerprint="738d0df021a0611fff5d277634e890cc91858fa72227cf0bcf36232a7caf014c",
                 serialized_bytes_length=100008,
             ),
         ),
         CoursierLockfileEntry(
-            coord=MavenCoord(coord="org.opentest4j:opentest4j:1.2.0"),
+            coord=Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
             file_name="opentest4j-1.2.0.jar",
-            direct_dependencies=MavenCoordinates([]),
-            dependencies=MavenCoordinates([]),
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
             file_digest=FileDigest(
                 fingerprint="58812de60898d976fb81ef3b62da05c6604c18fd4a249f5044282479fc286af2",
                 serialized_bytes_length=7653,
@@ -399,7 +402,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -455,7 +458,9 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     assert test_result.exit_code == 1
     assert (
         re.search(
-            r"testHello\(\).*?\[X\].*?expected: <Goodbye!> but was: <Hello!>", test_result.stdout
+            r"Finished:.*?testHello.*?Exception: org.opentest4j.AssertionFailedError: expected: <Goodbye!> but was: <Hello!>",
+            test_result.stdout,
+            re.DOTALL,
         )
         is not None
     )
@@ -532,7 +537,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -603,7 +608,7 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
-    assert re.search(r"testGoodbye.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None
     assert re.search(r"2 tests found", test_result.stdout) is not None

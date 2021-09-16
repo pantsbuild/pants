@@ -21,9 +21,10 @@ from pants.base.specs import (
 from pants.base.specs_parser import SpecsParser
 
 
-def address_literal(directory: str, name: str | None = None) -> AddressLiteralSpec:
-    name = name if name is not None else os.path.basename(directory)
-    return AddressLiteralSpec(directory, name)
+def address_literal(
+    directory: str, name: str | None = None, generated: str | None = None
+) -> AddressLiteralSpec:
+    return AddressLiteralSpec(directory, name, generated)
 
 
 def desc(directory: str) -> DescendantAddresses:
@@ -72,6 +73,12 @@ def assert_filesystem_spec_parsed(
         ("a/b", address_literal("a/b")),
         ("a/b:b", address_literal("a/b", "b")),
         ("a/b:c", address_literal("a/b", "c")),
+        ("//a/b:c", address_literal("a/b", "c")),
+        ("//#gen", address_literal("", None, "gen")),
+        ("//:tgt#gen", address_literal("", "tgt", "gen")),
+        ("dir:tgt#gen", address_literal("dir", "tgt", "gen")),
+        ("dir#gen", address_literal("dir", None, "gen")),
+        ("//dir:tgt#gen", address_literal("dir", "tgt", "gen")),
     ],
 )
 def test_address_literal_specs(tmp_path: Path, spec: str, expected: AddressLiteralSpec) -> None:

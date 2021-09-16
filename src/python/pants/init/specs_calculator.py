@@ -72,9 +72,8 @@ def calculate_specs(
         address_specs.append(
             AddressLiteralSpec(
                 path_component=address_input.path_component,
-                # NB: AddressInput.target_component may be None, but AddressLiteralSpec expects a
-                # string.
-                target_component=address_input.target_component or address.target_name,
+                target_component=address_input.target_component,
+                generated_component=address_input.generated_component,
             )
         )
     return Specs(AddressSpecs(address_specs, filter_by_global_options=True), FilesystemSpecs([]))

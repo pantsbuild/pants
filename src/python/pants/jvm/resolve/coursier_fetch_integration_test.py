@@ -10,10 +10,10 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    MavenCoord,
-    MavenCoordinates,
     MavenRequirements,
     ResolvedClasspathEntry,
 )
@@ -71,10 +71,10 @@ def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -98,22 +98,22 @@ def test_resolve_with_transitive_deps(rule_runner: RuleRunner) -> None:
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="junit:junit:4.13.2"),
+                coord=Coordinate(coord="junit:junit:4.13.2"),
                 file_name="junit-4.13.2.jar",
-                direct_dependencies=MavenCoordinates(
-                    [MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]
+                direct_dependencies=Coordinates(
+                    [Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]
                 ),
-                dependencies=MavenCoordinates([MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]),
+                dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
                 file_digest=FileDigest(
                     fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                     serialized_bytes_length=384581,
                 ),
             ),
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -141,10 +141,10 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="junit:junit:4.8.2"),
+                coord=Coordinate(coord="junit:junit:4.8.2"),
                 file_name="junit-4.8.2.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="a2aa2c3bb2b72da76c3e6a71531f1eefdc350494819baf2b1d80d7146e020f9e",
                     serialized_bytes_length=237344,
@@ -160,10 +160,10 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
         ResolvedClasspathEntry,
         [
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -171,7 +171,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")
+    assert classpath_entry.coord == Coordinate(coord="org.hamcrest:hamcrest-core:1.3")
     assert classpath_entry.file_name == "hamcrest-core-1.3.jar"
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "hamcrest-core-1.3.jar")]
@@ -188,12 +188,12 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
         ResolvedClasspathEntry,
         [
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="junit:junit:4.13.2"),
+                coord=Coordinate(coord="junit:junit:4.13.2"),
                 file_name="junit-4.13.2.jar",
-                direct_dependencies=MavenCoordinates(
-                    [MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]
+                direct_dependencies=Coordinates(
+                    [Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]
                 ),
-                dependencies=MavenCoordinates([MavenCoord(coord="org.hamcrest:hamcrest-core:1.3")]),
+                dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
                 file_digest=FileDigest(
                     fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                     serialized_bytes_length=384581,
@@ -201,7 +201,7 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == MavenCoord(coord="junit:junit:4.13.2")
+    assert classpath_entry.coord == Coordinate(coord="junit:junit:4.13.2")
     assert classpath_entry.file_name == "junit-4.13.2.jar"
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "junit-4.13.2.jar")]
@@ -219,10 +219,10 @@ def test_fetch_one_coord_with_bad_fingerprint(rule_runner: RuleRunner) -> None:
         r"did not match.*?ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
         file_name="hamcrest-core-1.3.jar",
-        direct_dependencies=MavenCoordinates([]),
-        dependencies=MavenCoordinates([]),
+        direct_dependencies=Coordinates([]),
+        dependencies=Coordinates([]),
         file_digest=FileDigest(
             fingerprint="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             serialized_bytes_length=45024,
@@ -241,10 +241,10 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
         r"serialized_bytes_length=1\).*?"
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
         file_name="hamcrest-core-1.3.jar",
-        direct_dependencies=MavenCoordinates([]),
-        dependencies=MavenCoordinates([]),
+        direct_dependencies=Coordinates([]),
+        dependencies=Coordinates([]),
         file_digest=FileDigest(
             fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
             serialized_bytes_length=1,
@@ -268,10 +268,10 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
         r'does not match requested coord.*?"org.hamcrest:hamcrest-core:1.3\+".*?'
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3+"),
+        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3+"),
         file_name="hamcrest-core-1.3.jar",
-        direct_dependencies=MavenCoordinates([]),
-        dependencies=MavenCoordinates([]),
+        direct_dependencies=Coordinates([]),
+        dependencies=Coordinates([]),
         file_digest=FileDigest(
             fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
             serialized_bytes_length=45024,
