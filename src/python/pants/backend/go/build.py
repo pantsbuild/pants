@@ -175,12 +175,14 @@ async def build_target(
     elif is_third_party_package_target(target):
         module_path = target[GoExternalModulePath].value
         if not module_path:
-            raise ValueError(f"_go_ext_mod_package at address {request.address} has a blank `path`")
+            raise ValueError(
+                f"_go_external_package at address {request.address} has a blank `path`"
+            )
 
         module_version = target[GoExternalModuleVersion].value
         if not module_version:
             raise ValueError(
-                f"_go_ext_mod_package at address {request.address} has a blank `version`"
+                f"_go_external_package at address {request.address} has a blank `version`"
             )
 
         module, resolved_package = await MultiGet(
