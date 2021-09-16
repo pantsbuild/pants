@@ -13,15 +13,11 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.jvm.goals.coursier import CoursierResolve
 from pants.jvm.goals.coursier import rules as coursier_goal_rules
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierLockfileEntry,
-    CoursierResolvedLockfile,
-    MavenCoord,
-    MavenCoordinates,
-)
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.types import Coordinate, Coordinates
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import RuleRunner
 
@@ -64,10 +60,10 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -85,10 +81,10 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -141,10 +137,10 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
@@ -180,10 +176,10 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
                 file_name="hamcrest-core-1.3.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
                     serialized_bytes_length=45024,
