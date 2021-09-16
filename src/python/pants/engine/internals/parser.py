@@ -218,17 +218,19 @@ class AstVisitor(ast.NodeVisitor):
         self.error_on_import(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        if not self.rename_symbols:
+        if (
+            not self.rename_symbols
+            or not isinstance(node.func, ast.Name)
+            or node.func.id not in DEPRECATED_MACRO_RENAMES
+        ):
             return
-        is_deprecated_symbol = (
-            isinstance(node.func, ast.Name) and node.func.id in DEPRECATED_MACRO_RENAMES
-        )
         name_keyword = next((kw for kw in node.keywords if kw.arg == "name"), None)
-        if is_deprecated_symbol and not name_keyword:
-            self.pending_renames.append(
-                SymbolRename(
-                    node.lineno,
-                    old_symbol=node.func.id,
-                    new_symbol=DEPRECATED_MACRO_RENAMES[node.func.id],
-                )
+        if not name_keyword:
+            return
+        self.pending_renames.append(
+            SymbolRename(
+                node.lineno,
+                old_symbol=node.func.id,
+                new_symbol=DEPRECATED_MACRO_RENAMES[node.func.id],
             )
+        )
