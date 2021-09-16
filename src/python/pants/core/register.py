@@ -6,7 +6,7 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core.goals import fmt, lint, package, repl, run, tailor, test, typecheck
+from pants.core.goals import check, fmt, lint, package, repl, run, tailor, test
 from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -27,13 +27,13 @@ from pants.source import source_root
 def rules():
     return [
         # goals
+        *check.rules(),
         *fmt.rules(),
         *lint.rules(),
         *package.rules(),
         *repl.rules(),
         *run.rules(),
         *test.rules(),
-        *typecheck.rules(),
         *tailor.rules(),
         # util_rules
         *config_files.rules(),

@@ -143,7 +143,7 @@ class Field:
 
     @classmethod
     def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.removal_version or address.is_file_target or raw_value is None:
+        if not cls.removal_version or address.is_generated_target or raw_value is None:
             return
         if not cls.removal_hint:
             raise ValueError(
@@ -290,13 +290,12 @@ class Target:
         self,
         unhydrated_values: Dict[str, Any],
         address: Address,
-        *,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
     ) -> None:
-        if self.removal_version and not address.is_file_target:
+        if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
                 raise ValueError(
                     f"You specified `removal_version` for {self.__class__}, but not "
@@ -565,14 +564,6 @@ class Target:
 
 
 @dataclass(frozen=True)
-class Subtargets:
-    # The BUILD target from which the subtargets were extracted.
-    base: Target
-    # The subtargets, one per file that was owned by the BUILD target.
-    subtargets: Tuple[Target, ...]
-
-
-@dataclass(frozen=True)
 class WrappedTarget:
     """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
 
@@ -604,7 +595,8 @@ class Targets(Collection[Target]):
 
 
 class UnexpandedTargets(Collection[Target]):
-    """Like `Targets`, but will not contain the expansion of `TargetAlias` instances."""
+    """Like `Targets`, but will not replace target generators with their generated targets (e.g.
+    replace `python_library` "BUILD targets" with generated `python_library` "file targets")."""
 
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
@@ -612,7 +604,7 @@ class UnexpandedTargets(Collection[Target]):
 
 
 @dataclass(frozen=True)
-class CoarsenedTarget:
+class CoarsenedTarget(EngineAwareParameter):
     """A set of Targets which cyclicly reach one another, and are thus indivisable."""
 
     # The members of the cycle.
@@ -622,6 +614,15 @@ class CoarsenedTarget:
     #
     # To expand these dependencies, request `CoarsenedTargets` for them.
     dependencies: FrozenOrderedSet[Address]
+
+    def debug_hint(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if len(self.members) > 1:
+            others = len(self.members) - 1
+            return f"{self.members[0].address.spec} (and {others} more)"
+        return self.members[0].address.spec
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):
@@ -691,79 +692,76 @@ class RegisteredTargetTypes:
 
 
 # -----------------------------------------------------------------------------------------------
-# Generated subtargets
+# Target generation
 # -----------------------------------------------------------------------------------------------
-
-
-def generate_subtarget_address(build_target_address: Address, *, full_file_name: str) -> Address:
-    """Return the address for a new target based on the BUILD target, but with a more precise
-    `sources` field.
-
-    The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
-
-    See generate_subtarget().
-    """
-    if build_target_address.is_file_target:
-        raise ValueError(f"Cannot generate file targets for a file Address: {build_target_address}")
-    original_spec_path = build_target_address.spec_path
-    relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
-    return Address(
-        spec_path=original_spec_path,
-        target_name=build_target_address.target_name,
-        relative_file_path=relative_file_path,
-    )
-
 
 _Tgt = TypeVar("_Tgt", bound=Target)
 
 
-def generate_subtarget(
-    build_target: _Tgt,
-    *,
-    full_file_name: str,
-    # NB: `union_membership` is only optional to facilitate tests. In production, we should
-    # always provide this parameter. This should be safe to do because production code should
-    # rarely directly instantiate Targets and should instead use the engine to request them.
-    union_membership: Optional[UnionMembership] = None,
-) -> _Tgt:
-    """Generate a new target with the exact same metadata as the BUILD target, except for the
-    `sources` field only referring to the single file `full_file_name` and with a new address.
+@union
+@dataclass(frozen=True)
+class GenerateTargetsRequest(Generic[_Tgt]):
+    generate_from: ClassVar[type[_Tgt]]
+    generator: _Tgt
 
-    This is used for greater precision when using dependency inference and file arguments. When we
-    are able to deduce specifically which files are being used, we can use only the files we care
-    about, rather than the entire `sources` field.
-    """
-    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
-        raise ValueError(
-            f"Target {build_target.address.spec} of type {type(build_target).__qualname__} does "
+
+class GeneratedTargets(FrozenDict[Address, Target]):
+    """A mapping of the address of generated targets to the targets themselves."""
+
+    def __init__(self, generated_targets: Iterable[Target]) -> None:
+        super().__init__({tgt.address: tgt for tgt in generated_targets})
+
+
+class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
+    def is_generator(self, tgt: Target) -> bool:
+        """Does this target type generate other targets?"""
+        return type(tgt) in self
+
+
+def generate_file_level_targets(
+    generated_target_cls: type[Target],
+    generator: Target,
+    paths: Iterable[str],
+    # NB: Should only ever be set to `None` in tests.
+    union_membership: UnionMembership | None,
+) -> GeneratedTargets:
+    """Generate one new target for each path, using the same fields as the generator target except
+    for the `sources` field only referring to the path and using a new address."""
+    if not generator.has_field(Dependencies) or not generator.has_field(Sources):
+        raise AssertionError(
+            f"The `{generator.alias}` target {generator.address.spec} does "
             "not have both a `dependencies` and `sources` field, and thus cannot generate a "
-            f"subtarget for the file {full_file_name}."
+            f"`{generated_target_cls.alias}` target."
         )
 
-    relativized_file_name = (
-        PurePath(full_file_name).relative_to(build_target.address.spec_path).as_posix()
-    )
+    def gen_tgt(fp: str) -> Target:
+        relativized_file_name = str(PurePath(fp).relative_to(generator.address.spec_path))
 
-    generated_target_fields = {}
-    for field in build_target.field_values.values():
-        value: Optional[ImmutableValue]
-        if isinstance(field, Sources):
-            if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
-                raise ValueError(
-                    f"Target {build_target.address.spec}'s `sources` field does not match a file "
-                    f"{full_file_name}."
-                )
-            value = (relativized_file_name,)
-        else:
-            value = field.value
-        generated_target_fields[field.alias] = value
+        generated_target_fields = {}
+        for field in generator.field_values.values():
+            value: Optional[ImmutableValue]
+            if isinstance(field, Sources):
+                if not bool(matches_filespec(field.filespec, paths=[fp])):
+                    raise AssertionError(
+                        f"Target {generator.address.spec}'s `sources` field does not match a file "
+                        f"{fp}."
+                    )
+                value = (relativized_file_name,)
+            else:
+                value = field.value
+            generated_target_fields[field.alias] = value
 
-    target_cls = type(build_target)
-    return target_cls(
-        generated_target_fields,
-        generate_subtarget_address(build_target.address, full_file_name=full_file_name),
-        union_membership=union_membership,
-    )
+        return generated_target_cls(
+            generated_target_fields,
+            Address(
+                generator.address.spec_path,
+                target_name=generator.address.target_name,
+                relative_file_path=relativized_file_name,
+            ),
+            union_membership,
+        )
+
+    return GeneratedTargets(gen_tgt(fp) for fp in paths)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1299,9 +1297,6 @@ class Sources(StringSequenceField, AsyncFieldMixin):
       is no limit on the number of source files.
     - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files referenced
       by this field.
-    - `indivisible` -- The Target API by default will split targets into per-file subtargets for each source
-      file. Set this property to `True` to opt-out of that spliting by marking the source files as "indivisible"
-      such that the Target API will never split targets containing this field into per-file subtargets.
     """
 
     alias = "sources"
@@ -1309,7 +1304,6 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
-    indivisible: ClassVar[bool] = False
 
     help = (
         "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
@@ -1693,11 +1687,11 @@ class ExplicitlyProvidedDependencies:
     def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
-        Note that if the input addresses are file addresses, they will still be marked as covered if
-        their original BUILD target is in the explicitly provided includes.
+        Note that if the input addresses are generated targets, they will still be marked as covered
+        if their original target generator is in the explicitly provided includes.
         """
         return any(
-            addr in self.includes or addr.maybe_convert_to_build_target() in self.includes
+            addr in self.includes or addr.maybe_convert_to_target_generator() in self.includes
             for addr in addresses
         )
 
@@ -1708,8 +1702,8 @@ class ExplicitlyProvidedDependencies:
         """All addresses that remain after ineligible candidates are discarded.
 
         Candidates are removed if they appear as ignores (`!` and `!!)` in the `dependencies`
-        field. Note that if the input addresses are file addresses, they will still be marked as
-        covered if their original BUILD target is in the explicitly provided ignores.
+        field. Note that if the input addresses are generated targets, they will still be marked as
+        covered if their original target generator is in the explicitly provided ignores.
 
         Candidates are also removed if `owners_must_be_ancestors` is True and the targets are not
         ancestors, e.g. `root2:tgt` is not a valid candidate for something defined in `root1`.
@@ -1718,7 +1712,7 @@ class ExplicitlyProvidedDependencies:
 
         def is_valid(addr: Address) -> bool:
             is_ignored = (
-                addr in self.ignores or addr.maybe_convert_to_build_target() in self.ignores
+                addr in self.ignores or addr.maybe_convert_to_target_generator() in self.ignores
             )
             if owners_must_be_ancestors is False:
                 return not is_ignored

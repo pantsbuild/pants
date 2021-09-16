@@ -11,6 +11,7 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
 from pants.build_graph.address import Address
@@ -32,6 +33,8 @@ from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
+# TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -47,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *junit_rules(),
             *javac_binary_rules(),
             *util_rules(),
+            *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
@@ -142,7 +146,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -195,7 +199,12 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     )
     assert test_result.exit_code == 1
     assert (
-        re.search(r"helloTest.*?\[X\].*?java.lang.AssertionError", test_result.stdout) is not None
+        re.search(
+            r"Finished:.*?helloTest.*?Exception: java.lang.AssertionError",
+            test_result.stdout,
+            re.DOTALL,
+        )
+        is not None
     )
     assert re.search(r"1 tests failed", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
@@ -267,7 +276,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -397,7 +406,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -453,7 +462,9 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     assert test_result.exit_code == 1
     assert (
         re.search(
-            r"testHello\(\).*?\[X\].*?expected: <Goodbye!> but was: <Hello!>", test_result.stdout
+            r"Finished:.*?testHello.*?Exception: org.opentest4j.AssertionFailedError: expected: <Goodbye!> but was: <Hello!>",
+            test_result.stdout,
+            re.DOTALL,
         )
         is not None
     )
@@ -530,7 +541,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
@@ -601,7 +612,7 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
-    assert re.search(r"testHello.*?\[OK\]", test_result.stdout) is not None
-    assert re.search(r"testGoodbye.*?\[OK\]", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None
     assert re.search(r"2 tests found", test_result.stdout) is not None

@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
 from pants.backend.python.lint.pylint.rules import PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
@@ -31,6 +32,7 @@ def rule_runner() -> RuleRunner:
             *pylint_rules(),
             *subsystem.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, [PylintRequest]),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],

@@ -47,6 +47,7 @@ class RunTracker:
     #  we want to do at the moment, so we maintain this manual list for now.
     STANDARD_GOALS = frozenset(
         (
+            "check",
             "count-loc",
             "dependees",
             "dependencies",

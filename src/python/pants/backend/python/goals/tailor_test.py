@@ -55,28 +55,46 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--no-python-setup-tailor-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
-            f"src/python/foo/{fp}": ""
-            for fp in (
-                "__init__.py",
-                "bar/__init__.py",
-                "bar/baz1.py",
-                "bar/baz1_test.py",
-                "bar/baz2.py",
-                "bar/baz2_test.py",
-                "bar/baz3.py",
-            )
+            "3rdparty/requirements.txt": "",
+            "3rdparty/requirements-test.txt": "",
+            **{
+                f"src/python/foo/{fp}": ""
+                for fp in (
+                    "__init__.py",
+                    "bar/__init__.py",
+                    "bar/baz1.py",
+                    "bar/baz1_test.py",
+                    "bar/baz2.py",
+                    "bar/baz2_test.py",
+                    "bar/baz3.py",
+                )
+            },
         }
     )
     pts = rule_runner.request(
         PutativeTargets,
         [
             PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
-            AllOwnedSources(["src/python/foo/bar/__init__.py", "src/python/foo/bar/baz1.py"]),
+            AllOwnedSources(
+                [
+                    "3rdparty/requirements.txt",
+                    "src/python/foo/bar/__init__.py",
+                    "src/python/foo/bar/baz1.py",
+                ]
+            ),
         ],
     )
     assert (
         PutativeTargets(
             [
+                PutativeTarget(
+                    "3rdparty",
+                    "requirements-test.txt",
+                    "python_requirements",
+                    ("3rdparty/requirements-test.txt",),
+                    ("3rdparty/requirements-test.txt",),
+                    kwargs={"requirements_relpath": "requirements-test.txt"},
+                ),
                 PutativeTarget.for_target_type(
                     PythonLibrary, "src/python/foo", "foo", ["__init__.py"]
                 ),

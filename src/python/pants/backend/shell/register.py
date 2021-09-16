@@ -3,6 +3,7 @@
 
 from pants.backend.shell import dependency_inference, shunit2_test_runner, tailor
 from pants.backend.shell.target_types import ShellLibrary, Shunit2Tests
+from pants.backend.shell.target_types import rules as target_types_rules
 
 
 def target_types():
@@ -10,4 +11,9 @@ def target_types():
 
 
 def rules():
-    return [*dependency_inference.rules(), *tailor.rules(), *shunit2_test_runner.rules()]
+    return [
+        *dependency_inference.rules(),
+        *tailor.rules(),
+        *shunit2_test_runner.rules(),
+        *target_types_rules(),
+    ]

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 import signal
 import sys
 import termios
@@ -11,7 +12,6 @@ from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native_engine_pyo3 import PantsdConnectionException, PyNailgunClient
-from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
@@ -27,6 +27,25 @@ def interrupts_ignored():
         yield
     finally:
         signal.signal(signal.SIGINT, old_handler)
+
+
+def ttynames_to_env(stdin, stdout, stderr):
+    """Generate nailgun tty capability environment variables based on checking a set of fds.
+
+    TODO: There is a Rust implementation of this as well in `src/rust/engine/nailgun/src/client.rs`.
+
+    :param file stdin: The stream to check for stdin tty capabilities.
+    :param file stdout: The stream to check for stdout tty capabilities.
+    :param file stderr: The stream to check for stderr tty capabilities.
+    :returns: A dict containing the tty capability environment variables.
+    """
+
+    def gen_env_vars():
+        for fd_id, fd in ((0, stdin), (1, stdout), (2, stderr)):
+            if fd.isatty():
+                yield (f"NAILGUN_TTY_PATH_{fd_id}", os.ttyname(fd.fileno()) or b"")
+
+    return dict(gen_env_vars())
 
 
 class STTYSettings:
@@ -103,7 +122,7 @@ class RemotePantsRunner:
         executor = GlobalOptions.create_py_executor_pyo3(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
         modified_env = {
             **self._env,
             **ng_env,

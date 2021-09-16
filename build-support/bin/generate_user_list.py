@@ -38,7 +38,9 @@ class Org:
 # Orgs will be displayed in case-insensitive alphabetical order, but it's useful for human readers
 # to keep this list in that order too.
 _orgs = (
-    Org("Chartbeat", "https://chartbeat.com", "https://files.readme.io/d4c9d71-chartbeat.png"),
+    Org(
+        "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
+    ),
     Org(
         "Coinbase",
         "https://www.coinbase.com/",
@@ -54,7 +56,16 @@ _orgs = (
         "https://foursquare.com/",
         "https://files.readme.io/aa53b52-foursquare-small.png",
     ),
-    Org("HousingAnywhere", "https://housinganywhere.com/", ""),
+    Org(
+        "Grapl",
+        "https://www.graplsecurity.com/",
+        "https://files.readme.io/8802ffd-grapl-small.png",
+    ),
+    Org(
+        "HousingAnywhere",
+        "https://housinganywhere.com/",
+        "https://files.readme.io/dd2a703-housinganywhere-small.png",
+    ),
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
     Org(
         "People Data Labs",

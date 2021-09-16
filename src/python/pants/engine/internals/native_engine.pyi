@@ -70,8 +70,8 @@ def teardown_dynamic_ui(scheduler: PyScheduler, session: PySession) -> None: ...
 def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
-    output_type: type,
-    can_modify_workunit: bool,
+    return_type: type,
+    engine_aware_return_type: bool,
     cacheable: bool,
     name: str,
     desc: str,

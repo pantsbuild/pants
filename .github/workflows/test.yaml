@@ -525,7 +525,7 @@ jobs:
     - name: Lint
       run: './pants validate ''**''
 
-        ./pants lint typecheck ::
+        ./pants lint check ::
 
         '
     - if: always()

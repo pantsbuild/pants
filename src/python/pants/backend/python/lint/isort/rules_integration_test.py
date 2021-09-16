@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -29,6 +30,7 @@ def rule_runner() -> RuleRunner:
             *isort_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, (IsortRequest,)),
             QueryRule(FmtResult, (IsortRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

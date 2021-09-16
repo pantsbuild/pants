@@ -25,7 +25,11 @@ from pants.backend.python.target_types import (
     PythonDistributionDependencies,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
+    PythonLibrary,
+    PythonLibrarySources,
     PythonProvidesField,
+    PythonTests,
+    PythonTestsSources,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
@@ -38,13 +42,18 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    SourcesPaths,
+    SourcesPathsRequest,
     Targets,
     WrappedTarget,
+    generate_file_level_targets,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -52,6 +61,40 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_library` and `python_tests` target generation rules
+# -----------------------------------------------------------------------------------------------
+
+
+class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
+    generate_from = PythonTests
+
+
+@rule
+async def generate_targets_from_python_tests(
+    request: GenerateTargetsFromPythonTests, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
+    return generate_file_level_targets(
+        PythonTests, request.generator, paths.files, union_membership
+    )
+
+
+class GenerateTargetsFromPythonLibrary(GenerateTargetsRequest):
+    generate_from = PythonLibrary
+
+
+@rule
+async def generate_targets_from_python_library(
+    request: GenerateTargetsFromPythonLibrary, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
+    return generate_file_level_targets(
+        PythonLibrary, request.generator, paths.files, union_membership
+    )
+
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
@@ -358,6 +401,8 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonLibrary),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )

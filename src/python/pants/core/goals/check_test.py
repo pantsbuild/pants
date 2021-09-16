@@ -6,13 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.core.goals.typecheck import (
-    EnrichedTypecheckResults,
-    Typecheck,
-    TypecheckRequest,
-    TypecheckResult,
-    typecheck,
-)
+from pants.core.goals.check import Check, CheckRequest, CheckResult, EnrichedCheckResults, check
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -32,13 +26,13 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockTypecheckFieldSet(FieldSet):
+class MockCheckFieldSet(FieldSet):
     required_fields = (Sources,)
 
 
-class MockTypecheckRequest(TypecheckRequest, metaclass=ABCMeta):
-    field_set_type = MockTypecheckFieldSet
-    typechecker_name: ClassVar[str]
+class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
+    field_set_type = MockCheckFieldSet
+    checker_name: ClassVar[str]
 
     @staticmethod
     @abstractmethod
@@ -46,38 +40,38 @@ class MockTypecheckRequest(TypecheckRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def typecheck_results(self) -> EnrichedTypecheckResults:
+    def check_results(self) -> EnrichedCheckResults:
         addresses = [config.address for config in self.field_sets]
-        return EnrichedTypecheckResults(
+        return EnrichedCheckResults(
             [
-                TypecheckResult(
+                CheckResult(
                     self.exit_code(addresses),
                     "",
                     "",
                 )
             ],
-            typechecker_name=self.typechecker_name,
+            checker_name=self.checker_name,
         )
 
 
-class SuccessfulRequest(MockTypecheckRequest):
-    typechecker_name = "SuccessfulTypechecker"
+class SuccessfulRequest(MockCheckRequest):
+    checker_name = "SuccessfulChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 0
 
 
-class FailingRequest(MockTypecheckRequest):
-    typechecker_name = "FailingTypechecker"
+class FailingRequest(MockCheckRequest):
+    checker_name = "FailingChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 1
 
 
-class ConditionallySucceedsRequest(MockTypecheckRequest):
-    typechecker_name = "ConditionallySucceedsTypechecker"
+class ConditionallySucceedsRequest(MockCheckRequest):
+    checker_name = "ConditionallySucceedsChecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -86,27 +80,27 @@ class ConditionallySucceedsRequest(MockTypecheckRequest):
         return 0
 
 
-class SkippedRequest(MockTypecheckRequest):
+class SkippedRequest(MockCheckRequest):
     @staticmethod
     def exit_code(_) -> int:
         return 0
 
     @property
-    def typecheck_results(self) -> EnrichedTypecheckResults:
-        return EnrichedTypecheckResults([], typechecker_name="SkippedTypechecker")
+    def check_results(self) -> EnrichedCheckResults:
+        return EnrichedCheckResults([], checker_name="SkippedChecker")
 
 
 class InvalidField(Sources):
     pass
 
 
-class InvalidFieldSet(MockTypecheckFieldSet):
+class InvalidFieldSet(MockCheckFieldSet):
     required_fields = (InvalidField,)
 
 
-class InvalidRequest(MockTypecheckRequest):
+class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    typechecker_name = "InvalidTypechecker"
+    checker_name = "InvalidChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -121,15 +115,15 @@ def make_target(address: Optional[Address] = None) -> Target:
 
 def run_typecheck_rule(
     *,
-    request_types: List[Type[TypecheckRequest]],
+    request_types: List[Type[CheckRequest]],
     targets: List[Target],
     include_sources: bool = True,
 ) -> Tuple[int, str]:
-    union_membership = UnionMembership({TypecheckRequest: request_types})
+    union_membership = UnionMembership({CheckRequest: request_types})
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
         rule_runner = RuleRunner()
-        result: Typecheck = run_rule_with_mocks(
-            typecheck,
+        result: Check = run_rule_with_mocks(
+            check,
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler),
@@ -139,9 +133,9 @@ def run_typecheck_rule(
             ],
             mock_gets=[
                 MockGet(
-                    output_type=EnrichedTypecheckResults,
-                    input_type=TypecheckRequest,
-                    mock=lambda field_set_collection: field_set_collection.typecheck_results,
+                    output_type=EnrichedCheckResults,
+                    input_type=CheckRequest,
+                    mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
                 MockGet(
                     output_type=FieldSetsWithSources,
@@ -187,24 +181,22 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 ConditionallySucceedsTypechecker failed.
-        𐄂 FailingTypechecker failed.
-        - SkippedTypechecker skipped.
-        ✓ SuccessfulTypechecker succeeded.
+        𐄂 ConditionallySucceedsChecker failed.
+        𐄂 FailingChecker failed.
+        - SkippedChecker skipped.
+        ✓ SuccessfulChecker succeeded.
         """
     )
 
 
 def test_streaming_output_skip() -> None:
-    results = EnrichedTypecheckResults([], typechecker_name="typechecker")
+    results = EnrichedCheckResults([], checker_name="typechecker")
     assert results.level() == LogLevel.DEBUG
     assert results.message() == "typechecker skipped."
 
 
 def test_streaming_output_success() -> None:
-    results = EnrichedTypecheckResults(
-        [TypecheckResult(0, "stdout", "stderr")], typechecker_name="typechecker"
-    )
+    results = EnrichedCheckResults([CheckResult(0, "stdout", "stderr")], checker_name="typechecker")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -217,8 +209,8 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = EnrichedTypecheckResults(
-        [TypecheckResult(18, "stdout", "stderr")], typechecker_name="typechecker"
+    results = EnrichedCheckResults(
+        [CheckResult(18, "stdout", "stderr")], checker_name="typechecker"
     )
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
@@ -232,12 +224,12 @@ def test_streaming_output_failure() -> None:
 
 
 def test_streaming_output_partitions() -> None:
-    results = EnrichedTypecheckResults(
+    results = EnrichedCheckResults(
         [
-            TypecheckResult(21, "", "", partition_description="ghc8.1"),
-            TypecheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+            CheckResult(21, "", "", partition_description="ghc8.1"),
+            CheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
         ],
-        typechecker_name="typechecker",
+        checker_name="typechecker",
     )
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(

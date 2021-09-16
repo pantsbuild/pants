@@ -1253,7 +1253,7 @@ fn tasks_task_begin(
   tasks_ptr: PyTasks,
   func: PyObject,
   output_type: PyType,
-  can_modify_workunit: bool,
+  engine_aware_return_type: bool,
   cacheable: bool,
   name: String,
   desc: String,
@@ -1268,7 +1268,7 @@ fn tasks_task_begin(
     tasks.task_begin(
       func,
       output_type,
-      can_modify_workunit,
+      engine_aware_return_type,
       cacheable,
       name,
       if desc.is_empty() { None } else { Some(desc) },

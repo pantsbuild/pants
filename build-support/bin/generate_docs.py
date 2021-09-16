@@ -12,7 +12,7 @@ Live run:
     ./pants run build-support/bin/generate_docs.py -- --sync --api-key=<API_KEY>
 
 where API_KEY is your readme.io API Key, found here:
-  https://dash.readme.com/project/pants/v2.3/api-key
+  https://dash.readme.com/project/pants/v2.6/api-key
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, Optional, cast
 import pystache
 import requests
 from common import die
+from readme_api import DocRef, ReadmeAPI
 
 from pants.help.help_info_extracter import to_help_str
 from pants.version import MAJOR_MINOR
@@ -42,6 +43,10 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
     args = create_parser().parse_args()
+
+    if args.sync and not args.api_key:
+        raise Exception("You specified --sync so you must also specify --api-key")
+
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
     doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
@@ -194,7 +199,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run_pants_help_all() -> Dict:
-    deactivated_backends = ["internal_plugins.releases"]
+    deactivated_backends = ["internal_plugins.releases", "pants.backend.experimental.java"]
     activated_backends = [
         "pants.backend.codegen.protobuf.python",
         "pants.backend.awslambda.python",
@@ -202,7 +207,7 @@ def run_pants_help_all() -> Dict:
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
     ]
-    deactivated_plugins = ["toolchain.pants.plugin==0.13.1"]
+    deactivated_plugins = ["toolchain.pants.plugin==0.14.0"]
     argv = [
         "./pants",
         "--concurrent",
@@ -261,7 +266,8 @@ def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
 class ReferenceGenerator:
     def __init__(self, args: argparse.Namespace, version: str, help_info: dict) -> None:
         self._args = args
-        self._version = version
+
+        self._readme_api = ReadmeAPI(api_key=self._args.api_key, version=version)
 
         def get_tpl(name: str) -> str:
             # Note that loading relative to __name__ may not always work when __name__=='__main__'.
@@ -356,18 +362,8 @@ class ReferenceGenerator:
     def category_id(self) -> str:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
-            self._category_id = self._get_id("categories/reference")
+            self._category_id = self._readme_api.get_category("reference").id
         return self._category_id
-
-    def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
-        """Sends requests to the readme.io API."""
-        url = f"https://dash.readme.io/api/v1/{url_suffix}"
-        headers = {"content-type": "application/json", "x-readme-version": f"v{self._version}"}
-        response = requests.request(
-            method, url, data=payload, headers=headers, auth=(self._args.api_key, "")
-        )
-        response.raise_for_status()
-        return cast(Dict, response.json()) if response.text else {}
 
     def _create(
         self, parent_doc_id: Optional[str], slug_suffix: str, title: str, body: str
@@ -393,50 +389,12 @@ class ReferenceGenerator:
         one we want humans to see (this will not change the slug, see above).
         """
         slug = f"reference-{slug_suffix}"
-
-        logger.info(f"Creating {slug}")
-
-        # See https://docs.readme.com/developers/reference/docs#createdoc.
-        page = {
-            "title": slug,
-            "type": "basic",
-            "body": "",
-            "category": self.category_id,
-            "parentDoc": parent_doc_id,
-            "hidden": False,
-        }
-        payload = json.dumps(page)
-        self._access_readme_api("docs/", "POST", payload)
+        self._readme_api.create_doc(
+            title=slug, category=self.category_id, parentDoc=parent_doc_id, hidden=False
+        )
 
         # Placeholder page exists, now update it with the real title and body.
-        self._update(parent_doc_id, slug, title, body)
-
-    def _update(self, parent_doc_id, slug, title, body):
-        """Update an existing page."""
-
-        logger.info(f"Updating {slug}")
-
-        # See https://docs.readme.com/developers/reference/docs#updatedoc.
-        page = {
-            "title": title,
-            "type": "basic",
-            "body": body,
-            "category": self.category_id,
-            "parentDoc": parent_doc_id,
-            "hidden": False,
-        }
-        payload = json.dumps(page)
-        self._access_readme_api(f"docs/{slug}", "PUT", payload)
-
-    def _delete(self, slug: str) -> None:
-        """Delete an existing page."""
-
-        logger.warning(f"Deleting {slug}")
-        self._access_readme_api(f"docs/{slug}", "DELETE", "")
-
-    def _get_id(self, url) -> str:
-        """Returns the id of the entity at the specified readme.io API url."""
-        return cast(str, self._access_readme_api(url, "GET", "")["_id"])
+        self._readme_api.update_doc(slug=slug, title=title, category=self.category_id, body=body)
 
     def _render_target(self, alias: str) -> str:
         return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
@@ -493,27 +451,30 @@ class ReferenceGenerator:
 
         All pages live under the "reference" category.
 
-        There are three top-level pages under that category:
+        There are four top-level pages under that category:
         - Global options
         - The Goals parent page
         - The Subsystems parent page
+        - The Targets parent page
 
-        The individual pages for each goal/subsystem are nested under the two parent pages.
+        The individual reference pages are nested under these parent pages.
         """
         # Docs appear on the site in creation order.  If we only create new docs
         # that don't already exist then they will appear at the end, instead of in
         # alphabetical order. So we first delete all previous docs, then recreate them.
         #
+        # TODO: Instead of deleting and recreating, we can set the order explicitly.
+        #
         # Note that deleting a non-empty parent will fail, so we delete children first.
-        def do_delete(doc_to_delete):
-            for child in doc_to_delete.get("children", []):
+        def do_delete(docref: DocRef):
+            for child in docref.children:
                 do_delete(child)
-            self._delete(doc_to_delete["slug"])
+            self._readme_api.delete_doc(docref.slug)
 
-        docs = self._access_readme_api("categories/reference/docs", "GET", "")
+        docrefs = self._readme_api.get_docs_for_category("reference")
 
-        for doc in docs:
-            do_delete(doc)
+        for docref in docrefs:
+            do_delete(docref)
 
         # Partition the scopes into goals and subsystems.
         goals = {}
@@ -553,7 +514,7 @@ class ReferenceGenerator:
         )
 
         # Create the individual goal/subsystem/target docs.
-        all_goals_doc_id = self._get_id("docs/reference-all-goals")
+        all_goals_doc_id = self._readme_api.get_doc("reference-all-goals").id
         for scope, shi in sorted(goals.items()):
             self._create(
                 parent_doc_id=all_goals_doc_id,
@@ -562,7 +523,7 @@ class ReferenceGenerator:
                 body=self._render_options_body(shi),
             )
 
-        all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
+        all_subsystems_doc_id = self._readme_api.get_doc("reference-all-subsystems").id
         for scope, shi in sorted(subsystems.items()):
             self._create(
                 parent_doc_id=all_subsystems_doc_id,
@@ -571,7 +532,7 @@ class ReferenceGenerator:
                 body=self._render_options_body(shi),
             )
 
-        all_targets_doc_id = self._get_id("docs/reference-all-targets")
+        all_targets_doc_id = self._readme_api.get_doc("reference-all-targets").id
         for alias, data in sorted(self._targets_info.items()):
             self._create(
                 parent_doc_id=all_targets_doc_id,

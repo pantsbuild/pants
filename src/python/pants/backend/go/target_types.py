@@ -17,7 +17,11 @@ from pants.engine.target import (
 
 class GoSources(Sources):
     expected_file_extensions = (".go",)
-    indivisible = True
+
+
+# -----------------------------------------------------------------------------------------------
+# `go_package` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoPackageSources(GoSources):
@@ -48,7 +52,6 @@ class GoModuleSources(Sources):
     alias = "_sources"
     default = ("go.mod", "go.sum")
     expected_num_files = range(1, 3)
-    indivisible = True
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)

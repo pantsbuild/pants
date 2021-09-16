@@ -157,13 +157,16 @@ class EngineInitializer:
             output_type = getattr(r, "output_type", None)
             if not output_type or not issubclass(output_type, Goal):
                 continue
+
             goal = r.output_type.name
-            if goal in goal_map:
-                raise EngineInitializer.GoalMappingError(
-                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product "
-                    f"`{goal_map[goal]}`"
-                )
-            goal_map[goal] = r.output_type
+            deprecated_goal = r.output_type.subsystem_cls.deprecated_options_scope
+            for goal_name in [goal, deprecated_goal] if deprecated_goal else [goal]:
+                if goal_name in goal_map:
+                    raise EngineInitializer.GoalMappingError(
+                        f"could not map goal `{goal_name}` to rule `{r}`: already claimed by product "
+                        f"`{goal_map[goal_name]}`"
+                    )
+                goal_map[goal_name] = r.output_type
         return goal_map
 
     @staticmethod

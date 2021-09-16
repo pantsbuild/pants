@@ -202,10 +202,18 @@ class PythonSetup(Subsystem):
             type=bool,
             default=True,
             advanced=True,
-            help="Don't tailor python_library targets for solitary __init__.py files, as "
+            help="Don't tailor python_library targets for solitary `__init__.py` files, as "
             "those usually exist as import scaffolding rather than true library code.\n\n"
             "Set to False if you commonly have packages containing real code in "
-            "__init__.py and there are no other .py files in the package.",
+            "`__init__.py` and there are no other .py files in the package.",
+        )
+
+        register(
+            "--tailor-requirements-targets",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Tailor python_requirements() targets for requirements files.",
         )
 
         register(
@@ -276,6 +284,10 @@ class PythonSetup(Subsystem):
     @property
     def tailor_ignore_solitary_init_files(self) -> bool:
         return cast(bool, self.options.tailor_ignore_solitary_init_files)
+
+    @property
+    def tailor_requirements_targets(self) -> bool:
+        return cast(bool, self.options.tailor_requirements_targets)
 
     @property
     def tailor_pex_binary_targets(self) -> bool:
