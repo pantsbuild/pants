@@ -30,6 +30,7 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.util.docutil import doc_url
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -81,11 +82,12 @@ async def build_local_dists(
 ) -> LocalDistsPex:
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+    applicable_targets = [
+        tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
+    ]
 
     python_dist_field_sets = [
-        PythonDistributionFieldSet.create(target)
-        for target in transitive_targets.closure
-        if PythonDistributionFieldSet.is_applicable(target)
+        PythonDistributionFieldSet.create(target) for target in applicable_targets
     ]
 
     dists = await MultiGet(
@@ -101,8 +103,8 @@ async def build_local_dists(
     provided_files = set()
     wheels = []
 
-    for dist in dists:
-        contents = await Get(DigestContents, Digest, dist.digest)
+    all_contents = await MultiGet(Get(DigestContents, Digest, dist.digest) for dist in dists)
+    for dist, contents, tgt in zip(dists, all_contents, applicable_targets):
         artifacts = set((a.relpath or "") for a in dist.artifacts)
         # A given local dist might build a wheel and an sdist (and maybe other artifacts -
         # we don't know what setup command was run...)
@@ -117,11 +119,14 @@ async def build_local_dists(
             with zipfile.ZipFile(buf) as zf:
                 provided_files.update(zf.namelist())
         else:
-            for art in artifacts:
-                logger.warning(
-                    f"Omitting dependency on local non-wheel artifact {art}. "
-                    f"This code will be depended on directly from sources."
-                )
+            logger.warning(
+                f"Encountered a dependency on the {tgt.alias} target at {tgt.address.spec}, but "
+                "this target does not produce a Python wheel artifact. Therefore this target's "
+                "code will be used directly from sources, without a distribution being built, "
+                "and therefore any native extensions in it will not be built.\n\n"
+                f"See {doc_url('python-distributions')} for details on how to set up a {tgt.alias} "
+                "target to produce a wheel."
+            )
 
     dists_digest = await Get(Digest, MergeDigests([dist.digest for dist in dists]))
     wheels_digest = await Get(Digest, DigestSubset(dists_digest, PathGlobs(["**/*.whl"])))
