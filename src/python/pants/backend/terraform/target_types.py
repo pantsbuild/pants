@@ -28,7 +28,10 @@ class TerraformModulesSources(TerraformSources):
 class TerraformModules(Target):
     alias = "terraform_modules"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModulesSources)
-    help = "Generate `terraform_module` targets from source globs."
+    help = (
+        "Generate a `terraform_module` target for each directory from the `sources` field "
+        "where Terraform files are present."
+    )
 
 
 def rules():
