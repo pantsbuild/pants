@@ -156,11 +156,19 @@ async def find_putative_targets(
         for entry_point_module in unowned_entry_point_modules:
             entry_point = module_to_entry_point[entry_point_module]
             path, fname = os.path.split(entry_point)
+            # We set the name to `my_file_bin` rather than these alternatives:
+            #
+            # a) `my_file`, because `my_file.py` already is used for the "file target" generated
+            #    by the `python_library` target owning the entry point file, so
+            #    `my_file` is confusing how it's different.
+            # b) `bin`, because it's common to have >1 script in a directory and `bin` is often
+            #    not very descriptive.
+            name = f"{os.path.splitext(fname)[0]}_bin"
             pts.append(
                 PutativeTarget.for_target_type(
                     target_type=PexBinary,
                     path=path,
-                    name="bin",
+                    name=name,
                     triggering_sources=tuple(),
                     kwargs={"entry_point": fname},
                 )

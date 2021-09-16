@@ -179,8 +179,8 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
     )
     rule_runner.add_to_build_file(
         "src/python/foo",
-        "pex_binary(name='main1', entry_point='main1.py')\n"
-        "pex_binary(name='main2', entry_point='foo.main2')\n",
+        "pex_binary(name='main1_bin', entry_point='main1.py')\n"
+        "pex_binary(name='main2_bin', entry_point='foo.main2')\n",
     )
     pts = rule_runner.request(
         PutativeTargets,
@@ -195,7 +195,7 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                 PutativeTarget.for_target_type(
                     PexBinary,
                     path="src/python/foo",
-                    name="bin",
+                    name="main3_bin",
                     triggering_sources=[],
                     kwargs={"entry_point": "main3.py"},
                 ),
