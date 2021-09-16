@@ -11,11 +11,7 @@ from pants.backend.go.tailor import (
     PutativeGoPackageTargetsRequest,
 )
 from pants.backend.go.tailor import rules as go_tailor_rules
-from pants.backend.go.target_types import (
-    GoExternalPackageTarget,
-    GoModule,
-    GoPackage,
-)
+from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoPackage
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -43,10 +39,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PutativeTargets, [PutativeGoModuleTargetsRequest, AllOwnedSources]),
             QueryRule(PutativeTargets, [PutativeGoExternalModuleTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[
-            GoPackage,
-            GoModule
-        ],
+        target_types=[GoPackage, GoModule],
     )
     rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
     return rule_runner
