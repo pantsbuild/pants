@@ -18,5 +18,18 @@ class TerraformModule(Target):
     help = """A single Terraform module."""
 
 
+class TerraformModulesSources(TerraformSources):
+    # TODO: This currently only globs .tf files but not non-.tf files referenced by Terraform config. This
+    # should be updated to allow for the generated TerraformModule targets to capture all files in the diectory
+    # other than BUILD files.
+    default = ("**/*.tf",)
+
+
+class TerraformModules(Target):
+    alias = "terraform_modules"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModulesSources)
+    help = """Generate `terraform_module` targets from source globs."""
+
+
 def rules():
     return collect_rules()

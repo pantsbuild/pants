@@ -1,0 +1,91 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+import textwrap
+
+import pytest
+
+from pants.backend.terraform import target_gen
+from pants.backend.terraform.target_gen import GenerateTerraformModuleTargetsRequest
+from pants.backend.terraform.target_types import (
+    TerraformModule,
+    TerraformModules,
+    TerraformModuleSources,
+)
+from pants.build_graph.address import Address
+from pants.core.util_rules import external_tool, source_files
+from pants.engine.rules import QueryRule
+from pants.engine.target import GeneratedTargets
+from pants.testutil.rule_runner import RuleRunner
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    rule_runner = RuleRunner(
+        target_types=[TerraformModule, TerraformModules],
+        rules=[
+            *external_tool.rules(),
+            *source_files.rules(),
+            *target_gen.rules(),
+            QueryRule(GeneratedTargets, [GenerateTerraformModuleTargetsRequest]),
+        ],
+    )
+    rule_runner.set_options(["--backend-packages=pants.backend.experimental.terraform"])
+    return rule_runner
+
+
+def test_target_generation(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": textwrap.dedent(
+                """\
+        terraform_modules(name="tf_mods")
+        """
+            ),
+            "src/tf/versions.tf": textwrap.dedent(
+                """\
+        terraform {
+          required_version = ">= 1.0"
+        }
+        """
+            ),
+            "src/tf/outputs.tf": textwrap.dedent(
+                """\
+        output "foo" {
+          value = 'foo'
+        }
+        """
+            ),
+            "src/tf/foo/versions.tf": textwrap.dedent(
+                """\
+        terraform {
+          required_version = ">= 1.0"
+        }
+        """
+            ),
+            "src/tf/not-terraform/README.md": "This should not trigger target generation.",
+        }
+    )
+
+    generator = rule_runner.get_target(Address("", target_name="tf_mods"))
+    targets = rule_runner.request(
+        GeneratedTargets, [GenerateTerraformModuleTargetsRequest(generator)]
+    )
+    assert targets == GeneratedTargets(
+        [
+            TerraformModule(
+                {
+                    TerraformModuleSources.alias: ("versions.tf",),
+                },
+                Address("src/tf/foo", target_name="tf_mod"),
+            ),
+            TerraformModule(
+                {
+                    TerraformModuleSources.alias: (
+                        "outputs.tf",
+                        "versions.tf",
+                    ),
+                },
+                Address("src/tf", target_name="tf_mod"),
+            ),
+        ]
+    )
