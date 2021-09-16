@@ -25,7 +25,6 @@ from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
-from pants.backend.terraform.dependency_inference import PythonHcl2Subsystem
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
