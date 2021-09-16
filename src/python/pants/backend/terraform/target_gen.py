@@ -46,7 +46,8 @@ async def generate_terraform_module_targets(
         for field in request.generator.field_values.values():
             value: ImmutableValue | None
             if isinstance(field, Sources):
-                value = tuple(dir_to_filenames[dir])
+                # TODO: Should this just use a glob if all of the filenames match the default *.tf glob?
+                value = tuple(sorted(dir_to_filenames[dir]))
             else:
                 value = field.value
             generated_target_fields[field.alias] = value
