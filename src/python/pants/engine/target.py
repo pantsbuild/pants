@@ -714,20 +714,20 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         mapping = {}
         for tgt in generated_targets:
             if tgt.address.spec_path != expected_spec_path:
-                raise ValueError(
+                raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.spec_path` as their "
                     f"target generator. Expected {generator.address.spec_path}, but got "
                     f"{tgt.address.spec_path} for target generated from {generator.address}: {tgt}"
                 )
             if tgt.address.target_name != expected_tgt_name:
-                raise ValueError(
+                raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.target_name` as their "
                     f"target generator. Expected {generator.address.target_name}, but got "
                     f"{tgt.address.target_name} for target generated from {generator.address}: "
                     f"{tgt}"
                 )
             if not tgt.address.is_generated_target:
-                raise ValueError(
+                raise InvalidGeneratedTargetException(
                     "All generated targets must set `Address.generator_name` or "
                     "`Address.relative_file_path`. Invalid for target generated from "
                     f"{generator.address}: {tgt}"
@@ -997,6 +997,10 @@ class InvalidTargetException(Exception):
 
          f"The `{repr(alias)}` target {address} ..."
     """
+
+
+class InvalidGeneratedTargetException(InvalidTargetException):
+    pass
 
 
 class InvalidFieldException(Exception):

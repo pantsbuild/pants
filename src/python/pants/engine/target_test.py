@@ -23,6 +23,7 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidGeneratedTargetException,
     InvalidTargetException,
     NestedDictStringToStringField,
     RequiredFieldMissingException,
@@ -516,7 +517,7 @@ def test_generated_targets_address_validation() -> None:
         core_fields = ()
 
     generator = MockTarget({}, Address("dir", target_name="generator"))
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidGeneratedTargetException):
         GeneratedTargets(
             generator,
             [
@@ -525,7 +526,7 @@ def test_generated_targets_address_validation() -> None:
                 )
             ],
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidGeneratedTargetException):
         GeneratedTargets(
             generator,
             [
@@ -534,7 +535,7 @@ def test_generated_targets_address_validation() -> None:
                 )
             ],
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidGeneratedTargetException):
         GeneratedTargets(
             generator,
             [
