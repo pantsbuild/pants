@@ -57,7 +57,7 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_DIGEST};
 use parking_lot::Mutex;
 use prost::Message;
 use remexec::{ServerCapabilities, Tree};
@@ -1098,6 +1098,10 @@ impl Store {
     &self,
     digest: Digest,
   ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
+    if digest == EMPTY_DIGEST {
+      return future::ready(Ok(vec![])).boxed();
+    }
+
     self
       .walk(digest, move |_, path_so_far, _, directory| {
         if directory.files.is_empty() {
