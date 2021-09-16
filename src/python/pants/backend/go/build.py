@@ -20,11 +20,9 @@ from pants.backend.go.pkg import (
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
     GoBinaryMainAddress,
-    GoExternalModulePath,
-    GoExternalModuleVersion,
-    GoImportPath,
+    GoExternalModulePathField,
+    GoExternalModuleVersionField,
     GoPackageSources,
-    GoSources,
 )
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -44,7 +42,6 @@ from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    FieldSet,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
@@ -55,24 +52,6 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
-
-
-class GoBuildSubsystem(GoalSubsystem):
-    name = "go-build"
-    help = "Compile Go targets that contain source code (i.e., `go_package`)."
-
-
-class GoBuildGoal(Goal):
-    subsystem_cls = GoBuildSubsystem
-
-
-@dataclass(frozen=True)
-class BuildGoPackageFieldSet(FieldSet):
-    required_fields = (GoImportPath,)
-    sources: GoSources
-    module_path: GoExternalModulePath
-    module_version: GoExternalModuleVersion
-    import_path: GoImportPath
 
 
 @dataclass(frozen=True)
@@ -96,16 +75,6 @@ class GoBinaryFieldSet(PackageFieldSet):
 
     main_address: GoBinaryMainAddress
     output_path: OutputPathField
-
-
-@goal_rule
-async def run_go_build(targets: UnexpandedTargets) -> GoBuildGoal:
-    await MultiGet(
-        Get(BuiltGoPackage, BuildGoPackageRequest(address=tgt.address))
-        for tgt in targets
-        if is_first_party_package_target(tgt) or is_third_party_package_target(tgt)
-    )
-    return GoBuildGoal(exit_code=0)
 
 
 @dataclass(frozen=True)
@@ -173,24 +142,13 @@ async def build_target(
         source_files_digest = source_files.snapshot.digest
         source_files_subpath = target.address.spec_path
     elif is_third_party_package_target(target):
-        module_path = target[GoExternalModulePath].value
-        if not module_path:
-            raise ValueError(
-                f"_go_external_package at address {request.address} has a blank `path`"
-            )
-
-        module_version = target[GoExternalModuleVersion].value
-        if not module_version:
-            raise ValueError(
-                f"_go_external_package at address {request.address} has a blank `version`"
-            )
-
+        module_path = target[GoExternalModulePathField].value
         module, resolved_package = await MultiGet(
             Get(
                 DownloadedExternalModule,
                 DownloadExternalModuleRequest(
                     path=module_path,
-                    version=module_version,
+                    version=target[GoExternalModuleVersionField].value,
                 ),
             ),
             Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=request.address)),
@@ -419,6 +377,25 @@ async def package_go_binary(
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
+
+
+class GoBuildSubsystem(GoalSubsystem):
+    name = "go-build"
+    help = "Compile Go targets that contain source code (i.e., `go_package`)."
+
+
+class GoBuildGoal(Goal):
+    subsystem_cls = GoBuildSubsystem
+
+
+@goal_rule
+async def run_go_build(targets: UnexpandedTargets) -> GoBuildGoal:
+    await MultiGet(
+        Get(BuiltGoPackage, BuildGoPackageRequest(address=tgt.address))
+        for tgt in targets
+        if is_first_party_package_target(tgt) or is_third_party_package_target(tgt)
+    )
+    return GoBuildGoal(exit_code=0)
 
 
 def rules():

@@ -18,9 +18,10 @@ from pants.backend.go.module import (
 )
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
-    GoExternalModulePath,
-    GoExternalModuleVersion,
-    GoExtModPackageDependencies,
+    GoExternalModulePathField,
+    GoExternalModuleVersionField,
+    GoExternalPackageDependencies,
+    GoExternalPackageImportPathField,
     GoImportPath,
     GoModuleSources,
     GoPackageSources,
@@ -211,7 +212,7 @@ def is_first_party_package_target(tgt: Target) -> bool:
 
 
 def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoExtModPackageDependencies)
+    return tgt.has_field(GoExternalPackageDependencies)
 
 
 @rule
@@ -289,22 +290,9 @@ async def resolve_external_go_package(
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
-    import_path = target[GoImportPath].value
-    if not import_path:
-        # TODO: Implement via `required = True` on the Target.
-        raise ValueError(
-            f"_go_external_package at address {request.address} does not have an import path set."
-        )
-
-    module_path = target[GoExternalModulePath].value
-    if not module_path:
-        # TODO: Implement GoExternalModulePath.compute_value for this check.
-        raise ValueError(f"_go_external_package at address {request.address} has a blank `path`")
-
-    module_version = target[GoExternalModuleVersion].value
-    if not module_version:
-        # TODO: Implement GoExternalModuleVersion.compute_value for this check.
-        raise ValueError(f"_go_external_package at address {request.address} has a blank `version`")
+    import_path = target[GoExternalPackageImportPathField].value
+    module_path = target[GoExternalModulePathField].value
+    module_version = target[GoExternalModuleVersionField].value
 
     module = await Get(
         DownloadedExternalModule,
