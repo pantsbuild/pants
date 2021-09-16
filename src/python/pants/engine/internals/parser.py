@@ -225,7 +225,7 @@ class AstVisitor(ast.NodeVisitor):
         ):
             return
         name_keyword = next((kw for kw in node.keywords if kw.arg == "name"), None)
-        if not name_keyword:
+        if name_keyword is not None:
             return
         self.pending_renames.append(
             SymbolRename(
