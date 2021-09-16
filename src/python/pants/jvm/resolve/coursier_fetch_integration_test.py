@@ -10,11 +10,11 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirements,
     Coordinate,
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    MavenRequirements,
     ResolvedClasspathEntry,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -23,6 +23,12 @@ from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+HAMCREST_COORD = Coordinate(
+    group="org.hamcrest",
+    artifact="hamcrest-core",
+    version="1.3",
+)
 
 
 @pytest.fixture
@@ -35,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
-            QueryRule(CoursierResolvedLockfile, (MavenRequirements,)),
+            QueryRule(CoursierResolvedLockfile, (ArtifactRequirements,)),
             QueryRule(ResolvedClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
         ],
@@ -46,11 +52,7 @@ def rule_runner() -> RuleRunner:
 def test_empty_resolve(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            MavenRequirements.create_from_maven_coordinates_fields(
-                fields=(),
-            )
-        ],
+        [ArtifactRequirements([])],
     )
     assert resolved_lockfile == CoursierResolvedLockfile(entries=())
 
@@ -61,17 +63,12 @@ def test_empty_resolve(rule_runner: RuleRunner) -> None:
 def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            MavenRequirements.create_from_maven_coordinates_fields(
-                fields=(),
-                additional_requirements=["org.hamcrest:hamcrest-core:1.3"],
-            )
-        ],
+        [ArtifactRequirements([HAMCREST_COORD])],
     )
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -85,32 +82,28 @@ def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
 
 
 def test_resolve_with_transitive_deps(rule_runner: RuleRunner) -> None:
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
         [
-            MavenRequirements.create_from_maven_coordinates_fields(
-                fields=(),
-                additional_requirements=["junit:junit:4.13.2"],
-            )
+            ArtifactRequirements([junit_coord]),
         ],
     )
 
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="junit:junit:4.13.2"),
+                coord=junit_coord,
                 file_name="junit-4.13.2.jar",
-                direct_dependencies=Coordinates(
-                    [Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]
-                ),
-                dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
+                direct_dependencies=Coordinates([HAMCREST_COORD]),
+                dependencies=Coordinates([HAMCREST_COORD]),
                 file_digest=FileDigest(
                     fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                     serialized_bytes_length=384581,
                 ),
             ),
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -127,21 +120,18 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
         [
-            MavenRequirements.create_from_maven_coordinates_fields(
-                fields=(),
-                # Note the open-ended coordinate here.  We will still resolve this for the user, but the result
-                # will be exact and pinned.  As noted above, this is an especially brittle unit test, but version
-                # 4.8 was chosen because it has multiple patch versions and no new versions have been uploaded
-                # to 4.8.x in over a decade.
-                additional_requirements=["junit:junit:4.8+"],
-            )
+            # Note the open-ended coordinate here.  We will still resolve this for the user, but the result
+            # will be exact and pinned.  As noted above, this is an especially brittle unit test, but version
+            # 4.8 was chosen because it has multiple patch versions and no new versions have been uploaded
+            # to 4.8.x in over a decade.
+            ArtifactRequirements([Coordinate(group="junit", artifact="junit", version="4.8+")]),
         ],
     )
 
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="junit:junit:4.8.2"),
+                coord=Coordinate(group="junit", artifact="junit", version="4.8.2"),
                 file_name="junit-4.8.2.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -160,7 +150,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
         ResolvedClasspathEntry,
         [
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -171,7 +161,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == Coordinate(coord="org.hamcrest:hamcrest-core:1.3")
+    assert classpath_entry.coord == HAMCREST_COORD
     assert classpath_entry.file_name == "hamcrest-core-1.3.jar"
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "hamcrest-core-1.3.jar")]
@@ -183,17 +173,15 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
 
 
 def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
-
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     classpath_entry = rule_runner.request(
         ResolvedClasspathEntry,
         [
             CoursierLockfileEntry(
-                coord=Coordinate(coord="junit:junit:4.13.2"),
+                coord=junit_coord,
                 file_name="junit-4.13.2.jar",
-                direct_dependencies=Coordinates(
-                    [Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]
-                ),
-                dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
+                direct_dependencies=Coordinates([HAMCREST_COORD]),
+                dependencies=Coordinates([HAMCREST_COORD]),
                 file_digest=FileDigest(
                     fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                     serialized_bytes_length=384581,
@@ -201,7 +189,7 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == Coordinate(coord="junit:junit:4.13.2")
+    assert classpath_entry.coord == junit_coord
     assert classpath_entry.file_name == "junit-4.13.2.jar"
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "junit-4.13.2.jar")]
@@ -219,7 +207,7 @@ def test_fetch_one_coord_with_bad_fingerprint(rule_runner: RuleRunner) -> None:
         r"did not match.*?ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+        coord=HAMCREST_COORD,
         file_name="hamcrest-core-1.3.jar",
         direct_dependencies=Coordinates([]),
         dependencies=Coordinates([]),
@@ -241,7 +229,7 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
         r"serialized_bytes_length=1\).*?"
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+        coord=HAMCREST_COORD,
         file_name="hamcrest-core-1.3.jar",
         direct_dependencies=Coordinates([]),
         dependencies=Coordinates([]),
@@ -268,7 +256,7 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
         r'does not match requested coord.*?"org.hamcrest:hamcrest-core:1.3\+".*?'
     )
     lockfile_entry = CoursierLockfileEntry(
-        coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3+"),
+        coord=Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3+"),
         file_name="hamcrest-core-1.3.jar",
         direct_dependencies=Coordinates([]),
         dependencies=Coordinates([]),

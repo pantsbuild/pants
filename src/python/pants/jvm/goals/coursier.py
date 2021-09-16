@@ -21,7 +21,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import Sources, Target, Targets
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile, MavenRequirements
+from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, CoursierResolvedLockfile
 from pants.jvm.target_types import JvmLockfileSources, MavenRequirementsField
 
 
@@ -58,8 +58,8 @@ async def coursier_generate_lockfile(
 ) -> CoursierGenerateLockfileResult:
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
-        MavenRequirements,
-        MavenRequirements.create_from_maven_coordinates_fields(
+        ArtifactRequirements,
+        ArtifactRequirements.create_from_maven_coordinates_fields(
             fields=(request.target[MavenRequirementsField],),
         ),
     )
