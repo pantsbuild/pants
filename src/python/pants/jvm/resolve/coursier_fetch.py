@@ -42,28 +42,63 @@ class CoursierError(Exception):
 class Coordinate:
     """A single Maven-style coordinate for a JVM dependency."""
 
-    # TODO: parse and validate the input into individual coordinate
-    # components, then re-expose the string coordinate as a property
-    # or __str__.
-    coord: str
+    group: str
+    artifact: str
+    version: str
+    packaging: str = "jar"
+
+    @staticmethod
+    def from_json_dict(data: dict) -> Coordinate:
+        return Coordinate(
+            group=data["group"],
+            artifact=data["artifact"],
+            version=data["version"],
+            packaging=data.get("packaging", "jar"),
+        )
+
+    def to_json_dict(self) -> dict:
+        return {
+            "group": self.group,
+            "artifact": self.artifact,
+            "version": self.version,
+            "packaging": self.packaging,
+        }
+
+    @classmethod
+    def from_coord_str(cls, s: str) -> Coordinate:
+        parts = s.split(":")
+        return cls(
+            group=parts[0],
+            artifact=parts[1],
+            version=parts[2],
+            packaging=parts[3] if len(parts) == 4 else "jar",
+        )
+
+    def to_coord_str(self) -> str:
+        return f"{self.group}:{self.artifact}:{self.version}"
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of Coordinate."""
 
 
-class MavenRequirements(DeduplicatedCollection[str]):
+# TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
+class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
+    """An ordered list of Coordinates used as requirements."""
+
     @classmethod
     def create_from_maven_coordinates_fields(
         cls,
         fields: Iterable[MavenRequirementsField],
         *,
-        additional_requirements: Iterable[str] = (),
-    ) -> MavenRequirements:
+        additional_requirements: Iterable[Coordinate] = (),
+    ) -> ArtifactRequirements:
         field_requirements = (
-            str(maven_coord) for field in fields for maven_coord in (field.value or ())
+            Coordinate.from_coord_str(str(maven_coord))
+            for field in fields
+            for maven_coord in (field.value or ())
         )
-        return MavenRequirements((*field_requirements, *additional_requirements))
+        return ArtifactRequirements((*field_requirements, *additional_requirements))
 
 
 @dataclass(frozen=True)
@@ -115,12 +150,12 @@ class CoursierLockfileEntry:
         """Construct a CoursierLockfileEntry from its JSON dictionary representation."""
 
         return cls(
-            coord=Coordinate(coord=entry["coord"]),
+            coord=Coordinate.from_json_dict(entry["coord"]),
             file_name=entry["file_name"],
             direct_dependencies=Coordinates(
-                Coordinate(coord=d) for d in entry["directDependencies"]
+                Coordinate.from_json_dict(d) for d in entry["directDependencies"]
             ),
-            dependencies=Coordinates(Coordinate(coord=d) for d in entry["dependencies"]),
+            dependencies=Coordinates(Coordinate.from_json_dict(d) for d in entry["dependencies"]),
             file_digest=FileDigest(
                 fingerprint=entry["file_digest"]["fingerprint"],
                 serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
@@ -131,9 +166,9 @@ class CoursierLockfileEntry:
         """Export this CoursierLockfileEntry to a JSON object."""
 
         return dict(
-            coord=self.coord.coord,
-            directDependencies=[coord.coord for coord in self.direct_dependencies],
-            dependencies=[coord.coord for coord in self.dependencies],
+            coord=self.coord.to_json_dict(),
+            directDependencies=[coord.to_json_dict() for coord in self.direct_dependencies],
+            dependencies=[coord.to_json_dict() for coord in self.dependencies],
             file_name=self.file_name,
             file_digest=dict(
                 fingerprint=self.file_digest.fingerprint,
@@ -152,9 +187,7 @@ class CoursierResolvedLockfile:
     def from_json_dict(cls, lockfile) -> CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
 
-        return CoursierResolvedLockfile(
-            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in lockfile)
-        )
+        return cls(entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in lockfile))
 
     def to_json(self) -> bytes:
         """Export this CoursierResolvedLockfile to human-readable JSON.
@@ -171,7 +204,7 @@ class CoursierResolvedLockfile:
 async def coursier_resolve_lockfile(
     bash: BashBinary,
     coursier: Coursier,
-    maven_requirements: MavenRequirements,
+    artifact_requirements: ArtifactRequirements,
 ) -> CoursierResolvedLockfile:
     """Run `coursier fetch ...` against a list of Maven coordinates and capture the result.
 
@@ -197,7 +230,7 @@ async def coursier_resolve_lockfile(
     lockfile out to the workspace to hermetically freeze the result of the resolve.
     """
 
-    if len(maven_requirements) == 0:
+    if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
     coursier_report_file_name = "coursier_report.json"
@@ -209,15 +242,15 @@ async def coursier_resolve_lockfile(
                 coursier.wrapper_script,
                 coursier.coursier.exe,
                 coursier_report_file_name,
-                *list(maven_requirements),
+                *(req.to_coord_str() for req in artifact_requirements),
             ],
             input_digest=coursier.digest,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             description=(
                 "Running `coursier fetch` against "
-                f"{pluralize(len(maven_requirements), 'requirement')}: "
-                f"{', '.join(maven_requirements)}"
+                f"{pluralize(len(artifact_requirements), 'requirement')}: "
+                f"{', '.join(req.to_coord_str() for req in artifact_requirements)}"
             ),
             level=LogLevel.DEBUG,
         ),
@@ -247,9 +280,11 @@ async def coursier_resolve_lockfile(
     return CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
-                coord=Coordinate(dep["coord"]),
-                direct_dependencies=Coordinates(Coordinate(dd) for dd in dep["directDependencies"]),
-                dependencies=Coordinates(Coordinate(d) for d in dep["dependencies"]),
+                coord=Coordinate.from_coord_str(dep["coord"]),
+                direct_dependencies=Coordinates(
+                    Coordinate.from_coord_str(dd) for dd in dep["directDependencies"]
+                ),
+                dependencies=Coordinates(Coordinate.from_coord_str(d) for d in dep["dependencies"]),
                 file_name=file_name,
                 file_digest=artifact_file_digest,
             )
@@ -311,7 +346,7 @@ async def coursier_fetch_one_coord(
                 coursier.coursier.exe,
                 coursier_report_file_name,
                 "--intransitive",
-                request.coord.coord,
+                request.coord.to_coord_str(),
             ],
             input_digest=coursier.digest,
             output_directories=("classpath",),
@@ -336,10 +371,10 @@ async def coursier_fetch_one_coord(
 
     dep = report_deps[0]
 
-    resolved_coord = dep["coord"]
-    if resolved_coord != request.coord.coord:
+    resolved_coord = Coordinate.from_coord_str(dep["coord"])
+    if resolved_coord != request.coord:
         raise CoursierError(
-            f'Coursier resolved coord ("{resolved_coord}") does not match requested coord ("{request.coord.coord}").'
+            f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
     file_path = PurePath(dep["file"])
@@ -467,7 +502,7 @@ class MaterializedClasspathRequest:
     prefix: Optional[str] = None
     lockfiles: Tuple[CoursierResolvedLockfile, ...] = ()
     resolved_classpaths: Tuple[ResolvedClasspathEntries, ...] = ()
-    maven_requirements: Tuple[MavenRequirements, ...] = ()
+    artifact_requirements: Tuple[ArtifactRequirements, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -500,13 +535,9 @@ class MaterializedClasspath:
 async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
-    maven_requirements_lockfiles = await MultiGet(
-        Get(
-            CoursierResolvedLockfile,
-            MavenRequirements,
-            maven_requirements,
-        )
-        for maven_requirements in request.maven_requirements
+    artifact_requirements_lockfiles = await MultiGet(
+        Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
+        for artifact_requirements in request.artifact_requirements
     )
     lockfile_and_requirements_classpath_entries = await MultiGet(
         Get(
@@ -514,7 +545,7 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
             CoursierResolvedLockfile,
             lockfile,
         )
-        for lockfile in (*request.lockfiles, *maven_requirements_lockfiles)
+        for lockfile in (*request.lockfiles, *artifact_requirements_lockfiles)
     )
     all_classpath_entries = (
         *lockfile_and_requirements_classpath_entries,

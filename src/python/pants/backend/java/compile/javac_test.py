@@ -623,7 +623,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     resolved_joda_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="joda-time:joda-time:2.10.10"),
+                coord=Coordinate(group="joda-time", artifact="joda-time", version="2.10.10"),
                 file_name="joda-time-2.10.10.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
