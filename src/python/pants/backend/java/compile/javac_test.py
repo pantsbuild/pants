@@ -26,11 +26,15 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
+)
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
-from pants.jvm.types import Coordinate, Coordinates
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 

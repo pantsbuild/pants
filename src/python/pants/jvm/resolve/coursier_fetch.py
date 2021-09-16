@@ -27,7 +27,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.target_types import JvmLockfileSources, MavenRequirementsField
-from pants.jvm.types import Coordinate, Coordinates
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -37,6 +36,20 @@ logger = logging.getLogger(__name__)
 
 class CoursierError(Exception):
     """An exception relating to invoking Coursier or processing its output."""
+
+
+@dataclass(frozen=True)
+class Coordinate:
+    """A single Maven-style coordinate for a JVM dependency."""
+
+    # TODO: parse and validate the input into individual coordinate
+    # components, then re-expose the string coordinate as a property
+    # or __str__.
+    coord: str
+
+
+class Coordinates(DeduplicatedCollection[Coordinate]):
+    """An ordered list of Coordinate."""
 
 
 class MavenRequirements(DeduplicatedCollection[str]):
