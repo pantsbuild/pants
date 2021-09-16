@@ -441,8 +441,16 @@ def test_generate_file_level_targets() -> None:
         alias = "generated"
         core_fields = (Dependencies, Tags, Sources)
 
-    def generate(generator: Target, files: List[str]) -> GeneratedTargets:
-        return generate_file_level_targets(MockGenerated, generator, files, None)
+    def generate(
+        generator: Target, files: List[str], *, use_generated_addr_syntax: bool = False
+    ) -> GeneratedTargets:
+        return generate_file_level_targets(
+            MockGenerated,
+            generator,
+            files,
+            None,
+            use_generated_address_syntax=use_generated_addr_syntax,
+        )
 
     tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
     assert generate(tgt, ["demo/f1.ext", "demo/f2.ext"]) == GeneratedTargets(
@@ -466,6 +474,16 @@ def test_generate_file_level_targets() -> None:
             MockGenerated(
                 {Sources.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+            )
+        ]
+    )
+    assert generate(
+        subdir_tgt, ["src/fortran/subdir/demo.f95"], use_generated_addr_syntax=True
+    ) == GeneratedTargets(
+        [
+            MockGenerated(
+                {Sources.alias: ["subdir/demo.f95"]},
+                Address("src/fortran", target_name="demo", generated_name="subdir/demo.f95"),
             )
         ]
     )
