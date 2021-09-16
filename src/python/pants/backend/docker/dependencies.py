@@ -7,6 +7,7 @@ from pants.backend.docker.target_types import DockerDependencies, DockerImageSou
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
+from pants.engine.unions import UnionRule
 
 
 class InjectDockerDependencies(InjectDependenciesRequest):
@@ -33,4 +34,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
+    ]
