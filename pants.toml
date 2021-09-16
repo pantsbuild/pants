@@ -16,6 +16,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shfmt",
   "pants.backend.experimental.docker",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.terraform",
   "internal_plugins.releases",
 ]
 plugins = [

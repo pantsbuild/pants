@@ -1,15 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import textwrap
-from pathlib import PurePath
 
 import pytest
 
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform import dependency_inference
-from pants.backend.terraform.dependency_inference import (
-    InferTerraformModuleDependenciesRequest,
-    resolve_pure_path,
-)
+from pants.backend.terraform.dependency_inference import InferTerraformModuleDependenciesRequest
 from pants.backend.terraform.target_types import TerraformModule
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
@@ -26,6 +23,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
+            *pex_rules(),
             *dependency_inference.rules(),
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
         ],
@@ -81,15 +79,16 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_resolve_pure_path() -> None:
-    assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../grok")) == PurePath(
-        "foo/bar/grok"
-    )
-    assert resolve_pure_path(
-        PurePath("foo/bar/hello/world"), PurePath("../../../../grok")
-    ) == PurePath("grok")
-    with pytest.raises(ValueError):
-        resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../../../../grok"))
-    assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("./grok")) == PurePath(
-        "foo/bar/hello/world/grok"
-    )
+# TODO: How can resolve_pure_path in the parser script be tested?
+# def test_resolve_pure_path() -> None:
+#     assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../grok")) == PurePath(
+#         "foo/bar/grok"
+#     )
+#     assert resolve_pure_path(
+#         PurePath("foo/bar/hello/world"), PurePath("../../../../grok")
+#     ) == PurePath("grok")
+#     with pytest.raises(ValueError):
+#         resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../../../../grok"))
+#     assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("./grok")) == PurePath(
+#         "foo/bar/hello/world/grok"
+#     )

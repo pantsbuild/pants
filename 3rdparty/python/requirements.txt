@@ -13,7 +13,6 @@ psutil==5.8.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.
 pytest>=6.0.1,<6.3
-python-hcl2==3.0.1
 PyYAML>=5.4,<5.5
 requests[security]>=2.25.1
 setproctitle==1.2.2

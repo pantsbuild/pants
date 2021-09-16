@@ -20,7 +20,6 @@
 #     "psutil==5.8.0",
 #     "pystache==0.5.4",
 #     "pytest<6.3,>=6.0.1",
-#     "python-hcl2==3.0.1",
 #     "requests[security]>=2.25.1",
 #     "setproctitle==1.2.2",
 #     "setuptools<58.0,>=56.0.0",
@@ -133,8 +132,6 @@ importlib-metadata==4.8.1; python_version < "3.8" and python_version >= "3.6" \
 iniconfig==1.1.1; python_version >= "3.6" \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
-lark-parser==0.10.1; python_full_version >= "3.6.0" \
-    --hash=sha256:42f367612a1bbc4cf9d8c8eb1b209d8a9b397d55af75620c9e6f53e502235996
 packaging==21.0; python_version >= "3.6" \
     --hash=sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14 \
     --hash=sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7
@@ -187,8 +184,6 @@ pytest==6.2.5; python_version >= "3.6" \
 python-dateutil==2.8.2; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.5" \
     --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
     --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
-python-hcl2==3.0.1; python_full_version >= "3.6.0" \
-    --hash=sha256:f6c178d216e9d8ef1ef9fceeb16792cbabfb69d2ae1a73e263974ab6f74489ab
 pyyaml==5.4.1; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.6.0") \
     --hash=sha256:3b2b1824fe7112845700f815ff6a489360226a5609b96ec2190a45e62a9fc922 \
     --hash=sha256:129def1b7c1bf22faffd67b8f3724645203b79d8f4cc81f674654d9902cb4393 \
