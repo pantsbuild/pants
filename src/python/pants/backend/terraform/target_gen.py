@@ -53,15 +53,10 @@ async def generate_terraform_module_targets(
             generated_target_fields[field.alias] = value
         return TerraformModule(
             generated_target_fields,
-            # TODO(12891): Make this be:
-            #   Address(
-            #       request.generator.address.spec_path,
-            #       target_name=request.generator.target_name,
-            #       generated_name=dir
-            #   )
             Address(
-                dir,
-                target_name="tf_mod",
+                request.generator.address.spec_path,
+                target_name=request.generator.address.target_name,
+                generated_name=dir,
             ),
         )
 

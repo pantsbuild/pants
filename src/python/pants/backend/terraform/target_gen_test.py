@@ -52,7 +52,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                 {
                     TerraformModuleSources.alias: ("versions.tf",),
                 },
-                Address("src/tf/foo", target_name="tf_mod"),
+                Address("", target_name="tf_mods", generated_name="src/tf/foo"),
             ),
             TerraformModule(
                 {
@@ -61,7 +61,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                         "versions.tf",
                     ),
                 },
-                Address("src/tf", target_name="tf_mod"),
+                Address("", target_name="tf_mods", generated_name="src/tf"),
             ),
         ]
     )
