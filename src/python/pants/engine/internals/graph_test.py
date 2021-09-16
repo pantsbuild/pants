@@ -561,7 +561,7 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
         "", target_name="non-generator", relative_file_path="f1.txt"
     )
     assert transitive_targets_rule_runner.get_target(non_generator_file_address) == MockTarget(
-        {Sources.alias: ["f1.txt"]}, non_generator_file_address.maybe_convert_to_build_target()
+        {Sources.alias: ["f1.txt"]}, non_generator_file_address.maybe_convert_to_target_generator()
     )
 
 

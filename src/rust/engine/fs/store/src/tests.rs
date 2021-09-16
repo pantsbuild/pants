@@ -12,7 +12,7 @@ use bytes::{Bytes, BytesMut};
 use fs::{DigestEntry, FileEntry};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use mock::StubCAS;
 
 use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
@@ -1267,6 +1267,13 @@ async fn entries_for_directory() {
       }),
     ],
   );
+
+  let empty_digest_entries = store
+    .entries_for_directory(EMPTY_DIGEST)
+    .await
+    .expect("Getting EMTPY_DIGEST");
+
+  assert_same_digest_entries(empty_digest_entries, vec![]);
 }
 
 fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {

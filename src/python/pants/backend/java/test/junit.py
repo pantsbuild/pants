@@ -96,6 +96,12 @@ async def run_junit_test(
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
+            # TODO(12812): Make these options configurable by integration tests in `junit_test.py`.
+            # Remove these hard-coded options before general availability.
+            "--disable-ansi-colors",
+            "--details=flat",
+            "--details-theme=ascii",
+            # END TODO REMOVAL
             "--classpath",
             usercp_relpath,
             "--scan-class-path",

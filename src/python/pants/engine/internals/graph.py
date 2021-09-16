@@ -116,7 +116,7 @@ async def resolve_target(
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> WrappedTarget:
-    if not address.is_file_target:
+    if not address.is_generated_target:
         target_adaptor = await Get(TargetAdaptor, Address, address)
         target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
         if target_type is None:
@@ -127,17 +127,14 @@ async def resolve_target(
         return WrappedTarget(target)
 
     wrapped_generator_tgt = await Get(
-        WrappedTarget, Address, address.maybe_convert_to_build_target()
+        WrappedTarget, Address, address.maybe_convert_to_target_generator()
     )
     generator_tgt = wrapped_generator_tgt.target
-    # Not all languages support file targets (Go and Terraform). If we got a file address, use
-    # that as an alias for the BUILD target.
-    #
-    # This code path will go away once we remove file addresses in favor of generated target
-    # addresses, e.g. path/to:generator:generated, because we will error in that case when
-    # there is no generator for the address.
     if not target_types_to_generate_requests.is_generator(generator_tgt):
+        # TODO: Error in this case. You should not use a generator address (or file address) if
+        #  the generator does not actually generate.
         return wrapped_generator_tgt
+
     generate_request = target_types_to_generate_requests[type(generator_tgt)]
     generated = await Get(GeneratedTargets, GenerateTargetsRequest, generate_request(generator_tgt))
     if address not in generated:
@@ -163,7 +160,10 @@ async def resolve_targets(
     generator_targets = []
     generate_gets = []
     for tgt in targets:
-        if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_file_target:
+        if (
+            target_types_to_generate_requests.is_generator(tgt)
+            and not tgt.address.is_generated_target
+        ):
             generator_targets.append(tgt)
             generate_request = target_types_to_generate_requests[type(tgt)]
             generate_gets.append(
@@ -428,8 +428,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     # For live files, we use ExpandedTargets, which causes more precise, often file-level, targets
-    # like python_source to be created. For deleted files we use UnexpandedTargets, which have
-    # the original declared glob.
+    # to be created. For deleted files we use UnexpandedTargets, which have the original declared
+    # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
@@ -865,7 +865,7 @@ async def resolve_dependencies(
 
     # If it's a target generator, inject dependencies on all of its generated targets.
     generated_addresses: tuple[Address, ...] = ()
-    if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_file_target:
+    if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
         generate_request = target_types_to_generate_requests[type(tgt)]
         generated_targets = await Get(
             GeneratedTargets, GenerateTargetsRequest, generate_request(tgt)

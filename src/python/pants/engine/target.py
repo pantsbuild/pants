@@ -143,7 +143,7 @@ class Field:
 
     @classmethod
     def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.removal_version or address.is_file_target or raw_value is None:
+        if not cls.removal_version or address.is_generated_target or raw_value is None:
             return
         if not cls.removal_hint:
             raise ValueError(
@@ -295,7 +295,7 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
     ) -> None:
-        if self.removal_version and not address.is_file_target:
+        if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
                 raise ValueError(
                     f"You specified `removal_version` for {self.__class__}, but not "
@@ -1712,11 +1712,11 @@ class ExplicitlyProvidedDependencies:
     def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
-        Note that if the input addresses are file addresses, they will still be marked as covered if
-        their original BUILD target is in the explicitly provided includes.
+        Note that if the input addresses are generated targets, they will still be marked as covered
+        if their original target generator is in the explicitly provided includes.
         """
         return any(
-            addr in self.includes or addr.maybe_convert_to_build_target() in self.includes
+            addr in self.includes or addr.maybe_convert_to_target_generator() in self.includes
             for addr in addresses
         )
 
@@ -1727,8 +1727,8 @@ class ExplicitlyProvidedDependencies:
         """All addresses that remain after ineligible candidates are discarded.
 
         Candidates are removed if they appear as ignores (`!` and `!!)` in the `dependencies`
-        field. Note that if the input addresses are file addresses, they will still be marked as
-        covered if their original BUILD target is in the explicitly provided ignores.
+        field. Note that if the input addresses are generated targets, they will still be marked as
+        covered if their original target generator is in the explicitly provided ignores.
 
         Candidates are also removed if `owners_must_be_ancestors` is True and the targets are not
         ancestors, e.g. `root2:tgt` is not a valid candidate for something defined in `root1`.
@@ -1737,7 +1737,7 @@ class ExplicitlyProvidedDependencies:
 
         def is_valid(addr: Address) -> bool:
             is_ignored = (
-                addr in self.ignores or addr.maybe_convert_to_build_target() in self.ignores
+                addr in self.ignores or addr.maybe_convert_to_target_generator() in self.ignores
             )
             if owners_must_be_ancestors is False:
                 return not is_ignored
