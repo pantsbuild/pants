@@ -28,7 +28,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
         ],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.terraform"])
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.experimental.terraform"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     return rule_runner
 
 

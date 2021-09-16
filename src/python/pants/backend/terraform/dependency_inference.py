@@ -29,7 +29,9 @@ PARSER = FileContent(
     "__pants_tf_parser.py",
     textwrap.dedent(
         """\
+    from pathlib import PurePath
     import sys
+    from typing import Set
 
     import hcl2
 
@@ -50,7 +52,7 @@ PARSER = FileContent(
         return PurePath(*parts)
 
 
-    def extract_module_source_paths(path: PurePath, raw_content: bytes) -> set[str]:
+    def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
         content = raw_content.decode("utf-8")
         parsed_content = hcl2.loads(content)
 
@@ -77,7 +79,9 @@ PARSER = FileContent(
 
     paths = set()
     for filename in sys.argv[1:]:
-        paths |= extract_module_source_paths(PurePath(filename).parent, entry.content)
+        with open(filename, "rb") as f:
+            content = f.read()
+        paths |= extract_module_source_paths(PurePath(filename).parent, content)
 
     for path in paths:
         print(path)
