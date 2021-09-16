@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 
 from pants.backend.docker.target_types import DockerImage
 from pants.core.goals.tailor import (
@@ -20,7 +19,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativeDockerTargetsRequest(PutativeTargetsRequest):
     pass
 

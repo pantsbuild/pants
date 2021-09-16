@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.java.target_types import JavaLibrary, JavaTestsSources, JunitTests
@@ -24,7 +23,6 @@ from pants.source.filespec import Filespec, matches_filespec
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativeJavaTargetsRequest(PutativeTargetsRequest):
     pass
 

@@ -3,9 +3,6 @@
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
-
 from pants.backend.terraform.target_types import TerraformModule
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -21,7 +18,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativeTerraformTargetsRequest(PutativeTargetsRequest):
     pass
 

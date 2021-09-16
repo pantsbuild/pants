@@ -3,9 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
-from dataclasses import dataclass
-
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -21,7 +18,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativeProtobufTargetsRequest(PutativeTargetsRequest):
     pass
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
@@ -38,7 +37,6 @@ from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativePythonTargetsRequest(PutativeTargetsRequest):
     pass
 

@@ -1,8 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import itertools
-import os
-from dataclasses import dataclass
 from typing import Dict, List
 
 from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
@@ -35,7 +34,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
 class PutativeGoPackageTargetsRequest(PutativeTargetsRequest):
     pass
 
@@ -58,7 +56,6 @@ async def find_putative_go_package_targets(
     return PutativeTargets(putative_targets)
 
 
-@dataclass(frozen=True)
 class PutativeGoModuleTargetsRequest(PutativeTargetsRequest):
     pass
 
@@ -85,7 +82,6 @@ def compute_go_external_module_target_name(name: str, version: str) -> str:
     return f"{name.replace('/', '_')}_{version}"
 
 
-@dataclass(frozen=True)
 class PutativeGoExternalModuleTargetsRequest(PutativeTargetsRequest):
     pass
 
