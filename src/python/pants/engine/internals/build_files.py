@@ -11,7 +11,11 @@ from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAd
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.parser import (
+    BuildFilePreludeSymbols,
+    Parser,
+    error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
@@ -37,7 +41,9 @@ async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSy
             exec(content, values)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
-        error_on_imports(file_content_str, file_content.path)
+        error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols(
+            file_content_str, file_content.path, rename_symbols=False
+        )
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.

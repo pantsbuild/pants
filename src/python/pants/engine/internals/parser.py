@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
+import ast
 import os.path
 import threading
-import tokenize
 from dataclasses import dataclass
 from difflib import get_close_matches
-from io import StringIO
-from typing import Any, Iterable
+from typing import Any, Iterable, NamedTuple
 
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
@@ -112,6 +111,13 @@ class Parser:
     def parse(
         self, filepath: str, build_file_content: str, extra_symbols: BuildFilePreludeSymbols
     ) -> list[TargetAdaptor]:
+        # TODO(#12915): We only combine these two mechanisms for performance, to avoid iterating
+        #  over the file twice. Once we remove the CAOF rewrite mechanism, go back to using
+        #  `tokenize` for erroring on imports.
+        build_file_content = error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols(
+            build_file_content, filepath, rename_symbols=False
+        )
+
         self._parse_state.reset(rel_path=os.path.dirname(filepath))
 
         # We update the known symbols with Build File Preludes. This is subtle code; functions have
@@ -152,26 +158,77 @@ class Parser:
                 f"{original}.\n\n{help_str}\n\nAll registered symbols: {valid_symbols}"
             )
 
-        error_on_imports(build_file_content, filepath)
-
         return self._parse_state.parsed_targets()
 
 
-def error_on_imports(build_file_content: str, filepath: str) -> None:
-    # This is poor sandboxing; there are many ways to get around this. But it's sufficient to tell
-    # users who aren't malicious that they're doing something wrong, and it has a low performance
-    # overhead.
-    if "import" not in build_file_content:
-        return
-    io_wrapped_python = StringIO(build_file_content)
-    for token in tokenize.generate_tokens(io_wrapped_python.readline):
-        token_str = token[1]
-        lineno, _ = token[2]
-        if token_str != "import":
-            continue
+def error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols(
+    content: str, filepath: str, *, rename_symbols: bool
+) -> str:
+    """Error if imports are detected, which break sandboxing, and rewrite the symbol of context-
+    aware object factories to avoid ambiguity with target generators.
+
+    We use a simple heuristic of checking if `name` is set. If not, we assume it's a macro.
+    """
+    tree = ast.parse(content, filename=filepath)
+    visitor = AstVisitor(filepath, rename_symbols=rename_symbols)
+    visitor.visit(tree)
+    if not visitor.pending_renames:
+        return content
+    lines = content.splitlines(keepends=True)
+    for rename in visitor.pending_renames:
+        idx = rename.lineno - 1
+        lines[idx] = lines[idx].replace(f"{rename.old_symbol}(", f"{rename.new_symbol}(")
+    return "".join(lines)
+
+
+DEPRECATED_MACRO_RENAMES = {
+    "python_requirements": "python_requirements_deprecated_macro",
+    "poetry_requirements": "poetry_requirements_deprecated_macro",
+    "pipenv_requirements": "pipenv_requirements_deprecated_macro",
+    "pants_requirement": "pants_requirement_deprecated_macro",
+}
+
+
+class SymbolRename(NamedTuple):
+    lineno: int
+    old_symbol: str
+    new_symbol: str
+
+
+class AstVisitor(ast.NodeVisitor):
+    def __init__(self, filepath: str, rename_symbols: bool) -> None:
+        super().__init__()
+        self.filepath = filepath
+        self.rename_symbols = rename_symbols
+        self.pending_renames: list[SymbolRename] = []
+
+    def error_on_import(self, node: ast.Import | ast.ImportFrom) -> None:
         raise ParseError(
-            f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-            "BUILD files because they can easily break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
-            f"writing a plugin ({doc_url('plugins-overview')}."
+            f"Import used in {self.filepath} at line {node.lineno}. Import statements are "
+            "banned in BUILD files because they can easily break Pants caching and lead to stale "
+            "results.\n\n"
+            f"Instead, consider writing a macro ({doc_url('macros')}) or writing a "
+            f"plugin ({doc_url('plugins-overview')}."
         )
+
+    def visit_Import(self, node: ast.Import) -> None:
+        self.error_on_import(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        self.error_on_import(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if not self.rename_symbols:
+            return
+        is_deprecated_symbol = (
+            isinstance(node.func, ast.Name) and node.func.id in DEPRECATED_MACRO_RENAMES
+        )
+        name_keyword = next((kw for kw in node.keywords if kw.arg == "name"), None)
+        if is_deprecated_symbol and not name_keyword:
+            self.pending_renames.append(
+                SymbolRename(
+                    node.lineno,
+                    old_symbol=node.func.id,
+                    new_symbol=DEPRECATED_MACRO_RENAMES[node.func.id],
+                )
+            )
