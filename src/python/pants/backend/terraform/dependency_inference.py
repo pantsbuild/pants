@@ -1,9 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pathlib import PurePath
-from typing import Iterable
+from __future__ import annotations
 
-import hcl2
+from pathlib import PurePath
+
+import hcl2  # type: ignore
 
 from pants.backend.terraform.target_types import TerraformModuleSources
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
@@ -41,15 +42,17 @@ def resolve_pure_path(base: PurePath, relative_path: PurePath) -> PurePath:
     return PurePath(*parts)
 
 
-def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Iterable[str]:
+def extract_module_source_paths(path: PurePath, raw_content: bytes) -> set[str]:
     content = raw_content.decode("utf-8")
     parsed_content = hcl2.loads(content)
 
     # Note: The `module` key is a list where each entry is a dict with a single entry where the key is the
     # module name and the values are a dict for that module's actual values.
-    paths = []
+    paths = set()
     for wrapped_module in parsed_content.get("module", []):
-        values = wrapped_module.values()[0]  # the module is the sole entry in `wrapped_module`
+        values = list(wrapped_module.values())[
+            0
+        ]  # the module is the sole entry in `wrapped_module`
         source = values.get("source", "")
 
         # Local paths to modules must begin with "." or ".." as per
@@ -57,7 +60,7 @@ def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Iterable[
         if source.startswith("./") or source.startswith("../"):
             try:
                 resolved_path = resolve_pure_path(path, PurePath(source))
-                paths.append(str(resolved_path))
+                paths.add(str(resolved_path))
             except ValueError:
                 pass
 
@@ -72,19 +75,19 @@ async def infer_terraform_module_dependencies(
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
 
     # Find all local modules referenced by this module.
-    paths = []
+    paths = set()
     for entry in digest_contents:
         if entry.path.endswith(".tf"):
-            paths.extend(extract_module_source_paths(entry.content))
+            paths |= extract_module_source_paths(PurePath(entry.path).parent, entry.content)
 
     # For each path, see if there is a `terraform_module` target at the specified path.
     candidate_targets = await Get(
         Targets, AddressSpecs([MaybeEmptySiblingAddresses(path) for path in paths])
     )
-    terraform_module_targets = [
-        tgt for tgt in candidate_targets if tgt.has_field(TerraformModuleSources)
+    terraform_module_addresses = [
+        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSources)
     ]
-    return InferredDependencies(terraform_module_targets)
+    return InferredDependencies(terraform_module_addresses, sibling_dependencies_inferrable=False)
 
 
 def rules():

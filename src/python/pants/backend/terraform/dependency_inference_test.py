@@ -1,16 +1,20 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import textwrap
+from pathlib import PurePath
 
 import pytest
 
 from pants.backend.terraform import dependency_inference
-from pants.backend.terraform.dependency_inference import InferTerraformModuleDependenciesRequest
+from pants.backend.terraform.dependency_inference import (
+    InferTerraformModuleDependenciesRequest,
+    resolve_pure_path,
+)
 from pants.backend.terraform.target_types import TerraformModule
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
-from pants.engine.target import InferredDependencies
+from pants.engine.target import InferredDependencies, Sources
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -48,7 +52,7 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
             module "bar" {
               source = "../../modules/foo/bar"
             }
-            module "subdur" {
+            module "subdir" {
               source = "./subdir"
             }
             # Should not be inferred as a dependency since not a local path.
@@ -61,14 +65,31 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
         }
     )
 
-    target = rule_runner.get_target(Address("src/tf/grok"))
+    target = rule_runner.get_target(Address("src/tf/resources/grok"))
     inferred_deps = rule_runner.request(
-        InferredDependencies, [InferTerraformModuleDependenciesRequest(target)]
+        InferredDependencies, [InferTerraformModuleDependenciesRequest(target.get(Sources))]
     )
-    assert inferred_deps == FrozenOrderedSet(
-        [
-            Address("src/tf/modules/foo"),
-            Address("src/tf/modules/foo/bar"),
-            Address("src/tf/resources/grok/subdir"),
-        ]
+    assert inferred_deps == InferredDependencies(
+        FrozenOrderedSet(
+            [
+                Address("src/tf/modules/foo"),
+                Address("src/tf/modules/foo/bar"),
+                Address("src/tf/resources/grok/subdir"),
+            ]
+        ),
+        sibling_dependencies_inferrable=False,
+    )
+
+
+def test_resolve_pure_path() -> None:
+    assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../grok")) == PurePath(
+        "foo/bar/grok"
+    )
+    assert resolve_pure_path(
+        PurePath("foo/bar/hello/world"), PurePath("../../../../grok")
+    ) == PurePath("grok")
+    with pytest.raises(ValueError):
+        resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../../../../grok"))
+    assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("./grok")) == PurePath(
+        "foo/bar/hello/world/grok"
     )
