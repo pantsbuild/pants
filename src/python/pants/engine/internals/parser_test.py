@@ -115,11 +115,7 @@ def test_rewrite_macro_symbols() -> None:
         )
         + unmodified_content
     )
-    print(
-        error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols(
-            original, "BUILD", rename_symbols=True
-        )
-    )
+
     assert (
         error_on_imports_and_rewrite_caofs_to_avoid_ambiguous_symbols(
             original, "BUILD", rename_symbols=True
