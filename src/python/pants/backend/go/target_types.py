@@ -78,7 +78,7 @@ class GoExternalPackageDependencies(Dependencies):
     pass
 
 
-class GoExternalPackagePathField(StringField):
+class GoExternalModulePathField(StringField):
     alias = "path"
     help = (
         "The module path of the third-party module this package comes from, "
@@ -88,7 +88,7 @@ class GoExternalPackagePathField(StringField):
     value: str
 
 
-class GoExternalPackageVersionField(StringField):
+class GoExternalModuleVersionField(StringField):
     alias = "version"
     help = "The version of the third-party module this package comes from, e.g. `v0.4.0`."
     required = True
@@ -105,8 +105,8 @@ class GoExternalPackageTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoExternalPackageDependencies,
-        GoExternalPackagePathField,
-        GoExternalPackageVersionField,
+        GoExternalModulePathField,
+        GoExternalModuleVersionField,
         GoExternalPackageImportPathField,
     )
     help = "A package from a third-party Go module."

@@ -20,8 +20,8 @@ from pants.backend.go.pkg import (
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
     GoBinaryMainAddress,
-    GoExternalPackagePathField,
-    GoExternalPackageVersionField,
+    GoExternalModulePathField,
+    GoExternalModuleVersionField,
     GoPackageSources,
 )
 from pants.build_graph.address import Address, AddressInput
@@ -35,9 +35,10 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -141,13 +142,13 @@ async def build_target(
         source_files_digest = source_files.snapshot.digest
         source_files_subpath = target.address.spec_path
     elif is_third_party_package_target(target):
-        module_path = target[GoExternalPackagePathField].value
+        module_path = target[GoExternalModulePathField].value
         module, resolved_package = await MultiGet(
             Get(
                 DownloadedExternalModule,
                 DownloadExternalModuleRequest(
                     path=module_path,
-                    version=target[GoExternalPackageVersionField].value,
+                    version=target[GoExternalModuleVersionField].value,
                 ),
             ),
             Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=request.address)),
@@ -376,6 +377,25 @@ async def package_go_binary(
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
+
+
+class GoBuildSubsystem(GoalSubsystem):
+    name = "go-build"
+    help = "Compile Go targets that contain source code (i.e., `go_package`)."
+
+
+class GoBuildGoal(Goal):
+    subsystem_cls = GoBuildSubsystem
+
+
+@goal_rule
+async def run_go_build(targets: UnexpandedTargets) -> GoBuildGoal:
+    await MultiGet(
+        Get(BuiltGoPackage, BuildGoPackageRequest(address=tgt.address))
+        for tgt in targets
+        if is_first_party_package_target(tgt) or is_third_party_package_target(tgt)
+    )
+    return GoBuildGoal(exit_code=0)
 
 
 def rules():

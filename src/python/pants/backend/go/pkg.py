@@ -18,10 +18,10 @@ from pants.backend.go.module import (
 )
 from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
+    GoExternalModulePathField,
+    GoExternalModuleVersionField,
     GoExternalPackageDependencies,
     GoExternalPackageImportPathField,
-    GoExternalPackagePathField,
-    GoExternalPackageVersionField,
     GoImportPath,
     GoModuleSources,
     GoPackageSources,
@@ -291,8 +291,8 @@ async def resolve_external_go_package(
     target = wrapped_target.target
 
     import_path = target[GoExternalPackageImportPathField].value
-    module_path = target[GoExternalPackagePathField].value
-    module_version = target[GoExternalPackageVersionField].value
+    module_path = target[GoExternalModulePathField].value
+    module_version = target[GoExternalModuleVersionField].value
 
     module = await Get(
         DownloadedExternalModule,
