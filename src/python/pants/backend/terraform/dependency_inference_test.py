@@ -6,7 +6,9 @@ import pytest
 
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform import dependency_inference
-from pants.backend.terraform.dependency_inference import InferTerraformModuleDependenciesRequest
+from pants.backend.terraform.dependency_inference import (
+    InferTerraformModuleDependenciesRequest,
+)
 from pants.backend.terraform.target_types import TerraformModule
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files

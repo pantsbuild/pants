@@ -25,6 +25,7 @@ from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,11 @@ def main() -> None:
             f"--coverage-py-extra-requirements={repr(CoverageSubsystem.default_extra_requirements)}",
             f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
             f"--coverage-py-lockfile={CoverageSubsystem.default_lockfile_path}",
+            # HCL2 for Terraform dependency inference
+            "--backend-packages=+['pants.backend.experimental.terraform']",
+            f"--terraform-hcl2-parser-version={TerraformHcl2Parser.default_version}",
+            f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
+            f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
             # Run the goal.
             "generate-lockfiles",
         ],

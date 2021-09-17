@@ -6,6 +6,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -23,6 +24,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.docutil import git_url
 from pants.util.ordered_set import OrderedSet
 
 PARSER = FileContent(
@@ -91,14 +93,30 @@ PARSER = FileContent(
 )
 
 
-class PythonHcl2Subsystem(PythonToolRequirementsBase):
-    options_scope = "python-hcl2"
+class TerraformHcl2Parser(PythonToolRequirementsBase):
+    options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
     default_version = "python-hcl2==3.0.1"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.terraform", "hcl2_lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/terraform/hcl2_lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
+
+
+class TerraformHcl2ParserLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = TerraformHcl2Parser.options_scope
+
+
+@rule
+def setup_lockfile_request(
+    _: TerraformHcl2ParserLockfileSentinel, hcl2_parser: TerraformHcl2Parser
+) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(hcl2_parser)
 
 
 @dataclass(frozen=True)
@@ -107,7 +125,7 @@ class ParserSetup:
 
 
 @rule
-async def setup_parser(hcl2_subsystem: PythonHcl2Subsystem) -> ParserSetup:
+async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
     parser_digest = await Get(Digest, CreateDigest([PARSER]))
 
     parser_pex = await Get(
@@ -115,8 +133,8 @@ async def setup_parser(hcl2_subsystem: PythonHcl2Subsystem) -> ParserSetup:
         PexRequest(
             output_filename="tf_parser.pex",
             internal_only=True,
-            requirements=hcl2_subsystem.pex_requirements(),
-            interpreter_constraints=hcl2_subsystem.interpreter_constraints,
+            requirements=hcl2_parser.pex_requirements(),
+            interpreter_constraints=hcl2_parser.interpreter_constraints,
             main=EntryPoint(PurePath(PARSER.path).stem),
             sources=parser_digest,
         ),
@@ -183,4 +201,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
+        UnionRule(PythonToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
     ]
