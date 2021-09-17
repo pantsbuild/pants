@@ -133,6 +133,7 @@ def main() -> None:
             "--backend-packages=+['pants.backend.experimental.terraform']",
             f"--terraform-hcl2-parser-version={TerraformHcl2Parser.default_version}",
             f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
+            f"--terraform-hcl2-parser-interpreter-constraints={repr(TerraformHcl2Parser.default_interpreter_constraints)}",
             f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
             # Run the goal.
             "generate-lockfiles",
