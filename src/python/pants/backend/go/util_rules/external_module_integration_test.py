@@ -8,10 +8,12 @@ from pants.backend.go.util_rules import external_module, sdk
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
     DownloadExternalModuleRequest,
+    ResolveExternalGoModuleToPackagesRequest,
+    ResolveExternalGoModuleToPackagesResult,
 )
 from pants.core.util_rules import external_tool, source_files
 from pants.engine import fs
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -26,6 +28,9 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *external_module.rules(),
             QueryRule(DownloadedExternalModule, [DownloadExternalModuleRequest]),
+            QueryRule(
+                ResolveExternalGoModuleToPackagesResult, [ResolveExternalGoModuleToPackagesRequest]
+            ),
             QueryRule(DigestContents, [Digest]),
         ],
         target_types=[GoPackage, GoModule],
@@ -66,3 +71,25 @@ def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None
             found_go_mod = True
             break
     assert found_go_mod
+
+
+def test_resolve_packages_of_go_external_module(rule_runner: RuleRunner) -> None:
+    result = rule_runner.request(
+        ResolveExternalGoModuleToPackagesResult,
+        [
+            ResolveExternalGoModuleToPackagesRequest(
+                path="github.com/google/go-cmp",
+                version="v0.5.6",
+                go_sum_digest=EMPTY_DIGEST,
+            )
+        ],
+    )
+
+    import_path_to_package = {pkg.import_path: pkg for pkg in result.packages}
+    assert len(import_path_to_package) > 1
+
+    pkg = import_path_to_package["github.com/google/go-cmp/cmp"]
+    assert pkg is not None
+    assert pkg.address is None
+    assert pkg.package_name == "cmp"
+    assert len(pkg.go_files) > 0

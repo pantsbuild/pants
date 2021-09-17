@@ -8,12 +8,12 @@ import logging
 from pants.backend.go.build import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.pkg import (
     ResolvedGoPackage,
-    ResolveExternalGoPackageRequest,
     ResolveGoPackageRequest,
     is_first_party_package_target,
     is_third_party_package_target,
 )
 from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
 from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
 from pants.engine.console import Console
 from pants.engine.fs import Workspace

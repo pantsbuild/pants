@@ -5,16 +5,16 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List
 
-from pants.backend.go.pkg import (
-    ResolvedGoPackage,
-    ResolveExternalGoModuleToPackagesRequest,
-    ResolveExternalGoModuleToPackagesResult,
-)
+from pants.backend.go.pkg import ResolvedGoPackage
 from pants.backend.go.target_types import (
     GoExternalPackageTarget,
     GoModule,
     GoModuleSources,
     GoPackage,
+)
+from pants.backend.go.util_rules.external_module import (
+    ResolveExternalGoModuleToPackagesRequest,
+    ResolveExternalGoModuleToPackagesResult,
 )
 from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
 from pants.base.specs import AddressSpecs, MaybeEmptyDescendantAddresses, MaybeEmptySiblingAddresses
