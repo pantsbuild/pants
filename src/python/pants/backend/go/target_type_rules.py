@@ -6,20 +6,17 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.go import import_analysis, pkg
-from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
-from pants.backend.go.module import FindNearestGoModuleRequest, ResolvedOwningGoModule
-from pants.backend.go.pkg import (
-    ResolvedGoPackage,
-    ResolveExternalGoPackageRequest,
-    ResolveGoPackageRequest,
-)
 from pants.backend.go.target_types import (
     GoExternalPackageDependencies,
     GoImportPath,
     GoPackageDependencies,
     GoPackageSources,
 )
+from pants.backend.go.util_rules import go_pkg, import_analysis
+from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
+from pants.backend.go.util_rules.go_mod import FindNearestGoModuleRequest, ResolvedOwningGoModule
+from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
+from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.base.specs import (
     AddressSpecs,
     DescendantAddresses,
@@ -216,7 +213,7 @@ async def inject_go_external_package_dependencies(
 def rules():
     return (
         *collect_rules(),
-        *pkg.rules(),
+        *go_pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
