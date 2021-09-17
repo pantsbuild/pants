@@ -59,7 +59,9 @@ async def generate_terraform_module_targets(
             ),
         )
 
-    return GeneratedTargets(gen_target(dir) for dir in dirs_with_terraform_files)
+    return GeneratedTargets(
+        request.generator, [gen_target(dir) for dir in dirs_with_terraform_files]
+    )
 
 
 def rules():

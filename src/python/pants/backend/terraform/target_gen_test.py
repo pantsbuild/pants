@@ -47,6 +47,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
         GeneratedTargets, [GenerateTerraformModuleTargetsRequest(generator)]
     )
     assert targets == GeneratedTargets(
+        generator,
         [
             TerraformModule(
                 {
@@ -63,5 +64,5 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="tf_mods", generated_name="src/tf"),
             ),
-        ]
+        ],
     )
