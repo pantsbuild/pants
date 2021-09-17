@@ -475,6 +475,7 @@ def test_generate_file_level_targets() -> None:
     assert generate(
         tgt, ["demo/f1.ext", "demo/f2.ext"], add_dependencies_on_all_siblings=True
     ) == GeneratedTargets(
+        tgt,
         [
             MockGenerated(
                 {
@@ -492,7 +493,7 @@ def test_generate_file_level_targets() -> None:
                 },
                 Address("demo", relative_file_path="f2.ext"),
             ),
-        ]
+        ],
     )
 
     subdir_tgt = MockGenerator(
