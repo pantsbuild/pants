@@ -13,7 +13,7 @@ from pants.backend.go.target_types import (
     GoPackage,
     GoPackageSources,
 )
-from pants.backend.go.util_rules import sdk
+from pants.backend.go.util_rules import external_module, sdk
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Addresses
@@ -37,6 +37,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *module.rules(),
             *pkg.rules(),
+            *external_module.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),

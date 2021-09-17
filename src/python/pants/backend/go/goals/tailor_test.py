@@ -12,7 +12,7 @@ from pants.backend.go.goals.tailor import (
 )
 from pants.backend.go.goals.tailor import rules as go_tailor_rules
 from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoPackage
-from pants.backend.go.util_rules import sdk
+from pants.backend.go.util_rules import external_module, sdk
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -34,6 +34,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *module.rules(),
+            *external_module.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(PutativeTargets, [PutativeGoPackageTargetsRequest, AllOwnedSources]),

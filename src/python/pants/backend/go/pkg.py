@@ -9,8 +9,6 @@ from dataclasses import dataclass
 import ijson
 
 from pants.backend.go.module import (
-    DownloadedExternalModule,
-    DownloadExternalModuleRequest,
     FindNearestGoModuleRequest,
     ResolvedGoModule,
     ResolvedOwningGoModule,
@@ -24,6 +22,10 @@ from pants.backend.go.target_types import (
     GoImportPath,
     GoModuleSources,
     GoPackageSources,
+)
+from pants.backend.go.util_rules.external_module import (
+    DownloadedExternalModule,
+    DownloadExternalModuleRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address

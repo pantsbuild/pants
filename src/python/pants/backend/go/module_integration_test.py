@@ -5,12 +5,7 @@ import textwrap
 import pytest
 
 from pants.backend.go import module
-from pants.backend.go.module import (
-    DownloadedExternalModule,
-    DownloadExternalModuleRequest,
-    ResolvedGoModule,
-    ResolveGoModuleRequest,
-)
+from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.target_types import GoModule, GoPackage
 from pants.backend.go.util_rules import sdk
 from pants.build_graph.address import Address
@@ -31,7 +26,6 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *module.rules(),
             QueryRule(ResolvedGoModule, [ResolveGoModuleRequest]),
-            QueryRule(DownloadedExternalModule, [DownloadExternalModuleRequest]),
             QueryRule(DigestContents, [Digest]),
         ],
         target_types=[GoPackage, GoModule],
@@ -82,37 +76,3 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
         if module_descriptor.path == "github.com/golang/protobuf":
             found_protobuf_module = True
     assert found_protobuf_module
-
-
-def test_download_external_module(rule_runner: RuleRunner) -> None:
-    downloaded_module = rule_runner.request(
-        DownloadedExternalModule,
-        [DownloadExternalModuleRequest(path="github.com/google/uuid", version="v1.3.0")],
-    )
-    assert downloaded_module.path == "github.com/google/uuid"
-    assert downloaded_module.version == "v1.3.0"
-
-    digest_contents = rule_runner.request(DigestContents, [downloaded_module.digest])
-    found_uuid_go_file = False
-    for file_content in digest_contents:
-        if file_content.path == "uuid.go":
-            found_uuid_go_file = True
-            break
-    assert found_uuid_go_file
-
-
-def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None:
-    downloaded_module = rule_runner.request(
-        DownloadedExternalModule,
-        [DownloadExternalModuleRequest(path="cloud.google.com/go", version="v0.26.0")],
-    )
-    assert downloaded_module.path == "cloud.google.com/go"
-    assert downloaded_module.version == "v0.26.0"
-
-    digest_contents = rule_runner.request(DigestContents, [downloaded_module.digest])
-    found_go_mod = False
-    for file_content in digest_contents:
-        if file_content.path == "go.mod":
-            found_go_mod = True
-            break
-    assert found_go_mod

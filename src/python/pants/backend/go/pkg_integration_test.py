@@ -12,7 +12,7 @@ from pants.backend.go.pkg import (
     ResolveGoPackageRequest,
 )
 from pants.backend.go.target_types import GoModule, GoPackage
-from pants.backend.go.util_rules import sdk
+from pants.backend.go.util_rules import external_module, sdk
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.fs import EMPTY_DIGEST
@@ -27,6 +27,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *module.rules(),
+            *external_module.rules(),
             *pkg.rules(),
             *sdk.rules(),
             QueryRule(ResolvedGoPackage, [ResolveGoPackageRequest]),
