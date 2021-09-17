@@ -5,10 +5,10 @@ python_library(dependencies=[":lockfile"])
 
 resources(name="lockfile", sources=["hcl2_lockfile.txt"])
 
-python_tests(name='tests', sources=["!dependency_inference_rules_test.py"])
+python_tests(name='tests', sources=["!dependency_inference_test.py"])
 python_tests(
-  name="rules_integration_test",
-  sources=["dependency_inference_rules_test.py"],
+  name="dependency_inference_test",
+  sources=["dependency_inference_test.py"],
   timeout=240,
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
