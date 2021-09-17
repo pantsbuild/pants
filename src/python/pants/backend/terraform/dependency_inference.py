@@ -196,7 +196,7 @@ async def infer_terraform_module_dependencies(
     terraform_module_addresses = [
         tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSources)
     ]
-    return InferredDependencies(terraform_module_addresses, sibling_dependencies_inferrable=False)
+    return InferredDependencies(terraform_module_addresses)
 
 
 def rules():
