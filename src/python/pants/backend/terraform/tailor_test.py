@@ -3,7 +3,7 @@
 
 from pants.backend.terraform.tailor import PutativeTerraformTargetsRequest
 from pants.backend.terraform.tailor import rules as terraform_tailor_rules
-from pants.backend.terraform.target_types import TerraformModule
+from pants.backend.terraform.target_types import TerraformModule, TerraformModules
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -25,6 +25,7 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[
             TerraformModule,
+            TerraformModules,
         ],
     )
     rule_runner.write_files(
@@ -56,30 +57,10 @@ def test_find_putative_targets() -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform",
-                    "terraform",
-                    [
-                        "root.tf",
-                    ],
-                ),
-                PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform/owned-module",
-                    "owned-module",
-                    [
-                        "foo.tf",
-                        "main.tf",
-                    ],
-                ),
-                PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform/unowned-module",
-                    "unowned-module",
-                    [
-                        "bar.tf",
-                        "main.tf",
-                    ],
+                    TerraformModules,
+                    "",
+                    "tf_mods",
+                    ("src/**/*.tf",),
                 ),
             ]
         )
