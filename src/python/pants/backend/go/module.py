@@ -27,12 +27,10 @@ from pants.engine.fs import (
     PathGlobs,
     RemovePrefix,
     Snapshot,
-    Workspace,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -165,32 +163,6 @@ async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> Resolve
     else:
         # TODO: Consider eventually requiring all go_package's to associate with a go_module.
         return ResolvedOwningGoModule(module_address=None)
-
-
-# TODO(12764): Add integration tests for the `go-resolve` goal once we figure out its final form. For now, it is a debug
-# tool to help update go.sum while developing the Go plugin and will probably change.
-class GoResolveSubsystem(GoalSubsystem):
-    name = "go-resolve"
-    help = "Resolve a Go module's go.mod and update go.sum accordingly."
-
-
-class GoResolveGoal(Goal):
-    subsystem_cls = GoResolveSubsystem
-
-
-@goal_rule
-async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> GoResolveGoal:
-    # TODO: Use MultiGet to resolve the go_module targets.
-    # TODO: Combine all of the go.sum's into a single Digest to write.
-    for target in targets:
-        if target.has_field(GoModuleSources):
-            resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
-            # TODO: Only update the files if they actually changed.
-            workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
-            logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
-        else:
-            logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
-    return GoResolveGoal(exit_code=0)
 
 
 @dataclass(frozen=True)

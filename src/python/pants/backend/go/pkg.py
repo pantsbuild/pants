@@ -28,7 +28,6 @@ from pants.backend.go.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.console import Console
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -41,11 +40,10 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -419,36 +417,6 @@ async def resolve_external_module_to_go_packages(
         packages.add(package)
 
     return ResolveExternalGoModuleToPackagesResult(packages=FrozenOrderedSet(packages))
-
-
-class GoPkgDebugSubsystem(GoalSubsystem):
-    name = "go-pkg-debug"
-    help = "Resolve a Go package and display its metadata"
-
-
-class GoPkgDebugGoal(Goal):
-    subsystem_cls = GoPkgDebugSubsystem
-
-
-@goal_rule
-async def run_go_pkg_debug(targets: UnexpandedTargets, console: Console) -> GoPkgDebugGoal:
-    first_party_package_targets = [tgt for tgt in targets if is_first_party_package_target(tgt)]
-    first_party_requests = [
-        Get(ResolvedGoPackage, ResolveGoPackageRequest(address=tgt.address))
-        for tgt in first_party_package_targets
-    ]
-
-    third_party_package_targets = [tgt for tgt in targets if is_third_party_package_target(tgt)]
-    third_party_requests = [
-        Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=tgt.address))
-        for tgt in third_party_package_targets
-    ]
-
-    resolved_packages = await MultiGet([*first_party_requests, *third_party_requests])  # type: ignore
-    for package in resolved_packages:
-        console.write_stdout(str(package) + "\n")
-
-    return GoPkgDebugGoal(exit_code=0)
 
 
 def rules():
