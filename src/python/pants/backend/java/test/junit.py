@@ -21,7 +21,6 @@ from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
-    Coordinates,
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
     MaterializedClasspath,
