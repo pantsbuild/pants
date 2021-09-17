@@ -6,7 +6,14 @@ from pants.backend.go import target_types as go_target_types
 from pants.backend.go.goals import custom_goals, package_binary, tailor
 from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
-from pants.backend.go.util_rules import build_go_pkg, go_mod, go_pkg, import_analysis, sdk
+from pants.backend.go.util_rules import (
+    build_go_pkg,
+    external_module,
+    go_mod,
+    go_pkg,
+    import_analysis,
+    sdk,
+)
 
 
 def target_types():
@@ -16,6 +23,7 @@ def target_types():
 def rules():
     return [
         *build_go_pkg.rules(),
+        *external_module.rules(),
         *golang.rules(),
         *go_target_types.rules(),
         *import_analysis.rules(),
