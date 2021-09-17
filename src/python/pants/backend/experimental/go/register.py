@@ -1,12 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.go import build, import_analysis, module, pkg, tailor, target_type_rules
+from pants.backend.go import build, module, pkg, tailor, target_type_rules
 from pants.backend.go import target_types as go_target_types
 from pants.backend.go.goals import custom_goals
 from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
-from pants.backend.go.util_rules import sdk
+from pants.backend.go.util_rules import import_analysis, sdk
 
 
 def target_types():
