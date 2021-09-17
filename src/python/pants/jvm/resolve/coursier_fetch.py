@@ -26,7 +26,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.target_types import JvmLockfileSources, MavenRequirementsField
+from pants.jvm.target_types import JvmLockfileSources, JvmRequirementsField
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -79,7 +79,7 @@ class Coordinate:
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
-    """An ordered list of Coordinate."""
+    """An ordered list of `Coordinate`s."""
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
@@ -89,7 +89,7 @@ class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
     @classmethod
     def create_from_maven_coordinates_fields(
         cls,
-        fields: Iterable[MavenRequirementsField],
+        fields: Iterable[JvmRequirementsField],
         *,
         additional_requirements: Iterable[Coordinate] = (),
     ) -> ArtifactRequirements:
