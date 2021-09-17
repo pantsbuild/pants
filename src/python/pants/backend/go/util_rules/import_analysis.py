@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 if TYPE_CHECKING:
-    from pants.backend.go.build import BuiltGoPackage
+    from pants.backend.go.util_rules.build_go_pkg import BuiltGoPackage
 
 
 logger = logging.getLogger(__name__)

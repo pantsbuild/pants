@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.go.build import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
 from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.util_rules.go_pkg import (
