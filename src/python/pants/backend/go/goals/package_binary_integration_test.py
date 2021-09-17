@@ -8,7 +8,8 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import build, module, pkg, target_type_rules
-from pants.backend.go.build import GoBinaryFieldSet
+from pants.backend.go.goals import package_binary
+from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.backend.go.util_rules import import_analysis, sdk
 from pants.build_graph.address import Address
@@ -27,6 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
+            *package_binary.rules(),
             *build.rules(),
             *pkg.rules(),
             *module.rules(),
