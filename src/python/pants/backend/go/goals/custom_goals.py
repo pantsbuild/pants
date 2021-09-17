@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 
 from pants.backend.go.build import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.module import ResolvedGoModule, ResolveGoModuleRequest
 from pants.backend.go.pkg import (
     ResolvedGoPackage,
     ResolveExternalGoPackageRequest,
@@ -15,6 +14,7 @@ from pants.backend.go.pkg import (
     is_third_party_package_target,
 )
 from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem

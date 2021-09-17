@@ -8,12 +8,6 @@ from dataclasses import dataclass
 
 import ijson
 
-from pants.backend.go.module import (
-    FindNearestGoModuleRequest,
-    ResolvedGoModule,
-    ResolvedOwningGoModule,
-    ResolveGoModuleRequest,
-)
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
@@ -26,6 +20,12 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
     DownloadExternalModuleRequest,
+)
+from pants.backend.go.util_rules.go_mod import (
+    FindNearestGoModuleRequest,
+    ResolvedGoModule,
+    ResolvedOwningGoModule,
+    ResolveGoModuleRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address

@@ -7,7 +7,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.go import pkg
-from pants.backend.go.module import FindNearestGoModuleRequest, ResolvedOwningGoModule
 from pants.backend.go.pkg import (
     ResolvedGoPackage,
     ResolveExternalGoPackageRequest,
@@ -20,6 +19,7 @@ from pants.backend.go.target_types import (
     GoPackageSources,
 )
 from pants.backend.go.util_rules import import_analysis
+from pants.backend.go.util_rules.go_mod import FindNearestGoModuleRequest, ResolvedOwningGoModule
 from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.base.specs import (
     AddressSpecs,
