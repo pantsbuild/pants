@@ -163,7 +163,7 @@ async def infer_go_dependencies(
                 f"in go_package at address '{this_go_package.address}'."
             )
 
-    return InferredDependencies(inferred_dependencies, sibling_dependencies_inferrable=False)
+    return InferredDependencies(inferred_dependencies)
 
 
 class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):

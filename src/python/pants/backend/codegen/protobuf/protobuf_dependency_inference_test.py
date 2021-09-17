@@ -170,13 +170,11 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             Address("src/protos/tests", relative_file_path="f.proto"),
             Address("src/protos/project", relative_file_path="f1.proto"),
         ],
-        sibling_dependencies_inferrable=True,
     )
 
     file_address = Address("src/protos/project", relative_file_path="f1.proto")
     assert run_dep_inference(file_address) == InferredDependencies(
-        [Address("src/protos/tests", relative_file_path="f.proto")],
-        sibling_dependencies_inferrable=True,
+        [Address("src/protos/tests", relative_file_path="f.proto")]
     )
 
     caplog.clear()
@@ -187,8 +185,7 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             Address(
                 "src/protos/ambiguous", target_name="dep1", relative_file_path="disambiguated.proto"
             )
-        ],
-        sibling_dependencies_inferrable=True,
+        ]
     )
     assert len(caplog.records) == 1
     assert "The target src/protos/ambiguous:main imports `ambiguous/dep.proto`" in caplog.text

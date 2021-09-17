@@ -443,13 +443,18 @@ def test_generate_file_level_targets() -> None:
         core_fields = (Dependencies, Tags, Sources)
 
     def generate(
-        generator: Target, files: List[str], *, use_generated_addr_syntax: bool = False
+        generator: Target,
+        files: List[str],
+        *,
+        add_dependencies_on_all_siblings: bool = False,
+        use_generated_addr_syntax: bool = False,
     ) -> GeneratedTargets:
         return generate_file_level_targets(
             MockGenerated,
             generator,
             files,
             None,
+            add_dependencies_on_all_siblings=add_dependencies_on_all_siblings,
             use_generated_address_syntax=use_generated_addr_syntax,
         )
 
@@ -463,6 +468,29 @@ def test_generate_file_level_targets() -> None:
             ),
             MockGenerated(
                 {Sources.alias: ["f2.ext"], Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f2.ext"),
+            ),
+        ],
+    )
+    assert generate(
+        tgt, ["demo/f1.ext", "demo/f2.ext"], add_dependencies_on_all_siblings=True
+    ) == GeneratedTargets(
+        tgt,
+        [
+            MockGenerated(
+                {
+                    Sources.alias: ["f1.ext"],
+                    Dependencies.alias: ["demo/f2.ext"],
+                    Tags.alias: ["tag"],
+                },
+                Address("demo", relative_file_path="f1.ext"),
+            ),
+            MockGenerated(
+                {
+                    Sources.alias: ["f2.ext"],
+                    Dependencies.alias: ["demo/f1.ext"],
+                    Tags.alias: ["tag"],
+                },
                 Address("demo", relative_file_path="f2.ext"),
             ),
         ],
