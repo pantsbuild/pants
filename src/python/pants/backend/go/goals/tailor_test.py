@@ -5,12 +5,12 @@ import textwrap
 import pytest
 
 from pants.backend.go import module, target_type_rules
-from pants.backend.go.tailor import (
+from pants.backend.go.goals.tailor import (
     PutativeGoExternalModuleTargetsRequest,
     PutativeGoModuleTargetsRequest,
     PutativeGoPackageTargetsRequest,
 )
-from pants.backend.go.tailor import rules as go_tailor_rules
+from pants.backend.go.goals.tailor import rules as go_tailor_rules
 from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoPackage
 from pants.backend.go.util_rules import sdk
 from pants.core.goals.tailor import (
