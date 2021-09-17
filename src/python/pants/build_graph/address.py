@@ -12,9 +12,9 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
-# `:` is used as a delimiter already. Others are reserved for possible future needs.
-BANNED_CHARS_IN_TARGET_NAME = frozenset(r":!@?/\=")
-BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":!@?=")
+# `:` and `#` used as delimiters already. Others are reserved for possible future needs.
+BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
+BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":#!@?=")
 
 
 class InvalidSpecPath(ValueError):
