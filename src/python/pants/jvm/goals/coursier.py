@@ -21,7 +21,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import InvalidTargetException, Sources, Target, Targets, UnexpandedTargets
+from pants.engine.target import InvalidTargetException, Sources, Target, Targets
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -85,7 +85,7 @@ async def gather_artifact_requirements(
     requirements_addresses = await Get(
         Addresses, UnparsedAddressInputs, request.requirements.to_unparsed_address_inputs()
     )
-    requirements_targets = await Get(UnexpandedTargets, Addresses, requirements_addresses)
+    requirements_targets = await Get(Targets, Addresses, requirements_addresses)
 
     return ArtifactRequirements(from_target(tgt) for tgt in requirements_targets)
 

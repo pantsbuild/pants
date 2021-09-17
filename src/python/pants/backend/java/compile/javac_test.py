@@ -24,7 +24,6 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import DigestContents, FileDigest
-from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.goals.coursier import rules as coursier_rules
@@ -54,7 +53,6 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *javac_binary_rules(),
             *target_types_rules(),
-            *fs_rules(),
             *coursier_rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
