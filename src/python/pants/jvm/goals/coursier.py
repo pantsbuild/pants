@@ -21,7 +21,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import Sources, Target, Targets, UnexpandedTargets
+from pants.engine.target import InvalidTargetException, Sources, Target, Targets, UnexpandedTargets
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -60,15 +60,21 @@ async def gather_artifact_requirements(
     def from_target(tgt: Target) -> Coordinate:
         group = tgt[JvmArtifactGroupField].value
         if not group:
-            raise ValueError("A group field must not be blank.")
+            raise InvalidTargetException(
+                f"The `group` field of {tgt.alias} target {tgt.address} must be set."
+            )
 
         artifact = tgt[JvmArtifactArtifactField].value
         if not artifact:
-            raise ValueError("A artifact field must not be blank.")
+            raise InvalidTargetException(
+                f"The `artifact` field of {tgt.alias} target {tgt.address} must be set."
+            )
 
         version = tgt[JvmArtifactVersionField].value
         if not version:
-            raise ValueError("A version field must not be blank.")
+            raise InvalidTargetException(
+                f"The `version` field of {tgt.alias} target {tgt.address} must be set."
+            )
 
         return Coordinate(
             group=group,
