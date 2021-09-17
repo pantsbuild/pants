@@ -10,8 +10,8 @@ from typing import List, Optional
 
 import ijson
 
-from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

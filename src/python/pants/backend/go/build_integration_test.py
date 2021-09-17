@@ -7,9 +7,10 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go import build, import_analysis, module, pkg, sdk, target_type_rules
+from pants.backend.go import build, import_analysis, module, pkg, target_type_rules
 from pants.backend.go.build import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
+from pants.backend.go.util_rules import sdk
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import external_tool, source_files

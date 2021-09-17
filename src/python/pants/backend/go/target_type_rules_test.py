@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.go import module, pkg, sdk, target_type_rules
+from pants.backend.go import module, pkg, target_type_rules
 from pants.backend.go.target_type_rules import InferGoPackageDependenciesRequest
 from pants.backend.go.target_types import (
     GoExternalPackageTarget,
@@ -13,6 +13,7 @@ from pants.backend.go.target_types import (
     GoPackage,
     GoPackageSources,
 )
+from pants.backend.go.util_rules import sdk
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Addresses

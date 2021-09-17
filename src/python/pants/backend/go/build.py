@@ -17,13 +17,13 @@ from pants.backend.go.pkg import (
     is_first_party_package_target,
     is_third_party_package_target,
 )
-from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
     GoBinaryMainAddress,
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoPackageSources,
 )
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
     BuiltPackage,

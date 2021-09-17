@@ -16,7 +16,6 @@ from pants.backend.go.module import (
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
 )
-from pants.backend.go.sdk import GoSdkProcess
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
@@ -26,6 +25,7 @@ from pants.backend.go.target_types import (
     GoModuleSources,
     GoPackageSources,
 )
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
