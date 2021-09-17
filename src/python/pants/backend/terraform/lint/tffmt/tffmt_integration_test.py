@@ -97,7 +97,10 @@ def run_tffmt(
     *,
     skip: bool = False,
 ) -> Tuple[Sequence[LintResult], FmtResult]:
-    args = ["--backend-packages=pants.backend.experimental.terraform.lint.tffmt"]
+    args = [
+        "--backend-packages=pants.backend.experimental.terraform",
+        "--backend-packages=pants.backend.experimental.terraform.lint.tffmt",
+    ]
     if skip:
         args.append("--terraform-fmt-skip")
     rule_runner.set_options(args)

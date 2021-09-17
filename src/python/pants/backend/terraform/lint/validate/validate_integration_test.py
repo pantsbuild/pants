@@ -86,7 +86,10 @@ def run_terraform_validate(
     *,
     skip: bool = False,
 ) -> Sequence[LintResult]:
-    args = ["--backend-packages=pants.backend.experimental.terraform.lint.validate"]
+    args = [
+        "--backend-packages=pants.backend.experimental.terraform",
+        "--backend-packages=pants.backend.experimental.terraform.lint.validate",
+    ]
     if skip:
         args.append("--terraform-validate-skip")
     rule_runner.set_options(args)
