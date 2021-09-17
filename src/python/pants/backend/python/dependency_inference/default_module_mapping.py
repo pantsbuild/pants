@@ -8,6 +8,7 @@ DEFAULT_MODULE_MAPPING = {
     "apache-airflow": ("airflow",),
     "attrs": ("attr",),
     "beautifulsoup4": ("bs4",),
+    "bitvector": ("BitVector",),
     "django-cors-headers": ("corsheaders",),
     "django-debug-toolbar": ("debug_toolbar",),
     "django-filter": ("django_filters",),
