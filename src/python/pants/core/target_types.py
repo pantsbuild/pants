@@ -73,8 +73,7 @@ async def generate_targets_from_files(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: Set to `False`!
-        add_dependencies_on_all_siblings=True,
+        add_dependencies_on_all_siblings=False,
     )
 
 
@@ -239,8 +238,7 @@ async def generate_targets_from_resources(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: Set to `False`!
-        add_dependencies_on_all_siblings=True,
+        add_dependencies_on_all_siblings=False,
     )
 
 
