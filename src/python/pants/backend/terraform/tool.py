@@ -52,7 +52,7 @@ class TerraformProcess:
     output_files: tuple[str, ...] = ()
 
 
-@rule(level=LogLevel.DEBUG)
+@rule
 async def setup_terraform_process(request: TerraformProcess, terraform: TerraformTool) -> Process:
     downloaded_terraform = await Get(
         DownloadedExternalTool,
