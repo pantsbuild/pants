@@ -91,14 +91,28 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "spec", ["", "a:", "a::", "//", "//:", "//:@t", "//:!t", "//:?", "//:=", r"a:b\c", "a:b/c"]
+    "spec",
+    [
+        "",
+        "a:",
+        "a::",
+        "//",
+        "//:",
+        "//:@t",
+        "//:!t",
+        "//:?",
+        "//:=",
+        r"a:b\c",
+        "a:b/c",
+        "a:my#tgt#generated",
+    ],
 )
 def test_address_bad_target_component(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
         AddressInput.parse(spec).dir_to_address()
 
 
-@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen="])
+@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
 def test_address_generated_name(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
         AddressInput.parse(spec).dir_to_address()
