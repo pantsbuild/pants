@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.terraform.target_types import TerraformSources
 from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -109,6 +110,7 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
+        *tool_rules(),
         UnionRule(LintRequest, ValidateRequest),
         SubsystemRule(TerraformValidateSubsystem),
     ]

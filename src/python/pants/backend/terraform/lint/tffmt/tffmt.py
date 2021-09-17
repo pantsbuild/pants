@@ -10,6 +10,7 @@ from typing import Dict
 from pants.backend.terraform.lint.fmt import TerraformFmtRequest
 from pants.backend.terraform.target_types import TerraformSources
 from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool
@@ -173,5 +174,6 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
+        *tool_rules(),
         UnionRule(TerraformFmtRequest, TffmtRequest),
     ]
