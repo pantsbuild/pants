@@ -330,6 +330,11 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
+    "tasks_add_union",
+    py_fn!(py, tasks_add_union(a: PyTasks, b: PyType, c: Vec<PyType>)),
+  )?;
+  m.add(
+    py,
     "tasks_add_select",
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
@@ -1290,6 +1295,21 @@ fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) 
     let output = externs::type_for(output);
     let input = externs::type_for(input);
     tasks.add_get(output, input);
+    Ok(None)
+  })
+}
+
+fn tasks_add_union(
+  py: Python,
+  tasks_ptr: PyTasks,
+  output_type: PyType,
+  input_types: Vec<PyType>,
+) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.add_union(
+      externs::type_for(output_type),
+      input_types.into_iter().map(externs::type_for).collect(),
+    );
     Ok(None)
   })
 }

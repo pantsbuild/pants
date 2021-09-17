@@ -148,6 +148,9 @@ pub struct Task {
   pub engine_aware_return_type: bool,
   pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
+  // TODO: This is a preliminary implementation of #12934: we should overhaul naming to
+  // align Query and @union/Protocol as described there.
+  pub unions: Vec<Query<Rule>>,
   pub func: Function,
   pub cacheable: bool,
   pub display_info: DisplayInfo,
@@ -234,6 +237,7 @@ impl Tasks {
       engine_aware_return_type,
       clause: Vec::new(),
       gets: Vec::new(),
+      unions: Vec::new(),
       func,
       display_info: DisplayInfo { name, desc, level },
     });
@@ -246,6 +250,17 @@ impl Tasks {
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
       .push(Get { output, input });
+  }
+
+  pub fn add_union(&mut self, product: TypeId, params: Vec<TypeId>) {
+    let query = Query::new(product, params);
+    self.queries.insert(query.clone());
+    self
+      .preparing
+      .as_mut()
+      .expect("Must `begin()` a task creation before adding unions!")
+      .unions
+      .push(query);
   }
 
   pub fn add_select(&mut self, selector: TypeId) {
