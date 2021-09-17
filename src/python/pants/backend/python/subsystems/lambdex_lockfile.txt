@@ -4,10 +4,12 @@
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 1,
-#   "requirements_invalidation_digest": "b3766b556f0c70fe89e235378292cb1369830e316df7ab0d4861a7dd0755f856",
+#   "version": 2,
 #   "valid_for_interpreter_constraints": [
 #     "CPython<3.10,>=3.6"
+#   ],
+#   "generated_with_requirements": [
+#     "lambdex==0.1.6"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -15,6 +17,6 @@
 lambdex==0.1.6; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.6.0" and python_version < "3.10") \
     --hash=sha256:cb685b106617fbd1afd26d6e9472b2e0c99df8574c6d358aee4e6c13aeef8eb1 \
     --hash=sha256:6d1a95c8a31baa703edece8e36a705045b0203c7e886812c27a4dd945aa694e0
-pex==2.1.49; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "3.10" \
-    --hash=sha256:da3bb92e82906f805c9207d91f2688635028e3900cf1f4a6014c2aa95535d925 \
-    --hash=sha256:af536388eeede93111d8ef0af4a80cbb3d847c1a1470c6f34f3abe83deac1b91
+pex==2.1.50; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "3.10" \
+    --hash=sha256:fee2e419f3439afd370c2770c82d148a277a980ebd3ebe7b35c5f4d10ef03a57 \
+    --hash=sha256:c67365b26060452631c0083a0f5d50af3cba9287b84b2c157404c959cb4bb74d

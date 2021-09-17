@@ -17,6 +17,7 @@ from pants.backend.java.compile.javac import (
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaLibrary
+from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files
@@ -26,10 +27,10 @@ from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    MavenCoord,
-    MavenCoordinates,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -50,6 +51,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *util_rules(),
             *javac_binary_rules(),
+            *target_types_rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
@@ -621,10 +623,10 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     resolved_joda_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=MavenCoord(coord="joda-time:joda-time:2.10.10"),
+                coord=Coordinate(group="joda-time", artifact="joda-time", version="2.10.10"),
                 file_name="joda-time-2.10.10.jar",
-                direct_dependencies=MavenCoordinates([]),
-                dependencies=MavenCoordinates([]),
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
                 file_digest=FileDigest(
                     fingerprint="dd8e7c92185a678d1b7b933f31209b6203c8ffa91e9880475a1be0346b9617e3",
                     serialized_bytes_length=644419,

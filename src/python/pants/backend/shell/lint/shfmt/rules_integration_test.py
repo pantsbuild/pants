@@ -10,6 +10,7 @@ import pytest
 from pants.backend.shell.lint.shfmt.rules import ShfmtFieldSet, ShfmtRequest
 from pants.backend.shell.lint.shfmt.rules import rules as shfmt_rules
 from pants.backend.shell.target_types import ShellLibrary
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
@@ -28,6 +29,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *source_files.rules(),
+            *target_types_rules(),
             QueryRule(LintResults, [ShfmtRequest]),
             QueryRule(FmtResult, [ShfmtRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),

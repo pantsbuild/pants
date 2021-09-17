@@ -19,11 +19,12 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirements,
+    Coordinate,
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
-    MavenRequirements,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
@@ -56,14 +57,25 @@ async def run_junit_test(
         MaterializedClasspathRequest(
             prefix="__thirdpartycp",
             lockfiles=(lockfile,),
-            maven_requirements=(
-                MavenRequirements.create_from_maven_coordinates_fields(
-                    fields=(),
-                    additional_requirements=[
-                        "org.junit.platform:junit-platform-console:1.7.2",
-                        "org.junit.jupiter:junit-jupiter-engine:5.7.2",
-                        "org.junit.vintage:junit-vintage-engine:5.7.2",
-                    ],
+            artifact_requirements=(
+                ArtifactRequirements(
+                    [
+                        Coordinate(
+                            group="org.junit.platform",
+                            artifact="junit-platform-console",
+                            version="1.7.2",
+                        ),
+                        Coordinate(
+                            group="org.junit.jupiter",
+                            artifact="junit-jupiter-engine",
+                            version="5.7.2",
+                        ),
+                        Coordinate(
+                            group="org.junit.vintage",
+                            artifact="junit-vintage-engine",
+                            version="5.7.2",
+                        ),
+                    ]
                 ),
             ),
         ),
@@ -96,6 +108,12 @@ async def run_junit_test(
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
+            # TODO(12812): Make these options configurable by integration tests in `junit_test.py`.
+            # Remove these hard-coded options before general availability.
+            "--disable-ansi-colors",
+            "--details=flat",
+            "--details-theme=ascii",
+            # END TODO REMOVAL
             "--classpath",
             usercp_relpath,
             "--scan-class-path",

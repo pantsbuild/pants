@@ -68,9 +68,9 @@ class PythonInferSubsystem(Subsystem):
             default=False,
             type=bool,
             help=(
-                "Infer a target's dependencies on any __init__.py files existing for the packages "
+                "Infer a target's dependencies on any `__init__.py` files in the packages "
                 "it is located in (recursively upward in the directory structure).\n\nEven if this "
-                "is disabled, Pants will still include any ancestor __init__.py files, only they "
+                "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
                 "will not be 'proper' dependencies, e.g. they will not show up in "
                 "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
                 "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "

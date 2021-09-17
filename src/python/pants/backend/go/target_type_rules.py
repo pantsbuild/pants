@@ -15,7 +15,7 @@ from pants.backend.go.pkg import (
     ResolveGoPackageRequest,
 )
 from pants.backend.go.target_types import (
-    GoExtModPackageDependencies,
+    GoExternalPackageDependencies,
     GoImportPath,
     GoPackageDependencies,
     GoPackageSources,
@@ -64,7 +64,7 @@ async def inject_go_package_dependencies(
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
 @dataclass(frozen=True)
 class GoImportPathToPackageMapping:
-    # Maps import paths to the address of go_package or (more likely) _go_ext_mod_package targets.
+    # Maps import paths to the address of go_package or (more likely) go_external_package targets.
     mapping: FrozenDict[str, tuple[Address, ...]]
 
 
@@ -150,7 +150,7 @@ async def infer_go_dependencies(
             inferred_dependencies.append(first_party_import_path_to_address[import_path])
             continue
 
-        # Infer third-party dependencies on _go_ext_mod_package targets.
+        # Infer third-party dependencies on _go_external_package targets.
         candidate_third_party_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_third_party_packages) > 1:
             # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
@@ -170,12 +170,12 @@ async def infer_go_dependencies(
 
 
 class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoExtModPackageDependencies
+    inject_for = GoExternalPackageDependencies
 
 
-# TODO(12761): This duplicates first-party dependency inference but that other rule cannot operate on_go_ext_mod_package
-# targets since there is no sources field in a _go_ext_mod_package. Consider how to merge the inference/injection
-# rules into one. Maybe use a private Sources field?
+# TODO(#12761): This duplicates first-party dependency inference but that other rule cannot operate
+#  on _go_external_package targets since there is no sources field in a _go_external_package.
+#  Consider how to merge the inference/injection rules into one. Maybe use a private Sources field?
 @rule
 async def inject_go_external_package_dependencies(
     request: InjectGoExternalPackageDependenciesRequest,
@@ -194,7 +194,7 @@ async def inject_go_external_package_dependencies(
         if import_path in goroot_imports.import_path_mapping:
             continue
 
-        # Infer third-party dependencies on _go_ext_mod_package targets.
+        # Infer third-party dependencies on _go_external_package targets.
         candidate_third_party_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_third_party_packages) > 1:
             # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
@@ -207,7 +207,7 @@ async def inject_go_external_package_dependencies(
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in _go_ext_mod_package at address '{this_go_package.address}'."
+                f"in go_external_package at address '{this_go_package.address}'."
             )
 
     return InjectedDependencies(inferred_dependencies)

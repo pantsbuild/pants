@@ -4,7 +4,7 @@
 python_library(dependencies=[":lockfile"])
 resources(name="lockfile", sources=["lockfile.txt"])
 
-python_tests(name="subsystem_test", sources=["subsystem_test.py"])
+python_tests(name="subsystem_test", sources=["subsystem_test.py"], timeout=180)
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],

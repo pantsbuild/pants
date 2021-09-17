@@ -34,6 +34,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import (
     ancestor_files,
+    local_dists,
     pex,
     pex_cli,
     pex_environment,
@@ -61,6 +62,7 @@ def rules():
         *lockfile.rules(),
         *tailor.rules(),
         *ancestor_files.rules(),
+        *local_dists.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
         *pex.rules(),

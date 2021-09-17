@@ -160,3 +160,47 @@ def test_no_leak_pex_root_issues_12055() -> None:
         result = run_pants(args)
         result.assert_success()
         assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
+
+
+def test_local_dist() -> None:
+    sources = {
+        "foo/bar.py": "BAR = 'LOCAL DIST'",
+        "foo/setup.py": dedent(
+            """\
+            from setuptools import setup
+
+            # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
+            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
+            """
+        ),
+        "foo/main.py": "from foo.bar import BAR; print(BAR)",
+        "foo/BUILD": dedent(
+            """\
+            python_library(name="lib", sources=["bar.py", "setup.py"])
+
+            python_library(name="main_lib", sources=["main.py"])
+
+            python_distribution(
+                name="dist",
+                dependencies=[":lib"],
+                provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
+                setup_py_commands=["bdist_wheel",]
+            )
+
+            pex_binary(
+                name="bin",
+                entry_point="main.py",
+                # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
+                dependencies=[":main_lib", ":dist", "!!:lib"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}']",
+            "run",
+            f"{tmpdir}/foo/main.py",
+        ]
+        result = run_pants(args)
+        assert result.stdout == "LOCAL DIST\n"

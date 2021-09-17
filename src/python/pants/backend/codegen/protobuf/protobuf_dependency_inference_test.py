@@ -13,6 +13,7 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     parse_proto_imports,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
@@ -77,6 +78,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *stripped_source_files.rules(),
             *protobuf_dependency_inference.rules(),
+            *target_types_rules(),
             QueryRule(ProtobufMapping, []),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
         ],

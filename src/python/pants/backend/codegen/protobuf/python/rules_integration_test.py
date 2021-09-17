@@ -317,6 +317,7 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
         extra_args=[
             "--python-protobuf-mypy-plugin",
             "--mypy-protobuf-version=mypy-protobuf==1.24",
+            "--mypy-protobuf-extra-requirements=six==1.16.0",
             "--mypy-protobuf-lockfile=<none>",
         ],
         expected_files=[
