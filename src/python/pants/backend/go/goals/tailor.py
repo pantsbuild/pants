@@ -144,10 +144,11 @@ async def find_putative_go_external_module_targets(
             assert package.module_version
             assert package.import_path.startswith(package.module_path)
             subpath = package.import_path[len(package.module_path) :].replace("/", "_")
-            ext_mod_target_name = compute_go_external_module_target_name(
+            target_name = compute_go_external_module_target_name(
                 package.module_path, package.module_version
             )
-            target_name = f"{ext_mod_target_name}-{subpath}"
+            if subpath:
+                target_name += f"-{subpath}"
 
             putative_targets.append(
                 PutativeTarget.for_target_type(
@@ -156,6 +157,7 @@ async def find_putative_go_external_module_targets(
                     target_name,
                     [],
                     kwargs={
+                        "name": target_name,
                         "path": package.module_path,
                         "version": package.module_version,
                         "import_path": package.import_path,
