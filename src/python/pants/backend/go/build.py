@@ -8,12 +8,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import List, Optional
 
-from pants.backend.go.pkg import (
-    ResolvedGoPackage,
-    ResolveGoPackageRequest,
-    is_first_party_package_target,
-    is_third_party_package_target,
-)
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
@@ -23,6 +17,12 @@ from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
     DownloadExternalModuleRequest,
     ResolveExternalGoPackageRequest,
+)
+from pants.backend.go.util_rules.go_pkg import (
+    ResolvedGoPackage,
+    ResolveGoPackageRequest,
+    is_first_party_package_target,
+    is_third_party_package_target,
 )
 from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.backend.go.util_rules.sdk import GoSdkProcess

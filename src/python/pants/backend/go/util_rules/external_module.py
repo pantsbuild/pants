@@ -7,12 +7,12 @@ from dataclasses import dataclass
 
 import ijson
 
-from pants.backend.go.pkg import ResolvedGoPackage
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoExternalPackageImportPathField,
 )
+from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address

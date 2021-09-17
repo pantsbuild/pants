@@ -4,10 +4,9 @@ import textwrap
 
 import pytest
 
-from pants.backend.go import pkg
-from pants.backend.go.pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.target_types import GoModule, GoPackage
-from pants.backend.go.util_rules import go_mod, sdk
+from pants.backend.go.util_rules import go_mod, go_pkg, sdk
+from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
@@ -21,7 +20,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *go_mod.rules(),
-            *pkg.rules(),
+            *go_pkg.rules(),
             *sdk.rules(),
             QueryRule(ResolvedGoPackage, [ResolveGoPackageRequest]),
         ],
