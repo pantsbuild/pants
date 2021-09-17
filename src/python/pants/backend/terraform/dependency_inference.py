@@ -191,6 +191,8 @@ async def infer_terraform_module_dependencies(
     candidate_targets = await Get(
         Targets, AddressSpecs([MaybeEmptySiblingAddresses(path) for path in candidate_spec_paths])
     )
+    # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
+    # per directory.
     terraform_module_addresses = [
         tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSources)
     ]
