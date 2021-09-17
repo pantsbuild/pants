@@ -5,6 +5,7 @@ from typing import List, Sequence
 
 import pytest
 
+from pants.backend.terraform import tool
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.validate import validate
 from pants.backend.terraform.lint.validate.validate import ValidateFieldSet, ValidateRequest
@@ -26,6 +27,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *fmt.rules(),
             *validate.rules(),
+            *tool.rules(),
             *source_files.rules(),
             QueryRule(LintResults, (ValidateRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
