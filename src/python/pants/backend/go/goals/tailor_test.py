@@ -138,12 +138,7 @@ def test_find_putative_go_external_module_targets(rule_runner: RuleRunner) -> No
         PutativeTargets,
         [
             PutativeGoExternalModuleTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(
-                [
-                    "src/go/go.mod",
-                    "src/go/go.sum",
-                ]
-            ),
+            AllOwnedSources(["src/go/go.mod", "src/go/go.sum"]),
         ],
     )
     assert putative_targets == PutativeTargets(
@@ -151,9 +146,10 @@ def test_find_putative_go_external_module_targets(rule_runner: RuleRunner) -> No
             PutativeTarget.for_target_type(
                 GoExternalPackageTarget,
                 "src/go",
-                "github.com_google_uuid_v1.2.0-",
+                "github.com_google_uuid_v1.2.0",
                 [],
                 kwargs={
+                    "name": "github.com_google_uuid_v1.2.0",
                     "path": "github.com/google/uuid",
                     "version": "v1.2.0",
                     "import_path": "github.com/google/uuid",
