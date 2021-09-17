@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import List, Optional
+from typing import Optional
 
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
@@ -24,18 +23,18 @@ from pants.backend.go.util_rules.go_pkg import (
     is_first_party_package_target,
     is_third_party_package_target,
 )
-from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
+from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -54,53 +53,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
 class BuiltGoPackage:
     import_path: str
     object_digest: Digest
-
-
-@dataclass(frozen=True)
-class GatherImportsRequest:
-    packages: FrozenOrderedSet[BuiltGoPackage]
-    include_stdlib: bool
-
-
-@dataclass(frozen=True)
-class GatheredImports:
-    digest: Digest
-
-
-@rule
-async def generate_import_config(
-    request: GatherImportsRequest, goroot_import_mappings: ResolvedImportPathsForGoLangDistribution
-) -> GatheredImports:
-    import_config_digests: dict[str, tuple[str, Digest]] = {}
-    for pkg in request.packages:
-        fp = pkg.object_digest.fingerprint
-        prefixed_digest = await Get(Digest, AddPrefix(pkg.object_digest, f"__pkgs__/{fp}"))
-        import_config_digests[pkg.import_path] = (fp, prefixed_digest)
-
-    pkg_digests: OrderedSet[Digest] = OrderedSet()
-
-    import_config: List[str] = ["# import config"]
-    for import_path, (fp, digest) in import_config_digests.items():
-        pkg_digests.add(digest)
-        import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
-
-    if request.include_stdlib:
-        for stdlib_pkg_importpath, stdlib_pkg in goroot_import_mappings.import_path_mapping.items():
-            pkg_digests.add(stdlib_pkg.digest)
-            import_config.append(
-                f"packagefile {stdlib_pkg_importpath}={os.path.normpath(stdlib_pkg.path)}"
-            )
-
-    import_config_content = "\n".join(import_config).encode("utf-8")
-
-    import_config_digest = await Get(
-        Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
-    )
-    pkg_digests.add(import_config_digest)
-
-    digest = await Get(Digest, MergeDigests(pkg_digests))
-
-    return GatheredImports(digest=digest)
 
 
 @rule
