@@ -25,6 +25,12 @@ from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import RuleRunner
 
+HAMCREST_COORD = Coordinate(
+    group="org.hamcrest",
+    artifact="hamcrest-core",
+    version="1.3",
+)
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -64,7 +70,7 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -85,7 +91,7 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -141,7 +147,7 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -180,7 +186,7 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+                coord=HAMCREST_COORD,
                 file_name="hamcrest-core-1.3.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),

@@ -76,17 +76,21 @@ def rule_runner() -> RuleRunner:
 JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=Coordinate(coord="junit:junit:4.13.2"),
+            coord=Coordinate(group="junit", artifact="junit", version="4.13.2"),
             file_name="junit-4.13.2.jar",
-            direct_dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
-            dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
+            direct_dependencies=Coordinates(
+                [Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3")]
+            ),
+            dependencies=Coordinates(
+                [Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3")]
+            ),
             file_digest=FileDigest(
                 fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                 serialized_bytes_length=384581,
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+            coord=Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),
             file_name="hamcrest-core-1.3.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -296,7 +300,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
+            coord=Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"),
             file_name="apiguardian-api-1.1.0.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -306,20 +310,34 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.junit.jupiter:junit-jupiter-api:5.7.2"),
+            coord=Coordinate(
+                group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2"
+            ),
             file_name="junit-jupiter-api-5.7.2.jar",
             direct_dependencies=Coordinates(
                 [
-                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(
+                        group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"
+                    ),
+                    Coordinate(
+                        group="org.junit.platform",
+                        artifact="junit-platform-commons",
+                        version="1.7.2",
+                    ),
+                    Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
                 ]
             ),
             dependencies=Coordinates(
                 [
-                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(
+                        group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"
+                    ),
+                    Coordinate(
+                        group="org.junit.platform",
+                        artifact="junit-platform-commons",
+                        version="1.7.2",
+                    ),
+                    Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
                 ]
             ),
             file_digest=FileDigest(
@@ -328,19 +346,23 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
+            coord=Coordinate(
+                group="org.junit.platform", artifact="junit-platform-commons", version="1.7.2"
+            ),
             file_name="junit-platform-commons-1.7.2.jar",
             direct_dependencies=Coordinates(
-                [Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]
+                [Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0")]
             ),
-            dependencies=Coordinates([Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]),
+            dependencies=Coordinates(
+                [Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0")]
+            ),
             file_digest=FileDigest(
                 fingerprint="738d0df021a0611fff5d277634e890cc91858fa72227cf0bcf36232a7caf014c",
                 serialized_bytes_length=100008,
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+            coord=Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
             file_name="opentest4j-1.2.0.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -370,8 +392,8 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
                 )
 
                 junit_tests(
-                    name='example-test',
-                    dependencies= [':lockfile'],
+                    name = 'example-test',
+                    dependencies = [':lockfile'],
                 )
                 """
             ),
@@ -476,7 +498,9 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['org.junit.jupiter:junit-jupiter-api:5.7.2'],
+                    maven_requirements = [
+                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    ],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -608,6 +632,8 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         ],
     )
     assert test_result.exit_code == 0
+    # TODO: Once support for parsing junit.xml is implemented, use that to determine status so we can remove the
+    #  hack to use ASCII test output in the `run_junit_test` rule.
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None

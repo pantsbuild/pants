@@ -15,7 +15,7 @@ from pants.backend.go.pkg import (
     ResolveGoPackageRequest,
 )
 from pants.backend.go.target_types import (
-    GoExtModPackageDependencies,
+    GoExternalPackageDependencies,
     GoImportPath,
     GoPackageDependencies,
     GoPackageSources,
@@ -170,12 +170,12 @@ async def infer_go_dependencies(
 
 
 class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoExtModPackageDependencies
+    inject_for = GoExternalPackageDependencies
 
 
 # TODO(#12761): This duplicates first-party dependency inference but that other rule cannot operate
-#  _go_external_package targets since there is no sources field in a _go_external_package. Consider
-#  how to merge the inference/injection rules into one. Maybe use a private Sources field?
+#  on _go_external_package targets since there is no sources field in a _go_external_package.
+#  Consider how to merge the inference/injection rules into one. Maybe use a private Sources field?
 @rule
 async def inject_go_external_package_dependencies(
     request: InjectGoExternalPackageDependenciesRequest,
