@@ -38,16 +38,12 @@ def rule_runner() -> RuleRunner:
 GOOD_SOURCE = FileContent(
     "good.tf",
     textwrap.dedent(
-        """\
-    locals {
-      foo = "xyzzy"
-    }
-
-    resource "test_instance" "default" {
-      key        = "value-${local.foo}"
-      longer_key = "bar"
-    }
-    """
+        """
+        locals {
+          good_base = "xyzzy"
+          foo       = "${local.good_base}"
+        }
+        """
     ).encode("utf-8"),
 )
 
@@ -55,15 +51,12 @@ GOOD_SOURCE = FileContent(
 BAD_SOURCE = FileContent(
     "bad.tf",
     textwrap.dedent(
-        """\
-    locals {
-      foo = "xyzzy"
-    }
-
-    resource "test_instance" "default" {
-      key = "${local.foo}"
-    }
-    """
+        """
+        locals {
+          bad_base = "xyzzy"
+          bar = "${bad_base}"
+        }
+        """
     ).encode("utf-8"),
 )
 
@@ -71,12 +64,11 @@ BAD_SOURCE = FileContent(
 def make_target(
     rule_runner: RuleRunner, source_files: List[FileContent], *, target_name="target"
 ) -> Target:
-    for source_file in source_files:
-        rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
-    rule_runner.add_to_build_file(
-        "",
-        f"terraform_module(name='{target_name}')\n",
-    )
+    files = {
+        "BUILD": f"terraform_module(name='{target_name}')\n",
+    }
+    files.update({source_file.path: source_file.content.decode() for source_file in source_files})
+    rule_runner.write_files(files)
     return rule_runner.get_target(Address("", target_name=target_name))
 
 
@@ -106,7 +98,6 @@ def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Dige
     return rule_runner.request(Digest, [CreateDigest(source_files)])
 
 
-@pytest.mark.xfail(reason="have to deal with terraform init", strict=True)
 def test_passing_source(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE])
     lint_results = run_terraform_validate(rule_runner, [target])
@@ -120,7 +111,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     lint_results = run_terraform_validate(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stdout
+    assert "bad.tf" in lint_results[0].stderr
 
 
 def test_mixed_sources(rule_runner: RuleRunner) -> None:
@@ -128,8 +119,8 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     lint_results = run_terraform_validate(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stdout
-    assert "good.tf" not in lint_results[0].stdout
+    assert "bad.tf" in lint_results[0].stderr
+    assert "good.tf" not in lint_results[0].stderr
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -140,8 +131,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     lint_results = run_terraform_validate(rule_runner, targets)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stdout
-    assert "good.tf" not in lint_results[0].stdout
+    assert "bad.tf" in lint_results[0].stderr
+    assert "good.tf" not in lint_results[0].stderr
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
