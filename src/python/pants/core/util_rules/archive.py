@@ -104,6 +104,34 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+# TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
+class _ZipBinaryRequest:
+    pass
+
+
+class _UnzipBinaryRequest:
+    pass
+
+
+class _TarBinaryRequest:
+    pass
+
+
+@rule
+async def find_zip_wrapper(_: _ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
+    return zip_binary
+
+
+@rule
+async def find_unzip_wrapper(_: _UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
+    return unzip_binary
+
+
+@rule
+async def find_tar_wrapper(_: _TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
+    return tar_binary
+
+
 # -----------------------------------------------------------------------------------------------
 # Create archives
 # -----------------------------------------------------------------------------------------------
@@ -122,14 +150,14 @@ class CreateArchive:
 
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
-async def create_archive(
-    request: CreateArchive, tar_binary: TarBinary, zip_binary: ZipBinary
-) -> Digest:
+async def create_archive(request: CreateArchive) -> Digest:
     if request.format == ArchiveFormat.ZIP:
+        zip_binary = await Get(ZipBinary, _ZipBinaryRequest())
         argv = zip_binary.create_archive_argv(request)
         env = {}
         input_digest = request.snapshot.digest
     else:
+        tar_binary = await Get(TarBinary, _TarBinaryRequest())
         argv = tar_binary.create_archive_argv(request)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
@@ -166,9 +194,7 @@ class ExtractedArchive:
 
 
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(
-    digest: Digest, tar_binary: TarBinary, unzip_binary: UnzipBinary
-) -> ExtractedArchive:
+async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
@@ -178,18 +204,29 @@ async def maybe_extract_archive(
     if len(snapshot.files) != 1:
         return ExtractedArchive(digest)
 
-    input_digest = await Get(Digest, MergeDigests((digest, output_dir_digest)))
     fp = snapshot.files[0]
+    is_zip = fp.endswith(".zip")
+    is_tar = fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"))
+    if not is_zip and not is_tar:
+        return ExtractedArchive(digest)
+
+    merge_digest_get = Get(Digest, MergeDigests((digest, output_dir_digest)))
     archive_path = f"../{fp}"
-    if fp.endswith(".zip"):
+    if is_zip:
+        input_digest, unzip_binary = await MultiGet(
+            merge_digest_get,
+            Get(UnzipBinary, _UnzipBinaryRequest()),
+        )
         argv = unzip_binary.extract_archive_argv(archive_path)
         env = {}
-    elif fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
+    else:
+        input_digest, tar_binary = await MultiGet(
+            merge_digest_get,
+            Get(TarBinary, _TarBinaryRequest()),
+        )
         argv = tar_binary.extract_archive_argv(archive_path)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
-    else:
-        return ExtractedArchive(digest)
 
     result = await Get(
         ProcessResult,
