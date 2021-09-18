@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import Dict, cast
+from typing import cast
 
-from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTargets
+from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.target import DescriptionField, ProvidesField, Targets
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +48,8 @@ class List(Goal):
 
 
 @goal_rule
-async def list_targets(
-    addresses: Addresses, list_subsystem: ListSubsystem, console: Console
-) -> List:
-    if not addresses:
+async def list_targets(targets: Targets, list_subsystem: ListSubsystem, console: Console) -> List:
+    if not targets:
         logger.warning(f"No targets were matched in goal `{list_subsystem.name}`.")
         return List(exit_code=0)
 
@@ -63,7 +60,6 @@ async def list_targets(
         )
 
     if list_subsystem.provides:
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_provide_artifacts = {
             tgt.address: tgt[ProvidesField].value
             for tgt in targets
@@ -75,15 +71,11 @@ async def list_targets(
         return List(exit_code=0)
 
     if list_subsystem.documented:
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
-        addresses_with_descriptions = cast(
-            Dict[Address, str],
-            {
-                tgt.address: tgt[DescriptionField].value
-                for tgt in targets
-                if tgt.get(DescriptionField).value is not None
-            },
-        )
+        addresses_with_descriptions = {
+            tgt.address: tgt[DescriptionField].value
+            for tgt in targets
+            if tgt.get(DescriptionField).value is not None
+        }
         with list_subsystem.line_oriented(console) as print_stdout:
             for address, description in addresses_with_descriptions.items():
                 formatted_description = "\n  ".join(description.strip().split("\n"))
@@ -91,8 +83,8 @@ async def list_targets(
         return List(exit_code=0)
 
     with list_subsystem.line_oriented(console) as print_stdout:
-        for address in sorted(addresses):
-            print_stdout(address.spec)
+        for tgt in sorted(targets, key=lambda t: t.address):
+            print_stdout(tgt.address.spec)
     return List(exit_code=0)
 
 
