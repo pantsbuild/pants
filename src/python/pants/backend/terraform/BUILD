@@ -5,7 +5,7 @@ python_library(dependencies=[":lockfile"])
 
 resources(name="lockfile", sources=["hcl2_lockfile.txt"])
 
-python_tests(name='tests', sources=["!dependency_inference_test.py"])
+python_tests(name='tests', sources=["*_test.py", "!dependency_inference_test.py"])
 python_tests(
   name="dependency_inference_test",
   sources=["dependency_inference_test.py"],
