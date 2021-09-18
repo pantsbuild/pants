@@ -36,7 +36,7 @@ class BanditFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBanditField).value
+        return tgt.get(SkipBanditField).value or not tgt.address.is_file_target
 
 
 class Bandit(PythonToolBase):

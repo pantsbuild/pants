@@ -30,7 +30,7 @@ class ShfmtFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipShfmtField).value
+        return tgt.get(SkipShfmtField).value or not tgt.address.is_file_target
 
 
 class ShfmtRequest(ShellFmtRequest, LintRequest):

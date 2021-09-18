@@ -54,7 +54,7 @@ class PylintFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipPylintField).value
+        return tgt.get(SkipPylintField).value or not tgt.address.is_file_target
 
 
 # --------------------------------------------------------------------------------------

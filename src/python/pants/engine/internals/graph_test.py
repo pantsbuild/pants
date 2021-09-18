@@ -337,11 +337,11 @@ def test_transitive_targets_tolerates_generated_target_cycles(
         [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
-    assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
+    assert result.roots[0].address == Address("", target_name="t2")
     assert [tgt.address for tgt in result.dependencies] == [
         Address("", relative_file_path="t1.txt", target_name="t1"),
-        Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
 
@@ -656,6 +656,7 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
         owners_rule_runner,
         ["demo/f.txt"],
         expected={
+            Address("demo", target_name="generator"),
             Address("demo", target_name="generator", relative_file_path="f.txt"),
             Address("demo", target_name="not-generator"),
         },
@@ -667,8 +668,8 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
         owners_rule_runner,
         ["demo/f.txt", "demo/deleted.txt"],
         expected={
-            Address("demo", target_name="generator", relative_file_path="f.txt"),
             Address("demo", target_name="generator"),
+            Address("demo", target_name="generator", relative_file_path="f.txt"),
             Address("demo", target_name="not-generator"),
             Address("demo", target_name="secondary"),
         },
@@ -695,6 +696,7 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
         owners_rule_runner,
         ["demo/f1.txt"],
         expected={
+            Address("demo", target_name="generator-all"),
             Address("demo", target_name="generator-all", relative_file_path="f1.txt"),
             Address("demo", target_name="not-generator-all"),
             Address("demo", target_name="secondary"),
@@ -704,8 +706,10 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
         owners_rule_runner,
         ["demo/f2.txt"],
         expected={
+            Address("demo", target_name="generator-all"),
             Address("demo", target_name="generator-all", relative_file_path="f2.txt"),
             Address("demo", target_name="not-generator-all"),
+            Address("demo", target_name="generator-f2"),
             Address("demo", target_name="generator-f2", relative_file_path="f2.txt"),
             Address("demo", target_name="not-generator-f2"),
         },
@@ -723,7 +727,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
                 target(name='f1', sources=['f1.txt'])
                 target(name='f2_first', sources=['f2.txt'])
                 target(name='f2_second', sources=['f2.txt'])
-                generator(name='generated', sources=['*.txt'])
+                generator(name='generator', sources=['*.txt'])
                 secondary_owner(name='secondary', secondary_owner_field='f1.txt')
                 """
             ),
@@ -737,8 +741,9 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", target_name="f2_first"),
             Address("demo", target_name="f2_second"),
             Address("demo", target_name="secondary"),
-            Address("demo", target_name="generated", relative_file_path="f1.txt"),
-            Address("demo", target_name="generated", relative_file_path="f2.txt"),
+            Address("demo", target_name="generator"),
+            Address("demo", target_name="generator", relative_file_path="f1.txt"),
+            Address("demo", target_name="generator", relative_file_path="f2.txt"),
         },
     )
 
@@ -778,6 +783,7 @@ def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
         }
     )
     assert resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("demo/f1.txt")]) == [
+        Address("demo", target_name="generator"),
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
     ]
@@ -797,6 +803,7 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
         }
     )
     all_addresses = [
+        Address("demo", target_name="generator"),
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
         Address("demo", target_name="generator", relative_file_path="f2.txt"),
@@ -859,6 +866,7 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
 
     result = specs_rule_runner.request(Addresses, [specs])
     assert set(result) == {
+        Address("fs_spec"),
         Address("fs_spec", relative_file_path="f.txt"),
         Address("address_spec"),
         Address("multiple_files"),

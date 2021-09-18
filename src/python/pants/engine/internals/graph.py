@@ -151,34 +151,30 @@ async def resolve_target(
 
 @rule
 async def resolve_targets(
-    targets: UnexpandedTargets,
+    unexpanded_targets: UnexpandedTargets,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> Targets:
-    # Replace all generating targets with what it generates. Otherwise, keep it. If a target
-    # generator does not generate any targets, keep the target generator.
-    expanded_targets: OrderedSet[Target] = OrderedSet()
-    generator_targets = []
+    # Apply all target generators.
+    result: OrderedSet[Target] = OrderedSet()
     generate_gets = []
-    for tgt in targets:
+    for tgt in unexpanded_targets:
+        result.add(tgt)
         if (
             target_types_to_generate_requests.is_generator(tgt)
             and not tgt.address.is_generated_target
         ):
-            generator_targets.append(tgt)
             generate_request = target_types_to_generate_requests[type(tgt)]
             generate_gets.append(
                 Get(GeneratedTargets, GenerateTargetsRequest, generate_request(tgt))
             )
-        else:
-            expanded_targets.add(tgt)
 
     all_generated_targets = await MultiGet(generate_gets)
-    expanded_targets.update(
-        tgt
-        for generator, generated_targets in zip(generator_targets, all_generated_targets)
-        for tgt in (generated_targets.values() if generated_targets else {generator})
+    result.update(
+        itertools.chain.from_iterable(
+            generated_targets.values() for generated_targets in all_generated_targets
+        )
     )
-    return Targets(expanded_targets)
+    return Targets(result)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -273,11 +269,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
     improved performance / concurrency.
     """
-    roots_as_targets: Collection[Target]
-    if request.expanded_targets:
-        roots_as_targets = await Get(Targets, Addresses(request.tt_request.roots))
-    else:
-        roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
+    roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
@@ -418,61 +410,37 @@ class Owners(Collection[Address]):
 
 @rule(desc="Find which targets own certain files")
 async def find_owners(owners_request: OwnersRequest) -> Owners:
-    # Determine which of the sources are live and which are deleted.
-    sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
-
-    live_files = FrozenOrderedSet(sources_paths.files)
-    deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
-    live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
-    deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
+    sources = FrozenOrderedSet(owners_request.sources)
+    dirs = FrozenOrderedSet(os.path.dirname(s) for s in sources)
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-    # For live files, we use ExpandedTargets, which causes more precise, often file-level, targets
-    # to be created. For deleted files we use UnexpandedTargets, which have the original declared
-    # glob.
-    live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
-    deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        Get(Targets, AddressSpecs(live_candidate_specs)),
-        Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs)),
-    )
+    candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs)
+    candidate_tgts = await Get(Targets, AddressSpecs(candidate_specs))
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
-    unmatched_sources = set(owners_request.sources)
-    for live in (True, False):
-        candidate_tgts: Sequence[Target]
-        if live:
-            candidate_tgts = live_candidate_tgts
-            sources_set = live_files
-        else:
-            candidate_tgts = deleted_candidate_tgts
-            sources_set = deleted_files
+    unmatched_sources = set(sources)
 
-        build_file_addresses = await MultiGet(
-            Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_tgts
+    build_file_addresses = await MultiGet(
+        Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_tgts
+    )
+
+    for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
+        matching_files = set(matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources))
+        # Also consider secondary ownership, meaning it's not a `Sources` field with primary
+        # ownership, but the target still should match the file. We can't use `tgt.get()`
+        # because this is a mixin, and there technically may be >1 field.
+        secondary_owner_fields = tuple(
+            field  # type: ignore[misc]
+            for field in candidate_tgt.field_values.values()
+            if isinstance(field, SecondaryOwnerMixin)
         )
+        for secondary_owner_field in secondary_owner_fields:
+            matching_files.update(matches_filespec(secondary_owner_field.filespec, paths=sources))
+        if not matching_files and bfa.rel_path not in sources:
+            continue
 
-        for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
-            matching_files = set(
-                matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
-            )
-            # Also consider secondary ownership, meaning it's not a `Sources` field with primary
-            # ownership, but the target still should match the file. We can't use `tgt.get()`
-            # because this is a mixin, and there technically may be >1 field.
-            secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
-                for field in candidate_tgt.field_values.values()
-                if isinstance(field, SecondaryOwnerMixin)
-            )
-            for secondary_owner_field in secondary_owner_fields:
-                matching_files.update(
-                    matches_filespec(secondary_owner_field.filespec, paths=sources_set)
-                )
-            if not matching_files and bfa.rel_path not in sources_set:
-                continue
-
-            unmatched_sources -= matching_files
-            matching_addresses.add(candidate_tgt.address)
+        unmatched_sources -= matching_files
+        matching_addresses.add(candidate_tgt.address)
 
     if (
         unmatched_sources

@@ -36,7 +36,7 @@ class ShellcheckFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipShellcheckField).value
+        return tgt.get(SkipShellcheckField).value or not tgt.address.is_file_target
 
 
 class ShellcheckRequest(LintRequest):

@@ -31,7 +31,7 @@ class IsortFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipIsortField).value
+        return tgt.get(SkipIsortField).value or not tgt.address.is_file_target
 
 
 class IsortRequest(PythonFmtRequest, LintRequest):

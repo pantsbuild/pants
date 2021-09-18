@@ -47,7 +47,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Sources, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Sources, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -62,6 +62,10 @@ class Shunit2FieldSet(TestFieldSet):
     timeout: Shunit2TestsTimeout
     shell: Shunit2ShellField
     runtime_package_dependencies: RuntimePackageDependenciesField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return not tgt.address.is_file_target
 
 
 @dataclass(frozen=True)

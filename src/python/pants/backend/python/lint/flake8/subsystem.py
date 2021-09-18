@@ -36,7 +36,7 @@ class Flake8FieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipFlake8Field).value
+        return tgt.get(SkipFlake8Field).value or not tgt.address.is_file_target
 
 
 class Flake8(PythonToolBase):

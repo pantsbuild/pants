@@ -31,7 +31,7 @@ class YapfFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipYapfField).value
+        return tgt.get(SkipYapfField).value or not tgt.address.is_file_target
 
 
 class YapfRequest(PythonFmtRequest, LintRequest):

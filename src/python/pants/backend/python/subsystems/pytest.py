@@ -54,10 +54,10 @@ class PythonTestFieldSet(TestFieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
+        if not tgt.address.is_file_target:
+            return True
         if tgt.get(SkipPythonTestsField).value:
             return True
-        if not tgt.address.is_file_target:
-            return False
         file_name = PurePath(tgt.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 

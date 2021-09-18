@@ -34,7 +34,7 @@ class BlackFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBlackField).value
+        return tgt.get(SkipBlackField).value or not tgt.address.is_file_target
 
 
 class BlackRequest(PythonFmtRequest, LintRequest):

@@ -30,7 +30,7 @@ class DocformatterFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipDocformatterField).value
+        return tgt.get(SkipDocformatterField).value or not tgt.address.is_file_target
 
 
 class DocformatterRequest(PythonFmtRequest, LintRequest):

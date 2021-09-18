@@ -167,8 +167,10 @@ class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
 async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
+    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    python_targets = tuple(
+        tgt for tgt in all_targets if tgt.has_field(PythonSources) and tgt.address.is_file_target
+    )
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSources]))
         for tgt in python_targets
