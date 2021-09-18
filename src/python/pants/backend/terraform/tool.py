@@ -14,6 +14,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -42,6 +43,45 @@ class TerraformTool(TemplatedExternalTool):
         ]
 
 
+class TerraformSubsystem(Subsystem):
+    options_scope = "terraform"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--path",
+            type=str,
+            default=None,
+            help=(
+                "Use this provided absolute path as the path to the `terraform` binary. "
+                "Prevents the automatic download of Terraform.",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class TerraformSetup:
+    digest: Digest
+    path: str
+
+
+@rule
+async def find_terraform(
+    tf_tool: TerraformTool, tf_subsystem: TerraformSubsystem
+) -> TerraformSetup:
+    if tf_subsystem.options.path:
+        return TerraformSetup(digest=EMPTY_DIGEST, path=tf_subsystem.options.path)
+
+    downloaded_terraform = await Get(
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        tf_tool.get_request(Platform.current),
+    )
+
+    return TerraformSetup(digest=downloaded_terraform.digest, path="./terraform")
+
+
 @dataclass(frozen=True)
 class TerraformProcess:
     """A request to invoke Terraform."""
@@ -53,20 +93,16 @@ class TerraformProcess:
 
 
 @rule
-async def setup_terraform_process(request: TerraformProcess, terraform: TerraformTool) -> Process:
-    downloaded_terraform = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        terraform.get_request(Platform.current),
-    )
-
+async def setup_terraform_process(
+    request: TerraformProcess, terraform_setup: TerraformSetup
+) -> Process:
     input_digest = await Get(
         Digest,
-        MergeDigests((request.input_digest, downloaded_terraform.digest)),
+        MergeDigests((request.input_digest, terraform_setup.digest)),
     )
 
     return Process(
-        argv=("./terraform",) + request.args,
+        argv=(terraform_setup.path,) + request.args,
         input_digest=input_digest,
         output_files=request.output_files,
         description=request.description,
