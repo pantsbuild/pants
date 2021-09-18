@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.python.macros.pants_requirement import PantsRequirement
+from pants.backend.python.macros.pants_requirement_caof import PantsRequirementCAOF
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -20,7 +20,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[PythonRequirementTarget],
-        context_aware_object_factories={PantsRequirement.alias: PantsRequirement},
+        context_aware_object_factories={PantsRequirementCAOF.alias: PantsRequirementCAOF},
     )
 
 
