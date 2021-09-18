@@ -48,7 +48,7 @@ class MyPyFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipMyPyField).value
+        return tgt.get(SkipMyPyField).value and not tgt.address.is_file_target
 
 
 # --------------------------------------------------------------------------------------

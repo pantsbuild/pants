@@ -337,11 +337,11 @@ def test_transitive_targets_tolerates_generated_target_cycles(
         [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
-    assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
+    assert result.roots[0].address == Address("", target_name="t2")
     assert [tgt.address for tgt in result.dependencies] == [
         Address("", relative_file_path="t1.txt", target_name="t1"),
-        Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
 
