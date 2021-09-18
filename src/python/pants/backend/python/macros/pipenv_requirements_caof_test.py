@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
+from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.engine.addresses import Address
@@ -19,7 +19,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[PythonRequirementTarget, PythonRequirementsFile],
-        context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
+        context_aware_object_factories={"pipenv_requirements": PipenvRequirementsCAOF},
     )
 
 

@@ -356,7 +356,7 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     )
 
 
-class PoetryRequirements:
+class PoetryRequirementsCAOF:
     """Translates dependencies specified in a  pyproject.toml Poetry file to a set of
     "python_requirements_library" targets.
 
