@@ -139,7 +139,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     )
 
     caplog.clear()
-    assert run_dep_inference(Address("ambiguous", target_name="main", relative_file_path="main.sh")) == InferredDependencies(
+    assert run_dep_inference(
+        Address("ambiguous", target_name="main", relative_file_path="main.sh")
+    ) == InferredDependencies(
         [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")]
     )
     assert len(caplog.records) == 1
