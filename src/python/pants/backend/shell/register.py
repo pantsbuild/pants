@@ -2,12 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.shell import dependency_inference, shunit2_test_runner, tailor
-from pants.backend.shell.target_types import ShellLibrary, Shunit2Tests
+from pants.backend.shell.target_types import (
+    ShellSourcesGeneratorTarget,
+    Shunit2TestsGeneratorTarget,
+)
 from pants.backend.shell.target_types import rules as target_types_rules
 
 
 def target_types():
-    return [ShellLibrary, Shunit2Tests]
+    return [ShellSourcesGeneratorTarget, Shunit2TestsGeneratorTarget]
 
 
 def rules():

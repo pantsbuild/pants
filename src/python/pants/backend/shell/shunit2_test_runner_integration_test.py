@@ -19,10 +19,10 @@ from pants.backend.shell.shunit2_test_runner import (
     Shunit2RunnerRequest,
 )
 from pants.backend.shell.target_types import (
-    ShellLibrary,
+    ShellSourcesGeneratorTarget,
     Shunit2Shell,
     Shunit2ShellField,
-    Shunit2Tests,
+    Shunit2TestsGeneratorTarget,
 )
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.test import (
@@ -56,7 +56,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestDebugRequest, [Shunit2FieldSet]),
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
-        target_types=[ShellLibrary, Shunit2Tests, PythonLibrary, PexBinary],
+        target_types=[
+            ShellSourcesGeneratorTarget,
+            Shunit2TestsGeneratorTarget,
+            PythonLibrary,
+            PexBinary,
+        ],
     )
 
 

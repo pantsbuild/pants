@@ -14,7 +14,7 @@ from pants.backend.shell.dependency_inference import (
     ParseShellImportsRequest,
     ShellMapping,
 )
-from pants.backend.shell.target_types import ShellLibrary, ShellSources
+from pants.backend.shell.target_types import ShellSourceField, ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ParsedShellImports, [ParseShellImportsRequest]),
             QueryRule(InferredDependencies, [InferShellDependencies]),
         ],
-        target_types=[ShellLibrary],
+        target_types=[ShellSourcesGeneratorTarget],
     )
 
 
@@ -131,24 +131,18 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferShellDependencies(tgt[ShellSources])]
+            InferredDependencies, [InferShellDependencies(tgt[ShellSourceField])]
         )
 
-    build_address = Address("a")
-    assert run_dep_inference(build_address) == InferredDependencies(
-        [Address("b", relative_file_path="f.sh"), Address("a", relative_file_path="f1.sh")]
-    )
-
-    file_address = Address("a", relative_file_path="f1.sh")
-    assert run_dep_inference(file_address) == InferredDependencies(
+    assert run_dep_inference(Address("a", relative_file_path="f1.sh")) == InferredDependencies(
         [Address("b", relative_file_path="f.sh")]
     )
 
     caplog.clear()
-    assert run_dep_inference(Address("ambiguous", target_name="main")) == InferredDependencies(
+    assert run_dep_inference(Address("ambiguous", target_name="main", relative_file_path="main.sh")) == InferredDependencies(
         [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")]
     )
     assert len(caplog.records) == 1
-    assert "The target ambiguous:main sources `ambiguous/dep.sh`" in caplog.text
+    assert "The target ambiguous/main.sh:main sources `ambiguous/dep.sh`" in caplog.text
     assert "['ambiguous/dep.sh:dep1', 'ambiguous/dep.sh:dep2']" in caplog.text
     assert "disambiguated.sh" not in caplog.text

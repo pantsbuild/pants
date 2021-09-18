@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
-from pants.backend.shell.target_types import ShellSources
+from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -29,9 +29,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class ShellcheckFieldSet(FieldSet):
-    required_fields = (ShellSources,)
+    required_fields = (ShellSourceField,)
 
-    sources: ShellSources
+    sources: ShellSourceField
     dependencies: Dependencies
 
     @classmethod
@@ -58,7 +58,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
         SourceFiles,
         SourceFilesRequest(
             (field_set.sources for field_set in request.field_sets),
-            for_sources_types=(ShellSources,),
+            for_sources_types=(ShellSourceField,),
             enable_codegen=True,
         ),
     )
@@ -66,7 +66,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
         SourceFiles,
         SourceFilesRequest(
             (tgt.get(Sources) for dependencies in all_dependencies for tgt in dependencies),
-            for_sources_types=(ShellSources,),
+            for_sources_types=(ShellSourceField,),
             enable_codegen=True,
         ),
     )

@@ -30,14 +30,19 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.enums import match
 
 
-class ShellSources(Sources):
+class ShellSourceField(Sources):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
+    uses_source_roots = False
+    expected_num_files = 1
+
+
+class ShellGeneratingSources(Sources):
     uses_source_roots = False
 
 
 # -----------------------------------------------------------------------------------------------
-# `shunit2_tests` target
+# `shunit2_test` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -83,15 +88,11 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestsDependencies(Dependencies):
+class Shunit2TestDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class Shunit2TestsSources(ShellSources):
-    default = ("*_test.sh", "test_*.sh", "tests.sh")
-
-
-class Shunit2TestsTimeout(IntField):
+class Shunit2TestTimeoutField(IntField):
     alias = "timeout"
     help = (
         "A timeout (in seconds) used by each test file belonging to this target. "
@@ -109,19 +110,45 @@ class Shunit2TestsTimeout(IntField):
         return value
 
 
+class Shunit2TestSourceField(ShellSourceField):
+    pass
+
+
 class Shunit2ShellField(StringField):
     alias = "shell"
     valid_choices = Shunit2Shell
     help = "Which shell to run the tests with. If unspecified, Pants will look for a shebang line."
 
 
-class Shunit2Tests(Target):
+class Shunit2TestTarget(Target):
+    alias = "shunit2_tests"  # TODO(#12954): rename to `shunit_test` when ready. Update `help` too.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Shunit2TestSourceField,
+        Shunit2TestDependenciesField,
+        Shunit2TestTimeoutField,
+        Shunit2ShellField,
+        RuntimePackageDependenciesField,
+    )
+    help = "A test file for Bourne-based shell scripts using the shunit2 test framework."
+
+
+# -----------------------------------------------------------------------------------------------
+# `shunit2_tests` target generator
+# -----------------------------------------------------------------------------------------------
+
+
+class Shunit2TestsGeneratorSourcesField(ShellGeneratingSources):
+    default = ("*_test.sh", "test_*.sh", "tests.sh")
+
+
+class Shunit2TestsGeneratorTarget(Target):
     alias = "shunit2_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Shunit2TestsDependencies,
-        Shunit2TestsSources,
-        Shunit2TestsTimeout,
+        Shunit2TestsGeneratorSourcesField,
+        Shunit2TestDependenciesField,
+        Shunit2TestTimeoutField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
@@ -138,7 +165,7 @@ class Shunit2Tests(Target):
 
 
 class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
-    generate_from = Shunit2Tests
+    generate_from = Shunit2TestsGeneratorTarget
 
 
 @rule
@@ -147,9 +174,11 @@ async def generate_targets_from_shunit2_tests(
     shell_setup: ShellSetup,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsGeneratorSourcesField])
+    )
     return generate_file_level_targets(
-        Shunit2Tests,
+        Shunit2TestTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -158,33 +187,46 @@ async def generate_targets_from_shunit2_tests(
 
 
 # -----------------------------------------------------------------------------------------------
-# `shell_library` target
+# `shell_source` target
 # -----------------------------------------------------------------------------------------------
 
 
-class ShellLibrarySources(ShellSources):
-    default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsSources.default)
+class ShellSourceTarget(Target):
+    alias = "shell_library"  # TODO(#12954): rename to `shell_source` when ready.
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
+    help = "A Bourne-based shell script, e.g. a Bash script."
 
 
-class ShellLibrary(Target):
-    alias = "shell_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellLibrarySources)
+# -----------------------------------------------------------------------------------------------
+# `shell_library` target generator
+# -----------------------------------------------------------------------------------------------
+
+
+class ShellSourcesGeneratingSourcesField(ShellGeneratingSources):
+    default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
+
+
+class ShellSourcesGeneratorTarget(Target):
+    alias = "shell_library"  # TODO(#12954): rename to `shell_sources` when ready.
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesGeneratingSourcesField)
     help = "Bourne-based shell scripts, e.g. Bash scripts."
 
 
-class GenerateTargetsFromShellLibrary(GenerateTargetsRequest):
-    generate_from = ShellLibrary
+class GenerateTargetsFromShellSources(GenerateTargetsRequest):
+    generate_from = ShellSourcesGeneratorTarget
 
 
 @rule
-async def generate_targets_from_shell_library(
-    request: GenerateTargetsFromShellLibrary,
+async def generate_targets_from_shell_sources(
+    request: GenerateTargetsFromShellSources,
     shell_setup: ShellSetup,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ShellLibrarySources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[ShellSourcesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
-        ShellLibrary,
+        ShellSourceTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -196,5 +238,5 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromShunit2Tests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShellLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShellSources),
     )

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shell_fmt import ShellFmtRequest
 from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
-from pants.backend.shell.target_types import ShellSources
+from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -24,9 +24,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class ShfmtFieldSet(FieldSet):
-    required_fields = (ShellSources,)
+    required_fields = (ShellSourceField,)
 
-    sources: ShellSources
+    sources: ShellSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
