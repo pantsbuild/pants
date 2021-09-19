@@ -50,6 +50,7 @@ class TerraformProcess:
     description: str
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
+    output_directories: tuple[str, ...] = ()
 
 
 @rule
@@ -69,6 +70,7 @@ async def setup_terraform_process(request: TerraformProcess, terraform: Terrafor
         argv=("./terraform",) + request.args,
         input_digest=input_digest,
         output_files=request.output_files,
+        output_directories=request.output_directories,
         description=request.description,
         level=LogLevel.DEBUG,
     )

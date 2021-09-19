@@ -5,11 +5,11 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Tar
 
 
 class TerraformSources(Sources):
-    expected_file_extensions = (".tf",)
+    pass
 
 
 class TerraformModuleSources(TerraformSources):
-    default = ("*.tf",)
+    default = ("*.tf", ".terraform/**", ".terraform.lock.hcl")
 
 
 class TerraformModule(Target):

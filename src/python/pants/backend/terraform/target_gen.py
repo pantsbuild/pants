@@ -45,7 +45,10 @@ async def generate_terraform_module_targets(
         for field in generator.field_values.values():
             value: ImmutableValue | None
             if isinstance(field, Sources):
-                value = tuple(sorted(dir_to_filenames[dir]))
+                value = tuple(sorted(dir_to_filenames[dir])) + (
+                    ".terraform/**",
+                    ".terraform.lock.hcl",
+                )
             else:
                 value = field.value
             generated_target_fields[field.alias] = value
