@@ -379,6 +379,16 @@ def test_address_maybe_convert_to_generated_target() -> None:
     assert_noops(Address("a/b", generated_name="generated"))
 
 
+def test_address_create_generated() -> None:
+    assert Address("dir", target_name="generator").create_generated("generated") == Address(
+        "dir", target_name="generator", generated_name="generated"
+    )
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", relative_file_path="f.ext").create_generated("gen")
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", generated_name="gen").create_generated("gen")
+
+
 @pytest.mark.parametrize(
     "addr,expected",
     [

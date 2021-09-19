@@ -9,7 +9,7 @@ from pants.backend.terraform.target_types import (
     TerraformModules,
     TerraformModuleSources,
 )
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedTargets
@@ -42,7 +42,8 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
         }
     )
 
-    generator = rule_runner.get_target(Address("", target_name="tf_mods"))
+    generator_addr = Address("", target_name="tf_mods")
+    generator = rule_runner.get_target(generator_addr)
     targets = rule_runner.request(
         GeneratedTargets, [GenerateTerraformModuleTargetsRequest(generator)]
     )
@@ -53,7 +54,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                 {
                     TerraformModuleSources.alias: ("versions.tf",),
                 },
-                Address("", target_name="tf_mods", generated_name="src/tf/foo"),
+                generator_addr.create_generated("src/tf/foo"),
             ),
             TerraformModule(
                 {
@@ -62,7 +63,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                         "versions.tf",
                     ),
                 },
-                Address("", target_name="tf_mods", generated_name="src/tf"),
+                generator_addr.create_generated("src/tf/")
             ),
         ],
     )
