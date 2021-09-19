@@ -19,6 +19,8 @@ from pants.backend.python.goals import (
     setup_py,
     tailor,
 )
+from pants.backend.python.macros import pipenv_requirements
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -83,6 +85,8 @@ def rules():
         *setuptools.rules(),
         *tailor.rules(),
         *target_types_rules.rules(),
+        # Macros.
+        *pipenv_requirements.rules(),
     )
 
 
@@ -98,4 +102,6 @@ def target_types():
         PythonTestsGeneratorTarget,
         PythonTestTarget,
         PythonTestUtilsGeneratorTarget,
+        # Macros.
+        PipenvRequirementsTargetGenerator,
     ]
