@@ -45,6 +45,7 @@ class TerraformTool(TemplatedExternalTool):
 
 class TerraformSubsystem(Subsystem):
     options_scope = "terraform"
+    help = "Terraform-relaed options"
 
     @classmethod
     def register_options(cls, register):
