@@ -7,10 +7,8 @@ from pants.backend.terraform.target_types import (
     TerraformModules,
     TerraformModulesSources,
 )
-from pants.build_graph.address import Address
 from pants.core.goals.tailor import group_by_dir
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -31,8 +29,9 @@ class GenerateTerraformModuleTargetsRequest(GenerateTargetsRequest):
 async def generate_terraform_module_targets(
     request: GenerateTerraformModuleTargetsRequest,
 ) -> GeneratedTargets:
+    generator = request.generator
     sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator.get(TerraformModulesSources))
+        SourcesPaths, SourcesPathsRequest(generator.get(TerraformModulesSources))
     )
 
     dir_to_filenames = group_by_dir(sources_paths.files)
@@ -43,21 +42,14 @@ async def generate_terraform_module_targets(
 
     def gen_target(dir: str) -> Target:
         generated_target_fields = {}
-        for field in request.generator.field_values.values():
+        for field in generator.field_values.values():
             value: ImmutableValue | None
             if isinstance(field, Sources):
                 value = tuple(sorted(dir_to_filenames[dir]))
             else:
                 value = field.value
             generated_target_fields[field.alias] = value
-        return TerraformModule(
-            generated_target_fields,
-            Address(
-                request.generator.address.spec_path,
-                target_name=request.generator.address.target_name,
-                generated_name=dir,
-            ),
-        )
+        return TerraformModule(generated_target_fields, generator.address.create_generated(dir))
 
     return GeneratedTargets(
         request.generator, [gen_target(dir) for dir in dirs_with_terraform_files]
