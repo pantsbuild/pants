@@ -7,9 +7,9 @@ use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
-use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
-
+use indexmap::IndexSet;
 use log::Level;
+use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
@@ -171,10 +171,10 @@ pub struct Intrinsic {
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
-  rules: Vec<Rule>,
+  rules: IndexSet<Rule>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
-  queries: Vec<Query<Rule>>,
+  queries: IndexSet<Query<Rule>>,
 }
 
 ///
@@ -190,23 +190,23 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      rules: Vec::default(),
+      rules: IndexSet::default(),
       preparing: None,
-      queries: Vec::default(),
+      queries: IndexSet::default(),
     }
   }
 
-  pub fn rules(&self) -> &Vec<Rule> {
+  pub fn rules(&self) -> &IndexSet<Rule> {
     &self.rules
   }
 
-  pub fn queries(&self) -> &Vec<Query<Rule>> {
+  pub fn queries(&self) -> &IndexSet<Query<Rule>> {
     &self.queries
   }
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
-      self.rules.push(Rule::Intrinsic(intrinsic.clone()))
+      self.rules.insert(Rule::Intrinsic(intrinsic.clone()));
     }
   }
 
@@ -263,10 +263,10 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    self.rules.push(Rule::Task(task))
+    self.rules.insert(Rule::Task(task));
   }
 
   pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {
-    self.queries.push(Query::new(product, params));
+    self.queries.insert(Query::new(product, params));
   }
 }
