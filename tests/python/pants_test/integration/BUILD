@@ -59,8 +59,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'pep_561_integration',
-  sources = ['pep_561_integration_test.py'],
+  name = 'pep561_integration',
+  sources = ['pep561_integration_test.py'],
   timeout = 300,
   runtime_package_dependencies=[
       'src/python/pants:pants-packaged',
