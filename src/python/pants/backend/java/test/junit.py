@@ -114,7 +114,7 @@ async def run_junit_test(
             usercp_relpath,
             "--scan-class-path",
             usercp_relpath,
-            *(junit.options.args),
+            *junit.options.args,
         ],
         input_digest=merged_digest,
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
