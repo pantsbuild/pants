@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Iterable
 
 from pants.backend.terraform.target_types import TerraformModules
 from pants.core.goals.tailor import (
@@ -20,7 +21,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-def longest_common_prefix(x, y):
+def longest_common_prefix(x: tuple[str, ...], y: tuple[str, ...]) -> tuple[str, ...]:
     """Find the longest common prefix between two sequences."""
 
     i = j = 0
@@ -33,7 +34,9 @@ def longest_common_prefix(x, y):
     return x[:i]
 
 
-def find_disjoint_longest_common_prefixes(raw_values):
+def find_disjoint_longest_common_prefixes(
+    raw_values: Iterable[tuple[str, ...]]
+) -> set[tuple[str, ...]]:
     values = sorted(raw_values)
 
     if len(values) == 0:
@@ -59,7 +62,7 @@ def find_disjoint_longest_common_prefixes(raw_values):
             current_prefix = values[i]
         i += 1
 
-    # Recod any prefix from the last run of items.
+    # Record any prefix from the last run of items.
     if current_prefix:
         prefixes.add(current_prefix)
 
