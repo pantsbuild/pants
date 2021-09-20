@@ -55,7 +55,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
         target_types=[JvmDependencyLockfile, JvmArtifact, JavaLibrary, JunitTests],
-        bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
+        bootstrap_args=[
+            "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
+            # Makes JUnit output predictable and parseable across versions (#12933):
+            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        ],
     )
 
 
