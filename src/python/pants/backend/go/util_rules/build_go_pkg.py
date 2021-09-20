@@ -2,15 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Optional
 
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoPackageSources,
+)
+from pants.backend.go.util_rules.assembly import (
+    AssemblyPostCompilation,
+    AssemblyPostCompilationRequest,
+    AssemblyPreCompilation,
+    AssemblyPreCompilationRequest,
 )
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
@@ -29,15 +33,12 @@ from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -104,55 +105,12 @@ async def build_target(
 
     gathered_imports = await Get(
         GatheredImports,
-        GatherImportsRequest(
-            packages=FrozenOrderedSet(built_go_deps),
-            include_stdlib=True,
-        ),
-    )
-
-    input_digest = await Get(
-        Digest,
-        MergeDigests([gathered_imports.digest, source_files_digest]),
+        GatherImportsRequest(packages=FrozenOrderedSet(built_go_deps), include_stdlib=True),
     )
 
     import_path = resolved_package.import_path
     if request.is_main:
         import_path = "main"
-
-    # If there are any .s assembly files to be built, then generate a "symabis" file for consumption by Go compiler.
-    # See https://github.com/bazelbuild/rules_go/issues/1893 (rules_go)
-    # TODO(12762): Refactor to separate rule to improve readability.
-    symabis_digest = None
-    if resolved_package.s_files:
-        # From Go tooling comments:
-        # 	// Supply an empty go_asm.h as if the compiler had been run.
-        # 	// -symabis parsing is lax enough that we don't need the
-        # 	// actual definitions that would appear in go_asm.h.
-        # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-        go_asm_h_digest = await Get(
-            Digest, CreateDigest([FileContent(path="go_asm.h", content=b"")])
-        )
-        gensymabis_input_digest = await Get(Digest, MergeDigests([input_digest, go_asm_h_digest]))
-        gensymabis_result = await Get(
-            ProcessResult,
-            GoSdkProcess(
-                input_digest=gensymabis_input_digest,
-                command=(
-                    "tool",
-                    "asm",
-                    "-I",
-                    "go/pkg/include",  # NOTE: points into GOROOT; assumption inferred from rules_go and Go tooling
-                    "-gensymabis",
-                    "-o",
-                    "gensymabis",
-                    "--",
-                    *(f"./{source_files_subpath}/{name}" for name in resolved_package.s_files),
-                ),
-                description="Generate gensymabis metadata for assemnbly files.",
-                output_files=("gensymabis",),
-            ),
-        )
-        symabis_digest = gensymabis_result.output_digest
 
     compile_command = [
         "tool",
@@ -165,12 +123,21 @@ async def build_target(
         "-o",
         "__pkg__.a",
     ]
-    if symabis_digest:
-        compile_command.extend(["-symabis", "./gensymabis"])
-        input_digest = await Get(
-            Digest,
-            MergeDigests([input_digest, symabis_digest]),
+
+    input_digest = await Get(Digest, MergeDigests([gathered_imports.digest, source_files_digest]))
+
+    assembly_digests = None
+    if resolved_package.s_files:
+        assembly_setup = await Get(
+            AssemblyPreCompilation,
+            AssemblyPreCompilationRequest(
+                input_digest, resolved_package.s_files, source_files_subpath
+            ),
         )
+        input_digest = assembly_setup.merged_compilation_input_digest
+        assembly_digests = assembly_setup.assembly_digests
+        compile_command.extend(assembly_setup.EXTRA_COMPILATION_ARGS)
+
     compile_command.append("--")
     compile_command.extend(f"./{source_files_subpath}/{name}" for name in resolved_package.go_files)
 
@@ -185,57 +152,14 @@ async def build_target(
     )
     output_digest = result.output_digest
 
-    # Assemble any .s files and merge into the package archive.
-    # TODO(12762): Refactor to separate rule to improve readability.
-    if resolved_package.s_files:
-        # Assemble
-        asm_requests = [
-            Get(
-                ProcessResult,
-                GoSdkProcess(
-                    input_digest=input_digest,
-                    command=(
-                        "tool",
-                        "asm",
-                        "-I",
-                        "go/pkg/include",  # NOTE: points into GOROOT; assumption inferred from rules_go and Go tooling
-                        "-o",
-                        f"./{source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
-                        f"./{source_files_subpath}/{s_file}",
-                    ),
-                    description=f"Assemble Go .s file [{request.address}]",
-                    output_files=(
-                        f"./{source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
-                    ),
-                ),
-            )
-            for s_file in resolved_package.s_files
-        ]
-        asm_results = await MultiGet(asm_requests)
-        merged_asm_output_digest = await Get(
-            Digest, MergeDigests([output_digest] + [r.output_digest for r in asm_results])
-        )
-
-        # Link into package archive.
-        pack_result = await Get(
-            ProcessResult,
-            GoSdkProcess(
-                input_digest=merged_asm_output_digest,
-                command=(
-                    "tool",
-                    "pack",
-                    "r",
-                    "__pkg__.a",
-                    *(
-                        f"./{source_files_subpath}/{PurePath(name).with_suffix('.o')}"
-                        for name in resolved_package.s_files
-                    ),
-                ),
-                description="Add assembly files to Go package archive.",
-                output_files=("__pkg__.a",),
+    if assembly_digests:
+        assembly_result = await Get(
+            AssemblyPostCompilation,
+            AssemblyPostCompilationRequest(
+                output_digest, assembly_digests, resolved_package.s_files, source_files_subpath
             ),
         )
-        output_digest = pack_result.output_digest
+        output_digest = assembly_result.merged_output_digest
 
     return BuiltGoPackage(import_path=import_path, object_digest=output_digest)
 

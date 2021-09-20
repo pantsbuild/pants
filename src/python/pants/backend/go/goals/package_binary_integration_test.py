@@ -12,6 +12,7 @@ from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.backend.go.util_rules import (
+    assembly,
     build_go_pkg,
     external_module,
     go_mod,
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
         target_types=[GoBinary, GoPackage, GoModule],
         rules=[
             *external_tool.rules(),
+            *assembly.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),

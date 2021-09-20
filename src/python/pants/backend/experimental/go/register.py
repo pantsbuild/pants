@@ -7,6 +7,7 @@ from pants.backend.go.goals import custom_goals, package_binary, tailor
 from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
 from pants.backend.go.util_rules import (
+    assembly,
     build_go_pkg,
     external_module,
     go_mod,
@@ -22,6 +23,7 @@ def target_types():
 
 def rules():
     return [
+        *assembly.rules(),
         *build_go_pkg.rules(),
         *external_module.rules(),
         *golang.rules(),

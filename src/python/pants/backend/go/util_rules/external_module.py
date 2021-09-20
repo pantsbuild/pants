@@ -165,12 +165,8 @@ async def resolve_external_go_package(
 
     module = await Get(
         DownloadedExternalModule,
-        DownloadExternalModuleRequest(
-            path=module_path,
-            version=module_version,
-        ),
+        DownloadExternalModuleRequest(path=module_path, version=module_version),
     )
-
     assert import_path.startswith(module_path)
     subpath = import_path[len(module_path) :]
 

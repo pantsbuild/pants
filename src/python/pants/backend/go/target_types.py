@@ -16,7 +16,7 @@ from pants.engine.target import (
 
 
 class GoSources(Sources):
-    expected_file_extensions = (".go",)
+    expected_file_extensions = (".go", ".s")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ class GoSources(Sources):
 
 
 class GoPackageSources(GoSources):
-    default = ("*.go",)
+    default = ("*.go", "*.s")
 
 
 class GoImportPath(StringField):
