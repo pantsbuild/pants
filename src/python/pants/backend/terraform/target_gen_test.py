@@ -9,8 +9,8 @@ from pants.backend.terraform.target_types import (
     TerraformModules,
     TerraformModuleSources,
 )
-from pants.engine.addresses import Address
 from pants.core.util_rules import external_tool, source_files
+from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedTargets
 from pants.testutil.rule_runner import RuleRunner
@@ -63,7 +63,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                         "versions.tf",
                     ),
                 },
-                generator_addr.create_generated("src/tf/")
+                generator_addr.create_generated("src/tf/"),
             ),
         ],
     )
