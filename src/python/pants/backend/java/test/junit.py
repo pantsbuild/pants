@@ -28,6 +28,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
+from pants.backend.java.subsystems.junit import JUnit
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class JavaTestFieldSet(TestFieldSet):
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     coursier: Coursier,
+    junit: JUnit,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
@@ -118,6 +120,7 @@ async def run_junit_test(
             usercp_relpath,
             "--scan-class-path",
             usercp_relpath,
+            *(junit.options.args)
         ],
         input_digest=merged_digest,
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
