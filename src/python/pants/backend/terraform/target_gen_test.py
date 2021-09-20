@@ -63,7 +63,7 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                         "versions.tf",
                     ),
                 },
-                generator_addr.create_generated("src/tf/"),
+                generator_addr.create_generated("src/tf"),
             ),
         ],
     )
