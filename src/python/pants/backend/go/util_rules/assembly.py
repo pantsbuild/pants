@@ -16,7 +16,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 class AssemblyPreCompilation:
     merged_compilation_input_digest: Digest
     assembly_digests: tuple[Digest, ...]
-    EXTRA_COMPILATION_ARGS = ("-symabis", "./gensymabis")
+    EXTRA_COMPILATION_ARGS = ("-symabis", "./symabis")
 
 
 @dataclass(frozen=True)
@@ -57,13 +57,13 @@ async def setup_assembly_pre_compilation(
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
     go_asm_h_digest = await Get(Digest, CreateDigest([FileContent("go_asm.h", b"")]))
-    gensymabis_input_digest = await Get(
+    symabis_input_digest = await Get(
         Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
-    gensymabis_result = await Get(
+    symabis_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=gensymabis_input_digest,
+            input_digest=symabis_input_digest,
             command=(
                 "tool",
                 "asm",
@@ -71,17 +71,17 @@ async def setup_assembly_pre_compilation(
                 "go/pkg/include",
                 "-gensymabis",
                 "-o",
-                "gensymabis",
+                "symabis",
                 "--",
                 *(f"./{request.source_files_subpath}/{name}" for name in request.s_files),
             ),
-            description="Generate gensymabis metadata for assembly files.",
-            output_files=("gensymabis",),
+            description="Generate symabis metadata for assembly files.",
+            output_files=("symabis",),
         ),
     )
     merged = await Get(
         Digest,
-        MergeDigests([request.compilation_input, gensymabis_result.output_digest]),
+        MergeDigests([request.compilation_input, symabis_result.output_digest]),
     )
 
     assembly_results = await MultiGet(
