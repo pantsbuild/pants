@@ -77,7 +77,7 @@ impl AsyncSemaphore {
     res
   }
 
-  async fn acquire(&self) -> Permit<'_> {
+  pub async fn acquire(&self) -> Permit<'_> {
     let permit = self.inner.sema.acquire().await.expect("semaphore closed");
     let id = {
       let mut available_ids = self.inner.available_ids.lock();
@@ -98,6 +98,12 @@ pub struct Permit<'a> {
   // NB: Kept for its `Drop` impl.
   _permit: SemaphorePermit<'a>,
   id: usize,
+}
+
+impl Permit<'_> {
+  pub fn concurrency_slot(&self) -> usize {
+    self.id
+  }
 }
 
 impl<'a> Drop for Permit<'a> {
