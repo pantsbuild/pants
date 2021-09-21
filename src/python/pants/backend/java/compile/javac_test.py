@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import (
     CompiledClassfiles,
     CompileJavaSourceRequest,
@@ -54,6 +55,7 @@ def rule_runner() -> RuleRunner:
             *javac_binary_rules(),
             *target_types_rules(),
             *coursier_rules(),
+            *java_util_rules.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
