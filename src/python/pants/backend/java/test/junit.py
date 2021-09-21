@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.subsystems.junit import JUnit
-from pants.backend.java.target_types import JavaTestsSources
+from pants.backend.java.target_types import JavaTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class JavaTestFieldSet(TestFieldSet):
-    required_fields = (JavaTestsSources,)
+    required_fields = (JavaTestSourceField,)
 
-    sources: JavaTestsSources
+    sources: JavaTestSourceField
 
 
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)

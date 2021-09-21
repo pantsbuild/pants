@@ -16,7 +16,7 @@ from pants.backend.java.compile.javac import (
 )
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
@@ -59,7 +59,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaLibrary, JvmArtifact],
+        target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
         # TODO(#12293): Remove this nonhermetic hack once Coursier JVM boostrapping flakiness
         # is properly fixed in CI.
         bootstrap_args=["--javac-jdk=system"],
@@ -117,7 +117,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -170,7 +170,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -217,7 +217,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -300,7 +300,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
             .decode("utf-8"),
             "a/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'a',
                     dependencies = [
                         '//:lockfile',
@@ -319,7 +319,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
             ),
             "b/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'b',
                     dependencies = [
                         '//:lockfile',
@@ -372,7 +372,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         '//:lockfile',
@@ -393,7 +393,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             .decode("utf-8"),
             "a/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'a',
                     dependencies = [
                         '//:lockfile',
@@ -412,7 +412,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             ),
             "b/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'b',
                     dependencies = [
                         '//:lockfile',
@@ -464,7 +464,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         '//:lockfile',
@@ -487,7 +487,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
             .decode("utf-8"),
             "lib/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         '//:lockfile',
@@ -543,7 +543,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -558,7 +558,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         '//:lockfile',
@@ -597,7 +597,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -654,7 +654,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -703,7 +703,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',

@@ -5,7 +5,7 @@ import pytest
 
 from pants.backend.java import tailor
 from pants.backend.java.tailor import PutativeJavaTargetsRequest, classify_source_files
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -22,9 +22,10 @@ def test_classify_source_files() -> None:
     }
     lib_files = {"foo/bar/Baz.java", "foo/SomeClass.java"}
 
-    assert {JunitTests: test_files, JavaLibrary: lib_files} == classify_source_files(
-        test_files | lib_files
-    )
+    assert {
+        JunitTestsGeneratorTarget: test_files,
+        JavaSourcesGeneratorTarget: lib_files,
+    } == classify_source_files(test_files | lib_files)
 
 
 @pytest.fixture
@@ -34,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *tailor.rules(),
             QueryRule(PutativeTargets, (PutativeJavaTargetsRequest, AllOwnedSources)),
         ],
-        target_types=[JavaLibrary, JunitTests],
+        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
     )
     rule_runner.set_options(["--backend-packages=pants.backend.experimental.java"])
     return rule_runner
@@ -60,10 +61,10 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    JavaLibrary, "src/java/unowned", "unowned", ["UnownedFile.java"]
+                    JavaSourcesGeneratorTarget, "src/java/unowned", "unowned", ["UnownedFile.java"]
                 ),
                 PutativeTarget.for_target_type(
-                    JunitTests,
+                    JunitTestsGeneratorTarget,
                     "src/java/unowned",
                     "tests",
                     ["UnownedFileTest.java"],

@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
@@ -54,7 +54,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact, JavaLibrary, JunitTests],
+        target_types=[
+            JvmDependencyLockfile,
+            JvmArtifact,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+        ],
         bootstrap_args=[
             "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
             # Makes JUnit output predictable and parseable across versions (#12933):
@@ -149,12 +154,16 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="SimpleTest.java"
+        )
+    )
+
     test_result = rule_runner.request(
         TestResult,
         [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
+            JavaTestFieldSet.create(tgt),
         ],
     )
     assert test_result.exit_code == 0
@@ -207,14 +216,16 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="SimpleTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
+        [JavaTestFieldSet.create(tgt)],
     )
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -248,7 +259,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',                    ],
@@ -291,12 +302,15 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="ExampleTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
         [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
+            JavaTestFieldSet.create(tgt),
         ],
     )
     assert test_result.exit_code == 0
@@ -443,12 +457,15 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="SimpleTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
         [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
+            JavaTestFieldSet.create(tgt),
         ],
     )
     assert test_result.exit_code == 0
@@ -503,13 +520,14 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="SimpleTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
+        [JavaTestFieldSet.create(tgt)],
     )
     assert test_result.exit_code == 1
     assert (
@@ -546,7 +564,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',
@@ -592,14 +610,18 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="SimpleTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
         [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
+            JavaTestFieldSet.create(tgt),
         ],
     )
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -675,12 +697,15 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
+    tgt = rule_runner.get_target(
+        address=Address(
+            spec_path="", target_name="example-test", relative_file_path="JupiterTest.java"
+        )
+    )
     test_result = rule_runner.request(
         TestResult,
         [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
+            JavaTestFieldSet.create(tgt),
         ],
     )
     assert test_result.exit_code == 0
