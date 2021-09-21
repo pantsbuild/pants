@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandOutputsField,
@@ -11,15 +13,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import (
     BashBinary,
     BinaryNotFoundError,
@@ -54,26 +48,38 @@ async def run_shell_command(
     working_directory = shell_command.address.spec_path
     command = shell_command[ShellCommandCommandField].value
     tools = shell_command[ShellCommandToolsField].value
-    outputs = shell_command[ShellCommandOutputsField].value
+    outputs = shell_command[ShellCommandOutputsField].value or ()
 
-    if not (command and tools and outputs):
-        return GeneratedSources(EMPTY_SNAPSHOT)
+    if not command:
+        raise ValueError(
+            f"Missing `command` line in `shell_command` target {shell_command.address}."
+        )
+
+    if not tools:
+        raise ValueError(
+            f"Must provide any `tools` used by the `shell_command` {shell_command.address}."
+        )
 
     tool_requests = [
         BinaryPathRequest(
             binary_name=tool,
             search_path=SearchPath(("/usr/bin", "/bin", "/usr/local/bin")),
         )
-        for tool in tools
+        for tool in {*tools, *["mkdir", "ln"]}
     ]
     tool_paths = await MultiGet(
         Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
     )
 
-    tools_env: dict[str, str] = {}
+    bin_relpath = ".bin"
+    command_env = {
+        "PATH": bin_relpath,
+        "TOOLS": " ".join(tools),
+    }
+
     for binary, tool_request in zip(tool_paths, tool_requests):
         if binary.first_path:
-            tools_env[tool_request.binary_name] = binary.first_path.path
+            command_env[tool_request.binary_name] = binary.first_path.path
         else:
             raise BinaryNotFoundError(
                 tool_request,
@@ -106,12 +112,22 @@ async def run_shell_command(
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
         input_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, work_dir]))
 
+    # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
+    setup_tool_symlinks_script = "; ".join(
+        dedent(
+            f"""\
+            $mkdir -p {bin_relpath}
+            for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}/; done
+            """
+        ).split("\n")
+    )
+
     result = await Get(
         ProcessResult,
         Process(
-            argv=(bash.path, "-c", command),
+            argv=(bash.path, "-c", setup_tool_symlinks_script + command),
             description=f"Running experimental_shell_command {shell_command.address}",
-            env=tools_env,
+            env=command_env,
             input_digest=input_digest,
             output_directories=output_directories,
             output_files=output_files,

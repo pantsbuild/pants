@@ -79,8 +79,8 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
             "src/intro.txt": MSG[0],
             "src/outro.txt": MSG[1],
             "src/script.sh": (
-                "#/bin/bash\n"
-                "$mkdir res && $cat *.txt > message.txt && $cat message.txt | $tee res/log.txt"
+                "#!/usr/bin/env bash\n"
+                "mkdir res && cat *.txt > message.txt && cat message.txt | tee res/log.txt"
             ),
         }
     )
