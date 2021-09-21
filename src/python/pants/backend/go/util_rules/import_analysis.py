@@ -1,22 +1,31 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import json
 import logging
+import os
 import textwrap
 from dataclasses import dataclass
-from typing import Dict
+from typing import TYPE_CHECKING, Dict, List
 
 import ijson
 
-from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.subsystems.golang import GoLangDistribution
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+if TYPE_CHECKING:
+    from pants.backend.go.util_rules.build_go_pkg import BuiltGoPackage
+
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +120,52 @@ async def analyze_imports_for_golang_distribution(
     )
 
 
+@dataclass(frozen=True)
+class GatherImportsRequest:
+    packages: FrozenOrderedSet[BuiltGoPackage]
+    include_stdlib: bool
+
+
+@dataclass(frozen=True)
+class GatheredImports:
+    digest: Digest
+
+
+@rule
+async def generate_import_config(
+    request: GatherImportsRequest, goroot_import_mappings: ResolvedImportPathsForGoLangDistribution
+) -> GatheredImports:
+    import_config_digests: dict[str, tuple[str, Digest]] = {}
+    for pkg in request.packages:
+        fp = pkg.object_digest.fingerprint
+        prefixed_digest = await Get(Digest, AddPrefix(pkg.object_digest, f"__pkgs__/{fp}"))
+        import_config_digests[pkg.import_path] = (fp, prefixed_digest)
+
+    pkg_digests: OrderedSet[Digest] = OrderedSet()
+
+    import_config: List[str] = ["# import config"]
+    for import_path, (fp, digest) in import_config_digests.items():
+        pkg_digests.add(digest)
+        import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
+
+    if request.include_stdlib:
+        for stdlib_pkg_importpath, stdlib_pkg in goroot_import_mappings.import_path_mapping.items():
+            pkg_digests.add(stdlib_pkg.digest)
+            import_config.append(
+                f"packagefile {stdlib_pkg_importpath}={os.path.normpath(stdlib_pkg.path)}"
+            )
+
+    import_config_content = "\n".join(import_config).encode("utf-8")
+
+    import_config_digest = await Get(
+        Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
+    )
+    pkg_digests.add(import_config_digest)
+
+    digest = await Get(Digest, MergeDigests(pkg_digests))
+
+    return GatheredImports(digest=digest)
+
+
 def rules():
-    return [
-        *collect_rules(),
-    ]
+    return collect_rules()

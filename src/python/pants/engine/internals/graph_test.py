@@ -114,7 +114,13 @@ class MockGenerateTargetsRequest(GenerateTargetsRequest):
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
-    return generate_file_level_targets(MockGeneratedTarget, request.generator, paths.files, None)
+    return generate_file_level_targets(
+        MockGeneratedTarget,
+        request.generator,
+        paths.files,
+        None,
+        add_dependencies_on_all_siblings=False,
+    )
 
 
 @pytest.fixture
@@ -331,11 +337,11 @@ def test_transitive_targets_tolerates_generated_target_cycles(
         [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
-    assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
+    assert result.roots[0].address == Address("", target_name="t2")
     assert [tgt.address for tgt in result.dependencies] == [
         Address("", relative_file_path="t1.txt", target_name="t1"),
-        Address("", relative_file_path="dep.txt", target_name="dep"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
 
@@ -1482,9 +1488,7 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     resolved = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line)) for line in all_lines
     )
-    # NB: See `test_depends_on_subtargets` for why we set the field
-    # `sibling_dependencies_inferrable` this way.
-    return InferredDependencies(resolved, sibling_dependencies_inferrable=bool(resolved))
+    return InferredDependencies(resolved)
 
 
 class GenerateTargetsFromSmallTalkLibraryRequest(GenerateTargetsRequest):
@@ -1496,7 +1500,13 @@ async def generate_targets_from_smalltalk_library(
     request: GenerateTargetsFromSmallTalkLibraryRequest,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[SmalltalkSources]))
-    return generate_file_level_targets(SmalltalkLibrary, request.generator, paths.files, None)
+    return generate_file_level_targets(
+        SmalltalkLibrary,
+        request.generator,
+        paths.files,
+        None,
+        add_dependencies_on_all_siblings=False,
+    )
 
 
 @pytest.fixture
@@ -1757,7 +1767,6 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
             "src/smalltalk/util/BUILD": "smalltalk()",
         }
     )
-
     assert_dependencies_resolved(
         dependencies_rule_runner,
         Address("src/smalltalk"),
@@ -1765,23 +1774,6 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
             Address("src/smalltalk", relative_file_path="f1.st"),
             Address("src/smalltalk", relative_file_path="f2.st"),
         ],
-    )
-
-    # Test that a file address depends on its siblings if it has no dependency inference rule,
-    # or those inference rules do not claim to infer dependencies on siblings.
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        Address("src/smalltalk", relative_file_path="f1.st"),
-        expected=[Address("src/smalltalk", relative_file_path="f2.st")],
-    )
-
-    # Now, recreate f1.st so that inference works. Our mock inference rule will consequently say
-    # that it can now generate dependencies on siblings, whereas it could not before.
-    dependencies_rule_runner.write_files({"src/smalltalk/f1.st": "src/smalltalk/util"})
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        Address("src/smalltalk", relative_file_path="f1.st"),
-        expected=[Address("src/smalltalk/util")],
     )
 
 

@@ -8,14 +8,7 @@ from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 import pytest
 
-from pants.core.goals.lint import (
-    EnrichedLintResults,
-    Lint,
-    LintRequest,
-    LintResult,
-    LintSubsystem,
-    lint,
-)
+from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -49,9 +42,9 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def lint_results(self) -> EnrichedLintResults:
+    def lint_results(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
-        return EnrichedLintResults(
+        return LintResults(
             [LintResult(self.exit_code(addresses), "", "")], linter_name=self.linter_name
         )
 
@@ -88,8 +81,8 @@ class SkippedRequest(MockLintRequest):
         return 0
 
     @property
-    def lint_results(self) -> EnrichedLintResults:
-        return EnrichedLintResults([], linter_name="SkippedLinter")
+    def lint_results(self) -> LintResults:
+        return LintResults([], linter_name="SkippedLinter")
 
 
 class InvalidField(Sources):
@@ -142,7 +135,7 @@ def run_lint_rule(
             ],
             mock_gets=[
                 MockGet(
-                    output_type=EnrichedLintResults,
+                    output_type=LintResults,
                     input_type=LintRequest,
                     mock=lambda field_set_collection: field_set_collection.lint_results,
                 ),
@@ -229,13 +222,13 @@ def test_summary(rule_runner: RuleRunner) -> None:
 
 
 def test_streaming_output_skip() -> None:
-    results = EnrichedLintResults([], linter_name="linter")
+    results = LintResults([], linter_name="linter")
     assert results.level() == LogLevel.DEBUG
     assert results.message() == "linter skipped."
 
 
 def test_streaming_output_success() -> None:
-    results = EnrichedLintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
+    results = LintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -248,7 +241,7 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = EnrichedLintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
+    results = LintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
@@ -261,7 +254,7 @@ def test_streaming_output_failure() -> None:
 
 
 def test_streaming_output_partitions() -> None:
-    results = EnrichedLintResults(
+    results = LintResults(
         [
             LintResult(21, "", "", partition_description="ghc8.1"),
             LintResult(0, "stdout", "stderr", partition_description="ghc9.2"),

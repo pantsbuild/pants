@@ -189,12 +189,12 @@ type InLabeledGraph<R> =
 ///
 pub struct Builder<R: Rule> {
   rules: BTreeMap<R::TypeId, Vec<R>>,
-  queries: Vec<Query<R>>,
+  queries: IndexSet<Query<R>>,
   params: ParamTypes<R::TypeId>,
 }
 
 impl<R: Rule> Builder<R> {
-  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Builder<R> {
+  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Builder<R> {
     // Group rules by product/return type.
     let mut rules_by_type = BTreeMap::new();
     for rule in rules {
@@ -1228,7 +1228,7 @@ impl<R: Rule> Builder<R> {
     }
 
     Ok(RuleGraph {
-      queries: self.queries,
+      queries: self.queries.into_iter().collect(),
       rule_dependency_edges,
       // TODO
       unreachable_rules: Vec::default(),

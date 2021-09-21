@@ -1,26 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.go import import_analysis, pkg
-from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
-from pants.backend.go.module import (
-    FindNearestGoModuleRequest,
-    ResolvedGoModule,
-    ResolvedOwningGoModule,
-    ResolveGoModuleRequest,
-)
-from pants.backend.go.pkg import (
-    ResolvedGoPackage,
-    ResolveExternalGoModuleToPackagesRequest,
-    ResolveExternalGoModuleToPackagesResult,
-    ResolveExternalGoPackageRequest,
-    ResolveGoPackageRequest,
-)
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
@@ -32,6 +18,20 @@ from pants.backend.go.target_types import (
     GoPackageDependencies,
     GoPackageSources,
 )
+from pants.backend.go.util_rules import go_pkg, import_analysis
+from pants.backend.go.util_rules.external_module import (
+    ResolveExternalGoModuleToPackagesRequest,
+    ResolveExternalGoModuleToPackagesResult,
+    ResolveExternalGoPackageRequest,
+)
+from pants.backend.go.util_rules.go_mod import (
+    FindNearestGoModuleRequest,
+    ResolvedGoModule,
+    ResolvedOwningGoModule,
+    ResolveGoModuleRequest,
+)
+from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
+from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.base.specs import (
     AddressSpecs,
     DescendantAddresses,
@@ -181,7 +181,7 @@ async def infer_go_dependencies(
                 f"in go_package at address '{this_go_package.address}'."
             )
 
-    return InferredDependencies(inferred_dependencies, sibling_dependencies_inferrable=False)
+    return InferredDependencies(inferred_dependencies)
 
 
 class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
@@ -283,7 +283,7 @@ async def generate_go_external_package_targets(
 def rules():
     return (
         *collect_rules(),
-        *pkg.rules(),
+        *go_pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),

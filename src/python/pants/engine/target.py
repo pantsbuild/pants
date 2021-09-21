@@ -718,19 +718,22 @@ class GeneratedTargets(FrozenDict[Address, Target]):
                     "All generated targets must have the same `Address.spec_path` as their "
                     f"target generator. Expected {generator.address.spec_path}, but got "
                     f"{tgt.address.spec_path} for target generated from {generator.address}: {tgt}"
+                    "\n\nConsider using `request.generator.address.create_generated()`."
                 )
             if tgt.address.target_name != expected_tgt_name:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.target_name` as their "
                     f"target generator. Expected {generator.address.target_name}, but got "
                     f"{tgt.address.target_name} for target generated from {generator.address}: "
-                    f"{tgt}"
+                    f"{tgt}\n\n"
+                    "Consider using `request.generator.address.create_generated()`."
                 )
             if not tgt.address.is_generated_target:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must set `Address.generator_name` or "
                     "`Address.relative_file_path`. Invalid for target generated from "
-                    f"{generator.address}: {tgt}"
+                    f"{generator.address}: {tgt}\n\n"
+                    "Consider using `request.generator.address.create_generated()`."
                 )
             mapping[tgt.address] = tgt
         super().__init__(mapping)
@@ -745,14 +748,27 @@ class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[Generat
 def generate_file_level_targets(
     generated_target_cls: type[Target],
     generator: Target,
-    paths: Iterable[str],
+    paths: Sequence[str],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
+    add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
-    for the `sources` field only referring to the path and using a new address."""
+    for the `sources` field only referring to the path and using a new address.
+
+    Set `add_dependencies_on_all_siblings` to True so that each file-level target depends on all
+    other generated targets from the target generator. This is useful if both are true:
+
+        a) file-level targets usually need their siblings to be present to work. Most target types
+          (Python, Java, Shell, etc) meet this, except for `files` and `resources` which have no
+          concept of "imports"
+        b) dependency inference cannot infer dependencies on sibling files.
+
+    Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
+    finer-grained.
+    """
     if not generator.has_field(Dependencies) or not generator.has_field(Sources):
         raise AssertionError(
             f"The `{generator.alias}` target {generator.address.spec} does "
@@ -760,39 +776,47 @@ def generate_file_level_targets(
             f"`{generated_target_cls.alias}` target."
         )
 
-    def gen_tgt(fp: str) -> Target:
-        relativized_file_name = str(PurePath(fp).relative_to(generator.address.spec_path))
-
-        generated_target_fields = {}
-        for field in generator.field_values.values():
-            value: Optional[ImmutableValue]
-            if isinstance(field, Sources):
-                if not bool(matches_filespec(field.filespec, paths=[fp])):
-                    raise AssertionError(
-                        f"Target {generator.address.spec}'s `sources` field does not match a file "
-                        f"{fp}."
-                    )
-                value = (relativized_file_name,)
-            else:
-                value = field.value
-            generated_target_fields[field.alias] = value
-
-        address = (
-            Address(
-                generator.address.spec_path,
-                target_name=generator.address.target_name,
-                generated_name=relativized_file_name,
-            )
+    all_generated_addresses = []
+    for fp in paths:
+        relativized_fp = str(PurePath(fp).relative_to(generator.address.spec_path))
+        all_generated_addresses.append(
+            generator.address.create_generated(relativized_fp)
             if use_generated_address_syntax
             else Address(
                 generator.address.spec_path,
                 target_name=generator.address.target_name,
-                relative_file_path=relativized_file_name,
+                relative_file_path=relativized_fp,
             )
         )
+
+    all_generated_address_specs = (
+        FrozenOrderedSet(addr.spec for addr in all_generated_addresses)
+        if add_dependencies_on_all_siblings
+        else FrozenOrderedSet()
+    )
+
+    def gen_tgt(full_fp: str, address: Address) -> Target:
+        generated_target_fields = {}
+        for field in generator.field_values.values():
+            value: Optional[ImmutableValue]
+            if isinstance(field, Sources):
+                if not bool(matches_filespec(field.filespec, paths=[full_fp])):
+                    raise AssertionError(
+                        f"Target {generator.address.spec}'s `sources` field does not match a file "
+                        f"{full_fp}."
+                    )
+                value = (address._relative_file_path or address.generated_name,)
+            elif add_dependencies_on_all_siblings and isinstance(field, Dependencies):
+                value = (field.value or ()) + tuple(all_generated_address_specs - {address.spec})
+            else:
+                value = field.value
+            generated_target_fields[field.alias] = value
+
         return generated_target_cls(generated_target_fields, address, union_membership)
 
-    return GeneratedTargets(generator, (gen_tgt(fp) for fp in paths))
+    return GeneratedTargets(
+        generator, (gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1902,20 +1926,30 @@ class InferDependenciesRequest(EngineAwareParameter):
 @dataclass(unsafe_hash=True)
 class InferredDependencies:
     dependencies: FrozenOrderedSet[Address]
-    sibling_dependencies_inferrable: bool
 
     def __init__(
-        self, dependencies: Iterable[Address], *, sibling_dependencies_inferrable: bool
+        self,
+        dependencies: Iterable[Address],
+        *,
+        sibling_dependencies_inferrable: bool | None = None,
     ) -> None:
-        """The result of inferring dependencies.
-
-        If the inference implementation is able to infer file-level dependencies on sibling files
-        belonging to the same target, set sibling_dependencies_inferrable=True. This allows for
-        finer-grained caching because the dependency rule will not automatically add a dependency on
-        all sibling files.
-        """
+        """The result of inferring dependencies."""
+        if sibling_dependencies_inferrable is not None:
+            warn_or_error(
+                "2.9.0.dev0",
+                "the `sibling_dependencies_inferrable` kwarg for InferredDependencies",
+                (
+                    "Pants no longer automatically generates 'file targets' automatically for "
+                    "you. You must now opt in to generating file targets by subclassing "
+                    "`GenerateTargetsRequest` and registering a rule that goes from your subclass "
+                    "to `GeneratedTargets`. Use `generate_file_level_targets()` from "
+                    "`pants.engine.target` to emulate the old 'file target' semantics. If you were "
+                    "setting `sibling_dependencies_inferrable=False` before, then you should use  "
+                    "set `add_dependencies_on_all_siblings=True` in your call to "
+                    "`generate_file_level_targets`."
+                ),
+            )
         self.dependencies = FrozenOrderedSet(sorted(dependencies))
-        self.sibling_dependencies_inferrable = sibling_dependencies_inferrable
 
     def __bool__(self) -> bool:
         return bool(self.dependencies)

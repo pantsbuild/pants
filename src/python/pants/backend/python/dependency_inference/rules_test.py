@@ -101,13 +101,11 @@ def test_infer_python_imports(caplog) -> None:
             Address("src/python", relative_file_path="app.py"),
             Address("src/python/util", relative_file_path="dep.py"),
         ],
-        sibling_dependencies_inferrable=True,
     )
 
     file_address = Address("src/python", relative_file_path="f2.py")
     assert run_dep_inference(file_address) == InferredDependencies(
-        [Address("src/python", relative_file_path="app.py")],
-        sibling_dependencies_inferrable=True,
+        [Address("src/python", relative_file_path="app.py")]
     )
     assert run_dep_inference(file_address, enable_string_imports=True) == InferredDependencies(
         [
@@ -115,7 +113,6 @@ def test_infer_python_imports(caplog) -> None:
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.pyi"),
         ],
-        sibling_dependencies_inferrable=True,
     )
 
     # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but not warn
@@ -150,7 +147,6 @@ def test_infer_python_imports(caplog) -> None:
                 relative_file_path="disambiguated_via_ignores.py",
             )
         ],
-        sibling_dependencies_inferrable=True,
     )
     assert len(caplog.records) == 1
     assert "The target src/python/ambiguous:main imports `ambiguous.dep`" in caplog.text
@@ -199,7 +195,6 @@ def test_infer_python_inits() -> None:
             Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
         ],
-        sibling_dependencies_inferrable=False,
     )
 
 
@@ -241,5 +236,4 @@ def test_infer_python_conftests() -> None:
             Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
         ],
-        sibling_dependencies_inferrable=False,
     )

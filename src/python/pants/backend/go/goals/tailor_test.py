@@ -3,10 +3,14 @@
 
 import pytest
 
-from pants.backend.go import module, sdk, target_type_rules
-from pants.backend.go.tailor import PutativeGoModuleTargetsRequest, PutativeGoPackageTargetsRequest
-from pants.backend.go.tailor import rules as go_tailor_rules
-from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoPackage
+from pants.backend.go import target_type_rules
+from pants.backend.go.goals.tailor import (
+    PutativeGoModuleTargetsRequest,
+    PutativeGoPackageTargetsRequest,
+)
+from pants.backend.go.goals.tailor import rules as go_tailor_rules
+from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.util_rules import external_module, go_mod, sdk
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -27,7 +31,8 @@ def rule_runner() -> RuleRunner:
             *go_tailor_rules(),
             *external_tool.rules(),
             *source_files.rules(),
-            *module.rules(),
+            *external_module.rules(),
+            *go_mod.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(PutativeTargets, [PutativeGoPackageTargetsRequest, AllOwnedSources]),

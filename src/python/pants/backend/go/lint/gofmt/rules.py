@@ -4,10 +4,10 @@
 import dataclasses
 from dataclasses import dataclass
 
-from pants.backend.go.distribution import GoLangDistribution
 from pants.backend.go.lint.fmt import GoLangFmtRequest
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
+from pants.backend.go.subsystems.golang import GoLangDistribution
 from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
