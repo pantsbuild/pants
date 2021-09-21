@@ -44,7 +44,7 @@ class JunitTestTarget(Target):
         Dependencies,
         JavaTestSourceField,
     )
-    help = "Java tests, run with JUnit."
+    help = "A single Java test, run with JUnit."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -63,6 +63,8 @@ class JunitTestsGeneratorTarget(Target):
         JavaTestsGeneratorSourcesField,
         Dependencies,
     )
+    help = "A suite of Java tests, run with JUnit."
+
 
 
 class GenerateTargetsFromJunitTests(GenerateTargetsRequest):
@@ -86,8 +88,8 @@ async def generate_targets_from_junit_tests(
     )
 
 
-# -----------------------------------------------------------------------------------------------
-# `java_source` target
+# --------------t---------------------------------------------------------------------------------
+# `java_source` arget
 # -----------------------------------------------------------------------------------------------
 
 
