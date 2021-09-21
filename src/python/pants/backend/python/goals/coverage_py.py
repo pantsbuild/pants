@@ -29,7 +29,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -364,6 +364,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
 @dataclass(frozen=True)
 class MergedCoverageData:
     coverage_data: Digest
+    addresses: tuple[Address, ...]
 
 
 @rule(desc="Merge Pytest coverage data", level=LogLevel.DEBUG)
@@ -374,16 +375,19 @@ async def merge_coverage_data(
     source_roots: AllSourceRoots,
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
-        return MergedCoverageData(data_collection[0].digest)
+        coverage_data = data_collection[0]
+        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
+    addresses = []
     for data in data_collection:
         # We prefix each .coverage file with its corresponding address to avoid collisions.
         coverage_digest_gets.append(
             Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         )
         coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
+        addresses.append(data.address)
 
     if coverage.global_report:
         global_coverage_base_dir = PurePath("__global_coverage__")
@@ -461,7 +465,8 @@ async def merge_coverage_data(
         ),
     )
     return MergedCoverageData(
-        await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest)))
+        await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest))),
+        tuple(addresses),
     )
 
 
@@ -471,10 +476,11 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-    all_used_addresses: Addresses,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(all_used_addresses))
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest(merged_coverage_data.addresses)
+    )
     sources = await Get(
         PythonSourceFiles,
         # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
