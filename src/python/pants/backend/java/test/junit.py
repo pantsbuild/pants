@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestsSources
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.backend.java.util_rules import JdkSetup
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
