@@ -107,7 +107,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="quotes",
                   tools=["echo", "tee"],
-                  command='$echo "foo bar" | $tee out.log',
+                  command='echo "foo bar" | tee out.log',
                   outputs=["out.log"],
                 )
                 """
@@ -131,7 +131,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   name="msg",
                   tools=["echo"],
                   outputs=["msg"],
-                  command="$echo 'shell_command:a' > msg",
+                  command="echo 'shell_command:a' > msg",
                 )
                 """
             ),
@@ -141,7 +141,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   name="msg",
                   tools=["cp", "echo"],
                   outputs=["msg"],
-                  command="$cp ../a/msg . ; $echo 'shell_command:b' >> msg",
+                  command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
                   dependencies=["src/a:msg"],
                 )
                 """
