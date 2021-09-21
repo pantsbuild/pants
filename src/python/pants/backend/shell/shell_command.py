@@ -3,15 +3,13 @@
 
 from __future__ import annotations
 
-import os
-
-from pants.core.target_types import (
-    FilesSources,
-    GenRuleCommandField,
-    GenRuleOutputsField,
-    GenRuleSources,
-    GenRuleToolsField,
+from pants.backend.shell.target_types import (
+    ShellCommandCommandField,
+    ShellCommandOutputsField,
+    ShellCommandSources,
+    ShellCommandToolsField,
 )
+from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -19,9 +17,7 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     Directory,
-    GlobMatchErrorBehavior,
     MergeDigests,
-    PathGlobs,
     Snapshot,
 )
 from pants.engine.process import (
@@ -45,21 +41,20 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-class GenerateFilesFromGenRuleRequest(GenerateSourcesRequest):
-    input = GenRuleSources
+class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
+    input = ShellCommandSources
     output = FilesSources
 
 
-@rule(desc="Running gen_rule", level=LogLevel.DEBUG)
-async def run_gen_rule(
-    request: GenerateFilesFromGenRuleRequest, bash: BashBinary
+@rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
+async def run_shell_command(
+    request: GenerateFilesFromShellCommandRequest, bash: BashBinary
 ) -> GeneratedSources:
-    gen_rule = request.protocol_target
-    working_directory = gen_rule.address.spec_path
-    command = gen_rule[GenRuleCommandField].value
-    tools = gen_rule[GenRuleToolsField].value
-    outputs = gen_rule[GenRuleOutputsField].value
-    source_globs = gen_rule[GenRuleSources].value or ()
+    shell_command = request.protocol_target
+    working_directory = shell_command.address.spec_path
+    command = shell_command[ShellCommandCommandField].value
+    tools = shell_command[ShellCommandToolsField].value
+    outputs = shell_command[ShellCommandOutputsField].value
 
     if not (command and tools and outputs):
         return GeneratedSources(EMPTY_SNAPSHOT)
@@ -81,51 +76,41 @@ async def run_gen_rule(
             tools_env[tool_request.binary_name] = binary.first_path.path
         else:
             raise BinaryNotFoundError(
-                tool_request, rationale=f"execute gen_rule {gen_rule.address}"
+                tool_request,
+                rationale=f"execute experimental_shell_command {shell_command.address}",
             )
 
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest([gen_rule.address]),
+        TransitiveTargetsRequest([shell_command.address]),
     )
 
-    own_sources, dep_sources = await MultiGet(
-        Get(
-            Digest,
-            PathGlobs(
-                [os.path.join(working_directory, glob) for glob in source_globs],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"{gen_rule.address}'s `{GenRuleSources.alias}` field",
+    sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            sources_fields=[tgt.get(Sources) for tgt in transitive_targets.dependencies],
+            for_sources_types=(
+                Sources,
+                FilesSources,
             ),
-        ),
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                sources_fields=[tgt.get(Sources) for tgt in transitive_targets.dependencies],
-                for_sources_types=(
-                    Sources,
-                    FilesSources,
-                ),
-                enable_codegen=True,
-            ),
+            enable_codegen=True,
         ),
     )
 
-    sources = await Get(Snapshot, MergeDigests([own_sources, dep_sources.snapshot.digest]))
     output_files = [f for f in outputs if not f.endswith("/")]
     output_directories = [d for d in outputs if d.endswith("/")]
 
-    if working_directory in sources.dirs:
-        input_digest = sources.digest
+    if working_directory in sources.snapshot.dirs:
+        input_digest = sources.snapshot.digest
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
-        input_digest = await Get(Digest, MergeDigests([sources.digest, work_dir]))
+        input_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, work_dir]))
 
     result = await Get(
         ProcessResult,
         Process(
             argv=(bash.path, "-c", command),
-            description=f"Running gen_rule {gen_rule.address}",
+            description=f"Running experimental_shell_command {shell_command.address}",
             env=tools_env,
             input_digest=input_digest,
             output_directories=output_directories,
@@ -141,5 +126,5 @@ async def run_gen_rule(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(GenerateSourcesRequest, GenerateFilesFromGenRuleRequest),
+        UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
     ]

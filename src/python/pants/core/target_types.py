@@ -30,7 +30,6 @@ from pants.engine.target import (
     SourcesPathsRequest,
     SpecialCasedDependencies,
     StringField,
-    StringSequenceField,
     Target,
     Targets,
     WrappedTarget,
@@ -364,58 +363,6 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         ),
     )
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
-
-
-# -----------------------------------------------------------------------------------------------
-# `gen_rule` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GenRuleCommandField(StringField):
-    alias = "command"
-    required = True
-    help = (
-        "Shell command to execute.\n\n" "The command is executed as 'bash -c <command>' by default."
-    )
-
-
-class GenRuleOutputsField(StringSequenceField):
-    alias = "outputs"
-    required = True
-    help = (
-        "Specify the shell command output files and directories.\n\n"
-        "Use a trailing slash on directory names, i.e. `my_dir/`."
-    )
-
-
-class GenRuleSources(Sources):
-    alias = "sources"
-
-
-class GenRuleToolsField(StringSequenceField):
-    alias = "tools"
-    required = True
-    help = (
-        "Specify required executable tools that might be used.\n\n"
-        "Each tool will be available in the environment via environment variables, e.g. the tool 'tar' should be used "
-        "as `$tar ...` in the command, or in any scripts invoked from the command line."
-    )
-
-
-class GenRuleTarget(Target):
-    alias = "gen_rule"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GenRuleCommandField,
-        GenRuleOutputsField,
-        GenRuleSources,
-        GenRuleToolsField,
-    )
-    help = (
-        "Execute any external tool for its side effects.\n"
-        "This may be retried and/or cancelled, so ensure that it is idempotent."
-    )
 
 
 def rules():

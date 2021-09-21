@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from textwrap import dedent
 from typing import Optional
 
 from pants.backend.shell.shell_setup import ShellSetup
@@ -23,6 +24,7 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
+    StringSequenceField,
     Target,
     generate_file_level_targets,
 )
@@ -189,6 +191,63 @@ async def generate_targets_from_shell_library(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `shell_command` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ShellCommandCommandField(StringField):
+    alias = "command"
+    required = True
+    help = (
+        "Shell command to execute.\n\n" "The command is executed as 'bash -c <command>' by default."
+    )
+
+
+class ShellCommandOutputsField(StringSequenceField):
+    alias = "outputs"
+    required = True
+    help = (
+        "Specify the shell command output files and directories.\n\n"
+        "Use a trailing slash on directory names, i.e. `my_dir/`."
+    )
+
+
+class ShellCommandSources(ShellSources):
+    # We solely register this field for codegen to work.
+    alias = "_sources"
+
+
+class ShellCommandToolsField(StringSequenceField):
+    alias = "tools"
+    required = True
+    help = (
+        "Specify required executable tools that might be used.\n\n"
+        "Each tool will be available in the environment via environment variables, "
+        "e.g. the tool 'tar' should be used as `$tar ...` in the command, or in any "
+        "scripts invoked from the command line."
+    )
+
+
+class ShellCommand(Target):
+    alias = "experimental_shell_command"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ShellCommandCommandField,
+        ShellCommandOutputsField,
+        ShellCommandSources,
+        ShellCommandToolsField,
+    )
+    help = dedent(
+        """\
+
+        Execute any external tool for its side effects.
+        This may be retried and/or cancelled, so ensure that it is idempotent.
+        """
     )
 
 
