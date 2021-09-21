@@ -6,9 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.java.compile.javac_subsystem import JavacSubsystem
-from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.coursier_setup import Coursier
 
