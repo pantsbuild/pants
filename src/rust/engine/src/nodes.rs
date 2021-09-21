@@ -1100,13 +1100,17 @@ impl Task {
               Select::new(params.clone(), get.output, entry)
             })
             .or_else(|| {
-              // Is a union.
-              let (_, rule_edges) = context
-                .core
-                .rule_graph
-                .find_root(vec![*get.input.type_id()], get.output)
-                .ok()?;
-              Some(Select::new_from_edges(params, get.output, &rule_edges))
+              if externs::is_union(get.input_type) {
+                // Is a union.
+                let (_, rule_edges) = context
+                  .core
+                  .rule_graph
+                  .find_root(vec![*get.input.type_id()], get.output)
+                  .ok()?;
+                Some(Select::new_from_edges(params, get.output, &rule_edges))
+              } else {
+                None
+              }
             })
             .ok_or_else(|| {
               if externs::is_union(get.input_type) {
