@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
 import re
 from dataclasses import InitVar, dataclass, field
 from typing import Generator, Pattern
@@ -11,8 +10,9 @@ from typing import Generator, Pattern
 from dockerfile import Command, parse_string
 
 from pants.backend.docker.target_types import DockerImageSources
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 
 
 @dataclass(frozen=True)
@@ -77,17 +77,16 @@ class DockerfileParser:
 
 
 @rule
-async def parse_dockerfile(request: DockerfileParseRequest) -> DockerfileInfo:
+async def parse_dockerfile(
+    request: DockerfileParseRequest, global_options: GlobalOptions
+) -> DockerfileInfo:
     if not request.sources.value:
         return DockerfileInfo()
 
     contents = await Get(
         DigestContents,
-        PathGlobs(
-            [os.path.join(request.sources.address.spec_path, request.sources.value[0])],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{request.sources.address}'s `{request.sources.alias}` field",
-        ),
+        PathGlobs,
+        request.sources.path_globs(global_options.options.files_not_found_behavior),
     )
 
     parser = DockerfileParser(contents[0].content.decode())
