@@ -18,23 +18,31 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 class Import {
-    public static Import fromImportDeclaration(ImportDeclaration imp) {
-        Import analysisImport = new Import();
-        analysisImport.name = imp.getName().toString();
-        analysisImport.isStatic = imp.isStatic();
-        analysisImport.isAsterisk = imp.isAsterisk();
-        return analysisImport;
+    Import(String name, boolean isStatic, boolean isAsterisk) {
+        this.name = name;
+        this.isStatic = isStatic;
+        this.isAsterisk = isAsterisk;
     }
 
-    public String name;
-    public boolean isStatic;
-    public boolean isAsterisk;
+    public static Import fromImportDeclaration(ImportDeclaration imp) {
+        return new Import(imp.getName().toString(), imp.isStatic(), imp.isAsterisk());
+    }
+
+    public final String name;
+    public final boolean isStatic;
+    public final boolean isAsterisk;
 }
 
 class CompilationUnitAnalysis {
-    public String declaredPackage;
-    public ArrayList<Import> imports;
-    public ArrayList<String> topLevelTypes;
+    CompilationUnitAnalysis(String declaredPackage, ArrayList<Import> imports, ArrayList<String> topLevelTypes) {
+        this.declaredPackage = declaredPackage;
+        this.imports = imports;
+        this.topLevelTypes = topLevelTypes;
+    }
+
+    public final String declaredPackage;
+    public final ArrayList<Import> imports;
+    public final ArrayList<String> topLevelTypes;
 }
 
 
@@ -44,22 +52,21 @@ public class PantsJavaParserLauncher {
         String sourceToAnalyze = args[1];
 
         CompilationUnit cu = StaticJavaParser.parse(new File(sourceToAnalyze));
-        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis();
 
         // Get the source's declare package.
-        analysis.declaredPackage = cu.getPackageDeclaration()
+        String declaredPackage = cu.getPackageDeclaration()
             .map(PackageDeclaration::getName)
             .map(Name::toString)
             .orElse("");
 
         // Get the source's imports.
-        analysis.imports = new ArrayList<Import>(
+        ArrayList<Import> imports = new ArrayList<Import>(
             cu.getImports().stream()
                 .map(Import::fromImportDeclaration)
                 .collect(Collectors.toList()));
 
         // Get the source's top level types
-        analysis.topLevelTypes = new ArrayList<String>(
+        ArrayList<String> topLevelTypes = new ArrayList<String>(
             cu.getTypes().stream()
                 .filter(TypeDeclaration::isTopLevelType)
                 .map(TypeDeclaration::getFullyQualifiedName)
@@ -69,6 +76,7 @@ public class PantsJavaParserLauncher {
                 .map(Optional::get)
                 .collect(Collectors.toList()));
 
+        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes);
         ObjectMapper mapper = new ObjectMapper();
         mapper.writeValue(new File(analysisOutputPath), analysis);
     }

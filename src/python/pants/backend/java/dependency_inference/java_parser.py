@@ -33,8 +33,7 @@ class FallibleJavaSourceDependencyAnalysisResult:
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleJavaSourceDependencyAnalysisResult,
 ) -> JavaSourceDependencyAnalysis:
-    # For whatever reason this doesn't work despite there being a rule that ostensibly
-    # does this conversion automatically.
+    # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
     if fallible_result.process_result.exit_code == 0:
         analysis_contents = await Get(
