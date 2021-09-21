@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestsSources
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
@@ -44,6 +44,7 @@ class JavaTestFieldSet(TestFieldSet):
 async def run_junit_test(
     coursier: Coursier,
     junit: JUnit,
+    test_subsystem: TestSubsystem,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
@@ -130,6 +131,7 @@ async def run_junit_test(
     return TestResult.from_fallible_process_result(
         process_result,
         address=field_set.address,
+        output_setting=test_subsystem.output,
     )
 
 

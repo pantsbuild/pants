@@ -26,7 +26,7 @@ from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -46,13 +46,15 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class TestResult:
+class TestResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stdout_digest: FileDigest
     stderr: str
     stderr_digest: FileDigest
     address: Address
+    output_setting: ShowOutput
+
     coverage_data: Optional[CoverageData] = None
     xml_results: Optional[Snapshot] = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
@@ -66,6 +68,7 @@ class TestResult:
         cls,
         process_result: FallibleProcessResult,
         address: Address,
+        output_setting: ShowOutput,
         *,
         coverage_data: Optional[CoverageData] = None,
         xml_results: Optional[Snapshot] = None,
@@ -78,38 +81,20 @@ class TestResult:
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
             address=address,
+            output_setting=output_setting,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
         )
 
-    def __lt__(self, other: Union[Any, EnrichedTestResult]) -> bool:
+    def __lt__(self, other: Any) -> bool:
         """We sort first by status (failed vs succeeded), then alphanumerically within each
         group."""
-        if not isinstance(other, EnrichedTestResult):
+        if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.address.spec < other.address.spec
         return abs(self.exit_code) < abs(other.exit_code)
-
-
-class ShowOutput(Enum):
-    """Which tests to emit detailed output for."""
-
-    ALL = "all"
-    FAILED = "failed"
-    NONE = "none"
-
-
-@dataclass(frozen=True)
-class EnrichedTestResult(TestResult, EngineAwareReturnType):
-    """A `TestResult` that is enriched for the sake of logging results as they come in.
-
-    Plugin authors only need to return `TestResult`, and a rule will upcast those into
-    `EnrichedTestResult`.
-    """
-
-    output_setting: ShowOutput = ShowOutput.ALL
 
     def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
         output: Dict[str, Union[FileDigest, Snapshot]] = {
@@ -141,6 +126,18 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
 
     def metadata(self) -> Dict[str, Any]:
         return {"address": self.address.spec}
+
+    def cacheable(self) -> bool:
+        """Is marked uncacheable to ensure that it always renders."""
+        return False
+
+
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
 
 
 @dataclass(frozen=True)
@@ -392,7 +389,7 @@ async def run_tests(
     )
 
     results = await MultiGet(
-        Get(EnrichedTestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
+        Get(TestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
     )
 
     # Print summary.
@@ -482,26 +479,6 @@ def get_filtered_environment(
         else FrozenDict({})
     )
     return TestExtraEnv(env)
-
-
-# NB: We mark this uncachable to ensure that the results are always streamed, even if the
-# underlying TestResult is memoized. This rule is very cheap, so there's little performance hit.
-@_uncacheable_rule(desc="test")
-def enrich_test_result(
-    test_result: TestResult, test_subsystem: TestSubsystem
-) -> EnrichedTestResult:
-    return EnrichedTestResult(
-        exit_code=test_result.exit_code,
-        stdout=test_result.stdout,
-        stdout_digest=test_result.stdout_digest,
-        stderr=test_result.stderr,
-        stderr_digest=test_result.stderr_digest,
-        address=test_result.address,
-        coverage_data=test_result.coverage_data,
-        xml_results=test_result.xml_results,
-        extra_output=test_result.extra_output,
-        output_setting=test_subsystem.output,
-    )
 
 
 # -------------------------------------------------------------------------------------------
