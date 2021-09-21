@@ -33,6 +33,8 @@ mod rules;
 use std::collections::{HashMap, HashSet};
 use std::io;
 
+use indexmap::IndexSet;
+
 pub use crate::builder::Builder;
 pub use crate::rules::{
   DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, TypeId,
@@ -243,7 +245,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Result<RuleGraph<R>, String> {
+  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Result<RuleGraph<R>, String> {
     Builder::new(rules, queries).graph()
   }
 
