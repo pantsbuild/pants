@@ -75,14 +75,5 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem) -> JdkSetup:
     )
 
 
-@dataclass(frozen=True)
-class JdkProcess:
-    tool: str  # "java", "javac" etc.
-    args: tuple[str, ...]
-    input_digest: Digest
-    description: str
-    cache_scope: ProcessCacheScope
-
-
 def rules():
     return collect_rules()
