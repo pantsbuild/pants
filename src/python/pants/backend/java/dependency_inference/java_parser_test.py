@@ -117,26 +117,22 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    fallible_result = rule_runner.request(
-        FallibleJavaSourceDependencyAnalysisResult,
+    analysis = rule_runner.request(
+        JavaSourceDependencyAnalysis,
         [source_files],
     )
-    assert fallible_result.analysis.declared_package == "org.pantsbuild.example"
-    assert fallible_result.analysis.imports == [
+    assert analysis.declared_package == "org.pantsbuild.example"
+    assert analysis.imports == [
         JavaImport(name="java.util.Date"),
         JavaImport(name="bogus", is_asterisk=True),
         JavaImport(name="bogus.T", is_static=True),
         JavaImport(name="bogus.T.t"),
         JavaImport(name="bogus.Foo", is_asterisk=True, is_static=True),
     ]
-    assert fallible_result.analysis.top_level_types == [
+    assert analysis.top_level_types == [
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     ]
-    assert (
-        rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
-        == fallible_result.analysis
-    )
 
 
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
@@ -245,10 +241,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    fallible_result = rule_runner.request(
-        FallibleJavaSourceDependencyAnalysisResult,
-        [source_files],
-    )
-    assert fallible_result.analysis.declared_package == ""
-    assert fallible_result.analysis.imports == []
-    assert fallible_result.analysis.top_level_types == ["SimpleSource", "Foo"]
+    analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
+    assert analysis.declared_package == ""
+    assert analysis.imports == []
+    assert analysis.top_level_types == ["SimpleSource", "Foo"]

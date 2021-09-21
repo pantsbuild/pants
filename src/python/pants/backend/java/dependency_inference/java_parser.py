@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class FallibleJavaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
-    analysis: JavaSourceDependencyAnalysis | None = None
 
 
 @rule(level=LogLevel.DEBUG)
@@ -38,7 +37,11 @@ async def resolve_fallible_result_to_analysis(
     # does this conversion automatically.
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
     if fallible_result.process_result.exit_code == 0:
-        return fallible_result.analysis
+        analysis_contents = await Get(
+            DigestContents, Digest, fallible_result.process_result.output_digest
+        )
+        analysis = json.loads(analysis_contents[0].content)
+        return JavaSourceDependencyAnalysis.from_json_dict(analysis)
     raise ProcessExecutionFailure(
         fallible_result.process_result.exit_code,
         fallible_result.process_result.stdout,
@@ -117,16 +120,7 @@ async def analyze_java_source_dependencies(
         proc,
     )
 
-    if process_result.exit_code != 0:
-        return FallibleJavaSourceDependencyAnalysisResult(process_result=process_result)
-
-    analysis_contents = await Get(DigestContents, Digest, process_result.output_digest)
-    analysis = json.loads(analysis_contents[0].content)
-
-    return FallibleJavaSourceDependencyAnalysisResult(
-        process_result=process_result,
-        analysis=JavaSourceDependencyAnalysis.from_json_dict(analysis),
-    )
+    return FallibleJavaSourceDependencyAnalysisResult(process_result=process_result)
 
 
 def rules():
