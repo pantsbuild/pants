@@ -71,9 +71,7 @@ async def run_shell_command(
         Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
     )
 
-    bin_relpath = ".bin"
     command_env = {
-        "PATH": bin_relpath,
         "TOOLS": " ".join(tools),
     }
 
@@ -113,11 +111,13 @@ async def run_shell_command(
         input_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, work_dir]))
 
     # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
-    setup_tool_symlinks_script = "; ".join(
+    bin_relpath = ".bin"
+    setup_tool_symlinks_script = ";".join(
         dedent(
             f"""\
             $mkdir -p {bin_relpath}
             for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}/; done
+            export PATH="$PWD/{bin_relpath}"
             """
         ).split("\n")
     )

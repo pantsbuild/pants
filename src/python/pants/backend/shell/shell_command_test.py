@@ -170,7 +170,7 @@ def test_side_effecting_command(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="side-effect",
                   command="echo 'server started'",
-                  tools=["echo"]
+                  tools=["echo"],
                 )
                 """
             ),
@@ -180,5 +180,27 @@ def test_side_effecting_command(rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="side-effect"),
+        expected_contents={},
+    )
+
+
+def test_tool_search_path_stable(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="paths",
+                  command="mkdir subdir; cd subdir; ls .",
+                  tools=["cd", "ls", "mkdir"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="paths"),
         expected_contents={},
     )
