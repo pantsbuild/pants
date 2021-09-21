@@ -50,7 +50,14 @@ async def generate_targets_from_junit_tests(
     request: GenerateTargetsFromJunitTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaTestsSources]))
-    return generate_file_level_targets(JunitTests, request.generator, paths.files, union_membership)
+    return generate_file_level_targets(
+        JunitTests,
+        request.generator,
+        paths.files,
+        union_membership,
+        # TODO(#12790): set to false when dependency inference is disabled.
+        add_dependencies_on_all_siblings=True,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -82,7 +89,12 @@ async def generate_targets_from_java_library(
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[JavaLibrarySources]))
     return generate_file_level_targets(
-        JavaLibrary, request.generator, paths.files, union_membership
+        JavaLibrary,
+        request.generator,
+        paths.files,
+        union_membership,
+        # TODO(#12790): set to false when dependency inference is disabled.
+        add_dependencies_on_all_siblings=True,
     )
 
 

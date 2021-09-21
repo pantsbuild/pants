@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.go import module, pkg, sdk, target_type_rules
+from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import InferGoPackageDependenciesRequest
 from pants.backend.go.target_types import (
     GoExternalPackageTarget,
@@ -13,6 +13,7 @@ from pants.backend.go.target_types import (
     GoPackage,
     GoPackageSources,
 )
+from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Addresses
@@ -34,8 +35,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
-            *module.rules(),
-            *pkg.rules(),
+            *go_mod.rules(),
+            *go_pkg.rules(),
+            *external_module.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
@@ -132,7 +134,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         InferredDependencies, [InferGoPackageDependenciesRequest(target1[GoPackageSources])]
     )
     assert inferred_deps_1.dependencies == FrozenOrderedSet([Address("foo/pkg")])
-    assert not inferred_deps_1.sibling_dependencies_inferrable
 
     target2 = rule_runner.get_target(Address("foo/pkg"))
     inferred_deps_2 = rule_runner.request(
@@ -141,4 +142,3 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     assert inferred_deps_2.dependencies == FrozenOrderedSet(
         [Address("foo", target_name="github.com_google_go-cmp_0.4.0-_cmp")]
     )
-    assert not inferred_deps_2.sibling_dependencies_inferrable

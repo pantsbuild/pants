@@ -273,16 +273,12 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
     improved performance / concurrency.
     """
-    roots_as_targets: Collection[Target]
-    if request.expanded_targets:
-        roots_as_targets = await Get(Targets, Addresses(request.tt_request.roots))
-    else:
-        roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
+    roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
-    dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
+    dependency_mapping: dict[Address, Tuple[Address, ...]] = {}
     while queued:
-        direct_dependencies: Tuple[Collection[Target], ...]
+        direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(
                 Get(
@@ -871,30 +867,6 @@ async def resolve_dependencies(
             GeneratedTargets, GenerateTargetsRequest, generate_request(tgt)
         )
         generated_addresses = tuple(generated_targets.keys())
-
-    # For "file targets", inject dependencies on all siblings if that target does not have
-    # dependency inference or the implementations cannot infer dependencies on sibling files.
-    # TODO: Remove this, have the target generation rules set up the dependencies directly.
-    no_sibling_file_deps_inferrable = not inferred or all(
-        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
-    )
-    if (
-        target_types_to_generate_requests.is_generator(tgt)
-        and tgt.address.is_file_target
-        and no_sibling_file_deps_inferrable
-    ):
-        generate_request = target_types_to_generate_requests[type(tgt)]
-        wrapped_target_generator = await Get(
-            WrappedTarget, Address, tgt.address.maybe_convert_to_target_generator()
-        )
-        generated_targets = await Get(
-            GeneratedTargets,
-            GenerateTargetsRequest,
-            generate_request(wrapped_target_generator.target),
-        )
-        generated_addresses = tuple(
-            addr for addr in generated_targets if addr != request.field.address
-        )
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always

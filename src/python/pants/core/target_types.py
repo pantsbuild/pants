@@ -69,7 +69,13 @@ async def generate_targets_from_files(
     request: GenerateTargetsFromFiles, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[FilesSources]))
-    return generate_file_level_targets(Files, request.generator, paths.files, union_membership)
+    return generate_file_level_targets(
+        Files,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=False,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -228,7 +234,13 @@ async def generate_targets_from_resources(
     request: GenerateTargetsFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ResourcesSources]))
-    return generate_file_level_targets(Resources, request.generator, paths.files, union_membership)
+    return generate_file_level_targets(
+        Resources,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=False,
+    )
 
 
 # -----------------------------------------------------------------------------------------------

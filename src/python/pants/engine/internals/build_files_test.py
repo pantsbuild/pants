@@ -139,13 +139,19 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
         request.generator,
         [
             *generate_file_level_targets(
-                MockGeneratedTarget, request.generator, paths.files, None
+                MockGeneratedTarget,
+                request.generator,
+                paths.files,
+                None,
+                add_dependencies_on_all_siblings=True,
+                use_generated_address_syntax=False,
             ).values(),
             *generate_file_level_targets(
                 MockGeneratedTarget,
                 request.generator,
                 paths.files,
                 None,
+                add_dependencies_on_all_siblings=True,
                 use_generated_address_syntax=True,
             ).values(),
         ],

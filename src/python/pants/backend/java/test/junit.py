@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestsSources
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
 from pants.engine.addresses import Addresses
@@ -42,6 +43,7 @@ class JavaTestFieldSet(TestFieldSet):
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     coursier: Coursier,
+    junit: JUnit,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
@@ -108,16 +110,11 @@ async def run_junit_test(
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
-            # TODO(12812): Make these options configurable by integration tests in `junit_test.py`.
-            # Remove these hard-coded options before general availability.
-            "--disable-ansi-colors",
-            "--details=flat",
-            "--details-theme=ascii",
-            # END TODO REMOVAL
             "--classpath",
             usercp_relpath,
             "--scan-class-path",
             usercp_relpath,
+            *junit.options.args,
         ],
         input_digest=merged_digest,
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",

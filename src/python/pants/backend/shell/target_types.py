@@ -7,6 +7,7 @@ import re
 from enum import Enum
 from typing import Optional
 
+from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
 from pants.engine.process import BinaryPathTest
@@ -142,11 +143,17 @@ class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_shunit2_tests(
-    request: GenerateTargetsFromShunit2Tests, union_membership: UnionMembership
+    request: GenerateTargetsFromShunit2Tests,
+    shell_setup: ShellSetup,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsSources]))
     return generate_file_level_targets(
-        Shunit2Tests, request.generator, paths.files, union_membership
+        Shunit2Tests,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
     )
 
 
@@ -171,11 +178,17 @@ class GenerateTargetsFromShellLibrary(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_shell_library(
-    request: GenerateTargetsFromShellLibrary, union_membership: UnionMembership
+    request: GenerateTargetsFromShellLibrary,
+    shell_setup: ShellSetup,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ShellLibrarySources]))
     return generate_file_level_targets(
-        ShellLibrary, request.generator, paths.files, union_membership
+        ShellLibrary,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
     )
 
 

@@ -161,7 +161,7 @@ async def infer_shell_dependencies(
     request: InferShellDependencies, shell_mapping: ShellMapping, shell_setup: ShellSetup
 ) -> InferredDependencies:
     if not shell_setup.dependency_inference:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     address = request.sources_field.address
     wrapped_tgt = await Get(WrappedTarget, Address, address)
@@ -195,7 +195,7 @@ async def infer_shell_dependencies(
                 maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
-    return InferredDependencies(sorted(result), sibling_dependencies_inferrable=True)
+    return InferredDependencies(sorted(result))
 
 
 def rules():

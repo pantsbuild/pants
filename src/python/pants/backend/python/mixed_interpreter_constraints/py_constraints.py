@@ -77,14 +77,14 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_expanded_targets, all_explicit_targets = await MultiGet(
+        with_generated_targets, without_generated_targets = await MultiGet(
             Get(Targets, AddressSpecs([DescendantAddresses("")])),
             Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")])),
         )
         all_python_targets = sorted(
             {
                 t
-                for t in (*all_expanded_targets, *all_explicit_targets)
+                for t in (*with_generated_targets, *without_generated_targets)
                 if t.has_field(InterpreterConstraintsField)
             },
             key=lambda tgt: cast(Address, tgt.address),
