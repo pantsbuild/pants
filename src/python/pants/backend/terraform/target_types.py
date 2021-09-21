@@ -15,7 +15,27 @@ class TerraformModuleSources(TerraformSources):
 class TerraformModule(Target):
     alias = "terraform_module"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModuleSources)
-    help = """A single Terraform module."""
+    help = (
+        "A single Terraform module corresponding to a directory.\n\n"
+        "There must only be one `terraform_module` in a directory.\n\n"
+        "Use `terraform_modules` to generate `terraform_module` targets for less boilerplate."
+    )
+
+
+class TerraformModulesSources(TerraformSources):
+    # TODO: This currently only globs .tf files but not non-.tf files referenced by Terraform config. This
+    # should be updated to allow for the generated TerraformModule targets to capture all files in the diectory
+    # other than BUILD files.
+    default = ("**/*.tf",)
+
+
+class TerraformModules(Target):
+    alias = "terraform_modules"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModulesSources)
+    help = (
+        "Generate a `terraform_module` target for each directory from the `sources` field "
+        "where Terraform files are present."
+    )
 
 
 def rules():

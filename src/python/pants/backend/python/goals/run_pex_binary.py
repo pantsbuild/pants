@@ -9,7 +9,8 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import Pex
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -40,8 +41,10 @@ async def create_pex_binary_run_request(
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
-    pex_get = Get(
-        Pex,
+    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
+    # so that we can get the interpreter constraints for use in local_dists_get.
+    requirements_pex_request = await Get(
+        PexRequest,
         PexFromTargetsRequest(
             [field_set.address],
             output_filename=f"{field_set.address.target_name}.pex",
@@ -60,12 +63,30 @@ async def create_pex_binary_run_request(
             ),
         ),
     )
+    pex_get = Get(Pex, PexRequest, requirements_pex_request)
     sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
     pex, sources = await MultiGet(pex_get, sources_get)
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [field_set.address],
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            sources=sources,
+        ),
+    )
+
     merged_digest = await Get(
-        Digest, MergeDigests([pex.digest, sources.source_files.snapshot.digest])
+        Digest,
+        MergeDigests(
+            [
+                pex.digest,
+                local_dists.pex.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
+            ]
+        ),
     )
 
     def in_chroot(relpath: str) -> str:
@@ -77,7 +98,8 @@ async def create_pex_binary_run_request(
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
-        "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        "PEX_PATH": in_chroot(local_dists.pex.name),
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)

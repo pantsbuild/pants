@@ -316,16 +316,13 @@ def test_group_by_dir() -> None:
 def test_specs_to_dirs() -> None:
     assert specs_to_dirs(Specs(AddressSpecs([]), FilesystemSpecs([]))) == ("",)
     assert specs_to_dirs(
-        Specs(AddressSpecs([AddressLiteralSpec("src/python/foo", "foo")]), FilesystemSpecs([]))
+        Specs(AddressSpecs([AddressLiteralSpec("src/python/foo")]), FilesystemSpecs([]))
     ) == ("src/python/foo",)
     assert (
         specs_to_dirs(
             Specs(
                 AddressSpecs(
-                    [
-                        AddressLiteralSpec("src/python/foo", "foo"),
-                        AddressLiteralSpec("src/python/bar", "bar"),
-                    ]
+                    [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
                 ),
                 FilesystemSpecs([]),
             )
@@ -340,8 +337,20 @@ def test_specs_to_dirs() -> None:
 
     with pytest.raises(ValueError):
         specs_to_dirs(
+            Specs(AddressSpecs([AddressLiteralSpec("src/python/bar", "tgt")]), FilesystemSpecs([]))
+        )
+
+    with pytest.raises(ValueError):
+        specs_to_dirs(
             Specs(
-                AddressSpecs([AddressLiteralSpec("src/python/bar", "notbar")]), FilesystemSpecs([])
+                AddressSpecs(
+                    [
+                        AddressLiteralSpec(
+                            "src/python/bar", target_component=None, generated_component="gen"
+                        )
+                    ]
+                ),
+                FilesystemSpecs([]),
             )
         )
 

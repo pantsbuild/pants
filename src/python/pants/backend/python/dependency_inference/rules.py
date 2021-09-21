@@ -68,9 +68,9 @@ class PythonInferSubsystem(Subsystem):
             default=False,
             type=bool,
             help=(
-                "Infer a target's dependencies on any __init__.py files existing for the packages "
+                "Infer a target's dependencies on any `__init__.py` files in the packages "
                 "it is located in (recursively upward in the directory structure).\n\nEven if this "
-                "is disabled, Pants will still include any ancestor __init__.py files, only they "
+                "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
                 "will not be 'proper' dependencies, e.g. they will not show up in "
                 "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
                 "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
@@ -129,7 +129,7 @@ async def infer_python_dependencies_via_imports(
     python_setup: PythonSetup,
 ) -> InferredDependencies:
     if not python_infer_subsystem.imports:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
     explicitly_provided_deps, detected_imports = await MultiGet(
@@ -162,7 +162,7 @@ async def infer_python_dependencies_via_imports(
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
 
-    return InferredDependencies(sorted(merged_result), sibling_dependencies_inferrable=True)
+    return InferredDependencies(sorted(merged_result))
 
 
 class InferInitDependencies(InferDependenciesRequest):
@@ -174,7 +174,7 @@ async def infer_python_init_dependencies(
     request: InferInitDependencies, python_infer_subsystem: PythonInferSubsystem
 ) -> InferredDependencies:
     if not python_infer_subsystem.inits:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -190,9 +190,7 @@ async def infer_python_init_dependencies(
     owners = await MultiGet(
         Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
     )
-    return InferredDependencies(
-        itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
-    )
+    return InferredDependencies(itertools.chain.from_iterable(owners))
 
 
 class InferConftestDependencies(InferDependenciesRequest):
@@ -205,7 +203,7 @@ async def infer_python_conftest_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> InferredDependencies:
     if not python_infer_subsystem.conftests:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -220,9 +218,7 @@ async def infer_python_conftest_dependencies(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in extra_conftest_files.snapshot.files
     )
-    return InferredDependencies(
-        itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
-    )
+    return InferredDependencies(itertools.chain.from_iterable(owners))
 
 
 # This is a separate function to facilitate tests registering import inference.

@@ -16,7 +16,7 @@ from pants.engine.target import (
 
 
 class GoSources(Sources):
-    expected_file_extensions = (".go",)
+    expected_file_extensions = (".go", ".s")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ class GoSources(Sources):
 
 
 class GoPackageSources(GoSources):
-    default = ("*.go",)
+    default = ("*.go", "*.s")
 
 
 class GoImportPath(StringField):
@@ -70,54 +70,46 @@ class GoModule(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_external_module` target
+# `_go_external_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExternalModulePath(StringField):
-    alias = "path"
-    help = "Module path to a Go module"
-
-
-class GoExternalModuleVersion(StringField):
-    alias = "version"
-    help = "Version of a Go module"
-
-
-class GoExternalModule(Target):
-    alias = "go_external_module"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoExternalModulePath,
-        GoExternalModuleVersion,
-        GoImportPath,
-    )
-    help = "External Go module."
-
-
-# -----------------------------------------------------------------------------------------------
-# `_go_ext_mod_package` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GoExtModPackageDependencies(Dependencies):
+class GoExternalPackageDependencies(Dependencies):
     pass
 
 
-# Represents a Go package within a third-party Go package.
-# TODO(12763): Create this target synthetically (or remove the need for it) instead of relying on
-# `./pants tailor` to create.
-class GoExtModPackage(Target):
-    alias = "_go_ext_mod_package"
+class GoExternalModulePathField(StringField):
+    alias = "path"
+    help = (
+        "The module path of the third-party module this package comes from, "
+        "e.g. `github.com/google/go-cmp`."
+    )
+    required = True
+    value: str
+
+
+class GoExternalModuleVersionField(StringField):
+    alias = "version"
+    help = "The version of the third-party module this package comes from, e.g. `v0.4.0`."
+    required = True
+    value: str
+
+
+class GoExternalPackageImportPathField(GoImportPath):
+    required = True
+    value: str
+
+
+class GoExternalPackageTarget(Target):
+    alias = "_go_external_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoExtModPackageDependencies,
-        GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
-        GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
-        GoImportPath,
+        GoExternalPackageDependencies,
+        GoExternalModulePathField,
+        GoExternalModuleVersionField,
+        GoExternalPackageImportPathField,
     )
-    help = "Package in an external Go module."
+    help = "A package from a third-party Go module."
 
 
 # -----------------------------------------------------------------------------------------------

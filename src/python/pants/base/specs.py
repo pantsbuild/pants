@@ -37,15 +37,27 @@ class AddressSpec(Spec, metaclass=ABCMeta):
 class AddressLiteralSpec(AddressSpec):
     """An AddressSpec for a single address.
 
-    This may be a traditional address, like `a/b/c:c`, or a file address using disambiguation
-    syntax, e.g. `a/b/c.txt:tgt`.
+    This may be one of:
+
+    * A traditional address, like `dir:lib`.
+    * A generated target address like `dir:lib#generated` or `dir#generated`.
+    * A file address using disambiguation syntax like dir/f.ext:lib` (files without a target will
+      be FilesystemSpecs).
     """
 
     path_component: str
-    target_component: str
+    target_component: str | None = None
+    generated_component: str | None = None
 
     def __str__(self) -> str:
-        return f"{self.path_component}:{self.target_component}"
+        tgt = f":{self.target_component}" if self.target_component else ""
+        generated = f"#{self.generated_component}" if self.generated_component else ""
+        return f"{self.path_component}{tgt}{generated}"
+
+    @property
+    def is_directory_shorthand(self) -> bool:
+        """Is in the format `path/to/dir`, which is shorthand for `path/to/dir:dir`."""
+        return self.target_component is None and self.generated_component is None
 
 
 class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):

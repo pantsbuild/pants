@@ -162,10 +162,13 @@ async def addresses_from_address_specs(
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
 
-    # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be file
+    # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be generated
     # addresses. This will raise an exception if any of the addresses are not valid.
     literal_addresses = await MultiGet(
-        Get(Address, AddressInput(spec.path_component, spec.target_component))
+        Get(
+            Address,
+            AddressInput(spec.path_component, spec.target_component, spec.generated_component),
+        )
         for spec in address_specs.literals
     )
     literal_target_adaptors = await MultiGet(
@@ -204,6 +207,7 @@ async def addresses_from_address_specs(
         matched_addresses.update(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
+            # TODO(#11123): handle the edge case if a generated target's `tags` != its generator's.
             if filtering_disabled or specs_filter.matches(addr, tgt)
         )
 

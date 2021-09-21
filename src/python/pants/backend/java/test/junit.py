@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestsSources
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
 from pants.engine.addresses import Addresses
@@ -19,11 +20,12 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirements,
+    Coordinate,
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
-    MavenRequirements,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
@@ -41,6 +43,7 @@ class JavaTestFieldSet(TestFieldSet):
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     coursier: Coursier,
+    junit: JUnit,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
@@ -56,14 +59,25 @@ async def run_junit_test(
         MaterializedClasspathRequest(
             prefix="__thirdpartycp",
             lockfiles=(lockfile,),
-            maven_requirements=(
-                MavenRequirements.create_from_maven_coordinates_fields(
-                    fields=(),
-                    additional_requirements=[
-                        "org.junit.platform:junit-platform-console:1.7.2",
-                        "org.junit.jupiter:junit-jupiter-engine:5.7.2",
-                        "org.junit.vintage:junit-vintage-engine:5.7.2",
-                    ],
+            artifact_requirements=(
+                ArtifactRequirements(
+                    [
+                        Coordinate(
+                            group="org.junit.platform",
+                            artifact="junit-platform-console",
+                            version="1.7.2",
+                        ),
+                        Coordinate(
+                            group="org.junit.jupiter",
+                            artifact="junit-jupiter-engine",
+                            version="5.7.2",
+                        ),
+                        Coordinate(
+                            group="org.junit.vintage",
+                            artifact="junit-vintage-engine",
+                            version="5.7.2",
+                        ),
+                    ]
                 ),
             ),
         ),
@@ -96,16 +110,11 @@ async def run_junit_test(
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
-            # TODO(12812): Make these options configurable by integration tests in `junit_test.py`.
-            # Remove these hard-coded options before general availability.
-            "--disable-ansi-colors",
-            "--details=flat",
-            "--details-theme=ascii",
-            # END TODO REMOVAL
             "--classpath",
             usercp_relpath,
             "--scan-class-path",
             usercp_relpath,
+            *junit.options.args,
         ],
         input_digest=merged_digest,
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",

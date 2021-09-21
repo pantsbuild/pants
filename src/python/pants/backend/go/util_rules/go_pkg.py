@@ -6,46 +6,25 @@ import json
 import logging
 from dataclasses import dataclass
 
-import ijson
-
-from pants.backend.go.module import (
-    DownloadedExternalModule,
-    DownloadExternalModuleRequest,
+from pants.backend.go.target_types import (
+    GoExternalPackageDependencies,
+    GoImportPath,
+    GoModuleSources,
+    GoPackageSources,
+)
+from pants.backend.go.util_rules.go_mod import (
     FindNearestGoModuleRequest,
     ResolvedGoModule,
     ResolvedOwningGoModule,
     ResolveGoModuleRequest,
 )
-from pants.backend.go.sdk import GoSdkProcess
-from pants.backend.go.target_types import (
-    GoExternalModulePath,
-    GoExternalModuleVersion,
-    GoExtModPackageDependencies,
-    GoImportPath,
-    GoModuleSources,
-    GoPackageSources,
-)
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.console import Console
-from pants.engine.fs import (
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    DigestContents,
-    DigestSubset,
-    FileContent,
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target, WrappedTarget
 
 logger = logging.getLogger(__name__)
 
@@ -191,11 +170,6 @@ class ResolveGoPackageRequest:
     address: Address
 
 
-@dataclass(frozen=True)
-class ResolveExternalGoPackageRequest:
-    address: Address
-
-
 def error_to_string(d: dict) -> str:
     pos = d.get("Pos", "")
     if pos:
@@ -211,7 +185,7 @@ def is_first_party_package_target(tgt: Target) -> bool:
 
 
 def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoExtModPackageDependencies)
+    return tgt.has_field(GoExternalPackageDependencies)
 
 
 @rule
@@ -280,187 +254,6 @@ async def resolve_go_package(
         address=request.address,
         module_address=owning_go_module_result.module_address,
     )
-
-
-@rule
-async def resolve_external_go_package(
-    request: ResolveExternalGoPackageRequest,
-) -> ResolvedGoPackage:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
-    target = wrapped_target.target
-
-    import_path = target[GoImportPath].value
-    if not import_path:
-        # TODO: Implement via `required = True` on the Target.
-        raise ValueError(
-            f"_go_ext_mod_package at address {request.address} does not have an import path set."
-        )
-
-    module_path = target[GoExternalModulePath].value
-    if not module_path:
-        # TODO: Implement GoExternalModulePath.compute_value for this check.
-        raise ValueError(f"_go_ext_mod_package at address {request.address} has a blank `path`")
-
-    module_version = target[GoExternalModuleVersion].value
-    if not module_version:
-        # TODO: Implement GoExternalModuleVersion.compute_value for this check.
-        raise ValueError(f"_go_ext_mod_package at address {request.address} has a blank `version`")
-
-    module = await Get(
-        DownloadedExternalModule,
-        DownloadExternalModuleRequest(
-            path=module_path,
-            version=module_version,
-        ),
-    )
-
-    assert import_path.startswith(module_path)
-    subpath = import_path[len(module_path) :]
-
-    result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=module.digest,
-            command=("list", "-json", f"./{subpath}"),
-            description="Resolve _go_ext_mod_package metadata.",
-        ),
-    )
-
-    metadata = json.loads(result.stdout)
-    return ResolvedGoPackage.from_metadata(
-        metadata,
-        import_path=import_path,
-        address=request.address,
-        module_address=None,
-        module_path=module_path,
-        module_version=module_version,
-    )
-
-
-@dataclass(frozen=True)
-class ResolveExternalGoModuleToPackagesRequest:
-    path: str
-    version: str
-    go_sum_digest: Digest
-
-
-@dataclass(frozen=True)
-class ResolveExternalGoModuleToPackagesResult:
-    # TODO: Consider using DeduplicatedCollection if this is the only field.
-    packages: FrozenOrderedSet[ResolvedGoPackage]
-
-
-@rule
-async def resolve_external_module_to_go_packages(
-    request: ResolveExternalGoModuleToPackagesRequest,
-) -> ResolveExternalGoModuleToPackagesResult:
-    module_path = request.path
-    assert module_path
-    module_version = request.version
-    assert module_version
-
-    downloaded_module = await Get(
-        DownloadedExternalModule,
-        DownloadExternalModuleRequest(path=module_path, version=module_version),
-    )
-    sources_digest = await Get(Digest, AddPrefix(downloaded_module.digest, "__sources__"))
-
-    # TODO: Super hacky merge of go.sum from both digests. We should really just pass in the fully-resolved
-    # go.sum and use that, but this allows the go.sum from the downloaded module to have some effect. Not sure
-    # if that is right call, but hackity hack!
-    left_digest_contents = await Get(DigestContents, Digest, sources_digest)
-    left_go_sum_contents = b""
-    for fc in left_digest_contents:
-        if fc.path == "__sources__/go.sum":
-            left_go_sum_contents = fc.content
-            break
-
-    go_sum_only_digest = await Get(
-        Digest, DigestSubset(request.go_sum_digest, PathGlobs(["go.sum"]))
-    )
-    go_sum_prefixed_digest = await Get(Digest, AddPrefix(go_sum_only_digest, "__sources__"))
-    right_digest_contents = await Get(DigestContents, Digest, go_sum_prefixed_digest)
-    right_go_sum_contents = b""
-    for fc in right_digest_contents:
-        if fc.path == "__sources__/go.sum":
-            right_go_sum_contents = fc.content
-            break
-    go_sum_contents = left_go_sum_contents + b"\n" + right_go_sum_contents
-    go_sum_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    path="__sources__/go.sum",
-                    content=go_sum_contents,
-                )
-            ]
-        ),
-    )
-
-    sources_digest_no_go_sum = await Get(
-        Digest,
-        DigestSubset(
-            sources_digest,
-            PathGlobs(
-                ["!__sources__/go.sum", "__sources__/**"],
-                conjunction=GlobExpansionConjunction.all_match,
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="FUNKY",
-            ),
-        ),
-    )
-
-    input_digest = await Get(Digest, MergeDigests([sources_digest_no_go_sum, go_sum_digest]))
-
-    result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=input_digest,
-            command=("list", "-json", "./..."),
-            working_dir="__sources__",
-            description=f"Resolve packages in Go external module {module_path}@{module_version}",
-        ),
-    )
-
-    packages: OrderedSet[ResolvedGoPackage] = OrderedSet()
-    for metadata in ijson.items(result.stdout, "", multiple_values=True):
-        package = ResolvedGoPackage.from_metadata(
-            metadata, module_path=module_path, module_version=module_version
-        )
-        packages.add(package)
-
-    return ResolveExternalGoModuleToPackagesResult(packages=FrozenOrderedSet(packages))
-
-
-class GoPkgDebugSubsystem(GoalSubsystem):
-    name = "go-pkg-debug"
-    help = "Resolve a Go package and display its metadata"
-
-
-class GoPkgDebugGoal(Goal):
-    subsystem_cls = GoPkgDebugSubsystem
-
-
-@goal_rule
-async def run_go_pkg_debug(targets: UnexpandedTargets, console: Console) -> GoPkgDebugGoal:
-    first_party_package_targets = [tgt for tgt in targets if is_first_party_package_target(tgt)]
-    first_party_requests = [
-        Get(ResolvedGoPackage, ResolveGoPackageRequest(address=tgt.address))
-        for tgt in first_party_package_targets
-    ]
-
-    third_party_package_targets = [tgt for tgt in targets if is_third_party_package_target(tgt)]
-    third_party_requests = [
-        Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=tgt.address))
-        for tgt in third_party_package_targets
-    ]
-
-    resolved_packages = await MultiGet([*first_party_requests, *third_party_requests])  # type: ignore
-    for package in resolved_packages:
-        console.write_stdout(str(package) + "\n")
-
-    return GoPkgDebugGoal(exit_code=0)
 
 
 def rules():

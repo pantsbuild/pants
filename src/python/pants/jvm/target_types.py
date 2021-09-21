@@ -3,14 +3,62 @@
 
 from __future__ import annotations
 
-from pants.engine.target import COMMON_TARGET_FIELDS, Sources, StringSequenceField, Target
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Sources,
+    SpecialCasedDependencies,
+    StringField,
+    Target,
+)
 
 
-class MavenRequirementsField(StringSequenceField):
-    alias = "maven_requirements"
+class JvmArtifactGroupField(StringField):
+    alias = "group"
     help = (
-        "A sequence of Maven coordinate strings, e.g. ['org.scala-lang:scala-compiler:2.12.0', "
-        "'org.scala-lang:scala-library:2.12.0']."
+        "The 'group' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
+        "com.google.guava:guava:30.1.1-jre, the group is 'com.google.guava'."
+    )
+    required = True
+
+
+class JvmArtifactArtifactField(StringField):
+    alias = "artifact"
+    required = True
+    help = (
+        "The 'artifact' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
+        "com.google.guava:guava:30.1.1-jre, the artifact is 'guava'."
+    )
+
+
+class JvmArtifactVersionField(StringField):
+    alias = "version"
+    required = True
+    help = (
+        "The 'version' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
+        "com.google.guava:guava:30.1.1-jre, the version is '30.1.1-jre'."
+    )
+
+
+class JvmArtifact(Target):
+    alias = "jvm_artifact"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmArtifactGroupField,
+        JvmArtifactArtifactField,
+        JvmArtifactVersionField,
+    )
+    help = (
+        "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
+        "that is, its `group`, `artifact`, and `version` components."
+    )
+
+
+class JvmRequirementsField(SpecialCasedDependencies):
+    alias = "requirements"
+    required = True
+    help = (
+        "A sequence of addresses to targets compatible with `jvm_artifact` that specify the coordinates for "
+        "third-party JVM dependencies."
     )
 
 
@@ -31,5 +79,5 @@ class JvmLockfileSources(Sources):
 
 class JvmDependencyLockfile(Target):
     alias = "coursier_lockfile"
-    core_fields = (*COMMON_TARGET_FIELDS, JvmLockfileSources, MavenRequirementsField)
-    help = "A Coursier lockfile along with the Maven-style requirements used to regenerate the lockfile."
+    core_fields = (*COMMON_TARGET_FIELDS, JvmLockfileSources, JvmRequirementsField)
+    help = "A Coursier lockfile along with references to the artifacts to use for the lockfile."
