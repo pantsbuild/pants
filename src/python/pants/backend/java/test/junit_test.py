@@ -14,6 +14,7 @@ from pants.backend.java.target_types import JavaLibrary, JunitTests
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
+from pants.backend.java.util_rules import rules as java_util_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -50,6 +51,7 @@ def rule_runner() -> RuleRunner:
             *junit_rules(),
             *javac_binary_rules(),
             *util_rules(),
+            *java_util_rules(),
             *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
