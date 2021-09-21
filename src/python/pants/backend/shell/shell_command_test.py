@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from textwrap import dedent
 
 import pytest
@@ -46,6 +47,17 @@ def assert_shell_command_result(
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
         assert fc.content == expected_contents[fc.path].encode()
+
+
+def assert_logged(caplog, expect_logged=None):
+    if expect_logged:
+        assert len(caplog.records) == len(expect_logged)
+        for idx, (lvl, msg) in enumerate(expect_logged):
+            log_record = caplog.records[idx]
+            assert msg in log_record.message
+            assert lvl == log_record.levelno
+    else:
+        assert not caplog.records
 
 
 def test_sources_and_files(rule_runner: RuleRunner) -> None:
@@ -162,15 +174,19 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_side_effecting_command(rule_runner: RuleRunner) -> None:
+def test_side_effecting_command(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
                 """\
                 experimental_shell_command(
                   name="side-effect",
-                  command="echo 'server started'",
+                  command="echo 'server started' && echo 'warn msg' >&2",
                   tools=["echo"],
+                  log_output=True,
                 )
                 """
             ),
@@ -181,6 +197,14 @@ def test_side_effecting_command(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src", target_name="side-effect"),
         expected_contents={},
+    )
+
+    assert_logged(
+        caplog,
+        [
+            (logging.INFO, "server started\n"),
+            (logging.WARNING, "warn msg\n"),
+        ],
     )
 
 
