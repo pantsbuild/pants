@@ -53,6 +53,8 @@ class TestResult:
     stderr: str
     stderr_digest: FileDigest
     address: Address
+    output_setting: ShowOutput
+
     coverage_data: Optional[CoverageData] = None
     xml_results: Optional[Snapshot] = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
@@ -66,6 +68,7 @@ class TestResult:
         cls,
         process_result: FallibleProcessResult,
         address: Address,
+        output_setting: ShowOutput,
         *,
         coverage_data: Optional[CoverageData] = None,
         xml_results: Optional[Snapshot] = None,
@@ -78,6 +81,7 @@ class TestResult:
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
             address=address,
+            output_setting=output_setting,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
@@ -108,8 +112,6 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
     Plugin authors only need to return `TestResult`, and a rule will upcast those into
     `EnrichedTestResult`.
     """
-
-    output_setting: ShowOutput = ShowOutput.ALL
 
     def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
         output: Dict[str, Union[FileDigest, Snapshot]] = {
@@ -487,9 +489,7 @@ def get_filtered_environment(
 # NB: We mark this uncachable to ensure that the results are always streamed, even if the
 # underlying TestResult is memoized. This rule is very cheap, so there's little performance hit.
 @_uncacheable_rule(desc="test")
-def enrich_test_result(
-    test_result: TestResult, test_subsystem: TestSubsystem
-) -> EnrichedTestResult:
+def enrich_test_result(test_result: TestResult) -> EnrichedTestResult:
     return EnrichedTestResult(
         exit_code=test_result.exit_code,
         stdout=test_result.stdout,
@@ -497,10 +497,10 @@ def enrich_test_result(
         stderr=test_result.stderr,
         stderr_digest=test_result.stderr_digest,
         address=test_result.address,
+        output_setting=test_result.output_setting,
         coverage_data=test_result.coverage_data,
         xml_results=test_result.xml_results,
         extra_output=test_result.extra_output,
-        output_setting=test_subsystem.output,
     )
 
 
