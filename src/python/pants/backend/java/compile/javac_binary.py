@@ -11,7 +11,6 @@ from typing import ClassVar
 from pants.backend.java.util_rules import JdkSetup
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.rules import Get, collect_rules, rule
-from pants.jvm.resolve.coursier_setup import Coursier
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class JavacBinary:
 
 
 @rule
-async def setup_javac_binary(coursier: Coursier, jdk_setup: JdkSetup) -> JavacBinary:
+async def setup_javac_binary(jdk_setup: JdkSetup) -> JavacBinary:
     # Awkward join so multi-line `fingerprint_comment` won't confuse textwrap.dedent
     javac_wrapper_script = "\n".join(
         [
@@ -33,7 +32,7 @@ async def setup_javac_binary(coursier: Coursier, jdk_setup: JdkSetup) -> JavacBi
                 f"""\
                 set -eu
                 /bin/mkdir -p {JavacBinary.classfiles_relpath}
-                exec '{jdk_setup.java_home}/bin/javac' "$@"
+                exec $({' '.join(jdk_setup.java_home_cmd)})/bin/javac "$@"
                 """
             ),
         ]
@@ -55,7 +54,7 @@ async def setup_javac_binary(coursier: Coursier, jdk_setup: JdkSetup) -> JavacBi
             Digest,
             MergeDigests(
                 [
-                    coursier.digest,
+                    jdk_setup.digest,
                     javac_wrapper_script_digest,
                 ]
             ),

@@ -11,7 +11,7 @@ from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     CoarsenedTargets,
@@ -42,6 +42,7 @@ class JavaTestFieldSet(TestFieldSet):
 
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
+    bash: BashBinary,
     jdk_setup: JdkSetup,
     junit: JUnit,
     test_subsystem: TestSubsystem,
@@ -99,12 +100,16 @@ async def run_junit_test(
             (
                 prefixed_transitive_user_classfiles_digest,
                 materialized_classpath.digest,
+                jdk_setup.digest,
             )
         ),
     )
     proc = Process(
         argv=[
-            f"{jdk_setup.java_home}/bin/java",
+            bash.path,
+            "-c",
+            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
+            "--",
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
@@ -118,6 +123,7 @@ async def run_junit_test(
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
         level=LogLevel.DEBUG,
     )
+    print(f"PROC={proc}")
 
     process_result = await Get(
         FallibleProcessResult,

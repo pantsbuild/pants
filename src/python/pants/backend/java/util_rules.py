@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.java.compile.javac_subsystem import JavacSubsystem
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -14,7 +15,8 @@ from pants.jvm.resolve.coursier_setup import Coursier
 
 @dataclass(frozen=True)
 class JdkSetup:
-    java_home: str
+    digest: Digest
+    java_home_cmd: tuple[str, ...]
     fingerprint_comment: str
 
 
@@ -69,7 +71,8 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem) -> JdkSetup:
     fingerprint_comment = "".join([f"# {line}\n" for line in fingerprint_comment_lines])
 
     return JdkSetup(
-        java_home=java_home,
+        digest=coursier.digest,
+        java_home_cmd=(coursier.coursier.exe, "java-home", coursier_jdk_option),
         fingerprint_comment=fingerprint_comment,
     )
 

@@ -16,7 +16,7 @@ from pants.backend.java.dependency_inference.types import JavaSourceDependencyAn
 from pants.backend.java.util_rules import JdkSetup
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
+from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, collect_rules, rule
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.util.logging import LogLevel
@@ -51,6 +51,7 @@ async def resolve_fallible_result_to_analysis(
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
+    bash: BashBinary,
     jdk_setup: JdkSetup,
     processor_classfiles: JavaParserCompiledClassfiles,
     source_files: SourceFiles,
@@ -88,6 +89,7 @@ async def analyze_java_source_dependencies(
                 prefixed_processor_classfiles_digest,
                 tool_classpath.digest,
                 prefixed_source_files_digest,
+                jdk_setup.digest,
             )
         ),
     )
@@ -96,7 +98,10 @@ async def analyze_java_source_dependencies(
 
     proc = Process(
         argv=[
-            f"{jdk_setup.java_home}/bin/java",
+            bash.path,
+            "-c",
+            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
+            "--",
             "-cp",
             ":".join([tool_classpath.classpath_arg(), processorcp_relpath]),
             "org.pantsbuild.javaparser.PantsJavaParserLauncher",
