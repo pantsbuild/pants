@@ -15,6 +15,7 @@ from pants.engine.process import BinaryPathTest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -229,12 +230,19 @@ class ShellCommandToolsField(StringSequenceField):
     )
 
 
+class ShellCommandLogOutputField(BoolField):
+    alias = "log_output"
+    default = False
+    help = "Set to true if you want the output from the command logged to the console."
+
+
 class ShellCommand(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ShellCommandCommandField,
+        ShellCommandLogOutputField,
         ShellCommandOutputsField,
         ShellCommandSources,
         ShellCommandToolsField,

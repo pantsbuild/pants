@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import logging
 from textwrap import dedent
 
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
+    ShellCommandLogOutputField,
     ShellCommandOutputsField,
     ShellCommandSources,
     ShellCommandToolsField,
@@ -33,6 +35,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
@@ -134,6 +138,12 @@ async def run_shell_command(
             working_directory=working_directory,
         ),
     )
+
+    if shell_command[ShellCommandLogOutputField].value:
+        if result.stdout:
+            logger.info(result.stdout.decode())
+        if result.stderr:
+            logger.warning(result.stderr.decode())
 
     output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
     return GeneratedSources(output)
