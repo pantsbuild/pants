@@ -123,7 +123,6 @@ async def run_junit_test(
         description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
         level=LogLevel.DEBUG,
     )
-    print(f"PROC={proc}")
 
     process_result = await Get(
         FallibleProcessResult,
