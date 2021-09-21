@@ -160,3 +160,25 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
         Address("src/b", target_name="msg"),
         expected_contents={"src/b/msg": "shell_command:a\nshell_command:b\n"},
     )
+
+
+def test_side_effecting_command(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="side-effect",
+                  command="echo 'server started'",
+                  tools=["echo"]
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="side-effect"),
+        expected_contents={},
+    )

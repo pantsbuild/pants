@@ -209,7 +209,6 @@ class ShellCommandCommandField(StringField):
 
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
-    required = True
     help = (
         "Specify the shell command output files and directories.\n\n"
         "Use a trailing slash on directory names, i.e. `my_dir/`."
@@ -226,9 +225,7 @@ class ShellCommandToolsField(StringSequenceField):
     required = True
     help = (
         "Specify required executable tools that might be used.\n\n"
-        "Each tool will be available in the environment via environment variables, "
-        "e.g. the tool 'tar' should be used as `$tar ...` in the command, or in any "
-        "scripts invoked from the command line."
+        "Only the tools explicitly provided will be available on the search PATH."
     )
 
 
@@ -244,9 +241,19 @@ class ShellCommand(Target):
     )
     help = dedent(
         """\
-
         Execute any external tool for its side effects.
         This may be retried and/or cancelled, so ensure that it is idempotent.
+
+        Example BUILD file:
+
+            experimental_shell_command(
+              command="./my-script.sh --flag",
+              tools=["tar", "curl", "cat", "bash", "env"],
+              dependencies=[":scripts"],
+              outputs=["results/", "logs/my-script.log"],
+            )
+
+            shell_library(name="scripts")
         """
     )
 
