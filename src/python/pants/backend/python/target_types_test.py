@@ -11,10 +11,7 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import (
-    DEFAULT_MODULE_MAPPING,
-    DEFAULT_TYPE_STUB_MODULE_MAPPING,
-)
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
@@ -515,7 +512,7 @@ def test_module_mapping_field(
     raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
 ) -> None:
     actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict({**DEFAULT_MODULE_MAPPING, **expected})
+    assert actual_value == FrozenDict(expected)
 
 
 @pytest.mark.parametrize(
@@ -530,4 +527,4 @@ def test_type_stub_module_mapping_field(
     raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
 ) -> None:
     actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict({**DEFAULT_TYPE_STUB_MODULE_MAPPING, **expected})
+    assert actual_value == FrozenDict(expected)
