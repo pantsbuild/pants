@@ -24,12 +24,11 @@ class JavaSourceField(Sources):
 
 
 class JavaGeneratorSources(Sources):
-    pass
-    # TODO: do I need anything else here?
+    expected_file_extensions = (".java",)
 
 
 # -----------------------------------------------------------------------------------------------
-# `java_test` target
+# `junit_test` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -63,8 +62,10 @@ class JunitTestsGeneratorTarget(Target):
         JavaTestsGeneratorSourcesField,
         Dependencies,
     )
-    help = "A suite of Java tests, run with JUnit."
-
+    help = (
+        "Generate a `junit_test` target for each Java test source file in this directory, "
+        "or the files specified in the `sources` field."
+    )
 
 
 class GenerateTargetsFromJunitTests(GenerateTargetsRequest):
@@ -88,19 +89,19 @@ async def generate_targets_from_junit_tests(
     )
 
 
-# --------------t---------------------------------------------------------------------------------
-# `java_source` arget
+# -----------------------------------------------------------------------------------------------
+# `java_source` target
 # -----------------------------------------------------------------------------------------------
 
 
-class JavaSource(Target):
+class JavaSourceTarget(Target):
     alias = "java_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourceField,
     )
-    help = "Java source code."
+    help = "A single Java source file containing application or library code."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -115,7 +116,10 @@ class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
 class JavaSourcesGeneratorTarget(Target):
     alias = "java_sources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JavaSourcesGeneratorSourcesField)
-    help = "Java source files for functional code (i.e. not tests)."
+    help = (
+        "Generate a `java_source` target for each Java application/library source file in this "
+        "directory, or the files specified in the `sources` field."
+    )
 
 
 class GenerateTargetsFromJavaSources(GenerateTargetsRequest):
@@ -130,7 +134,7 @@ async def generate_targets_from_java_sources(
         SourcesPaths, SourcesPathsRequest(request.generator[JavaSourcesGeneratorSourcesField])
     )
     return generate_file_level_targets(
-        JavaSource,
+        JavaSourceTarget,
         request.generator,
         paths.files,
         union_membership,

@@ -17,10 +17,7 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
-from pants.backend.java.target_types import (
-    JavaSourcesGeneratorSourcesField,
-    JavaSourcesGeneratorTarget,
-)
+from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -54,7 +51,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget],
+        target_types=[JvmDependencyLockfile, JavaSourceTarget],
         bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
@@ -75,8 +72,9 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_sources(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -114,7 +112,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSourcesGeneratorSourcesField,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],
@@ -154,8 +152,9 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_sources(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -175,7 +174,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSourcesGeneratorSourcesField,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],
@@ -211,8 +210,9 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_sources(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -238,7 +238,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSourcesGeneratorSourcesField,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],

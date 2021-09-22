@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/java/owned/BUILD": "java_library()\n",
+            "src/java/owned/BUILD": "java_sources()\n",
             "src/java/owned/OwnedFile.java": "package owned",
             "src/java/unowned/UnownedFile.java": "package unowned\n",
             "src/java/unowned/UnownedFileTest.java": "package unowned\n",

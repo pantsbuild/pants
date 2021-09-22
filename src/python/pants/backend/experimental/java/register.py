@@ -4,8 +4,8 @@
 from pants.backend.java import tailor
 from pants.backend.java.compile import javac, javac_binary
 from pants.backend.java.target_types import (
-    JavaSource,
     JavaSourcesGeneratorTarget,
+    JavaSourceTarget,
     JunitTestsGeneratorTarget,
     JunitTestTarget,
 )
@@ -21,7 +21,7 @@ def target_types():
     return [
         JunitTestTarget,
         JunitTestsGeneratorTarget,
-        JavaSource,
+        JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JvmDependencyLockfile,
     ]
