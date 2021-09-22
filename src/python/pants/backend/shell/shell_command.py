@@ -7,6 +7,7 @@ import logging
 import shlex
 from textwrap import dedent
 
+from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandLogOutputField,
@@ -16,6 +17,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import (
     BashBinary,
@@ -24,7 +26,6 @@ from pants.engine.process import (
     BinaryPaths,
     Process,
     ProcessResult,
-    SearchPath,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -47,7 +48,9 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 @rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
 async def run_shell_command(
-    request: GenerateFilesFromShellCommandRequest, bash: BashBinary
+    request: GenerateFilesFromShellCommandRequest,
+    shell_setup: ShellSetup,
+    bash: BashBinary,
 ) -> GeneratedSources:
     shell_command = request.protocol_target
     working_directory = shell_command.address.spec_path
@@ -65,10 +68,12 @@ async def run_shell_command(
             f"Must provide any `tools` used by the `shell_command` {shell_command.address}."
         )
 
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_path = shell_setup.executable_search_path(env)
     tool_requests = [
         BinaryPathRequest(
             binary_name=tool,
-            search_path=SearchPath(("/usr/bin", "/bin", "/usr/local/bin")),
+            search_path=search_path,
         )
         for tool in {*tools, *["mkdir", "ln"]}
     ]

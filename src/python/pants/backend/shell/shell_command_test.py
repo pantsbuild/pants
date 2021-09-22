@@ -23,7 +23,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *shell_command_rules(),
             *source_files_rules(),
@@ -34,6 +34,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[ShellCommand, ShellLibrary, Files],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def assert_shell_command_result(
