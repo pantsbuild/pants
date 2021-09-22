@@ -24,6 +24,13 @@ fn heavy_hitters_only_running() {
 }
 
 #[test]
+fn heavy_hitters_blocked_path() {
+  // Test that a chain of blocked workunits do not cause their parents to be rendered.
+  let ws = create_store(vec![wu_root(0)], vec![wu(1, 0), wu(2, 1)], vec![]);
+  assert!(ws.heavy_hitters(1).is_empty());
+}
+
+#[test]
 fn straggling_workunits_basic() {
   let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![]);
   assert_eq!(
@@ -36,9 +43,16 @@ fn straggling_workunits_basic() {
 }
 
 #[test]
-fn straggling_workunits_blocked() {
-  // Test that a blocked leaf is not eligible to be rendered.
+fn straggling_workunits_blocked_leaf() {
+  // Test that a blocked leaf does not cause its parents to be rendered.
   let ws = create_store(vec![wu_root(0)], vec![wu(1, 0)], vec![]);
+  assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
+}
+
+#[test]
+fn straggling_workunits_blocked_path() {
+  // Test that a chain of blocked workunits do not cause their parents to be rendered.
+  let ws = create_store(vec![wu_root(0)], vec![wu(1, 0), wu(2, 1)], vec![]);
   assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
 }
 

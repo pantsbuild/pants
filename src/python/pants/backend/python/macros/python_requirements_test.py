@@ -49,7 +49,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
     Some edge cases:
     * We ignore comments and options (values that start with `--`).
     * If a module_mapping is given, and the project is in the map, we copy over a subset of the
-      mapping to the created target.
+      mapping to the created target. It works regardless of capitalization.
     * Projects get normalized thanks to Requirement.parse().
     """
     assert_python_requirements(
@@ -57,7 +57,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
         dedent(
             """\
             python_requirements(
-                module_mapping={'ansicolors': ['colors']},
+                module_mapping={'ansiCOLORS': ['colors']},
                 type_stubs_module_mapping={'Django-types': ['django']},
             )
             """
@@ -126,7 +126,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
 
     assert_python_requirements(
         rule_runner,
-        "python_requirements(module_mapping={'ansicolors': ['colors']})",
+        "python_requirements()",
         dedent(
             """\
             Django>=3.2

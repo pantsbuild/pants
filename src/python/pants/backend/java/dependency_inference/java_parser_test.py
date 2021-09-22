@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.dependency_inference.java_parser import (
@@ -47,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *source_files.rules(),
             *util_rules(),
+            *java_util_rules.rules(),
             QueryRule(FallibleJavaSourceDependencyAnalysisResult, (SourceFiles,)),
             QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

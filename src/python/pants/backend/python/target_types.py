@@ -10,15 +10,23 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, Optional, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    Iterable,
+    Iterator,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import (
-    DEFAULT_MODULE_MAPPING,
-    DEFAULT_TYPE_STUB_MODULE_MAPPING,
-)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
@@ -732,27 +740,30 @@ class PythonRequirementsField(_RequirementSequenceField):
     )
 
 
+def normalize_module_mapping(
+    mapping: Mapping[str, Iterable[str]] | None
+) -> FrozenDict[str, tuple[str, ...]]:
+    return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
+
+
 class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
     help = (
-        "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
-        '`{"ansicolors": ["colors"]}`.\n\nAny unspecified requirements will use the requirement '
-        'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
-        "used to infer dependencies."
+        "A mapping of requirement names to a list of the modules they provide.\n\n"
+        'For example, `{"ansicolors": ["colors"]}`.\n\n'
+        "Any unspecified requirements will use the requirement name as the default module, "
+        'e.g. "Django" will default to `["django"]`.\n\n'
+        "This is used to infer dependencies."
     )
-    value: FrozenDict[str, Tuple[str, ...]]
+    value: FrozenDict[str, tuple[str, ...]]
+    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    def compute_value(  # type: ignore[override]
+        cls, raw_value: Dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        provided_mapping = super().compute_value(raw_value, address)
-        return FrozenDict(
-            {
-                **DEFAULT_MODULE_MAPPING,
-                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
-            }
-        )
+        value_or_default = super().compute_value(raw_value, address)
+        return normalize_module_mapping(value_or_default)
 
 
 class TypeStubsModuleMappingField(DictStringToStringSequenceField):
@@ -760,25 +771,22 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     help = (
         "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
         'For example, `{"types-requests": ["requests"]}`.\n\n'
-        "If the requirement is not specified _and_ it starts with `types-` or ends with `-types`, "
-        "the requirement will be treated as a type stub for the corresponding module, e.g. "
-        '"types-request" has the module "requests". Otherwise, the requirement is treated like a '
-        f"normal dependency (see the field {ModuleMappingField.alias}).\n\n"
+        "If the requirement is not specified _and_ it starts with `types-` or `stubs-`, or ends "
+        "with `-types` or `-stubs`, the requirement will be treated as a type stub for the "
+        'corresponding module, e.g. "types-request" has the module "requests". Otherwise, '
+        "the requirement is treated like a normal dependency (see the field "
+        f"{ModuleMappingField.alias}).\n\n"
         "This is used to infer dependencies for type stubs."
     )
-    value: FrozenDict[str, Tuple[str, ...]]
+    value: FrozenDict[str, tuple[str, ...]]
+    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    def compute_value(  # type: ignore[override]
+        cls, raw_value: Dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        provided_mapping = super().compute_value(raw_value, address)
-        return FrozenDict(
-            {
-                **DEFAULT_TYPE_STUB_MODULE_MAPPING,
-                **{canonicalize_project_name(k): v for k, v in (provided_mapping or {}).items()},
-            }
-        )
+        value_or_default = super().compute_value(raw_value, address)
+        return normalize_module_mapping(value_or_default)
 
 
 class PythonRequirementLibrary(Target):

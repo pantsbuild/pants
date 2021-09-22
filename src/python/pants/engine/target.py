@@ -712,7 +712,7 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         expected_spec_path = generator.address.spec_path
         expected_tgt_name = generator.address.target_name
         mapping = {}
-        for tgt in generated_targets:
+        for tgt in sorted(generated_targets, key=lambda t: t.address):
             if tgt.address.spec_path != expected_spec_path:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.spec_path` as their "
