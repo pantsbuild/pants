@@ -20,6 +20,7 @@ from pants.core.target_types import (
     RelocateFilesViaCodegenRequest,
 )
 from pants.core.target_types import rules as target_type_rules
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -37,6 +38,7 @@ def test_relocated_files() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
+            *archive_rules(),
             *source_files_rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),

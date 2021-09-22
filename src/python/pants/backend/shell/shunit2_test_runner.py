@@ -241,10 +241,16 @@ async def setup_shunit2_for_target(
 
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
-async def run_tests_with_shunit2(field_set: Shunit2FieldSet) -> TestResult:
+async def run_tests_with_shunit2(
+    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+) -> TestResult:
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return TestResult.from_fallible_process_result(result, address=field_set.address)
+    return TestResult.from_fallible_process_result(
+        result,
+        address=field_set.address,
+        output_setting=test_subsystem.output,
+    )
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)

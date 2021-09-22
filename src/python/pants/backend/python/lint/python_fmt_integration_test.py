@@ -11,7 +11,7 @@ from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import rules as isort_subsystem_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
-from pants.core.goals.fmt import LanguageFmtResults, enrich_fmt_result
+from pants.core.goals.fmt import LanguageFmtResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -26,7 +26,6 @@ FIXED_BAD_FILE = 'from animals import cat, dog\n\nprint("hello")\n'
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            enrich_fmt_result,
             format_python_target,
             *black_rules(),
             *isort_rules(),

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.go.target_types import GoSources
-from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
+from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
@@ -49,7 +49,7 @@ async def format_golang_targets(
         )
         if not request.field_sets:
             continue
-        result = await Get(EnrichedFmtResult, GoLangFmtRequest, request)
+        result = await Get(FmtResult, GoLangFmtRequest, request)
         results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
