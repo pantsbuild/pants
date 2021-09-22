@@ -35,6 +35,7 @@ class PipenvRequirements:
         self,
         requirements_relpath: str = "Pipfile.lock",
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
+        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
         pipfile_target: Optional[str] = None,
     ) -> None:
         """
@@ -74,16 +75,11 @@ class PipenvRequirements:
 
             parsed_req = Requirement.parse(req_str)
 
-            req_module_mapping = (
-                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
-                if module_mapping and parsed_req.project_name in module_mapping
-                else None
-            )
-
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],
-                module_mapping=req_module_mapping,
+                module_mapping=module_mapping or {},
+                type_stubs_module_mapping=type_stubs_module_mapping or {},
             )

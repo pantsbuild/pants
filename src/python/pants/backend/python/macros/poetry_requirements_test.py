@@ -414,6 +414,11 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     Note that this just ensures proper targets are created; see prior tests for specific parsing
     edge cases.
     """
+    common_fields = {
+        "dependencies": [":pyproject.toml"],
+        "module_mapping": {"ansicolors": ["colors"]},
+        "type_stubs_module_mapping": {"Django-types": ["django"]},
+    }
     assert_poetry_requirements(
         rule_runner,
         dedent(
@@ -440,32 +445,24 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
         ),
         expected_targets=[
             PythonRequirementLibrary(
-                {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "module_mapping": {"ansicolors": ["colors"]},
-                },
+                {"requirements": [Requirement.parse("ansicolors>=1.18.0")], **common_fields},
                 address=Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
                 {
-                    "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Django==3.2 ; python_version == '3'")],
+                    **common_fields,
                 },
                 address=Address("", target_name="Django"),
             ),
             PythonRequirementLibrary(
-                {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Django-types==2")],
-                    "type_stubs_module_mapping": {"Django-types": ["django"]},
-                },
+                {"requirements": [Requirement.parse("Django-types==2")], **common_fields},
                 address=Address("", target_name="Django-types"),
             ),
             PythonRequirementLibrary(
                 {
-                    "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Un_Normalized_PROJECT == 1.0.0")],
+                    **common_fields,
                 },
                 address=Address("", target_name="Un-Normalized-PROJECT"),
             ),

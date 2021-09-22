@@ -411,22 +411,11 @@ class PoetryRequirements:
             PyProjectToml.create(self._parse_context, pyproject_toml_relpath)
         )
         for parsed_req in requirements:
-            proj_name = parsed_req.project_name
-            req_module_mapping = (
-                {proj_name: module_mapping[proj_name]}
-                if module_mapping and proj_name in module_mapping
-                else None
-            )
-            stubs_module_mapping = (
-                {proj_name: type_stubs_module_mapping[proj_name]}
-                if type_stubs_module_mapping and proj_name in type_stubs_module_mapping
-                else None
-            )
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
+                module_mapping=module_mapping or {},
+                type_stubs_module_mapping=type_stubs_module_mapping or {},
                 dependencies=[requirements_dep],
             )

@@ -51,6 +51,10 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
     * If a module_mapping is given, and the project is in the map, we copy over a subset of the
         mapping to the created target.
     """
+    common_fields = {
+        "dependencies": [":Pipfile.lock"],
+        "module_mapping": {"ansicolors": ["colors"]},
+    }
     assert_pipenv_requirements(
         rule_runner,
         "pipenv_requirements(module_mapping={'ansicolors': ['colors']})",
@@ -63,11 +67,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
         ),
         expected_targets=[
             PythonRequirementLibrary(
-                {
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "dependencies": [":Pipfile.lock"],
-                    "module_mapping": {"ansicolors": ["colors"]},
-                },
+                {"requirements": [Requirement.parse("ansicolors>=1.18.0")], **common_fields},
                 Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
@@ -75,7 +75,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                     "requirements": [
                         Requirement.parse("cachetools==4.1.1;python_version ~= '3.5'")
                     ],
-                    "dependencies": [":Pipfile.lock"],
+                    **common_fields,
                 },
                 Address("", target_name="cachetools"),
             ),

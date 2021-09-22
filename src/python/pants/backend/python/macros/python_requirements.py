@@ -1,5 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import os
 from itertools import groupby
 from pathlib import Path
@@ -75,22 +76,11 @@ class PythonRequirements:
         grouped_requirements = groupby(requirements, lambda parsed_req: parsed_req.project_name)
 
         for project_name, parsed_reqs_ in grouped_requirements:
-            parsed_reqs = list(parsed_reqs_)
-            req_module_mapping = (
-                {project_name: module_mapping[project_name]}
-                if module_mapping and project_name in module_mapping
-                else None
-            )
-            stubs_module_mapping = (
-                {project_name: type_stubs_module_mapping[project_name]}
-                if type_stubs_module_mapping and project_name in type_stubs_module_mapping
-                else None
-            )
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=project_name,
-                requirements=parsed_reqs,
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
+                requirements=list(parsed_reqs_),
+                module_mapping=module_mapping or {},
+                type_stubs_module_mapping=type_stubs_module_mapping or {},
                 dependencies=[requirements_dep],
             )
