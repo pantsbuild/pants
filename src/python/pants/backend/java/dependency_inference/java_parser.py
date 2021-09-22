@@ -13,12 +13,12 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
     java_parser_artifact_requirements,
 )
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
+from pants.backend.java.util_rules import JdkSetup
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, collect_rules, rule
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ async def resolve_fallible_result_to_analysis(
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     bash: BashBinary,
-    coursier: Coursier,
+    jdk_setup: JdkSetup,
     processor_classfiles: JavaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
@@ -88,8 +88,8 @@ async def analyze_java_source_dependencies(
             (
                 prefixed_processor_classfiles_digest,
                 tool_classpath.digest,
-                coursier.digest,
                 prefixed_source_files_digest,
+                jdk_setup.digest,
             )
         ),
     )
@@ -98,9 +98,10 @@ async def analyze_java_source_dependencies(
 
     proc = Process(
         argv=[
-            coursier.coursier.exe,
-            "java",
-            "--system-jvm",  # TODO(#12293): use a fixed JDK version from a subsystem.
+            bash.path,
+            "-c",
+            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
+            "--",
             "-cp",
             ":".join([tool_classpath.classpath_arg(), processorcp_relpath]),
             "org.pantsbuild.javaparser.PantsJavaParserLauncher",

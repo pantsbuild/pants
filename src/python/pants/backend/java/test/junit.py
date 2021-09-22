@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestsSources
+from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     CoarsenedTargets,
@@ -27,7 +28,6 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,8 @@ class JavaTestFieldSet(TestFieldSet):
 
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
-    coursier: Coursier,
+    bash: BashBinary,
+    jdk_setup: JdkSetup,
     junit: JUnit,
     test_subsystem: TestSubsystem,
     field_set: JavaTestFieldSet,
@@ -99,15 +100,16 @@ async def run_junit_test(
             (
                 prefixed_transitive_user_classfiles_digest,
                 materialized_classpath.digest,
-                coursier.digest,
+                jdk_setup.digest,
             )
         ),
     )
     proc = Process(
         argv=[
-            coursier.coursier.exe,
-            "java",
-            "--system-jvm",  # TODO(#12293): use a fixed JDK version from a subsystem.
+            bash.path,
+            "-c",
+            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
+            "--",
             "-cp",
             materialized_classpath.classpath_arg(),
             "org.junit.platform.console.ConsoleLauncher",
