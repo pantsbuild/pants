@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import re
-from dataclasses import InitVar, dataclass, field
-from typing import Generator, Pattern
+from dataclasses import dataclass
+from typing import ClassVar, Generator, Pattern
 
 from dockerfile import Command, parse_string
 
@@ -25,33 +25,41 @@ class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
 
 
-@dataclass
-class DockerfileParser:
-    dockerfile: InitVar[str]
-    commands: tuple[Command, ...] = field(init=False)
+_pex_target_regexp: str = r"""
+(?# optional path, one level with dot-separated words)
+(?:(?P<path>(?:\w[.0-9_-]?)+) /)?
 
-    pex_target_regexp: str = r"""
-    (?# optional path, one level with dot-separated words)
-    (?:(?P<path>(?:\w[.0-9_-]?)+) /)?
+(?# binary name, with .pex file extension)
+(?P<name>(?:\w[.0-9_-]?)+) \.pex$
+"""
 
-    (?# binary name, with .pex file extension)
-    (?P<name>(?:\w[.0-9_-]?)+) \.pex$
-    """
 
-    def __post_init__(self, dockerfile: str):
-        self.commands = parse_string(dockerfile)
-        self._compiled_pex_target_regexp = re.compile(self.pex_target_regexp, re.VERBOSE)
+@dataclass(frozen=True)
+class ParsedDockerfile:
+    commands: tuple[Command, ...]
+    pex_target_regexp: ClassVar[Pattern]
+
+    def __post_init__(self):
+        # Compile regexp when creating the first instance, and store it on the class.
+        if not getattr(ParsedDockerfile, "pex_target_regexp", None):
+            ParsedDockerfile.pex_target_regexp = re.compile(_pex_target_regexp, re.VERBOSE)
+
+    @classmethod
+    def parse(cls, dockerfile: str) -> "ParsedDockerfile":
+        return cls(parse_string(dockerfile))
 
     def get_all(self, command_name: str) -> Generator[Command, None, None]:
         for command in self.commands:
             if command.cmd.upper() == command_name:
                 yield command
 
-    @staticmethod
-    def translate_to_address(value: str, pex_target_regexp: Pattern) -> str | None:
+    def translate_to_address(self, value: str) -> str | None:
+        # Technically this could be a classmethod, but we need at least one instance created first,
+        # so it is safer to simply have this as an instance method.
+
         # Translate something that resembles a packaged pex binary to its corresponding target
         # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
-        pex = re.match(pex_target_regexp, value)
+        pex = re.match(self.pex_target_regexp, value)
         if pex:
             path = (pex.group("path") or "").replace(".", "/")
             name = pex.group("name")
@@ -66,7 +74,7 @@ class DockerfileParser:
                 continue
             # The last element of copy.value is the destination.
             for source in copy.value[:-1]:
-                address = self.translate_to_address(source, self._compiled_pex_target_regexp)
+                address = self.translate_to_address(source)
                 if address:
                     yield address
 
@@ -89,10 +97,10 @@ async def parse_dockerfile(
         request.sources.path_globs(global_options.options.files_not_found_behavior),
     )
 
-    parser = DockerfileParser(contents[0].content.decode())
+    parsed = ParsedDockerfile.parse(contents[0].content.decode())
 
     return DockerfileInfo(
-        putative_target_addresses=parser.putative_target_addresses(),
+        putative_target_addresses=parsed.putative_target_addresses(),
     )
 
 

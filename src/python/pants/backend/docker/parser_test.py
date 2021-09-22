@@ -4,11 +4,13 @@
 
 from textwrap import dedent
 
-from pants.backend.docker.parser import DockerfileParser
+import pytest
+
+from pants.backend.docker.parser import ParsedDockerfile
 
 
-def test_dockerfile_parser() -> None:
-    parser = DockerfileParser(
+def test_putative_target_addresses() -> None:
+    parsed = ParsedDockerfile.parse(
         dedent(
             """\
             FROM base
@@ -18,8 +20,30 @@ def test_dockerfile_parser() -> None:
             """
         )
     )
-    assert parser.putative_target_addresses() == (
+    assert parsed.putative_target_addresses() == (
         "some/target:binary",
         "some/target:tool",
         "another:cli",
     )
+
+
+@pytest.mark.parametrize(
+    "copy_source, putative_target_address",
+    [
+        ("a/b", None),
+        ("a/b.c", None),
+        ("a.b", None),
+        ("a.pex", ":a"),
+        ("a/b.pex", "a:b"),
+        ("a.b/c.pex", "a/b:c"),
+        ("a.b.c/d.pex", "a/b/c:d"),
+        ("a.b/c/d.pex", None),
+        ("a/b/c.pex", None),
+        ("a.0-1/b_2.pex", "a/0-1:b_2"),
+        ("a#b/c.pex", None),
+    ],
+)
+def test_translate_to_address(copy_source, putative_target_address) -> None:
+    parsed = ParsedDockerfile(())
+    actual = parsed.translate_to_address(copy_source)
+    assert actual == putative_target_address
