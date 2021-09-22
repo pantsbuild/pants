@@ -1,6 +1,9 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// File specific allowance, since the pyo3 macros produce underscore bindings.
+#![allow(clippy::used_underscore_binding)]
+
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
