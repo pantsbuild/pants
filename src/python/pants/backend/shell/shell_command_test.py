@@ -13,6 +13,7 @@ from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import ShellCommand, ShellLibrary
 from pants.core.target_types import Files
 from pants.core.target_types import rules as target_type_rules
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -25,6 +26,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *archive_rules(),
             *shell_command_rules(),
             *source_files_rules(),
             *target_type_rules(),
