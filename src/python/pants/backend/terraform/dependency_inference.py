@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pkgutil
-import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -27,15 +26,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.ordered_set import OrderedSet
-
-PARSER = FileContent(
-    "",
-    textwrap.dedent(
-        """\
-    """
-    ).encode("utf-8"),
-    is_executable=True,
-)
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -71,21 +61,19 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
-    if not parser_content:
+    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
+    if not parser_script_content:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
+
+    parser_content = FileContent(
+        path="__pants_tf_parser.py",
+        content=parser_script_content,
+        is_executable=True,
+    )
 
     parser_digest = await Get(
         Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    path="__pants_tf_parser.py",
-                    content=parser_content,
-                    is_executable=True,
-                )
-            ]
-        ),
+        CreateDigest([parser_content]),
     )
 
     parser_pex = await Get(
@@ -95,7 +83,7 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
             internal_only=True,
             requirements=hcl2_parser.pex_requirements(),
             interpreter_constraints=hcl2_parser.interpreter_constraints,
-            main=EntryPoint(PurePath(PARSER.path).stem),
+            main=EntryPoint(PurePath(parser_content.path).stem),
             sources=parser_digest,
         ),
     )
