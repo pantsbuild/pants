@@ -9,7 +9,7 @@ from enum import Enum
 from itertools import chain
 
 from pants.backend.java.compile.javac_binary import JavacBinary
-from pants.backend.java.target_types import JavaSources
+from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class JavacFieldSet(FieldSet):
-    required_fields = (JavaSources,)
+    required_fields = (JavaSourceField,)
 
-    sources: JavaSources
+    sources: JavaSourceField
 
 
 class JavacCheckRequest(CheckRequest):
@@ -132,7 +132,7 @@ async def compile_java_source(
                 SourceFiles,
                 SourceFilesRequest(
                     (t.get(Sources),),
-                    for_sources_types=(JavaSources,),
+                    for_sources_types=(JavaSourceField,),
                     enable_codegen=True,
                 ),
             )

@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
@@ -56,7 +56,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact, JavaLibrary, JunitTests],
+        target_types=[
+            JvmDependencyLockfile,
+            JvmArtifact,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+        ],
         bootstrap_args=[
             "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
             # Makes JUnit output predictable and parseable across versions (#12933):
@@ -151,14 +156,8 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -209,14 +208,8 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -250,7 +243,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',                    ],
@@ -293,14 +286,8 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "ExampleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -445,14 +432,8 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -505,14 +486,8 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -548,7 +523,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',
@@ -594,14 +569,8 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -677,14 +646,8 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "JupiterTest.java")
+
     assert test_result.exit_code == 0
     # TODO: Once support for parsing junit.xml is implemented, use that to determine status so we can remove the
     #  hack to use ASCII test output in the `run_junit_test` rule.
@@ -692,3 +655,12 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None
     assert re.search(r"2 tests found", test_result.stdout) is not None
+
+
+def run_junit_test(
+    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+) -> TestResult:
+    tgt = rule_runner.get_target(
+        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
+    )
+    return rule_runner.request(TestResult, [JavaTestFieldSet.create(tgt)])

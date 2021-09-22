@@ -4,7 +4,12 @@
 from pants.backend.java import tailor
 from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile import javac, javac_binary
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import (
+    JavaSourcesGeneratorTarget,
+    JavaSourceTarget,
+    JunitTestsGeneratorTarget,
+    JunitTestTarget,
+)
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test import junit
 from pants.jvm import util_rules as jvm_util_rules
@@ -14,7 +19,13 @@ from pants.jvm.target_types import JvmDependencyLockfile
 
 
 def target_types():
-    return [JavaLibrary, JunitTests, JvmDependencyLockfile]
+    return [
+        JunitTestTarget,
+        JunitTestsGeneratorTarget,
+        JavaSourceTarget,
+        JavaSourcesGeneratorTarget,
+        JvmDependencyLockfile,
+    ]
 
 
 def rules():
