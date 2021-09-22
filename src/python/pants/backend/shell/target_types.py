@@ -228,7 +228,7 @@ class ShellCommandToolsField(StringSequenceField):
         "Specify required executable tools that might be used.\n\n"
         "Only the tools explicitly provided will be available on the search PATH, "
         "and these tools must be found on the paths provided by "
-        "[shell-setup].executable-search-paths (which defaults to the system PATH)."
+        "[shell-setup].executable_search_paths (which defaults to the system PATH)."
     )
 
 
