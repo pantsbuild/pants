@@ -221,12 +221,10 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     ) == ptgt.comments
 
 
-@pytest.mark.parametrize("name_prefix", ["BUILD", "BUILD2"])
-def test_edit_build_files(rule_runner: RuleRunner, name_prefix: str) -> None:
-    rule_runner.write_files(
-        {f"src/fortran/foo/{name_prefix}": 'fortran_library(sources=["bar1.f90"])'}
-    )
-    rule_runner.create_dir(f"src/fortran/baz/{name_prefix}")  # NB: A directory, not a file.
+@pytest.mark.parametrize("name", ["BUILD", "BUILD2"])
+def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
+    rule_runner.write_files({f"src/fortran/foo/{name}": 'fortran_library(sources=["bar1.f90"])'})
+    rule_runner.create_dir(f"src/fortran/baz/{name}")  # NB: A directory, not a file.
     req = EditBuildFilesRequest(
         PutativeTargets(
             [
@@ -250,19 +248,19 @@ def test_edit_build_files(rule_runner: RuleRunner, name_prefix: str) -> None:
                 ),
             ]
         ),
-        name_prefix=name_prefix,
+        name=name,
         header="Copyright © 2021 FooCorp.",
         indent="    ",
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
-    assert edited_build_files.created_paths == (f"src/fortran/baz/{name_prefix}.pants",)
-    assert edited_build_files.updated_paths == (f"src/fortran/foo/{name_prefix}",)
+    assert edited_build_files.created_paths == (f"src/fortran/baz/{name}.pants",)
+    assert edited_build_files.updated_paths == (f"src/fortran/foo/{name}",)
 
     contents = rule_runner.request(DigestContents, [edited_build_files.digest])
     expected = [
         FileContent(
-            f"src/fortran/baz/{name_prefix}.pants",
+            f"src/fortran/baz/{name}.pants",
             textwrap.dedent(
                 """
                 Copyright © 2021 FooCorp.
@@ -274,7 +272,7 @@ def test_edit_build_files(rule_runner: RuleRunner, name_prefix: str) -> None:
             .encode(),
         ),
         FileContent(
-            f"src/fortran/foo/{name_prefix}",
+            f"src/fortran/foo/{name}",
             textwrap.dedent(
                 """
             fortran_library(sources=["bar1.f90"])
@@ -383,7 +381,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
             rule_args=[
                 create_goal_subsystem(
                     TailorSubsystem,
-                    build_file_name_prefix="BUILD",
+                    build_file_name="BUILD",
                     build_file_header="",
                     build_file_indent="    ",
                     alias_mapping={"fortran_library": "my_fortran_lib"},

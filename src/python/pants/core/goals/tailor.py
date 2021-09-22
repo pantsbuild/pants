@@ -106,12 +106,6 @@ class PutativeTarget:
     # Should include the `#` prefix, which will not be added.
     comments: Tuple[str, ...]
 
-    # An optional suffix (including leading dot if necessary) to append to the name of the
-    # BUILD file to generate this putative target in. Typically empty, but you may want
-    # to have BUILD.lang for different languages, for example.
-    # Note that the suffixed name must match the value of the --build-patterns global option.
-    build_file_name_suffix: str
-
     @classmethod
     def for_target_type(
         cls,
@@ -121,7 +115,6 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name_suffix: str = "",
     ):
         explicit_sources = (kwargs or {}).get("sources")
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
@@ -145,7 +138,6 @@ class PutativeTarget:
             owned_sources,
             kwargs=kwargs,
             comments=comments,
-            build_file_name_suffix=build_file_name_suffix,
         )
 
     def __init__(
@@ -158,7 +150,6 @@ class PutativeTarget:
         *,
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name_suffix: str = "",
     ) -> None:
         self.path = path
         self.name = name
@@ -167,7 +158,6 @@ class PutativeTarget:
         self.owned_sources = tuple(owned_sources)
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
-        self.build_file_name_suffix = build_file_name_suffix
 
     @property
     def address(self) -> Address:
@@ -243,11 +233,11 @@ class TailorSubsystem(GoalSubsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--build-file-name-prefix",
+            "--build-file-name",
             advanced=True,
             type=str,
             default="BUILD",
-            help="The name prefix to use for BUILD files.",
+            help="The name to use for generated BUILD files.",
         )
 
         register(
@@ -276,8 +266,8 @@ class TailorSubsystem(GoalSubsystem):
         )
 
     @property
-    def build_file_name_prefix(self) -> str:
-        return cast(str, self.options.build_file_name_prefix)
+    def build_file_name(self) -> str:
+        return cast(str, self.options.build_file_name)
 
     @property
     def build_file_header(self) -> str:
@@ -307,13 +297,11 @@ def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
 
 
 def group_by_build_file(
-    build_file_name_prefix: str, ptgts: Iterable[PutativeTarget]
+    build_file_name: str, ptgts: Iterable[PutativeTarget]
 ) -> Dict[str, List[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
-        ret[
-            os.path.join(ptgt.path, f"{build_file_name_prefix}{ptgt.build_file_name_suffix}")
-        ].append(ptgt)
+        ret[os.path.join(ptgt.path, build_file_name)].append(ptgt)
     return ret
 
 
@@ -405,7 +393,7 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
 @dataclass(frozen=True)
 class EditBuildFilesRequest:
     putative_targets: PutativeTargets
-    name_prefix: str
+    name: str
     header: str
     indent: str
 
@@ -429,7 +417,7 @@ def make_content_str(
 
 @rule(desc="Edit BUILD files with new targets", level=LogLevel.DEBUG)
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
-    ptgts_by_build_file = group_by_build_file(req.name_prefix, req.putative_targets)
+    ptgts_by_build_file = group_by_build_file(req.name, req.putative_targets)
     # There may be an existing *directory* whose name collides with that of a BUILD file
     # we want to create. This is more likely on a system with case-insensitive paths,
     # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
@@ -530,14 +518,14 @@ async def tailor(
             EditedBuildFiles,
             EditBuildFilesRequest(
                 PutativeTargets(ptgts),
-                tailor_subsystem.build_file_name_prefix,
+                tailor_subsystem.build_file_name,
                 tailor_subsystem.build_file_header,
                 tailor_subsystem.build_file_indent,
             ),
         )
         updated_build_files = set(edited_build_files.updated_paths)
         workspace.write_digest(edited_build_files.digest)
-        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name_prefix, ptgts)
+        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
         for build_file_path, ptgts in ptgts_by_build_file.items():
             verb = "Updated" if build_file_path in updated_build_files else "Created"
             console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
