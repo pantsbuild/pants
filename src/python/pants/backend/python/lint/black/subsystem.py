@@ -95,8 +95,8 @@ class Black(PythonToolBase):
         return cast("str | None", self.options.config)
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        # Refer to https://github.com/psf/black#where-black-looks-for-the-file for how Black
-        # discovers config.
+        # Refer to https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#where-black-looks-for-the-file
+        # for how Black discovers config.
         candidates = {os.path.join(d, "pyproject.toml"): b"[tool.black]" for d in ("", *dirs)}
         return ConfigFilesRequest(
             specified=self.config,
