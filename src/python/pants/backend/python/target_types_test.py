@@ -11,7 +11,6 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
-from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
