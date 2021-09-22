@@ -49,20 +49,15 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
     Some edge cases:
     * We ignore comments and options (values that start with `--`).
     * If a module_mapping is given, and the project is in the map, we copy over a subset of the
-      mapping to the created target.
+      mapping to the created target. It works regardless of capitalization.
     * Projects get normalized thanks to Requirement.parse().
     """
-    common_fields = {
-        "dependencies": [":requirements.txt"],
-        "module_mapping": {"ansicolors": ["colors"]},
-        "type_stubs_module_mapping": {"Django-types": ["django"]},
-    }
     assert_python_requirements(
         rule_runner,
         dedent(
             """\
             python_requirements(
-                module_mapping={'ansicolors': ['colors']},
+                module_mapping={'ansiCOLORS': ['colors']},
                 type_stubs_module_mapping={'Django-types': ['django']},
             )
             """
@@ -84,28 +79,39 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
         ),
         expected_targets=[
             PythonRequirementLibrary(
-                {"requirements": [Requirement.parse("ansicolors>=1.18.0")], **common_fields},
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "module_mapping": {"ansicolors": ["colors"]},
+                },
                 Address("", target_name="ansicolors"),
             ),
             PythonRequirementLibrary(
                 {
+                    "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Django==3.2 ; python_version>'3'")],
-                    **common_fields,
                 },
                 Address("", target_name="Django"),
             ),
             PythonRequirementLibrary(
-                {"requirements": [Requirement.parse("Django-types")], **common_fields},
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("Django-types")],
+                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                },
                 Address("", target_name="Django-types"),
             ),
             PythonRequirementLibrary(
-                {"requirements": [Requirement.parse("Un_Normalized_PROJECT")], **common_fields},
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("Un_Normalized_PROJECT")],
+                },
                 Address("", target_name="Un-Normalized-PROJECT"),
             ),
             PythonRequirementLibrary(
                 {
+                    "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
-                    **common_fields,
                 },
                 Address("", target_name="pip"),
             ),

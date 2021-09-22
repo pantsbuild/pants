@@ -17,6 +17,7 @@ from typing import (
     Dict,
     Iterable,
     Iterator,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -739,6 +740,12 @@ class PythonRequirementsField(_RequirementSequenceField):
     )
 
 
+def normalize_module_mapping(
+    mapping: Mapping[str, Iterable[str]] | None
+) -> FrozenDict[str, tuple[str, ...]]:
+    return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
+
+
 class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
     help = (
@@ -755,10 +762,8 @@ class ModuleMappingField(DictStringToStringSequenceField):
     def compute_value(  # type: ignore[override]
         cls, raw_value: Dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = cast(
-            FrozenDict[str, tuple[str, ...]], super().compute_value(raw_value, address)
-        )
-        return FrozenDict({canonicalize_project_name(k): v for k, v in value_or_default.items()})
+        value_or_default = super().compute_value(raw_value, address)
+        return normalize_module_mapping(value_or_default)
 
 
 class TypeStubsModuleMappingField(DictStringToStringSequenceField):
@@ -780,10 +785,8 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     def compute_value(  # type: ignore[override]
         cls, raw_value: Dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = cast(
-            FrozenDict[str, tuple[str, ...]], super().compute_value(raw_value, address)
-        )
-        return FrozenDict({canonicalize_project_name(k): v for k, v in value_or_default.items()})
+        value_or_default = super().compute_value(raw_value, address)
+        return normalize_module_mapping(value_or_default)
 
 
 class PythonRequirementLibrary(Target):
