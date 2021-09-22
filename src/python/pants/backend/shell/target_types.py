@@ -247,22 +247,28 @@ class ShellCommand(Target):
         ShellCommandSources,
         ShellCommandToolsField,
     )
-    help = dedent(
-        """\
-        Execute any external tool for its side effects.
-        This may be retried and/or cancelled, so ensure that it is idempotent.
+    help = (
+        "Execute any external tool for its side effects.\n"
+        + dedent(
+            """\
 
-        Example BUILD file:
+            Example BUILD file:
 
-            experimental_shell_command(
-              command="./my-script.sh --flag",
-              tools=["tar", "curl", "cat", "bash", "env"],
-              dependencies=[":scripts"],
-              outputs=["results/", "logs/my-script.log"],
-            )
+                experimental_shell_command(
+                  command="./my-script.sh --flag",
+                  tools=["tar", "curl", "cat", "bash", "env"],
+                  dependencies=[":scripts"],
+                  outputs=["results/", "logs/my-script.log"],
+                )
 
-            shell_library(name="scripts")
-        """
+                shell_library(name="scripts")
+
+            """
+        )
+        + "Remember to add this target to the dependencies of each consumer, such as your "
+        "`python_tests` or `docker_image`. When relevant, Pants will run your `command` and "
+        "insert the `outputs` into that consumer's context.\n\n"
+        "The command may be retried and/or cancelled, so ensure that it is idempotent."
     )
 
 

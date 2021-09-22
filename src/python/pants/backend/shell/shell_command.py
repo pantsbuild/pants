@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 from textwrap import dedent
 
 from pants.backend.shell.target_types import (
@@ -76,7 +77,7 @@ async def run_shell_command(
     )
 
     command_env = {
-        "TOOLS": " ".join(tools),
+        "TOOLS": " ".join(map(shlex.quote, tools)),
     }
 
     for binary, tool_request in zip(tool_paths, tool_requests):
