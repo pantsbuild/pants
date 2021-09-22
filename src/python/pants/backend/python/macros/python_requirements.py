@@ -1,11 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import os
 from itertools import groupby
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from pants.backend.python.target_types import parse_requirements_file
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
+from pants.backend.python.target_types import normalize_module_mapping, parse_requirements_file
 from pants.base.build_environment import get_buildroot
 
 
@@ -67,6 +70,9 @@ class PythonRequirements:
         )
         requirements_dep = f":{req_file_tgt.name}"
 
+        normalized_module_mapping = normalize_module_mapping(module_mapping)
+        normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
+
         req_file = Path(get_buildroot(), self._parse_context.rel_path, requirements_relpath)
         requirements = parse_requirements_file(
             req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
@@ -75,22 +81,22 @@ class PythonRequirements:
         grouped_requirements = groupby(requirements, lambda parsed_req: parsed_req.project_name)
 
         for project_name, parsed_reqs_ in grouped_requirements:
-            parsed_reqs = list(parsed_reqs_)
+            normalized_proj_name = canonicalize_project_name(project_name)
             req_module_mapping = (
-                {project_name: module_mapping[project_name]}
-                if module_mapping and project_name in module_mapping
-                else None
+                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_module_mapping
+                else {}
             )
-            stubs_module_mapping = (
-                {project_name: type_stubs_module_mapping[project_name]}
-                if type_stubs_module_mapping and project_name in type_stubs_module_mapping
-                else None
+            req_stubs_mapping = (
+                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_type_stubs_module_mapping
+                else {}
             )
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=project_name,
-                requirements=parsed_reqs,
+                requirements=list(parsed_reqs_),
                 module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
+                type_stubs_module_mapping=req_stubs_mapping,
                 dependencies=[requirements_dep],
             )

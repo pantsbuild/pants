@@ -419,7 +419,8 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
         dedent(
             """\
             poetry_requirements(
-                module_mapping={'ansicolors': ['colors']},
+                # module_mapping should work regardless of capitalization.
+                module_mapping={'ansiCOLORS': ['colors']},
                 type_stubs_module_mapping={'Django-types': ['django']},
             )
             """
