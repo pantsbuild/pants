@@ -108,11 +108,12 @@ async def find_putative_targets(
                 PutativeTarget(
                     path=path,
                     # python_requirements is a macro and doesn't take a name argument, but the
-                    # PutativeTarget still needs a name so it can participate in de-duping logic.
+                    # PutativeTarget still needs a name for display purposes.
                     name=name,
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
+                    addressable=False,
                     kwargs={} if name == "requirements.txt" else {"requirements_relpath": name},
                 )
             )
