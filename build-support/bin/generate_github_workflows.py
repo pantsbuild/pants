@@ -279,6 +279,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
+                install_jdk(),
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -349,6 +350,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
+                install_jdk(),
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 pants_virtualenv_cache(),
@@ -369,6 +371,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
+                install_jdk(),
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -463,6 +466,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
+                        install_jdk(),
                         install_rustup(),
                         {
                             "name": "Expose Pythons",
@@ -487,6 +491,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
+                        install_jdk(),
                         setup_toolchain_auth(),
                         expose_all_pythons(),
                         # NB: We only cache Rust, but not `native_engine.so` and the Pants
