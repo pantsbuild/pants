@@ -76,7 +76,7 @@ class PutativeTarget:
     """A potential target to add, detected by various heuristics.
 
     This class uses the term "target" in the loose sense. It can also represent an invocation of a
-    target-genernating macro.
+    target-generating macro.
     """
 
     # Note that field order is such that the dataclass order will be by address (path+name).
