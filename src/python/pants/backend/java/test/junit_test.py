@@ -31,6 +31,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -114,6 +115,7 @@ JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@maybe_skip_jdk_test
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -164,6 +166,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -223,6 +226,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -386,6 +390,7 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@maybe_skip_jdk_test
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -440,6 +445,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -501,6 +507,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -577,6 +584,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     combined_lockfile = CoursierResolvedLockfile(
         entries=(*JUNIT4_RESOLVED_LOCKFILE.entries, *JUNIT5_RESOLVED_LOCKFILE.entries)

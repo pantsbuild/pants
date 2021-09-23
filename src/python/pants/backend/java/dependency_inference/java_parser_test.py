@@ -30,6 +30,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -58,6 +59,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@maybe_skip_jdk_test
 def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -138,6 +140,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     ]
 
 
+@maybe_skip_jdk_test
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -196,6 +199,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], ProcessExecutionFailure)
 
 
+@maybe_skip_jdk_test
 def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
