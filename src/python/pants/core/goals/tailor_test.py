@@ -193,6 +193,29 @@ def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_root_macros_dont_get_named(rule_runner: RuleRunner) -> None:
+    # rule_runner.write_files({"macro_trigger.txt": ""})
+    ptgt = PutativeTarget("", "", "fortran_macro", [], [], addressable=False)
+    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
+    ptgts = unpts.putative_targets
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget(
+                    "",
+                    "",
+                    "fortran_macro",
+                    [],
+                    [],
+                    addressable=False,
+                    kwargs={},
+                )
+            ]
+        )
+        == ptgts
+    )
+
+
 def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -451,17 +474,10 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
 
         stdout_str = stdio_reader.get_stdout()
 
+    assert "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target baz" in stdout_str
+    assert "Updated src/fortran/foo/BUILD:\n  - Added fortran_tests target tests" in stdout_str
     assert (
-        "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target src/fortran/baz"
-        in stdout_str
-    )
-    assert (
-        "Updated src/fortran/foo/BUILD:\n  - Added fortran_tests target src/fortran/foo:tests"
-        in stdout_str
-    )
-    assert (
-        "Updated src/fortran/conflict/BUILD:\n  - Added my_fortran_lib target "
-        "src/fortran/conflict:conflict0"
+        "Updated src/fortran/conflict/BUILD:\n  - Added my_fortran_lib target conflict0"
     ) in stdout_str
 
 

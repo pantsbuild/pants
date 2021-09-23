@@ -73,7 +73,11 @@ def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
 @frozen_after_init
 @dataclass(order=True, unsafe_hash=True)
 class PutativeTarget:
-    """A potential target to add, detected by various heuristics."""
+    """A potential target to add, detected by various heuristics.
+
+    This class uses the term "target" in the loose sense. It can also represent an invocation of a
+    target-generating macro.
+    """
 
     # Note that field order is such that the dataclass order will be by address (path+name).
     path: str
@@ -95,6 +99,9 @@ class PutativeTarget:
     #  source globs for that type from BuildConfiguration.  However that is fiddly and not
     #  a high priority.
     owned_sources: Tuple[str, ...]
+
+    # Whether the pututative target has an address (or, e.g., is a macro with no address).
+    addressable: bool
 
     # Note that we generate the BUILD file target entry exclusively from these kwargs (plus the
     # type_alias), not from the fields above, which are broken out for other uses.
@@ -136,6 +143,7 @@ class PutativeTarget:
             target_type.alias,
             triggering_sources,
             owned_sources,
+            addressable=True,  # "Real" targets are always addressable.
             kwargs=kwargs,
             comments=comments,
         )
@@ -148,6 +156,7 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         owned_sources: Iterable[str],
         *,
+        addressable: bool = True,
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> None:
@@ -156,11 +165,17 @@ class PutativeTarget:
         self.type_alias = type_alias
         self.triggering_sources = tuple(triggering_sources)
         self.owned_sources = tuple(owned_sources)
+        self.addressable = addressable
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
 
     @property
     def address(self) -> Address:
+        if not self.addressable:
+            raise ValueError(
+                f"Cannot compute address for non-addressable putative target of type "
+                f"{self.type_alias} at path {self.path}"
+            )
         return Address(self.path, target_name=self.name)
 
     def realias(self, new_alias: str | None) -> PutativeTarget:
@@ -336,6 +351,11 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     existing_addrs: Set[str] = {tgt.address.spec for tgt in all_existing_tgts}
     uniquely_named_putative_targets: List[PutativeTarget] = []
     for ptgt in ptgts:
+        if not ptgt.addressable:
+            # Non-addressable PutativeTargets never have collision issues.
+            uniquely_named_putative_targets.append(ptgt)
+            continue
+
         idx = 0
         possibly_renamed_ptgt = ptgt
         # Targets in root-level BUILD files must be named explicitly.
@@ -532,7 +552,7 @@ async def tailor(
             for ptgt in ptgts:
                 console.print_stdout(
                     f"  - Added {console.green(ptgt.type_alias)} target "
-                    f"{console.cyan(ptgt.address.spec)}"
+                    f"{console.cyan(ptgt.name)}"
                 )
     return Tailor(0)
 
