@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from textwrap import dedent
 
 import pytest
@@ -58,6 +59,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -138,6 +140,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     ]
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -196,6 +199,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], ProcessExecutionFailure)
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

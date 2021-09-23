@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from textwrap import dedent
 
@@ -114,6 +115,7 @@ JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -164,6 +166,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -223,6 +226,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -386,6 +390,7 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -440,6 +445,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -501,6 +507,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -577,6 +584,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     combined_lockfile = CoursierResolvedLockfile(
         entries=(*JUNIT4_RESOLVED_LOCKFILE.entries, *JUNIT5_RESOLVED_LOCKFILE.entries)

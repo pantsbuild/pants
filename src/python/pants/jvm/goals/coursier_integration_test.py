@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -49,6 +50,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -93,6 +95,7 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
     )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     expected_lockfile = CoursierResolvedLockfile(
         entries=(
@@ -137,6 +140,7 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
     assert result.stderr == ""
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -182,6 +186,7 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
 def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
