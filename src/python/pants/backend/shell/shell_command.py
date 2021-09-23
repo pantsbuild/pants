@@ -7,6 +7,7 @@ import logging
 import shlex
 from textwrap import dedent
 
+from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
@@ -76,6 +77,7 @@ async def run_shell_command(
             search_path=search_path,
         )
         for tool in {*tools, *["mkdir", "ln"]}
+        if tool not in BASH_BUILTIN_COMMANDS
     ]
     tool_paths = await MultiGet(
         Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
