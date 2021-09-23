@@ -84,7 +84,7 @@ async def run_shell_command(
     )
 
     command_env = {
-        "TOOLS": " ".join(map(shlex.quote, tools)),
+        "TOOLS": " ".join(shlex.quote(tool.binary_name) for tool in tool_requests),
     }
 
     for binary, tool_request in zip(tool_paths, tool_requests):
