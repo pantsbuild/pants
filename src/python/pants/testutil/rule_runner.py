@@ -282,7 +282,7 @@ class RuleRunner:
             ),
         )
 
-    def _invalidate_for(self, *relpaths):
+    def _invalidate_for(self, *relpaths: str):
         """Invalidates all files from the relpath, recursively up to the root.
 
         Many python operations implicitly create parent directories, so we assume that touching a
@@ -290,6 +290,15 @@ class RuleRunner:
         """
         files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
         return self.scheduler.invalidate_files(files)
+
+    def chmod(self, relpath: str | PurePath, mode: int) -> None:
+        """Change the file mode and permissions.
+
+        relpath: The relative path to the file or directory from the build root.
+        mode: The file mode to set, preferable in octal representation, e.g. `mode=0o750`.
+        """
+        Path(self.build_root, relpath).chmod(mode)
+        self._invalidate_for(str(relpath))
 
     def create_dir(self, relpath: str) -> str:
         """Creates a directory under the buildroot.
