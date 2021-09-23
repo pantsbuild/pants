@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from textwrap import dedent
 
 import pytest
@@ -38,6 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -107,7 +107,7 @@ def expect_single_expanded_coarsened_target(
     return coarsened_targets[0]
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -160,7 +160,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     assert check_result.partition_description == str(coarsened_target)
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 @pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -209,7 +209,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         rule_runner.request(CompiledClassfiles, [request])
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -272,7 +272,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     """Test that javac can handle source-level cycles--even across build target boundaries--via
     graph coarsening.
@@ -363,7 +363,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_cycle, but the cycle occurs as a transitive dep of the requested
     target."""
@@ -456,7 +456,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
     rather than explicitly."""
@@ -539,7 +539,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -594,7 +594,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -632,7 +632,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     assert "package org.pantsbuild.example.lib does not exist" in fallible_result.stderr
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     resolved_joda_lockfile = CoursierResolvedLockfile(
         entries=(
@@ -702,7 +702,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

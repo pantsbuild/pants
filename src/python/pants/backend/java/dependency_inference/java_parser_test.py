@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from textwrap import dedent
 
 import pytest
@@ -31,6 +30,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -59,7 +59,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -140,7 +140,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     ]
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -199,7 +199,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], ProcessExecutionFailure)
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

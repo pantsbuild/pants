@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from pants.core.util_rules import config_files, source_files
@@ -22,6 +20,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -51,7 +50,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_empty_resolve(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
@@ -63,7 +62,7 @@ def test_empty_resolve(rule_runner: RuleRunner) -> None:
 # TODO(#11928): Make all of these tests more hermetic and not dependent on having a network connection.
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
@@ -85,7 +84,7 @@ def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_resolve_with_transitive_deps(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     resolved_lockfile = rule_runner.request(
@@ -121,7 +120,7 @@ def test_resolve_with_transitive_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
@@ -150,7 +149,7 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
 
     classpath_entry = rule_runner.request(
@@ -179,7 +178,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     classpath_entry = rule_runner.request(
@@ -208,7 +207,7 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_bad_fingerprint(rule_runner: RuleRunner) -> None:
     expected_exception_msg = (
         r".*?CoursierError:.*?Coursier fetch for .*?hamcrest.*? succeeded.*?"
@@ -229,7 +228,7 @@ def test_fetch_one_coord_with_bad_fingerprint(rule_runner: RuleRunner) -> None:
         rule_runner.request(ResolvedClasspathEntry, [lockfile_entry])
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
     expected_exception_msg = (
         r".*?CoursierError:.*?Coursier fetch for .*?hamcrest.*? succeeded.*?"
@@ -252,7 +251,7 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
         rule_runner.request(ResolvedClasspathEntry, [lockfile_entry])
 
 
-@pytest.mark.skipif("PANTS_RUN_JDK_TESTS" not in os.environ, reason="Skip JDK tests")
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
     """This test demonstrates that fetch_one_coord is picky about inexact coordinates.
 
