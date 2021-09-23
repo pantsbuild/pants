@@ -13,6 +13,7 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -213,6 +214,15 @@ async def setup_pytest_for_target(
         extra_output_directory_digest_get,
     )
 
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [request.field_set.address],
+            interpreter_constraints=interpreter_constraints,
+            sources=prepared_sources,
+        ),
+    )
+
     pytest_runner_pex_get = Get(
         VenvPex,
         PexRequest(
@@ -220,7 +230,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex],
+            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(
@@ -235,7 +245,7 @@ async def setup_pytest_for_target(
         MergeDigests(
             (
                 coverage_config.digest,
-                prepared_sources.source_files.snapshot.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
                 config_files.snapshot.digest,
                 extra_output_directory_digest,
                 *(plugin_setup.digest for plugin_setup in plugin_setups),
@@ -346,6 +356,7 @@ async def run_python_test(
     return TestResult.from_fallible_process_result(
         result,
         address=field_set.address,
+        output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,

@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.java.compile.javac_binary import JavacBinary
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
+from pants.backend.java.util_rules import rules as util_rules_rules
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -22,6 +23,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *javac_binary_rules(),
+            *util_rules_rules(),
             *process_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(JavacBinary, ()),

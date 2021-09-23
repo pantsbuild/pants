@@ -178,6 +178,17 @@ def rust_caches() -> Sequence[Step]:
     ]
 
 
+def install_jdk() -> Step:
+    return {
+        "name": "Install AdoptJDK",
+        "uses": "actions/setup-java@v2",
+        "with": {
+            "distribution": "adopt",
+            "java-version": "11",
+        },
+    }
+
+
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
@@ -319,6 +330,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
+                install_jdk(),
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 expose_all_pythons(),
@@ -383,6 +395,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
+                install_jdk(),
                 setup_toolchain_auth(),
                 *setup_primary_python(),
                 expose_all_pythons(),

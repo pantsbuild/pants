@@ -1076,23 +1076,49 @@ impl Task {
         let context = context.clone();
         let mut params = params.clone();
         let entry = entry.clone();
-        let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
-          output: get.output,
-          input: *get.input.type_id(),
-        });
-        let entry_res = context
-          .core
-          .rule_graph
-          .edges_for_inner(&entry)
-          .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))
-          .and_then(|edges| {
-            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
+        async move {
+          let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
+            output: get.output,
+            input: *get.input.type_id(),
+          });
+          params.put(get.input);
+
+          let edges = context
+            .core
+            .rule_graph
+            .edges_for_inner(&entry)
+            .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))?;
+
+          // See if there is a Get: otherwise, a union (which is executed as a Query).
+          // See #12934 for further cleanup of this API.
+          let select = edges
+            .entry_for(&dependency_key)
+            .cloned()
+            .map(|entry| {
+              // The subject of the get is a new parameter that replaces an existing param of the same
+              // type.
+              Select::new(params.clone(), get.output, entry)
+            })
+            .or_else(|| {
+              if externs::is_union(get.input_type) {
+                // Is a union.
+                let (_, rule_edges) = context
+                  .core
+                  .rule_graph
+                  .find_root(vec![*get.input.type_id()], get.output)
+                  .ok()?;
+                Some(Select::new_from_edges(params, get.output, &rule_edges))
+              } else {
+                None
+              }
+            })
+            .ok_or_else(|| {
               if externs::is_union(get.input_type) {
                 throw(&format!(
                   "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
-                    with `@union`, the third argument should be a member of that union. Did you \
-                    intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
-                    type ({}) for the third argument.",
+                  with `@union`, the third argument should be a member of that union. Did you \
+                  intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
+                  type ({}) for the third argument.",
                   get.output,
                   get.input_type,
                   get.input,
@@ -1105,19 +1131,13 @@ impl Task {
                 // `type(input) != input_type`.
                 throw(&format!(
                   "Get({}, {}, {}) was not detected in your @rule body at rule compile time. \
-                    Was the `Get` constructor called in a separate function, or perhaps \
-                    dynamically? If so, it must be inlined into the @rule body.",
+                  Was the `Get` constructor called in a separate function, or perhaps \
+                  dynamically? If so, it must be inlined into the @rule body.",
                   get.output, get.input_type, get.input
                 ))
               }
-            })
-          });
-        // The subject of the get is a new parameter that replaces an existing param of the same
-        // type.
-        params.put(get.input);
-        match entry_res {
-          Ok(entry) => Select::new(params, get.output, entry).run(context).boxed(),
-          Err(e) => future::err(e).boxed(),
+            })?;
+          select.run(context).await
         }
       })
       .collect::<Vec<_>>();

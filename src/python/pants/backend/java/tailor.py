@@ -7,7 +7,11 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.java.target_types import JavaLibrary, JavaTestsSources, JunitTests
+from pants.backend.java.target_types import (
+    JavaSourcesGeneratorTarget,
+    JavaTestsGeneratorSourcesField,
+    JunitTestsGeneratorTarget,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -31,13 +35,13 @@ class PutativeJavaTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(JavaTestsSources.default))
+    tests_filespec = Filespec(includes=list(JavaTestsGeneratorSourcesField.default))
     test_filenames = set(
         matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
     )
     test_files = {path for path in paths if os.path.basename(path) in test_filenames}
-    library_files = set(paths) - test_files
-    return {JunitTests: test_files, JavaLibrary: library_files}
+    sources_files = set(paths) - test_files
+    return {JunitTestsGeneratorTarget: test_files, JavaSourcesGeneratorTarget: sources_files}
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Java targets to create")
@@ -53,8 +57,8 @@ async def find_putative_targets(
     putative_targets = []
     for tgt_type, paths in classified_unowned_java_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == JunitTests else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == JunitTests else {}
+            name = "tests" if tgt_type == JunitTestsGeneratorTarget else os.path.basename(dirname)
+            kwargs = {"name": name} if tgt_type == JunitTestsGeneratorTarget else {}
             putative_targets.append(
                 PutativeTarget.for_target_type(
                     tgt_type, dirname, name, sorted(filenames), kwargs=kwargs

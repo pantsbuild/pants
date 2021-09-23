@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 """A Digest is a lightweight reference to a set of files known about by the engine.
 
-You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
+You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
 Get(DigestContents, Digest)` to see the actual file content.
 """
 Digest = PyDigest
@@ -239,7 +239,7 @@ class RemovePrefix:
     """A request to remove the specified prefix path from every file and directory in the digest.
 
     This will fail if there are any files or directories in the original input digest without the
-    specified digest.
+    specified prefix.
 
     Example:
 

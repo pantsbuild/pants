@@ -9,7 +9,6 @@ from typing import ClassVar, List, Optional, Type
 import pytest
 
 from pants.core.goals.fmt import (
-    EnrichedFmtResult,
     Fmt,
     FmtResult,
     FmtSubsystem,
@@ -285,14 +284,14 @@ def test_summary(rule_runner: RuleRunner) -> None:
 
 
 def test_streaming_output_skip() -> None:
-    result = EnrichedFmtResult.skip(formatter_name="formatter")
+    result = FmtResult.skip(formatter_name="formatter")
     assert result.level() == LogLevel.DEBUG
     assert result.message() == "formatter skipped."
 
 
 def test_streaming_output_changed() -> None:
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
-    result = EnrichedFmtResult(
+    result = FmtResult(
         input=EMPTY_DIGEST,
         output=changed_digest,
         stdout="stdout",
@@ -311,7 +310,7 @@ def test_streaming_output_changed() -> None:
 
 
 def test_streaming_output_not_changed() -> None:
-    result = EnrichedFmtResult(
+    result = FmtResult(
         input=EMPTY_DIGEST,
         output=EMPTY_DIGEST,
         stdout="stdout",

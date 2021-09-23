@@ -14,7 +14,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -24,7 +24,7 @@ _F = TypeVar("_F", bound="FmtResult")
 
 
 @dataclass(frozen=True)
-class FmtResult:
+class FmtResult(EngineAwareReturnType):
     input: Digest
     output: Digest
     stdout: str
@@ -74,15 +74,6 @@ class FmtResult:
     def did_change(self) -> bool:
         return self.output != self.input
 
-
-@dataclass(frozen=True)
-class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
-    """A `FmtResult` that is enriched for the sake of logging results as they come in.
-
-    Plugin authors only need to return `FmtResult`, and a rule will upcast those into
-    `EnrichedFmtResult`.
-    """
-
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -101,18 +92,9 @@ class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
             output = f"{output.rstrip()}\n\n"
         return f"{self.formatter_name} {message}{output}"
 
-
-# NB: We mark this uncachable to ensure that the results are always streamed, even if the
-# underlying FmtResult is memoized. This rule is very cheap, so there's little performance hit.
-@_uncacheable_rule(desc="fmt")
-async def enrich_fmt_result(result: FmtResult) -> EnrichedFmtResult:
-    return EnrichedFmtResult(
-        input=result.input,
-        output=result.output,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        formatter_name=result.formatter_name,
-    )
+    def cacheable(self) -> bool:
+        """Is marked uncacheable to ensure that it always renders."""
+        return False
 
 
 @union

@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
 
-from pants.backend.go import import_analysis
-from pants.backend.go.import_analysis import ResolvedImportPathsForGoLangDistribution
+from pants.backend.go.util_rules import import_analysis
+from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.core.util_rules import external_tool
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner

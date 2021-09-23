@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -47,11 +48,17 @@ class GenerateTargetsFromProtobufLibrary(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_protobuf_library(
-    request: GenerateTargetsFromProtobufLibrary, union_membership: UnionMembership
+    request: GenerateTargetsFromProtobufLibrary,
+    protoc: Protoc,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSources]))
     return generate_file_level_targets(
-        ProtobufLibrary, request.generator, paths.files, union_membership
+        ProtobufLibrary,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not protoc.dependency_inference,
     )
 
 

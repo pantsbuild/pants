@@ -1,9 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
 
-from pants.backend.terraform.tailor import PutativeTerraformTargetsRequest
+from pants.backend.terraform.tailor import (
+    PutativeTerraformTargetsRequest,
+    find_disjoint_longest_common_prefixes,
+)
 from pants.backend.terraform.tailor import rules as terraform_tailor_rules
-from pants.backend.terraform.target_types import TerraformModule
+from pants.backend.terraform.target_types import TerraformModule, TerraformModules
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -25,24 +29,29 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[
             TerraformModule,
+            TerraformModules,
         ],
     )
     rule_runner.write_files(
         {
-            f"src/terraform/{fp}": ""
+            fp: ""
             for fp in (
-                "root.tf",
-                "owned-module/main.tf",
-                "owned-module/foo.tf",
-                "unowned-module/main.tf",
-                "unowned-module/bar.tf",
+                "prod/terraform/resources/foo/versions.tf",
+                "prod/terraform/resources/bar/versions.tf",
+                "prod/terraform/modules/bar/versions.tf",
+                "prod/terraform/modules/bar/hello/versions.tf",
+                "prod/terraform/modules/world/versions.tf",
+                "service1/src/terraform/versions.tf",
+                "service1/src/terraform/foo/versions.tf",
+                "service1/src/terraform/versions.tf",
+                "service2/src/terraform/versions.tf",
             )
         }
     )
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeTerraformTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
+            PutativeTerraformTargetsRequest(PutativeTargetsSearchPaths(("",))),
             AllOwnedSources(
                 [
                     "src/terraform/root.tf",
@@ -56,32 +65,44 @@ def test_find_putative_targets() -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform",
-                    "terraform",
-                    [
-                        "root.tf",
-                    ],
+                    TerraformModules,
+                    "prod/terraform",
+                    "tf_mods",
+                    ("prod/terraform/**/*.tf",),
                 ),
                 PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform/owned-module",
-                    "owned-module",
-                    [
-                        "foo.tf",
-                        "main.tf",
-                    ],
+                    TerraformModules,
+                    "service1/src/terraform",
+                    "tf_mods",
+                    ("service1/src/terraform/**/*.tf",),
                 ),
                 PutativeTarget.for_target_type(
-                    TerraformModule,
-                    "src/terraform/unowned-module",
-                    "unowned-module",
-                    [
-                        "bar.tf",
-                        "main.tf",
-                    ],
+                    TerraformModules,
+                    "service2/src/terraform",
+                    "tf_mods",
+                    ("service2/src/terraform/**/*.tf",),
                 ),
             ]
         )
         == pts
     )
+
+
+def test_find_disjoint_longest_common_prefixes() -> None:
+    paths = [
+        "prod/terraform/resources/foo/versions.tf",
+        "prod/terraform/resources/bar/versions.tf",
+        "prod/terraform/modules/bar/versions.tf",
+        "prod/terraform/modules/bar/hello/versions.tf",
+        "prod/terraform/modules/world/versions.tf",
+        "service1/src/terraform/versions.tf",
+        "service1/src/terraform/foo/versions.tf",
+        "service1/src/terraform/versions.tf",
+        "service2/src/terraform/versions.tf",
+    ]
+    prefixes = find_disjoint_longest_common_prefixes([PurePath(p).parts[:-1] for p in paths])
+    assert prefixes == {
+        ("prod", "terraform"),
+        ("service1", "src", "terraform"),
+        ("service2", "src", "terraform"),
+    }

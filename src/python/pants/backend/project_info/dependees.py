@@ -28,11 +28,11 @@ class AddressToDependees:
 @rule(desc="Map all targets to their dependees", level=LogLevel.DEBUG)
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
-    all_expanded_targets, all_explicit_targets = await MultiGet(
+    with_generated_targets, without_generated_targets = await MultiGet(
         Get(Targets, AddressSpecs([DescendantAddresses("")])),
         Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")])),
     )
-    all_targets = {*all_expanded_targets, *all_explicit_targets}
+    all_targets = {*with_generated_targets, *without_generated_targets}
     dependencies_per_target = await MultiGet(
         Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
         for tgt in all_targets

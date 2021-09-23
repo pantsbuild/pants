@@ -762,7 +762,7 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     let cached_response_opt = check_action_cache(
       action_digest,
-      &command,
+      &request.description,
       &self.metadata,
       self.platform,
       &context2,
@@ -1337,7 +1337,7 @@ fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
 /// the Bazel RE client.
 pub async fn check_action_cache(
   action_digest: Digest,
-  command: &Command,
+  command_description: &str,
   metadata: &ProcessMetadata,
   platform: Platform,
   context: &Context,
@@ -1349,11 +1349,8 @@ pub async fn check_action_cache(
     context.workunit_store.clone(),
     "check_action_cache".to_owned(),
     WorkunitMetadata {
-      level: Level::Trace,
-      desc: Some(format!(
-        "check action cache for {:?} ({:?})",
-        command, action_digest
-      )),
+      level: Level::Debug,
+      desc: Some(format!("Remote cache lookup for: {}", command_description)),
       ..WorkunitMetadata::default()
     },
     |workunit| async move {

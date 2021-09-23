@@ -10,10 +10,11 @@ import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
+from pants.backend.java.util_rules import rules as java_util_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -29,7 +30,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -50,12 +51,22 @@ def rule_runner() -> RuleRunner:
             *junit_rules(),
             *javac_binary_rules(),
             *util_rules(),
+            *java_util_rules(),
             *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaLibrary, JunitTests],
-        bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
+        target_types=[
+            JvmDependencyLockfile,
+            JvmArtifact,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+        ],
+        bootstrap_args=[
+            "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
+            # Makes JUnit output predictable and parseable across versions (#12933):
+            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        ],
     )
 
 
@@ -76,17 +87,21 @@ def rule_runner() -> RuleRunner:
 JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=Coordinate(coord="junit:junit:4.13.2"),
+            coord=Coordinate(group="junit", artifact="junit", version="4.13.2"),
             file_name="junit-4.13.2.jar",
-            direct_dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
-            dependencies=Coordinates([Coordinate(coord="org.hamcrest:hamcrest-core:1.3")]),
+            direct_dependencies=Coordinates(
+                [Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3")]
+            ),
+            dependencies=Coordinates(
+                [Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3")]
+            ),
             file_digest=FileDigest(
                 fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
                 serialized_bytes_length=384581,
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.hamcrest:hamcrest-core:1.3"),
+            coord=Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),
             file_name="hamcrest-core-1.3.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -105,9 +120,15 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -135,14 +156,8 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -155,9 +170,15 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -187,14 +208,8 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -214,15 +229,21 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['junit:junit:4.13.2'],
+                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',                    ],
@@ -265,14 +286,8 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "ExampleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -296,7 +311,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
+            coord=Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"),
             file_name="apiguardian-api-1.1.0.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -306,20 +321,34 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.junit.jupiter:junit-jupiter-api:5.7.2"),
+            coord=Coordinate(
+                group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2"
+            ),
             file_name="junit-jupiter-api-5.7.2.jar",
             direct_dependencies=Coordinates(
                 [
-                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(
+                        group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"
+                    ),
+                    Coordinate(
+                        group="org.junit.platform",
+                        artifact="junit-platform-commons",
+                        version="1.7.2",
+                    ),
+                    Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
                 ]
             ),
             dependencies=Coordinates(
                 [
-                    Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0"),
-                    Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
-                    Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+                    Coordinate(
+                        group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"
+                    ),
+                    Coordinate(
+                        group="org.junit.platform",
+                        artifact="junit-platform-commons",
+                        version="1.7.2",
+                    ),
+                    Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
                 ]
             ),
             file_digest=FileDigest(
@@ -328,19 +357,23 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.junit.platform:junit-platform-commons:1.7.2"),
+            coord=Coordinate(
+                group="org.junit.platform", artifact="junit-platform-commons", version="1.7.2"
+            ),
             file_name="junit-platform-commons-1.7.2.jar",
             direct_dependencies=Coordinates(
-                [Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]
+                [Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0")]
             ),
-            dependencies=Coordinates([Coordinate(coord="org.apiguardian:apiguardian-api:1.1.0")]),
+            dependencies=Coordinates(
+                [Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0")]
+            ),
             file_digest=FileDigest(
                 fingerprint="738d0df021a0611fff5d277634e890cc91858fa72227cf0bcf36232a7caf014c",
                 serialized_bytes_length=100008,
             ),
         ),
         CoursierLockfileEntry(
-            coord=Coordinate(coord="org.opentest4j:opentest4j:1.2.0"),
+            coord=Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
             file_name="opentest4j-1.2.0.jar",
             direct_dependencies=Coordinates([]),
             dependencies=Coordinates([]),
@@ -359,10 +392,16 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -370,8 +409,8 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
                 )
 
                 junit_tests(
-                    name='example-test',
-                    dependencies= [':lockfile'],
+                    name = 'example-test',
+                    dependencies = [':lockfile'],
                 )
                 """
             ),
@@ -393,14 +432,8 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -413,10 +446,16 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -447,14 +486,8 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -474,15 +507,23 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = ['org.junit.jupiter:junit-jupiter-api:5.7.2'],
+                    requirements = [
+                        ':org.junit.jupiter_junit-jupiter-api',
+                    ],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',
@@ -528,14 +569,8 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -551,11 +586,23 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": combined_lockfile.to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
+                jvm_artifact(
+                  name='junit_junit',
+                  group='junit',
+                  artifact='junit',
+                  version='4.13.2',
+                )
+                jvm_artifact(
+                  name='org.junit.jupiter_junit-jupiter-api',
+                  group='org.junit.jupiter',
+                  artifact='junit-jupiter-api',
+                  version='5.7.2',
+                )
                 coursier_lockfile(
                     name = 'lockfile',
-                    maven_requirements = [
-                        'junit:junit:4.13.2',
-                        'org.junit.jupiter:junit-jupiter-api:5.7.2',
+                    requirements = [
+                        ':junit_junit',
+                        ':org.junit.jupiter_junit-jupiter-api',
                     ],
                     sources = [
                         "coursier_resolve.lockfile",
@@ -599,16 +646,21 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "JupiterTest.java")
+
     assert test_result.exit_code == 0
+    # TODO: Once support for parsing junit.xml is implemented, use that to determine status so we can remove the
+    #  hack to use ASCII test output in the `run_junit_test` rule.
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None
     assert re.search(r"2 tests found", test_result.stdout) is not None
+
+
+def run_junit_test(
+    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+) -> TestResult:
+    tgt = rule_runner.get_target(
+        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
+    )
+    return rule_runner.request(TestResult, [JavaTestFieldSet.create(tgt)])

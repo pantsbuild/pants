@@ -11,10 +11,12 @@ from pathlib import Path, PurePath
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
 
 import toml
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
 from pkg_resources import Requirement
 from typing_extensions import TypedDict
 
+from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
@@ -407,26 +409,30 @@ class PoetryRequirements:
         )
         requirements_dep = f":{req_file_tgt.name}"
 
+        normalized_module_mapping = normalize_module_mapping(module_mapping)
+        normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
+
         requirements = parse_pyproject_toml(
             PyProjectToml.create(self._parse_context, pyproject_toml_relpath)
         )
         for parsed_req in requirements:
-            proj_name = parsed_req.project_name
+            normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             req_module_mapping = (
-                {proj_name: module_mapping[proj_name]}
-                if module_mapping and proj_name in module_mapping
-                else None
+                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_module_mapping
+                else {}
             )
-            stubs_module_mapping = (
-                {proj_name: type_stubs_module_mapping[proj_name]}
-                if type_stubs_module_mapping and proj_name in type_stubs_module_mapping
-                else None
+            req_stubs_mapping = (
+                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_type_stubs_module_mapping
+                else {}
             )
+
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
+                type_stubs_module_mapping=req_stubs_mapping,
                 dependencies=[requirements_dep],
             )

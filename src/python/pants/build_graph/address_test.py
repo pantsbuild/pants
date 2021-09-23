@@ -91,14 +91,28 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "spec", ["", "a:", "a::", "//", "//:", "//:@t", "//:!t", "//:?", "//:=", r"a:b\c", "a:b/c"]
+    "spec",
+    [
+        "",
+        "a:",
+        "a::",
+        "//",
+        "//:",
+        "//:@t",
+        "//:!t",
+        "//:?",
+        "//:=",
+        r"a:b\c",
+        "a:b/c",
+        "a:my#tgt#generated",
+    ],
 )
 def test_address_bad_target_component(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
         AddressInput.parse(spec).dir_to_address()
 
 
-@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen="])
+@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
 def test_address_generated_name(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
         AddressInput.parse(spec).dir_to_address()
@@ -363,6 +377,16 @@ def test_address_maybe_convert_to_generated_target() -> None:
     assert_noops(Address("a/b", target_name="c"))
     assert_noops(Address("a/b"))
     assert_noops(Address("a/b", generated_name="generated"))
+
+
+def test_address_create_generated() -> None:
+    assert Address("dir", target_name="generator").create_generated("generated") == Address(
+        "dir", target_name="generator", generated_name="generated"
+    )
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", relative_file_path="f.ext").create_generated("gen")
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", generated_name="gen").create_generated("gen")
 
 
 @pytest.mark.parametrize(

@@ -73,7 +73,11 @@ def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
 @frozen_after_init
 @dataclass(order=True, unsafe_hash=True)
 class PutativeTarget:
-    """A potential target to add, detected by various heuristics."""
+    """A potential target to add, detected by various heuristics.
+
+    This class uses the term "target" in the loose sense. It can also represent an invocation of a
+    target-generating macro.
+    """
 
     # Note that field order is such that the dataclass order will be by address (path+name).
     path: str
@@ -96,6 +100,9 @@ class PutativeTarget:
     #  a high priority.
     owned_sources: Tuple[str, ...]
 
+    # Whether the pututative target has an address (or, e.g., is a macro with no address).
+    addressable: bool
+
     # Note that we generate the BUILD file target entry exclusively from these kwargs (plus the
     # type_alias), not from the fields above, which are broken out for other uses.
     # This allows the creator of instances of this class to control whether the generated
@@ -106,10 +113,6 @@ class PutativeTarget:
     # Should include the `#` prefix, which will not be added.
     comments: Tuple[str, ...]
 
-    # The name of the BUILD file to generate this putative target in. Typically just `BUILD`,
-    # but `BUILD.suffix` for any suffix is also valid.
-    build_file_name: str
-
     @classmethod
     def for_target_type(
         cls,
@@ -119,7 +122,6 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name: str = "BUILD",
     ):
         explicit_sources = (kwargs or {}).get("sources")
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
@@ -141,9 +143,9 @@ class PutativeTarget:
             target_type.alias,
             triggering_sources,
             owned_sources,
+            addressable=True,  # "Real" targets are always addressable.
             kwargs=kwargs,
             comments=comments,
-            build_file_name=build_file_name,
         )
 
     def __init__(
@@ -154,25 +156,26 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         owned_sources: Iterable[str],
         *,
+        addressable: bool = True,
         kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name: str = "BUILD",
     ) -> None:
         self.path = path
         self.name = name
         self.type_alias = type_alias
         self.triggering_sources = tuple(triggering_sources)
         self.owned_sources = tuple(owned_sources)
+        self.addressable = addressable
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
-        self.build_file_name = build_file_name
-
-    @property
-    def build_file_path(self) -> str:
-        return os.path.join(self.path, self.build_file_name)
 
     @property
     def address(self) -> Address:
+        if not self.addressable:
+            raise ValueError(
+                f"Cannot compute address for non-addressable putative target of type "
+                f"{self.type_alias} at path {self.path}"
+            )
         return Address(self.path, target_name=self.name)
 
     def realias(self, new_alias: str | None) -> PutativeTarget:
@@ -245,6 +248,22 @@ class TailorSubsystem(GoalSubsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
+            "--build-file-name",
+            advanced=True,
+            type=str,
+            default="BUILD",
+            help="The name to use for generated BUILD files.",
+        )
+
+        register(
+            "--build-file-header",
+            advanced=True,
+            type=str,
+            default="",
+            help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
+        )
+
+        register(
             "--build-file-indent",
             advanced=True,
             type=str,
@@ -260,6 +279,14 @@ class TailorSubsystem(GoalSubsystem):
             "type can be a custom target type or a macro that offers compatible functionality "
             f"to the one it replaces (see {doc_url('macros')}).",
         )
+
+    @property
+    def build_file_name(self) -> str:
+        return cast(str, self.options.build_file_name)
+
+    @property
+    def build_file_header(self) -> str:
+        return cast(str, self.options.build_file_header)
 
     @property
     def build_file_indent(self) -> str:
@@ -284,10 +311,12 @@ def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
     return ret
 
 
-def group_by_build_file(ptgts: Iterable[PutativeTarget]) -> Dict[str, List[PutativeTarget]]:
+def group_by_build_file(
+    build_file_name: str, ptgts: Iterable[PutativeTarget]
+) -> Dict[str, List[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
-        ret[ptgt.build_file_path].append(ptgt)
+        ret[os.path.join(ptgt.path, build_file_name)].append(ptgt)
     return ret
 
 
@@ -322,6 +351,11 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     existing_addrs: Set[str] = {tgt.address.spec for tgt in all_existing_tgts}
     uniquely_named_putative_targets: List[PutativeTarget] = []
     for ptgt in ptgts:
+        if not ptgt.addressable:
+            # Non-addressable PutativeTargets never have collision issues.
+            uniquely_named_putative_targets.append(ptgt)
+            continue
+
         idx = 0
         possibly_renamed_ptgt = ptgt
         # Targets in root-level BUILD files must be named explicitly.
@@ -379,6 +413,8 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
 @dataclass(frozen=True)
 class EditBuildFilesRequest:
     putative_targets: PutativeTargets
+    name: str
+    header: str
     indent: str
 
 
@@ -401,7 +437,7 @@ def make_content_str(
 
 @rule(desc="Edit BUILD files with new targets", level=LogLevel.DEBUG)
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
-    ptgts_by_build_file = group_by_build_file(req.putative_targets)
+    ptgts_by_build_file = group_by_build_file(req.name, req.putative_targets)
     # There may be an existing *directory* whose name collides with that of a BUILD file
     # we want to create. This is more likely on a system with case-insensitive paths,
     # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
@@ -420,7 +456,7 @@ async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     def make_content(bf_path: str, pts: Iterable[PutativeTarget]) -> FileContent:
         existing_content_bytes = existing_build_files_contents_by_path.get(bf_path)
         existing_content = (
-            None if existing_content_bytes is None else existing_content_bytes.decode()
+            req.header if existing_content_bytes is None else existing_content_bytes.decode()
         )
         new_content_bytes = make_content_str(existing_content, req.indent, pts).encode()
         return FileContent(bf_path, new_content_bytes)
@@ -500,18 +536,23 @@ async def tailor(
     if ptgts:
         edited_build_files = await Get(
             EditedBuildFiles,
-            EditBuildFilesRequest(PutativeTargets(ptgts), tailor_subsystem.build_file_indent),
+            EditBuildFilesRequest(
+                PutativeTargets(ptgts),
+                tailor_subsystem.build_file_name,
+                tailor_subsystem.build_file_header,
+                tailor_subsystem.build_file_indent,
+            ),
         )
         updated_build_files = set(edited_build_files.updated_paths)
         workspace.write_digest(edited_build_files.digest)
-        ptgts_by_build_file = group_by_build_file(ptgts)
+        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
         for build_file_path, ptgts in ptgts_by_build_file.items():
             verb = "Updated" if build_file_path in updated_build_files else "Created"
             console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
             for ptgt in ptgts:
                 console.print_stdout(
                     f"  - Added {console.green(ptgt.type_alias)} target "
-                    f"{console.cyan(ptgt.address.spec)}"
+                    f"{console.cyan(ptgt.name)}"
                 )
     return Tailor(0)
 

@@ -1,31 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::unseparated_literal_suffix,
-// TODO: Falsely triggers for async/await:
-//   see https://github.com/rust-lang/rust-clippy/issues/5360
-// clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
 // File-specific allowances to silence internal warnings of `py_class!`.
 #![allow(
   unused_braces,
@@ -327,6 +302,11 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "tasks_add_get",
     py_fn!(py, tasks_add_get(a: PyTasks, b: PyType, c: PyType)),
+  )?;
+  m.add(
+    py,
+    "tasks_add_union",
+    py_fn!(py, tasks_add_union(a: PyTasks, b: PyType, c: Vec<PyType>)),
   )?;
   m.add(
     py,
@@ -1290,6 +1270,21 @@ fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) 
     let output = externs::type_for(output);
     let input = externs::type_for(input);
     tasks.add_get(output, input);
+    Ok(None)
+  })
+}
+
+fn tasks_add_union(
+  py: Python,
+  tasks_ptr: PyTasks,
+  output_type: PyType,
+  input_types: Vec<PyType>,
+) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.add_union(
+      externs::type_for(output_type),
+      input_types.into_iter().map(externs::type_for).collect(),
+    );
     Ok(None)
   })
 }

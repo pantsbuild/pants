@@ -5,7 +5,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.go.distribution import GoLangDistribution
+from pants.backend.go.subsystems.golang import GoLangDistribution
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get

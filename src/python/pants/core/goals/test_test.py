@@ -21,12 +21,12 @@ from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
-    EnrichedTestResult,
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
     TestDebugRequest,
     TestFieldSet,
+    TestResult,
     TestSubsystem,
     build_runtime_package_dependencies,
     run_tests,
@@ -90,8 +90,8 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
         pass
 
     @property
-    def test_result(self) -> EnrichedTestResult:
-        return EnrichedTestResult(
+    def test_result(self) -> TestResult:
+        return TestResult(
             exit_code=self.exit_code(self.address),
             stdout="",
             stdout_digest=EMPTY_FILE_DIGEST,
@@ -193,7 +193,7 @@ def run_test_rule(
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
-                    output_type=EnrichedTestResult,
+                    output_type=TestResult,
                     input_type=TestFieldSet,
                     mock=lambda fs: fs.test_result,
                 ),
@@ -298,7 +298,7 @@ def test_coverage(rule_runner: RuleRunner) -> None:
 
 def sort_results() -> None:
     create_test_result = partial(
-        EnrichedTestResult,
+        TestResult,
         stdout="",
         stdout_digest=EMPTY_FILE_DIGEST,
         stderr="",
@@ -330,7 +330,7 @@ def assert_streaming_output(
     expected_level: LogLevel,
     expected_message: str,
 ) -> None:
-    result = EnrichedTestResult(
+    result = TestResult(
         exit_code=exit_code,
         stdout=stdout,
         stdout_digest=EMPTY_FILE_DIGEST,
