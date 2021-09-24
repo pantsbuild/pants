@@ -6,19 +6,18 @@ from __future__ import annotations
 import json
 import logging
 import os
-import textwrap
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import ijson
 
 from pants.backend.go.subsystems.golang import GoRoot
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 if TYPE_CHECKING:
@@ -66,41 +65,17 @@ def parse_imports_for_golang_distribution(raw_json: bytes) -> dict[str, str]:
 
 @rule
 async def analyze_imports_for_golang_distribution(
-    goroot: GoRoot, bash: BashBinary
+    goroot: GoRoot,
 ) -> ResolvedImportPathsForGoLangDistribution:
-    # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
-    # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
-    analyze_script_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    "analyze.sh",
-                    textwrap.dedent(
-                        """\
-                export GOROOT="./go"
-                export GOPATH="$(/bin/pwd)/gopath"
-                export GOCACHE="$(/bin/pwd)/cache"
-                mkdir -p "$GOPATH" "$GOCACHE"
-                exec ./go/bin/go list -json std
-                """
-                    ).encode("utf-8"),
-                )
-            ]
+    list_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=("list", "-json", "std"),
+            description="Ask Go for its available import paths",
+            absolutify_goroot=False,
         ),
     )
-
-    input_root = await Get(Digest, MergeDigests([goroot.digest, analyze_script_digest]))
-
-    process = Process(
-        argv=[bash.path, "./analyze.sh"],
-        input_digest=input_root,
-        description="Analyze import paths available in Go distribution.",
-        level=LogLevel.DEBUG,
-    )
-
-    result = await Get(ProcessResult, Process, process)
-    import_paths = parse_imports_for_golang_distribution(result.stdout)
+    import_paths = parse_imports_for_golang_distribution(list_result.stdout)
     import_descriptors: dict[str, ImportDescriptor] = {
         import_path: ImportDescriptor(digest=goroot.digest, path=path)
         for import_path, path in import_paths.items()

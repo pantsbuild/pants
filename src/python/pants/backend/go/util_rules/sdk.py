@@ -24,10 +24,15 @@ class GoSdkProcess:
     working_dir: str | None = None
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+    # TODO: Remove when Goroot comes from user PATH, rather than being installed.
+    absolutify_goroot: bool = True
 
 
 @rule
 async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: BashBinary) -> Process:
+    # TODO: Use `goroot.path` when Goroot comes from user PATH, rather than being installed.
+    #  For now, that would break working_dir support.
+    goroot_val = '"$(/bin/pwd)/go"' if request.absolutify_goroot else "./go"
     working_dir_cmd = f"cd '{request.working_dir}'" if request.working_dir else ""
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
@@ -35,11 +40,9 @@ async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: Bash
     # absolute paths inside the sandbox.
     go_run_script = FileContent(
         "__run_go.sh",
-        # TODO: fix this to use `goroot.path` when that is an absolute path. It does not
-        #  work currently because of working_dir.
         textwrap.dedent(
             f"""\
-            export GOROOT="$(/bin/pwd)/go"
+            export GOROOT={goroot_val}
             export GOPATH="$(/bin/pwd)/gopath"
             export GOCACHE="$(/bin/pwd)/cache"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
