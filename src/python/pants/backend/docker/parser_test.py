@@ -44,6 +44,5 @@ def test_putative_target_addresses() -> None:
     ],
 )
 def test_translate_to_address(copy_source, putative_target_address) -> None:
-    parsed = ParsedDockerfile(())
-    actual = parsed.translate_to_address(copy_source)
+    actual = ParsedDockerfile.translate_to_address(copy_source)
     assert actual == putative_target_address

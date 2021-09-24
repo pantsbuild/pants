@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import ClassVar, Generator, Pattern
+from typing import Generator
 
 from dockerfile import Command, parse_string
 
@@ -25,41 +25,38 @@ class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
 
 
-_pex_target_regexp: str = r"""
-(?# optional path, one level with dot-separated words)
-(?:(?P<path>(?:\w[.0-9_-]?)+) /)?
+# We pay for the up front time it takes to compile this at load time, as the alternative complicates
+# the implementation. See PR #12920.
+_pex_target_regexp = re.compile(
+    r"""
+    (?# optional path, one level with dot-separated parts)
+    (?:(?P<path>(?:\w[.0-9_-]?)+) /)?
 
-(?# binary name, with .pex file extension)
-(?P<name>(?:\w[.0-9_-]?)+) \.pex$
-"""
+    (?# binary name, with .pex file extension)
+    (?P<name>(?:\w[.0-9_-]?)+) \.pex$
+    """,
+    re.VERBOSE,
+)
 
 
 @dataclass(frozen=True)
 class ParsedDockerfile:
     commands: tuple[Command, ...]
-    pex_target_regexp: ClassVar[Pattern]
-
-    def __post_init__(self):
-        # Compile regexp when creating the first instance, and store it on the class.
-        if not getattr(ParsedDockerfile, "pex_target_regexp", None):
-            ParsedDockerfile.pex_target_regexp = re.compile(_pex_target_regexp, re.VERBOSE)
 
     @classmethod
-    def parse(cls, dockerfile: str) -> "ParsedDockerfile":
-        return cls(parse_string(dockerfile))
+    def parse(cls, dockerfile_contents: str) -> "ParsedDockerfile":
+        return cls(parse_string(dockerfile_contents))
 
     def get_all(self, command_name: str) -> Generator[Command, None, None]:
         for command in self.commands:
             if command.cmd.upper() == command_name:
                 yield command
 
-    def translate_to_address(self, value: str) -> str | None:
-        # Technically this could be a classmethod, but we need at least one instance created first,
-        # so it is safer to simply have this as an instance method.
-
+    @staticmethod
+    def translate_to_address(value: str) -> str | None:
         # Translate something that resembles a packaged pex binary to its corresponding target
         # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
-        pex = re.match(self.pex_target_regexp, value)
+        pex = re.match(_pex_target_regexp, value)
         if pex:
             path = (pex.group("path") or "").replace(".", "/")
             name = pex.group("name")
