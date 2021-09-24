@@ -4,20 +4,20 @@
 from __future__ import annotations
 
 import dataclasses
+import os.path
 from dataclasses import dataclass
 
 from pants.backend.go.lint.fmt import GoLangFmtRequest
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
-from pants.backend.go.subsystems.golang import GoLangDistribution
+from pants.backend.go.subsystems import golang
+from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.platform import Platform
+from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -54,20 +54,11 @@ class Setup:
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_gofmt(setup_request: SetupRequest, goroot: GoLangDistribution) -> Setup:
-    download_goroot_request = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(Platform.current),
-    )
-
-    source_files_request = Get(
+async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
+    source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-
-    downloaded_goroot, source_files = await MultiGet(download_goroot_request, source_files_request)
-
     source_files_snapshot = (
         source_files.snapshot
         if setup_request.request.prior_formatter_result is None
@@ -76,11 +67,10 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoLangDistribution) -
 
     input_digest = await Get(
         Digest,
-        MergeDigests((source_files_snapshot.digest, downloaded_goroot.digest)),
+        MergeDigests((source_files_snapshot.digest, goroot.digest)),
     )
-
     argv = (
-        "./go/bin/gofmt",
+        os.path.join(goroot.path, "bin/gofmt"),
         "-l" if setup_request.check_only else "-w",
         *source_files_snapshot.files,
     )
@@ -127,6 +117,7 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
 def rules():
     return [
         *collect_rules(),
+        *golang.rules(),
         UnionRule(GoLangFmtRequest, GofmtRequest),
         UnionRule(LintRequest, GofmtRequest),
     ]

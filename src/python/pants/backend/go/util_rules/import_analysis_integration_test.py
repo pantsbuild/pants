@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.go.util_rules import import_analysis
+from pants.backend.go.util_rules import import_analysis, sdk
 from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.core.util_rules import external_tool
 from pants.engine.rules import QueryRule
@@ -17,6 +17,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *external_tool.rules(),
+            *sdk.rules(),
             *import_analysis.rules(),
             QueryRule(ResolvedImportPathsForGoLangDistribution, []),
         ],

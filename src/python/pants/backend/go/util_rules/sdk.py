@@ -7,11 +7,10 @@ import shlex
 import textwrap
 from dataclasses import dataclass
 
-from pants.backend.go.subsystems.golang import GoLangDistribution
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.backend.go.subsystems import golang
+from pants.backend.go.subsystems.golang import GoRoot
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -28,17 +27,7 @@ class GoSdkProcess:
 
 
 @rule
-async def setup_go_sdk_command(
-    request: GoSdkProcess,
-    goroot: GoLangDistribution,
-    bash: BashBinary,
-) -> Process:
-    downloaded_goroot = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(Platform.current),
-    )
-
+async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: BashBinary) -> Process:
     working_dir_cmd = f"cd '{request.working_dir}'" if request.working_dir else ""
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
@@ -63,7 +52,7 @@ async def setup_go_sdk_command(
     script_digest = await Get(Digest, CreateDigest([go_run_script]))
     input_root_digest = await Get(
         Digest,
-        MergeDigests([downloaded_goroot.digest, script_digest, request.input_digest]),
+        MergeDigests([goroot.digest, script_digest, request.input_digest]),
     )
 
     return Process(
@@ -77,4 +66,4 @@ async def setup_go_sdk_command(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *golang.rules())

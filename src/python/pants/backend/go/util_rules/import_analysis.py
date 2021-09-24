@@ -12,11 +12,9 @@ from typing import TYPE_CHECKING
 
 import ijson
 
-from pants.backend.go.subsystems.golang import GoLangDistribution
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.backend.go.subsystems.golang import GoRoot
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -68,16 +66,8 @@ def parse_imports_for_golang_distribution(raw_json: bytes) -> dict[str, str]:
 
 @rule
 async def analyze_imports_for_golang_distribution(
-    goroot: GoLangDistribution,
-    platform: Platform,
-    bash: BashBinary,
+    goroot: GoRoot, bash: BashBinary
 ) -> ResolvedImportPathsForGoLangDistribution:
-    downloaded_goroot = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        goroot.get_request(platform),
-    )
-
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved from within the
     # execution sandbox. Thus, this code uses a bash script to be able to resolve that path.
     analyze_script_digest = await Get(
@@ -100,7 +90,7 @@ async def analyze_imports_for_golang_distribution(
         ),
     )
 
-    input_root = await Get(Digest, MergeDigests([downloaded_goroot.digest, analyze_script_digest]))
+    input_root = await Get(Digest, MergeDigests([goroot.digest, analyze_script_digest]))
 
     process = Process(
         argv=[bash.path, "./analyze.sh"],
@@ -112,7 +102,7 @@ async def analyze_imports_for_golang_distribution(
     result = await Get(ProcessResult, Process, process)
     import_paths = parse_imports_for_golang_distribution(result.stdout)
     import_descriptors: dict[str, ImportDescriptor] = {
-        import_path: ImportDescriptor(digest=downloaded_goroot.digest, path=path)
+        import_path: ImportDescriptor(digest=goroot.digest, path=path)
         for import_path, path in import_paths.items()
     }
     return ResolvedImportPathsForGoLangDistribution(
