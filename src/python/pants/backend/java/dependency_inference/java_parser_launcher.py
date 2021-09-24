@@ -8,10 +8,10 @@ import logging
 import pkg_resources
 
 from pants.backend.java.compile.javac import CompiledClassfiles
-from pants.backend.java.compile.javac_binary import JavacBinary
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
+from pants.backend.java.util_rules import JdkSetup
+from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import BashBinary, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -50,24 +50,28 @@ class JavaParserCompiledClassfiles(CompiledClassfiles):
 
 
 @rule
-async def build_processors(bash: BashBinary, javac: JavacBinary) -> JavaParserCompiledClassfiles:
-    materialized_classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__toolcp",
-            artifact_requirements=(java_parser_artifact_requirements(),),
-        ),
-    )
+async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserCompiledClassfiles:
+    dest_dir = "classfiles"
 
-    source_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    path=_LAUNCHER_BASENAME,
-                    content=_load_javaparser_launcher_source(),
-                )
-            ]
+    materialized_classpath, source_digest = await MultiGet(
+        Get(
+            MaterializedClasspath,
+            MaterializedClasspathRequest(
+                prefix="__toolcp",
+                artifact_requirements=(java_parser_artifact_requirements(),),
+            ),
+        ),
+        Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(
+                        path=_LAUNCHER_BASENAME,
+                        content=_load_javaparser_launcher_source(),
+                    ),
+                    Directory(dest_dir),
+                ]
+            ),
         ),
     )
 
@@ -76,7 +80,7 @@ async def build_processors(bash: BashBinary, javac: JavacBinary) -> JavaParserCo
         MergeDigests(
             (
                 materialized_classpath.digest,
-                javac.digest,
+                jdk_setup.digest,
                 source_digest,
             )
         ),
@@ -86,22 +90,23 @@ async def build_processors(bash: BashBinary, javac: JavacBinary) -> JavaParserCo
         ProcessResult,
         Process(
             argv=[
-                bash.path,
-                javac.javac_wrapper_script,
+                *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
+                "com.sun.tools.javac.Main",
                 "-cp",
                 materialized_classpath.classpath_arg(),
                 "-d",
-                "classfiles",
+                dest_dir,
                 _LAUNCHER_BASENAME,
             ],
             input_digest=merged_digest,
-            output_directories=("classfiles",),
+            use_nailgun=jdk_setup.digest,
+            output_directories=(dest_dir,),
             description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
             level=LogLevel.DEBUG,
         ),
     )
     stripped_classfiles_digest = await Get(
-        Digest, RemovePrefix(process_result.output_digest, "classfiles")
+        Digest, RemovePrefix(process_result.output_digest, dest_dir)
     )
     return JavaParserCompiledClassfiles(digest=stripped_classfiles_digest)
 

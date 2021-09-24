@@ -36,7 +36,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use bazel_protos::gen::buildbarn::cas::UncachedActionResult;
 use bazel_protos::require_digest;
 use fs::RelativePath;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
 use prost::Message;
 use store::{Store, StoreWrapper};
@@ -186,10 +186,14 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   cache_rpc_concurrency: usize,
 
-  /// Whether or not to enable running the process through a Nailgun server.
-  /// This will likely start a new Nailgun server as a side effect.
+  /// If set, run the process through a Nailgun server with the given digest.
+  /// This will start a new Nailgun server as a side effect, but will tear it down on exit.
   #[structopt(long)]
-  use_nailgun: bool,
+  use_nailgun_digest: Option<Fingerprint>,
+
+  /// Length of the `use_nailgun_digest` digest.
+  #[structopt(long)]
+  use_nailgun_digest_length: Option<usize>,
 
   /// Overall timeout in seconds for each request from time of submission.
   #[structopt(long, default_value = "600")]
@@ -417,6 +421,17 @@ fn make_request_from_flat_args(
     })
     .transpose()?;
 
+  let use_nailgun = match (args.use_nailgun_digest, args.use_nailgun_digest_length) {
+    (Some(d), Some(l)) => Digest::new(d, l),
+    (Some(_), None) | (None, Some(_)) => {
+      return Err(
+        "If either `use_nailgun_digest` or `use_nailgun_digest_length` are set, both must be."
+          .to_owned(),
+      )
+    }
+    _ => EMPTY_DIGEST,
+  };
+
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
     env: collection_from_keyvalues(args.command.env.iter()),
@@ -430,7 +445,7 @@ fn make_request_from_flat_args(
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
     platform_constraint: None,
-    is_nailgunnable: args.use_nailgun,
+    use_nailgun,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -516,7 +531,7 @@ async fn extract_request_from_action_digest(
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
+    use_nailgun: EMPTY_DIGEST,
     cache_scope: ProcessCacheScope::Always,
   };
 

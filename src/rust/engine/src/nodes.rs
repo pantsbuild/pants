@@ -274,8 +274,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let py_digest: Value = externs::getattr(value, "input_digest").unwrap();
-    let digest =
-      lift_directory_digest(&py_digest).map_err(|err| format!("Error parsing digest {}", err))?;
+    let digest = lift_directory_digest(&py_digest)
+      .map_err(|err| format!("Error parsing input_digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
       .unwrap()
@@ -315,7 +315,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let is_nailgunnable: bool = externs::getattr(value, "is_nailgunnable").unwrap();
+    let py_use_nailgun: Value = externs::getattr(value, "use_nailgun").unwrap();
+    let use_nailgun = lift_directory_digest(&py_use_nailgun)
+      .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
 
     let execution_slot_variable = {
       let s = externs::getattr_as_string(value, "execution_slot_variable");
@@ -343,7 +345,7 @@ impl MultiPlatformExecuteProcess {
       append_only_caches,
       jdk_home,
       platform_constraint,
-      is_nailgunnable,
+      use_nailgun,
       execution_slot_variable,
       cache_scope,
     })

@@ -106,12 +106,7 @@ async def run_junit_test(
     )
     proc = Process(
         argv=[
-            bash.path,
-            "-c",
-            f"exec $({' '.join(jdk_setup.java_home_cmd)})/bin/java \"$@\"",
-            "--",
-            "-cp",
-            materialized_classpath.classpath_arg(),
+            *jdk_setup.args(bash, [materialized_classpath.classpath_arg()]),
             "org.junit.platform.console.ConsoleLauncher",
             "--classpath",
             usercp_relpath,

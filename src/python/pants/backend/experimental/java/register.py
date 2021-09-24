@@ -3,7 +3,7 @@
 
 from pants.backend.java import tailor
 from pants.backend.java import util_rules as java_util_rules
-from pants.backend.java.compile import javac, javac_binary
+from pants.backend.java.compile import javac
 from pants.backend.java.target_types import (
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
@@ -31,7 +31,6 @@ def target_types():
 def rules():
     return [
         *javac.rules(),
-        *javac_binary.rules(),
         *junit.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
