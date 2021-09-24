@@ -6,7 +6,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
@@ -52,7 +51,6 @@ def rule_runner() -> RuleRunner:
             *java_parser_rules(),
             *java_target_rules(),
             *java_util_rules(),
-            *javac_binary_rules(),
             *javac_rules(),
             *junit_rules(),
             *source_files.rules(),
