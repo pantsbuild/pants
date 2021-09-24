@@ -33,6 +33,7 @@ from pants.engine.target import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -66,6 +67,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@maybe_skip_jdk_test
 def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -113,6 +115,7 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -156,6 +159,7 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     ) == InferredDependencies(dependencies=[])
 
 
+@maybe_skip_jdk_test
 def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -202,6 +206,7 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
+@maybe_skip_jdk_test
 def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -243,6 +248,7 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
+@maybe_skip_jdk_test
 def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -323,6 +329,7 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_package_private_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -371,6 +378,7 @@ def test_package_private_dep(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_junit_test_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

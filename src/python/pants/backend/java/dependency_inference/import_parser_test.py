@@ -28,6 +28,7 @@ from pants.engine.process import rules as process_rules
 from pants.engine.target import Targets
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -58,6 +59,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@maybe_skip_jdk_test
 def test_parse_java_imports(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -92,6 +94,7 @@ def test_parse_java_imports(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_parse_java_imports_subtargets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
