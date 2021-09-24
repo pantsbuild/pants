@@ -14,8 +14,6 @@ target(
     'src/python/pants/backend/experimental/go/lint/gofmt',
     'src/python/pants/backend/experimental/python',
     'src/python/pants/backend/experimental/terraform',
-    'src/python/pants/backend/experimental/terraform/lint/tffmt',
-    'src/python/pants/backend/experimental/terraform/lint/validate',
     'src/python/pants/backend/experimental/debian',
     'src/python/pants/backend/google_cloud_function/python',
     'src/python/pants/backend/project_info',
