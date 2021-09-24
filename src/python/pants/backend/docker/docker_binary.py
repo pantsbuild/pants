@@ -53,7 +53,7 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale="interact with the docker daemon")
+        raise BinaryNotFoundError.create(request, rationale="interact with the docker daemon")
     return DockerBinary(first_path.path, first_path.fingerprint)
 
 

@@ -91,7 +91,7 @@ async def run_shell_command(
         if binary.first_path:
             command_env[tool_request.binary_name] = binary.first_path.path
         else:
-            raise BinaryNotFoundError(
+            raise BinaryNotFoundError.create(
                 tool_request,
                 rationale=f"execute experimental_shell_command {shell_command.address}",
             )
