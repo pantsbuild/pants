@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from pants.backend.java.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.backend.java.target_types import JavaSources
+from pants.backend.java.target_types import JavaSourceField
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -17,11 +17,6 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class JavaPackage:
-    package: str
 
 
 # -----------------------------------------------------------------------------------------------
@@ -86,9 +81,9 @@ async def map_first_party_java_targets_to_symbols(
     _: FirstPartyJavaTargetsMappingMarker,
 ) -> FirstPartyJavaMappingImpl:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    java_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(JavaSources))
+    java_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(JavaSourceField))
     source_files = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest([target[JavaSources]])) for target in java_targets
+        Get(SourceFiles, SourceFilesRequest([target[JavaSourceField]])) for target in java_targets
     )
     source_analysis = await MultiGet(
         Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)

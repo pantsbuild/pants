@@ -10,7 +10,7 @@ from pants.backend.java.dependency_inference.import_parser import (
     ParseJavaImportsRequest,
 )
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
-from pants.backend.java.target_types import JavaSources
+from pants.backend.java.target_types import JavaSourceField
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
@@ -49,7 +49,7 @@ class JavaInferSubsystem(Subsystem):
 
 
 class InferJavaImportDependencies(InferDependenciesRequest):
-    infer_from = JavaSources
+    infer_from = JavaSourceField
 
 
 @rule(desc="Inferring Java dependencies by analyzing imports")

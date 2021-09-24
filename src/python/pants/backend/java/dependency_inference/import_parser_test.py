@@ -18,7 +18,9 @@ from pants.backend.java.dependency_inference.java_parser import rules as java_pa
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
-from pants.backend.java.target_types import JavaLibrary, JavaSources
+from pants.backend.java.target_types import JavaSourceField, JavaSourcesGeneratorTarget
+from pants.backend.java.target_types import rules as java_target_rules
+from pants.backend.java.util_rules import rules as java_util_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import UnparsedAddressInputs
@@ -41,6 +43,8 @@ def rule_runner() -> RuleRunner:
             *import_parser_rules(),
             *java_parser_launcher_rules(),
             *java_parser_rules(),
+            *java_target_rules(),
+            *java_util_rules(),
             *javac_binary_rules(),
             *javac_rules(),
             *process_rules(),
@@ -49,7 +53,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ParsedJavaImports, [ParseJavaImportsRequest]),
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
-        target_types=[JavaLibrary],
+        target_types=[JavaSourcesGeneratorTarget],
         bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
@@ -143,7 +147,7 @@ def test_parse_java_imports(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_library(name = 'lib')
+                java_sources(name = 'lib')
                 """
             ),
             "ExampleLib.java": dedent(
@@ -164,7 +168,7 @@ def test_parse_java_imports(rule_runner: RuleRunner) -> None:
             ParsedJavaImports,
             [
                 ParseJavaImportsRequest(
-                    sources=target[JavaSources],
+                    sources=target[JavaSourceField],
                 )
             ],
         )
@@ -177,7 +181,7 @@ def test_parse_java_imports_subtargets(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_library(name = 'lib')
+                java_sources(name = 'lib')
                 """
             ),
             "ExampleLib.java": dedent(
@@ -207,7 +211,7 @@ def test_parse_java_imports_subtargets(rule_runner: RuleRunner) -> None:
             ParsedJavaImports,
             [
                 ParseJavaImportsRequest(
-                    sources=targets[0][JavaSources],
+                    sources=targets[0][JavaSourceField],
                 )
             ],
         )
@@ -218,7 +222,7 @@ def test_parse_java_imports_subtargets(rule_runner: RuleRunner) -> None:
             ParsedJavaImports,
             [
                 ParseJavaImportsRequest(
-                    sources=targets[1][JavaSources],
+                    sources=targets[1][JavaSourceField],
                 )
             ],
         )
