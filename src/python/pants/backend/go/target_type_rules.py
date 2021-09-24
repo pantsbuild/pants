@@ -31,7 +31,7 @@ from pants.backend.go.util_rules.go_mod import (
     ResolveGoModuleRequest,
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
-from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
+from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.base.specs import (
     AddressSpecs,
     DescendantAddresses,
@@ -113,7 +113,7 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
-    goroot_imports: ResolvedImportPathsForGoLangDistribution,
+    std_lib_imports: GoStdLibImports,
     package_mapping: GoImportPathToPackageMapping,
 ) -> InferredDependencies:
     this_go_package = await Get(
@@ -156,8 +156,7 @@ async def infer_go_dependencies(
     # external modules.
     inferred_dependencies = []
     for import_path in this_go_package.imports + this_go_package.test_imports:
-        # Check whether the import path comes from the standard library.
-        if import_path in goroot_imports.import_path_mapping:
+        if import_path in std_lib_imports:
             continue
 
         # Infer first-party dependencies to other packages in same go_module.
@@ -194,7 +193,7 @@ class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
 @rule
 async def inject_go_external_package_dependencies(
     request: InjectGoExternalPackageDependenciesRequest,
-    goroot_imports: ResolvedImportPathsForGoLangDistribution,
+    std_lib_imports: GoStdLibImports,
     package_mapping: GoImportPathToPackageMapping,
 ) -> InjectedDependencies:
     this_go_package = await Get(
@@ -205,8 +204,7 @@ async def inject_go_external_package_dependencies(
     # external modules.
     inferred_dependencies = []
     for import_path in this_go_package.imports + this_go_package.test_imports:
-        # Check whether the import path comes from the standard library.
-        if import_path in goroot_imports.import_path_mapping:
+        if import_path in std_lib_imports:
             continue
 
         # Infer third-party dependencies on _go_external_package targets.
