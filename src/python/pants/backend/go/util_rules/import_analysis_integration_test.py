@@ -1,5 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import pytest
 
 from pants.backend.go.util_rules import import_analysis
@@ -18,7 +21,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(ResolvedImportPathsForGoLangDistribution, []),
         ],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
     return rule_runner
 
 

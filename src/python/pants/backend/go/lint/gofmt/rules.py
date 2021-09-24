@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 from dataclasses import dataclass
 
@@ -77,11 +79,11 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoLangDistribution) -
         MergeDigests((source_files_snapshot.digest, downloaded_goroot.digest)),
     )
 
-    argv = [
+    argv = (
         "./go/bin/gofmt",
         "-l" if setup_request.check_only else "-w",
         *source_files_snapshot.files,
-    ]
+    )
 
     process = Process(
         argv=argv,
@@ -90,7 +92,6 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoLangDistribution) -
         description=f"Run gofmt on {pluralize(len(source_files_snapshot.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
-
     return Setup(process=process, original_digest=source_files_snapshot.digest)
 
 

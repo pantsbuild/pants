@@ -8,7 +8,7 @@ import logging
 import os
 import textwrap
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 import ijson
 
@@ -51,8 +51,8 @@ class ResolvedImportPathsForGoLangDistribution(ResolvedImportPaths):
     pass
 
 
-def parse_imports_for_golang_distribution(raw_json: bytes) -> Dict[str, str]:
-    import_paths: Dict[str, str] = {}
+def parse_imports_for_golang_distribution(raw_json: bytes) -> dict[str, str]:
+    import_paths: dict[str, str] = {}
     package_descriptors = ijson.items(raw_json, "", multiple_values=True)
     for package_descriptor in package_descriptors:
         try:
@@ -111,7 +111,7 @@ async def analyze_imports_for_golang_distribution(
 
     result = await Get(ProcessResult, Process, process)
     import_paths = parse_imports_for_golang_distribution(result.stdout)
-    import_descriptors: Dict[str, ImportDescriptor] = {
+    import_descriptors: dict[str, ImportDescriptor] = {
         import_path: ImportDescriptor(digest=downloaded_goroot.digest, path=path)
         for import_path, path in import_paths.items()
     }
@@ -143,7 +143,7 @@ async def generate_import_config(
 
     pkg_digests: OrderedSet[Digest] = OrderedSet()
 
-    import_config: List[str] = ["# import config"]
+    import_config = ["# import config"]
     for import_path, (fp, digest) in import_config_digests.items():
         pkg_digests.add(digest)
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
@@ -156,14 +156,12 @@ async def generate_import_config(
             )
 
     import_config_content = "\n".join(import_config).encode("utf-8")
-
     import_config_digest = await Get(
-        Digest, CreateDigest([FileContent(path="./importcfg", content=import_config_content)])
+        Digest, CreateDigest([FileContent("./importcfg", import_config_content)])
     )
     pkg_digests.add(import_config_digest)
 
     digest = await Get(Digest, MergeDigests(pkg_digests))
-
     return GatheredImports(digest=digest)
 
 
