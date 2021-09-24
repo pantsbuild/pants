@@ -1,12 +1,21 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.core.util_rules.external_tool import TemplatedExternalTool
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+    TemplatedExternalTool,
+)
+from pants.engine.fs import Digest
 from pants.engine.platform import Platform
-from pants.engine.rules import collect_rules
+from pants.engine.rules import Get, collect_rules, rule
 
 
-class GoLangDistribution(TemplatedExternalTool):
+class GolangSubsystem(TemplatedExternalTool):
     options_scope = "golang"
     name = "golang"
     help = "Official golang distribution."
@@ -26,6 +35,24 @@ class GoLangDistribution(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         return "./bin"
+
+
+@dataclass(frozen=True)
+class GoRoot:
+    """Path to the Go installation (the `GOROOT`)."""
+
+    path: str
+    digest: Digest
+
+
+@rule
+async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
+    downloaded_go_dist = await Get(
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        golang_subsystem.get_request(Platform.current),
+    )
+    return GoRoot("./go", downloaded_go_dist.digest)
 
 
 def rules():

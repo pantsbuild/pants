@@ -24,7 +24,6 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "43757804"]
 #[macro_use]
 extern crate derivative;
 
@@ -249,7 +248,13 @@ pub struct Process {
 
   pub platform_constraint: Option<Platform>,
 
-  pub is_nailgunnable: bool,
+  ///
+  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
+  ///
+  /// TODO: Currently this Digest must be a subset of the `input_digest`, but we should consider
+  /// making it disjoint, and then automatically merging it.
+  ///
+  pub use_nailgun: Digest,
 
   pub cache_scope: ProcessCacheScope,
 }
@@ -279,7 +284,7 @@ impl Process {
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       platform_constraint: None,
-      is_nailgunnable: false,
+      use_nailgun: hashing::EMPTY_DIGEST,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
     }

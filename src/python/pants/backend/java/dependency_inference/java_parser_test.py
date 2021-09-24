@@ -9,7 +9,6 @@ import pytest
 
 from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.dependency_inference.java_parser import (
     FallibleJavaSourceDependencyAnalysisResult,
 )
@@ -45,7 +44,6 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *java_parser_launcher_rules(),
             *java_parser_rules(),
-            *javac_binary_rules(),
             *javac_rules(),
             *source_files.rules(),
             *util_rules(),
@@ -55,7 +53,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourceTarget],
-        bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
+        # TODO(#12293): use a fixed JDK version.
+        bootstrap_args=[
+            "--javac-jdk=system",
+        ],
     )
 
 

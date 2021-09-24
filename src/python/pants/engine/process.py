@@ -66,7 +66,7 @@ class Process:
     output_directories: Tuple[str, ...]
     timeout_seconds: int | float
     jdk_home: str | None
-    is_nailgunnable: bool
+    use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
 
@@ -84,7 +84,7 @@ class Process:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
-        is_nailgunnable: bool = False,
+        use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
@@ -128,7 +128,7 @@ class Process:
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
-        self.is_nailgunnable = is_nailgunnable
+        self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
 

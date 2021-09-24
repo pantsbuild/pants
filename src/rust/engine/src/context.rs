@@ -164,7 +164,6 @@ impl Core {
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
-    process_execution_metadata: &ProcessMetadata,
     exec_strategy_opts: &ExecutionStrategyOptions,
   ) -> Box<dyn CommandRunner> {
     let local_command_runner = process_execution::local::CommandRunner::new(
@@ -179,9 +178,12 @@ impl Core {
       if exec_strategy_opts.local_enable_nailgun {
         Box::new(process_execution::nailgun::CommandRunner::new(
           local_command_runner,
-          process_execution_metadata.clone(),
           local_execution_root_dir.to_path_buf(),
+          store.clone(),
           executor.clone(),
+          // TODO: The nailgun pool size should almost certainly be configurable independent
+          // of concurrency, along with per-instance memory usage.
+          exec_strategy_opts.local_parallelism,
         ))
       } else {
         Box::new(local_command_runner)
@@ -223,7 +225,6 @@ impl Core {
       executor,
       local_execution_root_dir,
       named_caches_dir,
-      process_execution_metadata,
       exec_strategy_opts,
     );
 

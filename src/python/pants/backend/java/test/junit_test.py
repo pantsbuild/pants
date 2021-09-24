@@ -9,7 +9,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
@@ -50,7 +49,6 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *javac_rules(),
             *junit_rules(),
-            *javac_binary_rules(),
             *util_rules(),
             *java_util_rules(),
             *target_types_rules(),
