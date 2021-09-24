@@ -45,6 +45,9 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             "--type",
             type=DependencyType,
             default=DependencyType.SOURCE,
+            removal_version="2.9.0.dev0",
+            removal_hint="This option is misleading and not very useful. In the future there "
+            "will be a more robust way of querying and filtering dependencies.",
             help=(
                 "Which types of dependencies to list, where `source` means source code "
                 "dependencies and `3rdparty` means third-party requirement strings."
