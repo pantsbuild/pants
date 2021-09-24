@@ -47,11 +47,11 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             default=DependencyType.SOURCE,
             removal_version="2.9.0.dev0",
             removal_hint="This option is misleading and not very useful. In the future there "
-            "will be a more robust way of querying and filtering dependencies.  Meanwhile you "
-            "can get the list of requirement strings for a set of targets using something like\n"
+            "will be a more robust way of querying and filtering dependencies.\nMeanwhile you "
+            "can get the list of requirement strings for a set of targets using something like\n\n"
             "./pants dependencies :: \\\n"
             "| xargs ./pants filter --target-type=python_requirement_library \\\n"
-            "| xargs ./pants peek | jq -r '.[][\"requirements\"][]'",
+            "| xargs ./pants peek | jq -r '.[][\"requirements\"][]'\n",
             help=(
                 "Which types of dependencies to list, where `source` means source code "
                 "dependencies and `3rdparty` means third-party requirement strings."
