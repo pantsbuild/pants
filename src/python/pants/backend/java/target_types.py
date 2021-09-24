@@ -84,8 +84,7 @@ async def generate_targets_from_junit_tests(
         request.generator,
         paths.files,
         union_membership,
-        # TODO(#12790): set to false when dependency inference is disabled.
-        add_dependencies_on_all_siblings=True,
+        add_dependencies_on_all_siblings=False,
     )
 
 

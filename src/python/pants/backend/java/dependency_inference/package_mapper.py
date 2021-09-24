@@ -95,7 +95,6 @@ async def map_first_party_java_targets_to_symbols(
     for address, analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
             package, type_ = top_level_type.rsplit(".", maxsplit=1)
-            print(f"Adding {top_level_type} to {address}")
             dep_map.add_top_level_type(package=package, type_=type_, address=address)
 
     return FirstPartyJavaMappingImpl(package_rooted_dependency_map=dep_map)

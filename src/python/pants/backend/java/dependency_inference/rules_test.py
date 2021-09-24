@@ -13,7 +13,11 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
 )
 from pants.backend.java.dependency_inference.rules import InferJavaImportDependencies
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
-from pants.backend.java.target_types import JavaSourceField, JavaSourcesGeneratorTarget
+from pants.backend.java.target_types import (
+    JavaSourceField,
+    JavaSourcesGeneratorTarget,
+    JunitTestsGeneratorTarget,
+)
 from pants.backend.java.target_types import rules as java_target_rules
 from pants.backend.java.test.junit import rules as junit_rules
 from pants.backend.java.util_rules import rules as java_util_rules
@@ -57,7 +61,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, [InferJavaImportDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
-        target_types=[JavaSourcesGeneratorTarget],
+        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
         bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
@@ -295,8 +299,6 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
         == FrozenOrderedSet()
     )
 
-    target_t = rule_runner.get_target(Address("", target_name="t"))
-
     # Neither //:t nor either of its source subtargets have explicitly provided deps
     assert (
         rule_runner.request(
@@ -337,3 +339,100 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     assert (
         rule_runner.request(Addresses, [DependenciesRequest(target_b[Dependencies])]) == Addresses()
     )
+
+
+def test_package_private_dep(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name = 't')
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.pantsbuild.example.C;
+
+                public class A {
+                    public static void main(String[] args) throws Exception {
+                        C c = new C();
+                    }
+                }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                public class B {}
+
+                class C {}
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
+
+    # A.java has an inferred dependency on B.java
+    assert rule_runner.request(
+        Addresses, [DependenciesRequest(target_a[Dependencies])]
+    ) == Addresses([target_b.address])
+
+    # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
+    # inferred dependencies.
+    assert (
+        rule_runner.request(Addresses, [DependenciesRequest(target_b[Dependencies])]) == Addresses()
+    )
+
+
+def test_junit_test_dep(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name = 'lib')
+                junit_tests(name = 'tests')
+                """
+            ),
+            "FooTest.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.pantsbuild.example.C;
+
+                public class FooTest {
+                    public static void main(String[] args) throws Exception {
+                        C c = new C();
+                    }
+                }
+                """
+            ),
+            "Foo.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                public class Foo {}
+
+                class C {}
+                """
+            ),
+        }
+    )
+
+    lib = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Foo.java"))
+    tests = rule_runner.get_target(
+        Address("", target_name="tests", relative_file_path="FooTest.java")
+    )
+
+    # A.java has an inferred dependency on B.java
+    assert rule_runner.request(Addresses, [DependenciesRequest(tests[Dependencies])]) == Addresses(
+        [lib.address]
+    )
+
+    # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
+    # inferred dependencies.
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses()
