@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 from typing import cast
 
@@ -59,7 +60,7 @@ async def infer_java_dependencies_via_imports(
     first_party_dep_map: FirstPartyJavaPackageMapping,
 ) -> InferredDependencies:
     if not java_infer_subsystem.imports:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies([])
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
     explicitly_provided_deps, detected_imports = await MultiGet(
@@ -75,14 +76,10 @@ async def infer_java_dependencies_via_imports(
 
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
-    def deps_iter():
-        for imp in relevant_imports:
-            for address in dep_map.addresses_for_symbol(imp):
-                yield address
-
     return InferredDependencies(
-        dependencies=sorted(frozenset(deps_iter())),
-        sibling_dependencies_inferrable=True,
+        dependencies=itertools.chain.from_iterable(
+            dep_map.addresses_for_symbol(imp) for imp in relevant_imports
+        ),
     )
 
 

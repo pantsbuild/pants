@@ -96,20 +96,20 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
 
     print([target_a, target_b])
 
-    assert rule_runner.request(
-        InferredDependencies,
-        [InferJavaImportDependencies(target_a[JavaSourceField])],
-    ) == InferredDependencies(
-        dependencies=[],
-        sibling_dependencies_inferrable=True,
+    assert (
+        rule_runner.request(
+            InferredDependencies,
+            [InferJavaImportDependencies(target_a[JavaSourceField])],
+        )
+        == InferredDependencies(dependencies=[])
     )
 
-    assert rule_runner.request(
-        InferredDependencies,
-        [InferJavaImportDependencies(target_b[JavaSourceField])],
-    ) == InferredDependencies(
-        dependencies=[],
-        sibling_dependencies_inferrable=True,
+    assert (
+        rule_runner.request(
+            InferredDependencies,
+            [InferJavaImportDependencies(target_b[JavaSourceField])],
+        )
+        == InferredDependencies(dependencies=[])
     )
 
 
@@ -149,17 +149,11 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[target_b.address],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[])
 
 
 def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
@@ -201,17 +195,11 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[target_b.address],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[target_a.address],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[target_a.address])
 
 
 def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> None:
@@ -248,17 +236,11 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[target_b.address],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
-    ) == InferredDependencies(
-        dependencies=[target_a.address],
-        sibling_dependencies_inferrable=True,
-    )
+    ) == InferredDependencies(dependencies=[target_a.address])
 
 
 def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
