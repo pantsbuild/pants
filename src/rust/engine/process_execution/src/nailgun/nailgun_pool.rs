@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
-use hashing::{Digest, Fingerprint};
+use hashing::Fingerprint;
 use lazy_static::lazy_static;
 use log::{debug, info};
 use regex::Regex;
@@ -18,7 +18,7 @@ use store::Store;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use crate::Process;
+use crate::{MultiPlatformProcess, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -47,15 +47,17 @@ pub type Port = u16;
 pub struct NailgunPool {
   workdir_base: PathBuf,
   size: usize,
+  store: Store,
   executor: Executor,
   processes: Arc<Mutex<Vec<PoolEntry>>>,
 }
 
 impl NailgunPool {
-  pub fn new(workdir_base: PathBuf, size: usize, executor: Executor) -> Self {
+  pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
     NailgunPool {
       workdir_base,
       size,
+      store,
       executor,
       processes: Arc::default(),
     }
@@ -68,14 +70,9 @@ impl NailgunPool {
   /// If the server is not running, or if it's running with a different configuration,
   /// this code will start a new server as a side effect.
   ///
-  pub async fn acquire(
-    &self,
-    name: String,
-    startup_options: Process,
-    nailgun_req_digest: Digest,
-    store: Store,
-  ) -> Result<BorrowedNailgunProcess, String> {
-    let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), nailgun_req_digest)?;
+  pub async fn acquire(&self, server_process: Process) -> Result<BorrowedNailgunProcess, String> {
+    let name = server_process.description.clone();
+    let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
     let mut processes = self.processes.lock().await;
 
     // Start by seeing whether there are any idle processes with a matching fingerprint.
@@ -99,9 +96,9 @@ impl NailgunPool {
     let process = Arc::new(Mutex::new(
       NailgunProcess::start_new(
         name.clone(),
-        startup_options,
+        server_process,
         &self.workdir_base,
-        store,
+        &self.store,
         self.executor.clone(),
         requested_fingerprint.clone(),
       )
@@ -254,7 +251,7 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
   let port = &NAILGUN_PORT_REGEX
     .captures_iter(&port_line)
     .next()
-    .ok_or("Output for nailgun server didn't match the regex!")?[1];
+    .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{:?}", port_line))?[1];
   port
     .parse::<Port>()
     .map_err(|e| format!("Error parsing port {}! {}", &port, e))
@@ -265,7 +262,7 @@ impl NailgunProcess {
     name: String,
     startup_options: Process,
     workdir_base: &Path,
-    store: Store,
+    store: &Store,
     executor: Executor,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
@@ -340,10 +337,14 @@ struct NailgunProcessFingerprint {
 }
 
 impl NailgunProcessFingerprint {
-  pub fn new(name: String, nailgun_server_req_digest: Digest) -> Result<Self, String> {
+  pub fn new(name: String, nailgun_req: &Process) -> Result<Self, String> {
+    let nailgun_req_digest = crate::digest(
+      MultiPlatformProcess::from(nailgun_req.clone()),
+      &ProcessMetadata::default(),
+    );
     Ok(NailgunProcessFingerprint {
       name,
-      fingerprint: nailgun_server_req_digest.hash,
+      fingerprint: nailgun_req_digest.hash,
     })
   }
 }
@@ -363,9 +364,12 @@ impl BorrowedNailgunProcess {
     &self.0.as_ref().unwrap().name
   }
 
+  pub fn port(&self) -> u16 {
+    self.0.as_ref().unwrap().port
+  }
+
   pub fn address(&self) -> SocketAddr {
-    let port = self.0.as_ref().unwrap().port;
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), self.port())
   }
 
   pub fn workdir_path(&self) -> &Path {

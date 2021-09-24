@@ -9,6 +9,7 @@ use futures::stream::{BoxStream, StreamExt};
 use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
+use store::Store;
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::RunningWorkunit;
@@ -16,7 +17,7 @@ use workunit_store::RunningWorkunit;
 use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessCacheScope, ProcessMetadata,
+  ProcessCacheScope,
 };
 
 #[cfg(test)]
@@ -57,7 +58,7 @@ fn construct_nailgun_server_request(
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::new(1000, 0)),
-    description: format!("Start a nailgun server for {}", nailgun_name),
+    description: format!("nailgun server for {}", nailgun_name),
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
@@ -92,22 +93,20 @@ fn construct_nailgun_client_request(
 pub struct CommandRunner {
   inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
-  metadata: ProcessMetadata,
   executor: Executor,
 }
 
 impl CommandRunner {
   pub fn new(
     runner: crate::local::CommandRunner,
-    metadata: ProcessMetadata,
     workdir_base: PathBuf,
+    store: Store,
     executor: Executor,
     nailgun_pool_size: usize,
   ) -> Self {
     CommandRunner {
       inner: runner,
-      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, executor.clone()),
-      metadata,
+      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, store, executor.clone()),
       executor,
     }
   }
@@ -149,20 +148,10 @@ impl super::CommandRunner for CommandRunner {
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
-    let nailgun_req_digest = crate::digest(
-      MultiPlatformProcess::from(nailgun_req.clone()),
-      &self.metadata,
-    );
-
     // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
     let mut nailgun_process = self
       .nailgun_pool
-      .acquire(
-        nailgun_name,
-        nailgun_req,
-        nailgun_req_digest,
-        self.inner.store.clone(),
-      )
+      .acquire(nailgun_req)
       .await
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
 
