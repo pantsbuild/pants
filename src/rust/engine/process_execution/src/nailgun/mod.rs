@@ -112,8 +112,6 @@ impl CommandRunner {
     }
   }
 
-  // TODO(#8527) Make this a more intentional scope (v2). Using the main class here is fragile,
-  // because two tasks might want to run the same main class with different input digests.
   fn calculate_nailgun_name(main_class: &str) -> String {
     format!("nailgun_server_{}", main_class)
   }

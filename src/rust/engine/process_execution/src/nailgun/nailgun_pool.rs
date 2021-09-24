@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::io::{self, BufRead, Read};
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -30,7 +30,7 @@ struct PoolEntry {
   process: Arc<Mutex<NailgunProcess>>,
 }
 
-pub type Port = usize;
+pub type Port = u16;
 
 ///
 /// A NailgunPool contains a small Vec of running NailgunProcess instances, fingerprinted with the
@@ -365,7 +365,7 @@ impl BorrowedNailgunProcess {
 
   pub fn address(&self) -> SocketAddr {
     let port = self.0.as_ref().unwrap().port;
-    format!("127.0.0.1:{:?}", port).parse().unwrap()
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)
   }
 
   pub fn workdir_path(&self) -> &Path {

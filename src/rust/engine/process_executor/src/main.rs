@@ -186,8 +186,8 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   cache_rpc_concurrency: usize,
 
-  /// If set, use run the process through a Nailgun server.
-  /// This will likely start a new Nailgun server as a side effect.
+  /// If set, run the process through a Nailgun server with the given digest.
+  /// This will start a new Nailgun server as a side effect, but will tear it down on exit.
   #[structopt(long)]
   use_nailgun_digest: Option<Fingerprint>,
 
