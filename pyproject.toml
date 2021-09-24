@@ -51,6 +51,7 @@ show_traceback = true
 module = [
     "bs4",
     "colors",
+    "dockerfile",
     "fasteners",
     "freezegun",
     "hdrh",

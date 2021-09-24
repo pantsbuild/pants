@@ -8,10 +8,16 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
-from pants.backend.docker.rules import rules
+from pants.backend.docker.docker_build_context import rules as context_rules
 from pants.backend.docker.target_types import DockerImage
+from pants.backend.python import target_types_rules
+from pants.backend.python.goals import package_pex_binary
+from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.target_types import PexBinary
+from pants.backend.python.util_rules import pex_from_targets
+from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import Files
-from pants.core.util_rules.source_files import rules as source_files_rules
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -21,11 +27,15 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *rules(),
-            *source_files_rules(),
+            *context_rules(),
+            *core_target_types_rules(),
+            *package_pex_binary.rules(),
+            *pex_from_targets.rules(),
+            *target_types_rules.rules(),
+            QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImage, Files],
+        target_types=[DockerImage, Files, PexBinary],
     )
 
 
@@ -143,4 +153,24 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
             "res/static/s02",
             "res/static/sub/s03",
         ],
+    )
+
+
+def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
+    # This test is here to ensure that we catch if there is any change in the generated path where
+    # built pex binaries go, as we rely on that for dependency inference in the Dockerfile.
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
+            "src/docker/Dockerfile": """FROM python""",
+            "src/python/proj/cli/BUILD": """pex_binary(name="bin", entry_point="main.py")""",
+            "src/python/proj/cli/main.py": """print("cli main")""",
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker", target_name="docker"),
+        expected_files=["src/docker/Dockerfile", "src.python.proj.cli/bin.pex"],
     )
