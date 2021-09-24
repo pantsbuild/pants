@@ -25,8 +25,6 @@ class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
 
 
-# We pay for the up front time it takes to compile this at load time, as the alternative complicates
-# the implementation. See PR #12920.
 _pex_target_regexp = re.compile(
     r"""
     (?# optional path, one level with dot-separated parts)
