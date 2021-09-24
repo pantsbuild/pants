@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -32,6 +30,8 @@ mod rules;
 
 use std::collections::{HashMap, HashSet};
 use std::io;
+
+use indexmap::IndexSet;
 
 pub use crate::builder::Builder;
 pub use crate::rules::{
@@ -243,7 +243,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Result<RuleGraph<R>, String> {
+  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Result<RuleGraph<R>, String> {
     Builder::new(rules, queries).graph()
   }
 

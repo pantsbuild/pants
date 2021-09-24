@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import logging
@@ -7,14 +8,28 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
+    GoExternalModulePathField,
+    GoExternalModuleVersionField,
     GoExternalPackageDependencies,
+    GoExternalPackageImportPathField,
+    GoExternalPackageTarget,
     GoImportPath,
+    GoModule,
     GoPackageDependencies,
     GoPackageSources,
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
-from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
-from pants.backend.go.util_rules.go_mod import FindNearestGoModuleRequest, ResolvedOwningGoModule
+from pants.backend.go.util_rules.external_module import (
+    ResolveExternalGoModuleToPackagesRequest,
+    ResolveExternalGoModuleToPackagesResult,
+    ResolveExternalGoPackageRequest,
+)
+from pants.backend.go.util_rules.go_mod import (
+    FindNearestGoModuleRequest,
+    ResolvedGoModule,
+    ResolvedOwningGoModule,
+    ResolveGoModuleRequest,
+)
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.util_rules.import_analysis import ResolvedImportPathsForGoLangDistribution
 from pants.base.specs import (
@@ -27,14 +42,17 @@ from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    GeneratedTargets,
+    GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
-    UnexpandedTargets,
+    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +87,7 @@ class GoImportPathToPackageMapping:
 async def analyze_import_path_to_package_mapping() -> GoImportPathToPackageMapping:
     mapping: dict[str, list[Address]] = defaultdict(list)
 
-    all_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     for tgt in all_targets:
         if not tgt.has_field(GoImportPath):
             continue
@@ -109,7 +127,7 @@ async def infer_go_dependencies(
         MaybeEmptySiblingAddresses(spec_path),
         MaybeEmptyDescendantAddresses(spec_path),
     ]
-    candidate_targets = await Get(UnexpandedTargets, AddressSpecs(address_specs))
+    candidate_targets = await Get(Targets, AddressSpecs(address_specs))
     go_package_targets = [
         tgt
         for tgt in candidate_targets
@@ -210,6 +228,58 @@ async def inject_go_external_package_dependencies(
     return InjectedDependencies(inferred_dependencies)
 
 
+# -----------------------------------------------------------------------------------------------
+# Generate `_go_external_package` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class GenerateGoExternalPackageTargetsRequest(GenerateTargetsRequest):
+    generate_from = GoModule
+
+
+@rule(desc="Generate targets for each external package in `go.mod`", level=LogLevel.DEBUG)
+async def generate_go_external_package_targets(
+    request: GenerateGoExternalPackageTargetsRequest,
+) -> GeneratedTargets:
+    generator_addr = request.generator.address
+    resolved_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(generator_addr))
+    all_resolved_packages = await MultiGet(
+        Get(
+            ResolveExternalGoModuleToPackagesResult,
+            ResolveExternalGoModuleToPackagesRequest(
+                path=module_descriptor.path,
+                version=module_descriptor.version,
+                go_sum_digest=resolved_module.digest,
+            ),
+        )
+        for module_descriptor in resolved_module.modules
+    )
+
+    def create_tgt(pkg: ResolvedGoPackage) -> GoExternalPackageTarget:
+        return GoExternalPackageTarget(
+            {
+                GoExternalModulePathField.alias: pkg.module_path,
+                GoExternalModuleVersionField.alias: pkg.module_version,
+                GoExternalPackageImportPathField.alias: pkg.import_path,
+            },
+            # E.g. `src/go:mod#github.com/google/uuid`.
+            Address(
+                generator_addr.spec_path,
+                target_name=generator_addr.target_name,
+                generated_name=pkg.import_path,
+            ),
+        )
+
+    return GeneratedTargets(
+        request.generator,
+        (
+            create_tgt(pkg)
+            for resolved_pkgs in all_resolved_packages
+            for pkg in resolved_pkgs.packages
+        ),
+    )
+
+
 def rules():
     return (
         *collect_rules(),
@@ -218,4 +288,5 @@ def rules():
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InjectDependenciesRequest, InjectGoExternalPackageDependenciesRequest),
+        UnionRule(GenerateTargetsRequest, GenerateGoExternalPackageTargetsRequest),
     )

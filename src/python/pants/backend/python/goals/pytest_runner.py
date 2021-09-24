@@ -356,6 +356,7 @@ async def run_python_test(
     return TestResult.from_fallible_process_result(
         result,
         address=field_set.address,
+        output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,

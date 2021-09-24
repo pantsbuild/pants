@@ -6,7 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.core.goals.check import Check, CheckRequest, CheckResult, EnrichedCheckResults, check
+from pants.core.goals.check import Check, CheckRequest, CheckResult, CheckResults, check
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -40,9 +40,9 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def check_results(self) -> EnrichedCheckResults:
+    def check_results(self) -> CheckResults:
         addresses = [config.address for config in self.field_sets]
-        return EnrichedCheckResults(
+        return CheckResults(
             [
                 CheckResult(
                     self.exit_code(addresses),
@@ -86,8 +86,8 @@ class SkippedRequest(MockCheckRequest):
         return 0
 
     @property
-    def check_results(self) -> EnrichedCheckResults:
-        return EnrichedCheckResults([], checker_name="SkippedChecker")
+    def check_results(self) -> CheckResults:
+        return CheckResults([], checker_name="SkippedChecker")
 
 
 class InvalidField(Sources):
@@ -133,7 +133,7 @@ def run_typecheck_rule(
             ],
             mock_gets=[
                 MockGet(
-                    output_type=EnrichedCheckResults,
+                    output_type=CheckResults,
                     input_type=CheckRequest,
                     mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
@@ -190,13 +190,13 @@ def test_summary() -> None:
 
 
 def test_streaming_output_skip() -> None:
-    results = EnrichedCheckResults([], checker_name="typechecker")
+    results = CheckResults([], checker_name="typechecker")
     assert results.level() == LogLevel.DEBUG
     assert results.message() == "typechecker skipped."
 
 
 def test_streaming_output_success() -> None:
-    results = EnrichedCheckResults([CheckResult(0, "stdout", "stderr")], checker_name="typechecker")
+    results = CheckResults([CheckResult(0, "stdout", "stderr")], checker_name="typechecker")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -209,9 +209,7 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = EnrichedCheckResults(
-        [CheckResult(18, "stdout", "stderr")], checker_name="typechecker"
-    )
+    results = CheckResults([CheckResult(18, "stdout", "stderr")], checker_name="typechecker")
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
@@ -224,7 +222,7 @@ def test_streaming_output_failure() -> None:
 
 
 def test_streaming_output_partitions() -> None:
-    results = EnrichedCheckResults(
+    results = CheckResults(
         [
             CheckResult(21, "", "", partition_description="ghc8.1"),
             CheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),

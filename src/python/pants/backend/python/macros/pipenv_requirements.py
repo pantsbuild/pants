@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
+from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
 
 
@@ -35,6 +37,7 @@ class PipenvRequirements:
         self,
         requirements_relpath: str = "Pipfile.lock",
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
+        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
         pipfile_target: Optional[str] = None,
     ) -> None:
         """
@@ -64,6 +67,9 @@ class PipenvRequirements:
             )
             requirements_dep = f":{requirements_file_target_name}"
 
+        normalized_module_mapping = normalize_module_mapping(module_mapping)
+        normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
+
         requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
         for req, info in requirements.items():
             extras = [x for x in info.get("extras", [])]
@@ -74,10 +80,16 @@ class PipenvRequirements:
 
             parsed_req = Requirement.parse(req_str)
 
+            normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             req_module_mapping = (
-                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
-                if module_mapping and parsed_req.project_name in module_mapping
-                else None
+                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_module_mapping
+                else {}
+            )
+            req_stubs_mapping = (
+                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
+                if normalized_proj_name in normalized_type_stubs_module_mapping
+                else {}
             )
 
             self._parse_context.create_object(
@@ -86,4 +98,5 @@ class PipenvRequirements:
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],
                 module_mapping=req_module_mapping,
+                type_stubs_module_mapping=req_stubs_mapping,
             )

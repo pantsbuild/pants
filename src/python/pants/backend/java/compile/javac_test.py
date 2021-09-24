@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import (
     CompiledClassfiles,
     CompileJavaSourceRequest,
@@ -16,7 +17,7 @@ from pants.backend.java.compile.javac import (
 )
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
@@ -36,6 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -54,12 +56,13 @@ def rule_runner() -> RuleRunner:
             *javac_binary_rules(),
             *target_types_rules(),
             *coursier_rules(),
+            *java_util_rules.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaLibrary, JvmArtifact],
+        target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
         # TODO(#12293): Remove this nonhermetic hack once Coursier JVM boostrapping flakiness
         # is properly fixed in CI.
         bootstrap_args=["--javac-jdk=system"],
@@ -104,6 +107,7 @@ def expect_single_expanded_coarsened_target(
     return coarsened_targets[0]
 
 
+@maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -117,7 +121,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -156,6 +160,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     assert check_result.partition_description == str(coarsened_target)
 
 
+@maybe_skip_jdk_test
 @pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -170,7 +175,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -204,6 +209,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         rule_runner.request(CompiledClassfiles, [request])
 
 
+@maybe_skip_jdk_test
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -217,7 +223,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         ':lockfile',
@@ -266,6 +272,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     """Test that javac can handle source-level cycles--even across build target boundaries--via
     graph coarsening.
@@ -300,7 +307,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
             .decode("utf-8"),
             "a/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'a',
                     dependencies = [
                         '//:lockfile',
@@ -319,7 +326,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
             ),
             "b/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'b',
                     dependencies = [
                         '//:lockfile',
@@ -356,6 +363,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_cycle, but the cycle occurs as a transitive dep of the requested
     target."""
@@ -372,7 +380,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         '//:lockfile',
@@ -393,7 +401,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             .decode("utf-8"),
             "a/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'a',
                     dependencies = [
                         '//:lockfile',
@@ -412,7 +420,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             ),
             "b/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'b',
                     dependencies = [
                         '//:lockfile',
@@ -448,6 +456,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     )
 
 
+@maybe_skip_jdk_test
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
     rather than explicitly."""
@@ -464,7 +473,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         '//:lockfile',
@@ -487,7 +496,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
             .decode("utf-8"),
             "lib/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         '//:lockfile',
@@ -530,6 +539,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
     )
 
 
+@maybe_skip_jdk_test
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -543,7 +553,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -558,7 +568,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
-                java_library(
+                java_sources(
                     name = 'lib',
                     dependencies = [
                         '//:lockfile',
@@ -584,6 +594,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
 
 
+@maybe_skip_jdk_test
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -597,7 +608,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -621,6 +632,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     assert "package org.pantsbuild.example.lib does not exist" in fallible_result.stderr
 
 
+@maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     resolved_joda_lockfile = CoursierResolvedLockfile(
         entries=(
@@ -654,7 +666,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',
@@ -690,6 +702,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
 
 
+@maybe_skip_jdk_test
 def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -703,7 +716,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name = 'main',
                     dependencies = [
                         ':lockfile',

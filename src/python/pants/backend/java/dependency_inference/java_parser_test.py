@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
 from pants.backend.java.dependency_inference.java_parser import (
@@ -17,7 +18,7 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
-from pants.backend.java.target_types import JavaLibrary, JavaSources
+from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -29,6 +30,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -47,15 +49,17 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *source_files.rules(),
             *util_rules(),
+            *java_util_rules.rules(),
             QueryRule(FallibleJavaSourceDependencyAnalysisResult, (SourceFiles,)),
             QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaLibrary],
+        target_types=[JvmDependencyLockfile, JavaSourceTarget],
         bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
 
+@maybe_skip_jdk_test
 def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -72,8 +76,9 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -111,7 +116,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSources,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],
@@ -135,6 +140,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     ]
 
 
+@maybe_skip_jdk_test
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -151,8 +157,9 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -172,7 +179,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSources,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],
@@ -192,6 +199,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], ProcessExecutionFailure)
 
 
+@maybe_skip_jdk_test
 def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -208,8 +216,9 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_source(
                     name='simple-source',
+                    sources=['SimpleSource.java'],
                     dependencies= [':lockfile'],
                 )
                 """
@@ -235,7 +244,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
         [
             SourceFilesRequest(
                 (target.get(Sources),),
-                for_sources_types=(JavaSources,),
+                for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
         ],

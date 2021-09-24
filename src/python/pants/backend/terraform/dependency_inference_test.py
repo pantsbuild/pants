@@ -137,18 +137,3 @@ def test_hcl_parser_wrapper_runs(rule_runner: RuleRunner, major_minor_interprete
 
     lines = {line for line in result.stdout.decode("utf-8").splitlines() if line}
     assert lines == {"grok", "foo/hello/world"}
-
-
-# TODO: How can resolve_pure_path in the parser script be tested?
-# def test_resolve_pure_path() -> None:
-#     assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../grok")) == PurePath(
-#         "foo/bar/grok"
-#     )
-#     assert resolve_pure_path(
-#         PurePath("foo/bar/hello/world"), PurePath("../../../../grok")
-#     ) == PurePath("grok")
-#     with pytest.raises(ValueError):
-#         resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("../../../../../grok"))
-#     assert resolve_pure_path(PurePath("foo/bar/hello/world"), PurePath("./grok")) == PurePath(
-#         "foo/bar/hello/world/grok"
-#     )

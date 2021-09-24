@@ -11,6 +11,10 @@ from typing import DefaultDict
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
+)
 from pants.backend.python.target_types import (
     ModuleMappingField,
     PythonRequirementsField,
@@ -245,8 +249,11 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
-        module_map = tgt.get(ModuleMappingField).value
-        stubs_module_map = tgt.get(TypeStubsModuleMappingField).value
+        module_map = {**DEFAULT_MODULE_MAPPING, **tgt.get(ModuleMappingField).value}
+        stubs_module_map = {
+            **DEFAULT_TYPE_STUB_MODULE_MAPPING,
+            **tgt.get(TypeStubsModuleMappingField).value,
+        }
         for req in tgt[PythonRequirementsField].value:
             # NB: We don't use `canonicalize_project_name()` for the fallback value because we
             # want to preserve `.` in the module name. See
