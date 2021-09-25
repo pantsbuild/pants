@@ -593,6 +593,9 @@ impl Store {
   ///
   /// Returns a structure with the summary of operations.
   ///
+  /// TODO: This method is only aware of File and Directory typed blobs: in particular, that means
+  /// it will not expand Trees to upload the files that they refer to. See #13006.
+  ///
   pub fn ensure_remote_has_recursive(
     &self,
     digests: Vec<Digest>,

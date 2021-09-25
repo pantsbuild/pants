@@ -115,12 +115,13 @@ impl CommandRunner {
   /// Note that the Tree does not include the directory_path as a prefix, per REAPI. This path
   /// gets stored on the OutputDirectory proto.
   ///
-  /// If the output directory does not exist, then returns Ok(None).
+  /// Returns the created Tree and any File Digests referenced within it. If the output directory
+  /// does not exist, then returns Ok(None).
   pub(crate) async fn make_tree_for_output_directory(
     root_directory_digest: Digest,
     directory_path: RelativePath,
     store: &Store,
-  ) -> Result<Option<Tree>, String> {
+  ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
     // Traverse down from the root directory digest to find the directory digest for
     // the output directory.
     let mut current_directory_digest = root_directory_digest;
@@ -161,7 +162,10 @@ impl CommandRunner {
 
     // At this point, `current_directory_digest` holds the digest of the output directory.
     // This will be the root of the Tree. Add it to a queue of digests to traverse.
+    // TODO: The remainder of this method can be implemented in terms of
+    // `Store::entries_for_directory`, but it does not exist on the 2.7.x branch.
     let mut tree = Tree::default();
+    let mut file_digests = Vec::new();
 
     let mut digest_queue = VecDeque::new();
     digest_queue.push_back(current_directory_digest);
@@ -184,6 +188,15 @@ impl CommandRunner {
         digest_queue.push_back(subdirectory_digest);
       }
 
+      // Collect referenced file Digests.
+      file_digests.extend(
+        directory
+          .files
+          .iter()
+          .map(|file_node| require_digest(file_node.digest.as_ref()))
+          .collect::<Result<Vec<_>, String>>()?,
+      );
+
       // Store this directory either as the `root` or one of the `children` if not the root.
       if directory_digest == current_directory_digest {
         tree.root = Some(directory);
@@ -192,7 +205,7 @@ impl CommandRunner {
       }
     }
 
-    Ok(Some(tree))
+    Ok(Some((tree, file_digests)))
   }
 
   pub(crate) async fn extract_output_file(
@@ -289,19 +302,20 @@ impl CommandRunner {
     digests.insert(result.stderr_digest);
 
     for output_directory in &command.output_directories {
-      let tree = match Self::make_tree_for_output_directory(
+      let (tree, file_digests) = match Self::make_tree_for_output_directory(
         result.output_directory,
         RelativePath::new(output_directory).unwrap(),
         store,
       )
       .await?
       {
-        Some(t) => t,
+        Some(res) => res,
         None => continue,
       };
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       digests.insert(tree_digest);
+      digests.extend(file_digests);
 
       action_result
         .output_directories
