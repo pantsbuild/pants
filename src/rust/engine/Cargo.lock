@@ -241,6 +241,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
+name = "cache"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "grpc_util",
+ "hashing",
+ "protos",
+ "sharded_lmdb",
+ "task_executor",
+]
+
+[[package]]
 name = "cargo_metadata"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -632,6 +644,7 @@ dependencies = [
  "async_latch",
  "async_semaphore",
  "bytes",
+ "cache",
  "concrete_time",
  "cpython",
  "crossbeam-channel 0.4.4",
@@ -664,7 +677,6 @@ dependencies = [
  "reqwest",
  "rule_graph",
  "serde_json",
- "sharded_lmdb",
  "smallvec 0.6.14",
  "stdio",
  "store",
@@ -2192,6 +2204,7 @@ dependencies = [
  "async_semaphore",
  "bincode",
  "bytes",
+ "cache",
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
