@@ -56,16 +56,16 @@ async def analyze_java_source_dependencies(
     processor_classfiles: JavaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
-    if len(source_files.snapshot.files) > 1:
+    if len(source_files.files) > 1:
         raise ValueError(
             f"parse_java_package expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
         )
-    elif len(source_files.snapshot.files) == 0:
+    elif len(source_files.files) == 0:
         raise ValueError(
             "parse_java_package expects sources with exactly 1 source file, but found none."
         )
     source_prefix = "__source_to_analyze"
-    source_path = os.path.join(source_prefix, source_files.snapshot.files[0])
+    source_path = os.path.join(source_prefix, source_files.files[0])
     processorcp_relpath = "__processorcp"
 
     (
