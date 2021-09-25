@@ -2,12 +2,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::Bytes;
 use futures::{future, FutureExt};
 use hashing::Fingerprint;
 use log::{debug, warn};
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use serde::{Deserialize, Serialize};
 use sharded_lmdb::ShardedLmdb;
 use store::Store;

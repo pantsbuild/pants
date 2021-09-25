@@ -8,10 +8,6 @@ use std::time::SystemTime;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::google::longrunning::Operation;
-use bazel_protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
-use bazel_protos::require_digest;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
 use double_checked_cell_async::DoubleCheckedCell;
@@ -26,6 +22,10 @@ use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::longrunning::Operation;
+use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
+use protos::require_digest;
 use rand::{thread_rng, Rng};
 use remexec::{
   action_cache_client::ActionCacheClient, capabilities_client::CapabilitiesClient,
@@ -450,7 +450,7 @@ impl CommandRunner {
       OperationOrStatus::Operation(operation) => {
         assert!(operation.done, "operation was not marked done");
 
-        use bazel_protos::gen::google::longrunning::operation::Result as OperationResult;
+        use protos::gen::google::longrunning::operation::Result as OperationResult;
         let execute_response = match operation.result {
           Some(OperationResult::Response(response_any)) => {
             remexec::ExecuteResponse::decode(&response_any.value[..])

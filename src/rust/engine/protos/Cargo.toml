@@ -1,7 +1,7 @@
 [package]
 version = "0.0.1"
 edition = "2018"
-name = "bazel_protos"
+name = "protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
@@ -14,9 +14,5 @@ prost-types = "0.8"
 tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
-copy_dir = "0.1.2"
-dir-diff = "0.3.1"
-tempfile = "3"
 prost-build = "0.8"
 tonic-build = { version = "0.5.1", features = ["prost"] }
-walkdir = "2"

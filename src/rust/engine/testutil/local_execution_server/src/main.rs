@@ -25,11 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos::{
+use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
+use protos::{
   gen::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
   gen::google::longrunning::Operation,
 };
-use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
 use std::io::Read;
 
 use structopt::StructOpt;

@@ -17,7 +17,6 @@ use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use double_checked_cell_async::DoubleCheckedCell;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
@@ -27,6 +26,7 @@ use process_execution::{
   self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
   RemoteCacheWarningsBehavior,
 };
+use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;

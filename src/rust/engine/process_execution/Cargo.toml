@@ -10,7 +10,7 @@ async-trait = "0.1"
 async-lock = "2.4"
 walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
-bazel_protos = { path = "../bazel_protos" }
+protos = { path = "../protos" }
 bytes = "1.0"
 derivative = "2.2"
 grpc_util = { path = "../grpc_util" }

@@ -106,7 +106,7 @@ default = []
 async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
-bazel_protos = { path = "bazel_protos" }
+protos = { path = "protos" }
 bytes = "1.0"
 concrete_time = { path = "concrete_time" }
 # TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.

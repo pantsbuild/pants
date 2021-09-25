@@ -7,7 +7,6 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
   SymlinkBehavior,
@@ -16,6 +15,7 @@ use futures::future;
 use futures::FutureExt;
 use hashing::{Digest, EMPTY_DIGEST};
 use itertools::Itertools;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use crate::Store;
 

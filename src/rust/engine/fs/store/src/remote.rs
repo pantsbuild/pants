@@ -6,8 +6,6 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bytes::{Bytes, BytesMut};
 use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
@@ -16,6 +14,8 @@ use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
   capabilities_client::CapabilitiesClient,
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
@@ -291,7 +291,7 @@ impl ByteStore {
         futures::future::ready(None)
       } else {
         let next_offset = min(offset + chunk_size_bytes, len);
-        let req = bazel_protos::gen::google::bytestream::WriteRequest {
+        let req = protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
           write_offset: offset as i64,
           finish_write: next_offset == len,
@@ -374,7 +374,7 @@ impl ByteStore {
 
       let stream_result = client
         .read({
-          bazel_protos::gen::google::bytestream::ReadRequest {
+          protos::gen::google::bytestream::ReadRequest {
             resource_name: resource_name.clone(),
             read_offset: 0,
             // 0 means no limit.
