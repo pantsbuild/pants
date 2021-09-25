@@ -426,7 +426,7 @@ async fn make_tree_from_directory() {
     .await
     .expect("Error saving directory");
 
-  let tree = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+  let (tree, file_digests) = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
     directory_digest,
     RelativePath::new("pets").unwrap(),
     &store,
@@ -453,6 +453,7 @@ async fn make_tree_from_directory() {
   assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
+  assert_eq!(file_digests, vec![TestData::roland().digest()]);
 
   // Test that extracting non-existent output directories fails gracefully.
   assert!(
