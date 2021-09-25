@@ -444,13 +444,14 @@ class BinaryPaths(EngineAwareReturnType):
 
 
 class BinaryNotFoundError(EnvironmentError):
-    def __init__(
-        self,
+    @classmethod
+    def from_request(
+        cls,
         request: BinaryPathRequest,
         *,
         rationale: str | None = None,
         alternative_solution: str | None = None,
-    ) -> None:
+    ) -> BinaryNotFoundError:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 
         :param rationale: A short description of why this binary is needed, e.g.
@@ -466,7 +467,7 @@ class BinaryNotFoundError(EnvironmentError):
         msg += f" so that Pants can {rationale}." if rationale else "."
         if alternative_solution:
             msg += f"\n\n{alternative_solution}"
-        super().__init__(msg)
+        return BinaryNotFoundError(msg)
 
 
 class BashBinary(BinaryPath):
@@ -490,7 +491,7 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request)
+        raise BinaryNotFoundError.from_request(request)
     return BashBinary(first_path.path, first_path.fingerprint)
 
 

@@ -76,7 +76,7 @@ async def find_zip() -> ZipBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale="create `.zip` archives")
+        raise BinaryNotFoundError.from_request(request, rationale="create `.zip` archives")
     return ZipBinary(first_path.path, first_path.fingerprint)
 
 
@@ -88,7 +88,9 @@ async def find_unzip() -> UnzipBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale="download the tools Pants needs to run")
+        raise BinaryNotFoundError.from_request(
+            request, rationale="download the tools Pants needs to run"
+        )
     return UnzipBinary(first_path.path, first_path.fingerprint)
 
 
@@ -100,7 +102,9 @@ async def find_tar() -> TarBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale="download the tools Pants needs to run")
+        raise BinaryNotFoundError.from_request(
+            request, rationale="download the tools Pants needs to run"
+        )
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
