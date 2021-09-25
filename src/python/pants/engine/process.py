@@ -445,7 +445,7 @@ class BinaryPaths(EngineAwareReturnType):
 
 class BinaryNotFoundError(EnvironmentError):
     @classmethod
-    def create(
+    def from_request(
         cls,
         request: BinaryPathRequest,
         *,
@@ -491,7 +491,7 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError.create(request)
+        raise BinaryNotFoundError.from_request(request)
     return BashBinary(first_path.path, first_path.fingerprint)
 
 
