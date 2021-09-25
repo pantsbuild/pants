@@ -15,15 +15,16 @@ from pants.backend.java.test import junit
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import coursier
 from pants.jvm.resolve import coursier_fetch, coursier_setup
-from pants.jvm.target_types import JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 
 
 def target_types():
     return [
-        JunitTestTarget,
-        JunitTestsGeneratorTarget,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
+        JunitTestTarget,
+        JunitTestsGeneratorTarget,
+        JvmArtifact,
         JvmDependencyLockfile,
     ]
 
