@@ -1,36 +1,38 @@
-Active Committers
-=================
+Active Maintainers
+==================
 
+* Andreas Stenius
 * Benjy Weinberger
-* Chris Heisterkamp
 * Daniel McClanahan
 * Daniel Wagner-Hall
-* Dorothy Ordogh
 * Eric Arellano
 * Greg Shuflin
 * Henry Fuller
 * Ity Kaul
+* Patrick Lawson
 * John Sirois
 * Kris Wilson
-* Larry Hosken
 * Nora Howard
-* Pierre Chevalier
 * Stu Hood
+* Tom Dyas
 * Yi Cheng
 
 Emeritus
 ========
 
 * Andy Reitz
+* Chris Heisterkamp
 * David Taylor
 * David Turner
+* Dorothy Ordogh
 * Eric Ayers
 * Fedor Korotkov
 * Garrett Malmquist
+* Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen
-* Patrick Lawson
 * Peiyu Wang
+* Pierre Chevalier
 * Tejal Desai
 * Travis Crawford
 * Yujie Chen
