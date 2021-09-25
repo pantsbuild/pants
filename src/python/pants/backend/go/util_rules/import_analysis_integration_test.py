@@ -7,7 +7,6 @@ import pytest
 
 from pants.backend.go.util_rules import import_analysis, sdk
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
-from pants.core.util_rules import external_tool
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -16,12 +15,12 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *external_tool.rules(),
             *sdk.rules(),
             *import_analysis.rules(),
             QueryRule(GoStdLibImports, []),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 

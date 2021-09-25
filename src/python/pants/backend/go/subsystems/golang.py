@@ -3,38 +3,76 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
+from typing import cast
 
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.process import (
+    BinaryNotFoundError,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
 )
-from pants.engine.fs import Digest
-from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
+
+logger = logging.getLogger(__name__)
 
 
-class GolangSubsystem(TemplatedExternalTool):
+class GolangSubsystem(Subsystem):
     options_scope = "golang"
-    name = "golang"
-    help = "Official golang distribution."
+    help = "Options for Golang support."
 
-    default_version = "1.16.5"
-    default_known_versions = [
-        "1.16.5|macos_arm64 |7b1bed9b63d69f1caa14a8d6911fbd743e8c37e21ed4e5b5afdbbaa80d070059|125731583",
-        "1.16.5|macos_x86_64|be761716d5bfc958a5367440f68ba6563509da2f539ad1e1864bd42fe553f277|130223787",
-        "1.16.5|linux_x86_64|b12c23023b68de22f74c0524f10b753e7b08b1504cb7e417eccebdd3fae49061|129049763",
-    ]
-    default_url_template = "https://golang.org/dl/go{version}.{platform}.tar.gz"
-    default_url_platform_mapping = {
-        "macos_arm64": "darwin-arm64",
-        "macos_x86_64": "darwin-amd64",
-        "linux_x86_64": "linux-amd64",
-    }
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--go-search-paths",
+            type=list,
+            member_type=str,
+            default=["<PATH>"],
+            help=(
+                "A list of paths to search for Go.\n\n"
+                "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
+                "Earlier entries will be searched first.\n\n"
+                "The special string '<PATH>' will expand to the contents of the PATH env var."
+            ),
+        )
+        # TODO(#13005): Support multiple Go versions in a project?
+        register(
+            "--expected-version",
+            type=str,
+            default="1.17",
+            help=(
+                "The Go version you are using, such as `1.17`.\n\n"
+                "Pants will only use Go distributions from `--go-search-paths` that have the "
+                "expected version, and it will error if none are found. "
+            ),
+        )
 
-    def generate_exe(self, plat: Platform) -> str:
-        return "./bin"
+    def go_search_paths(self, env: Environment) -> tuple[str, ...]:
+        def iter_path_entries():
+            for entry in self.options.go_search_paths:
+                if entry == "<PATH>":
+                    path = env.get("PATH")
+                    if path:
+                        for path_entry in path.split(os.pathsep):
+                            yield path_entry
+                else:
+                    yield entry
+
+        return tuple(OrderedSet(iter_path_entries()))
+
+    @property
+    def expected_version(self) -> str:
+        return cast(str, self.options.expected_version)
 
 
 @dataclass(frozen=True)
@@ -42,17 +80,70 @@ class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
 
     path: str
-    digest: Digest
 
 
 @rule
 async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
-    downloaded_go_dist = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        golang_subsystem.get_request(Platform.current),
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_paths = golang_subsystem.go_search_paths(env)
+    all_go_binary_paths = await Get(
+        BinaryPaths,
+        BinaryPathRequest(
+            search_path=search_paths,
+            binary_name="go",
+            test=BinaryPathTest(["version"]),
+        ),
     )
-    return GoRoot("./go", downloaded_go_dist.digest)
+    if not all_go_binary_paths.paths:
+        raise BinaryNotFoundError(
+            "Cannot find any `go` binaries using the option "
+            f"`[golang].go_search_paths`: {list(search_paths)}\n\n"
+            "To fix, please install Go (https://golang.org/doc/install) with the version "
+            f"{golang_subsystem.expected_version} (set by `[golang].expected_version`) and ensure "
+            "that it is discoverable via `[golang].go_search_paths`."
+        )
+
+    env_results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                (binary_path.path, "env", "GOVERSION", "GOROOT"),
+                description=f"Determine Go version and GOROOT for {binary_path.path}",
+                level=LogLevel.DEBUG,
+                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                env={"GOPATH": "/does/not/matter"},
+            ),
+        )
+        for binary_path in all_go_binary_paths.paths
+    )
+
+    invalid_versions = []
+    for binary_path, env_result in zip(all_go_binary_paths.paths, env_results):
+        _raw_version, goroot = env_result.stdout.decode("utf-8").strip().splitlines()
+        version = _raw_version[2:]
+        if version == golang_subsystem.expected_version:
+            return GoRoot(goroot)
+
+        logger.debug(
+            f"Go binary at {binary_path.path} has version {version}, but this "
+            f"project is using {golang_subsystem.expected_version} "
+            "(set by `[golang].expected_version`). Ignoring."
+        )
+        invalid_versions.append((binary_path.path, version))
+
+    bulleted_list_sep = "\n  * "
+    invalid_versions_str = bulleted_list_sep.join(
+        f"{path}, {version}" for path, version in sorted(invalid_versions)
+    )
+    raise BinaryNotFoundError(
+        "Cannot find a `go` binary with the expected version of "
+        f"{golang_subsystem.expected_version} (set by `[golang].expected_version`).\n\n"
+        f"Found these `go` binaries, but they had different versions:\n"
+        f"{bulleted_list_sep}{invalid_versions_str}\n\n"
+        "To fix, please install the expected version (https://golang.org/doc/install) and ensure "
+        "that it is discoverable via the option `[golang].go_search_paths`, or change "
+        "`[golang].expected_version`."
+    )
 
 
 def rules():

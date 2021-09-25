@@ -22,7 +22,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -30,10 +30,9 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         target_types=[GoBinary, GoPackage, GoModule],
         rules=[
-            *external_tool.rules(),
             *assembly.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
@@ -47,6 +46,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:

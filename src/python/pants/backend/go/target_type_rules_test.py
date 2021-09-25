@@ -38,7 +38,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
@@ -54,6 +54,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModule, GoExternalPackageTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def assert_go_module_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
@@ -93,7 +95,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                 "foo/go.mod": textwrap.dedent(
                     """\
                     module go.example.com/foo
-                    go 1.16
+                    go 1.17
 
                     require (
                         github.com/google/go-cmp v0.4.0
@@ -159,7 +161,7 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
             "src/go/go.mod": textwrap.dedent(
                 """\
                 module example.com/src/go
-                go 1.16
+                go 1.17
 
                 require (
                     github.com/google/go-cmp v0.4.0
