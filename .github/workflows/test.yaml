@@ -37,11 +37,6 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -108,6 +103,11 @@ jobs:
           src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -191,11 +191,6 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -262,6 +257,11 @@ jobs:
           src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -492,11 +492,6 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -522,6 +517,11 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Lint
       run: './pants validate ''**''
 
@@ -572,11 +572,10 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with: !!set
+        'go-version: ''^1.17.1''': null
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -604,6 +603,11 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Run Python tests
       run: './pants test ::
 
@@ -654,11 +658,6 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -686,6 +685,11 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 

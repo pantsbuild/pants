@@ -189,6 +189,14 @@ def install_jdk() -> Step:
     }
 
 
+def install_go() -> Step:
+    return {
+        "name": "Install Go",
+        "uses": "actions/setup-go@v2",
+        "with": {"go-version: '^1.17.1'"}
+    }
+
+
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
@@ -279,9 +287,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
-                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
+                setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
                     "name": "Validate CI config",
@@ -331,11 +339,12 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 install_jdk(),
-                setup_toolchain_auth(),
+                install_go(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
+                setup_toolchain_auth(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
@@ -349,10 +358,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
-                setup_toolchain_auth(),
                 *setup_primary_python(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
+                setup_toolchain_auth(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint check ::\n",
@@ -369,9 +378,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
-                setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
+                setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 native_binaries_upload(),
                 {
@@ -396,11 +405,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 install_jdk(),
-                setup_toolchain_auth(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
+                setup_toolchain_auth(),
                 {
                     "name": "Run Python tests",
                     "run": (
