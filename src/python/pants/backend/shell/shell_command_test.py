@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest
 from pants.backend.shell.shell_command import rules as shell_command_rules
-from pants.backend.shell.target_types import ShellCommand, ShellLibrary
+from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
 from pants.core.target_types import Files
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[ShellCommand, ShellLibrary, Files],
+        target_types=[ShellCommand, ShellSourcesGeneratorTarget, Files],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
