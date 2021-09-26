@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.shell.target_types import ShellSources
+from pants.backend.shell.target_types import ShellSourcesField
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -17,7 +17,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 
 @dataclass(frozen=True)
 class ShellFmtTargets(LanguageFmtTargets):
-    required_fields = (ShellSources,)
+    required_fields = (ShellSourcesField,)
 
 
 @union
@@ -31,7 +31,7 @@ async def format_shell_targets(
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[ShellSources] for target in shell_fmt_targets.targets),
+        SourceFilesRequest(target[ShellSourcesField] for target in shell_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 

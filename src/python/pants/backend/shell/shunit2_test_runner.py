@@ -6,12 +6,12 @@ from dataclasses import dataclass
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
-    ShellSources,
+    ShellSourcesField,
     Shunit2Shell,
     Shunit2ShellField,
-    Shunit2Tests,
-    Shunit2TestsSources,
-    Shunit2TestsTimeout,
+    Shunit2TestsGeneratorTarget,
+    Shunit2TestSourcesField,
+    Shunit2TestTimeoutField,
 )
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
@@ -56,10 +56,10 @@ from pants.util.strutil import create_path_env_var
 
 @dataclass(frozen=True)
 class Shunit2FieldSet(TestFieldSet):
-    required_fields = (Shunit2TestsSources,)
+    required_fields = (Shunit2TestSourcesField,)
 
-    sources: Shunit2TestsSources
-    timeout: Shunit2TestsTimeout
+    sources: Shunit2TestSourcesField
+    timeout: Shunit2TestTimeoutField
     shell: Shunit2ShellField
     runtime_package_dependencies: RuntimePackageDependenciesField
 
@@ -127,7 +127,7 @@ async def determine_shunit2_shell(
                 f"Please either specify the `{Shunit2ShellField.alias}` field or add a "
                 f"shebang to {request.test_file_content.path} with one of the supported shells in "
                 f"the format `!#/path/to/shell` or `!#/path/to/env shell`"
-                f"(run `./pants help {Shunit2Tests.alias}` for valid shells)."
+                f"(run `./pants help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
             )
         tgt_shell = parse_result
 
@@ -172,7 +172,7 @@ async def setup_shunit2_for_target(
         SourceFiles,
         SourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.dependencies),
-            for_sources_types=(ShellSources, FilesSources, ResourcesSources),
+            for_sources_types=(ShellSourcesField, FilesSources, ResourcesSources),
             enable_codegen=True,
         ),
     )
@@ -182,24 +182,16 @@ async def setup_shunit2_for_target(
     )
 
     field_set_digest_content = await Get(DigestContents, Digest, field_set_sources.snapshot.digest)
-    # Because a FieldSet corresponds to a file address, there should be exactly 1 file in the
-    # sources. This assumption allows us to simplify determining which shell to use via inspecting
-    # the shebang.
-    if len(field_set_digest_content) != 1:
-        raise AssertionError(
-            f"The file address {request.field_set.address} had sources != 1, which is unexpected: "
-            f"{field_set_sources.snapshot.files}. Please file a bug at "
-            "https://github.com/pantsbuild/pants/issues/new with this error message copied."
-        )
-    original_test_file_content = field_set_digest_content[0]
-    updated_test_file_content = add_source_shunit2(original_test_file_content)
+    # `ShellTestSourceField` validates that there's exactly one file.
+    test_file_content = field_set_digest_content[0]
+    updated_test_file_content = add_source_shunit2(test_file_content)
 
     updated_test_digest, runner = await MultiGet(
         Get(Digest, CreateDigest([updated_test_file_content])),
         Get(
             Shunit2Runner,
             Shunit2RunnerRequest(
-                request.field_set.address, original_test_file_content, request.field_set.shell
+                request.field_set.address, test_file_content, request.field_set.shell
             ),
         ),
     )

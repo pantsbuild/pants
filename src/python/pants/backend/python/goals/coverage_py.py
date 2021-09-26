@@ -46,6 +46,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
+from pants.option.global_options import GlobalOptions
 from pants.source.source_root import AllSourceRoots
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -476,6 +477,7 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
+    global_options: GlobalOptions,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     transitive_targets = await Get(
@@ -552,6 +554,7 @@ async def generate_coverage_reports(
                 res.stdout,
                 res.stderr,
                 proc.description,
+                local_cleanup=global_options.options.process_execution_local_cleanup,
             )
 
     # In practice if one result triggers --fail-under, they all will, but no need to rely on that.

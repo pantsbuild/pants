@@ -1,7 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.shell.target_types import ShellLibrary, Shunit2Tests
+from pants.backend.shell.target_types import (
+    ShellSourcesGeneratorTarget,
+    ShellSourceTarget,
+    Shunit2TestsGeneratorTarget,
+    Shunit2TestTarget,
+)
 from pants.engine.target import BoolField
 
 
@@ -13,6 +18,8 @@ class SkipShfmtField(BoolField):
 
 def rules():
     return [
-        ShellLibrary.register_plugin_field(SkipShfmtField),
-        Shunit2Tests.register_plugin_field(SkipShfmtField),
+        ShellSourceTarget.register_plugin_field(SkipShfmtField),
+        ShellSourcesGeneratorTarget.register_plugin_field(SkipShfmtField),
+        Shunit2TestTarget.register_plugin_field(SkipShfmtField),
+        Shunit2TestsGeneratorTarget.register_plugin_field(SkipShfmtField),
     ]
