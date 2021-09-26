@@ -400,8 +400,8 @@ jobs:
         java-version: '11'
     - name: Install Go
       uses: actions/setup-go@v2
-      with: !!set
-        'go-version: ''^1.17.1''': null
+      with:
+        go-version: ^1.17.1'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
