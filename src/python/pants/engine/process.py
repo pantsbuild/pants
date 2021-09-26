@@ -18,6 +18,7 @@ from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, Fil
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
+from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -209,7 +210,13 @@ class ProcessExecutionFailure(Exception):
     """
 
     def __init__(
-        self, exit_code: int, stdout: bytes, stderr: bytes, process_description: str
+        self,
+        exit_code: int,
+        stdout: bytes,
+        stderr: bytes,
+        process_description: str,
+        *,
+        local_cleanup: bool,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -217,17 +224,20 @@ class ProcessExecutionFailure(Exception):
         self.stderr = stderr
         # NB: We don't use dedent on a single format string here because it would attempt to
         # interpret the stdio content.
-        super().__init__(
-            "\n".join(
-                [
-                    f"Process '{process_description}' failed with exit code {exit_code}.",
-                    "stdout:",
-                    stdout.decode(),
-                    "stderr:",
-                    stderr.decode(),
-                ]
+        err_strings = [
+            f"Process '{process_description}' failed with exit code {exit_code}.",
+            "stdout:",
+            stdout.decode(),
+            "stderr:",
+            stderr.decode(),
+        ]
+        if local_cleanup:
+            err_strings.append(
+                "\n\n"
+                "Use --no-process-execution-local-cleanup to preserve process chroots "
+                "for inspection."
             )
-        )
+        super().__init__("\n".join(err_strings))
 
 
 @rule
@@ -243,7 +253,9 @@ def upcast_process(req: Process) -> MultiPlatformProcess:
 
 @rule
 def fallible_to_exec_result_or_raise(
-    fallible_result: FallibleProcessResult, description: ProductDescription
+    fallible_result: FallibleProcessResult,
+    description: ProductDescription,
+    global_options: GlobalOptions,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -260,6 +272,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
+        local_cleanup=global_options.options.process_execution_local_cleanup,
     )
 
 

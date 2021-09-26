@@ -42,11 +42,10 @@ class _NativeHandler(StreamHandler):
 class _ExceptionFormatter(Formatter):
     """Possibly render the stacktrace and possibly give debug hints, based on global options."""
 
-    def __init__(self, level: LogLevel, *, print_stacktrace: bool, local_cleanup: bool) -> None:
+    def __init__(self, level: LogLevel, *, print_stacktrace: bool) -> None:
         super().__init__(None)
         self.level = level
         self.print_stacktrace = print_stacktrace
-        self.local_cleanup = local_cleanup
 
     def formatException(self, exc_info):
         stacktrace = super().formatException(exc_info) if self.print_stacktrace else ""
@@ -54,8 +53,6 @@ class _ExceptionFormatter(Formatter):
         debug_instructions = []
         if not self.print_stacktrace:
             debug_instructions.append("--print-stacktrace for more error details")
-        if self.local_cleanup:
-            debug_instructions.append("--no-process-execution-local-cleanup to inspect chroots")
         if self.level not in {LogLevel.DEBUG, LogLevel.TRACE}:
             debug_instructions.append("-ldebug for more logs")
         debug_instructions = (
@@ -102,9 +99,7 @@ def stdio_destination_use_color(use_color: bool) -> None:
 
 
 @contextmanager
-def _python_logging_setup(
-    level: LogLevel, *, print_stacktrace: bool, local_cleanup: bool
-) -> Iterator[None]:
+def _python_logging_setup(level: LogLevel, *, print_stacktrace: bool) -> Iterator[None]:
     """Installs a root Python logger that routes all logging through a Rust logger."""
 
     def trace_fn(self, message, *args, **kwargs):
@@ -130,9 +125,7 @@ def _python_logging_setup(
         # This routes warnings through our loggers instead of straight to raw stderr.
         logging.captureWarnings(True)
         handler = _NativeHandler()
-        exc_formatter = _ExceptionFormatter(
-            level, print_stacktrace=print_stacktrace, local_cleanup=local_cleanup
-        )
+        exc_formatter = _ExceptionFormatter(level, print_stacktrace=print_stacktrace)
         handler.setFormatter(exc_formatter)
         logger.addHandler(handler)
         level.set_level_for(logger)
@@ -169,7 +162,6 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     show_target = global_bootstrap_options.show_log_target
     log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
     print_stacktrace = global_bootstrap_options.print_stacktrace
-    local_cleanup = global_bootstrap_options.process_execution_local_cleanup
 
     literal_filters = []
     regex_filters = []
@@ -205,9 +197,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
 
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
-        with _python_logging_setup(
-            global_level, print_stacktrace=print_stacktrace, local_cleanup=local_cleanup
-        ):
+        with _python_logging_setup(global_level, print_stacktrace=print_stacktrace):
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
