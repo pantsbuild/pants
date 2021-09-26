@@ -165,7 +165,10 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     ]
     lint_results, fmt_result = run_autoflake(rule_runner, bad_tgts)
     assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert "bad.py: Unused imports/variables detected" in lint_results[0].stdout
+    # Note that we can't be specific about the file in this output check.  For some reason
+    # autoflake non-deterministically outputs only one the files that needed changes, not
+    # all of them.
+    assert "Unused imports/variables detected" in lint_results[0].stdout
     assert fmt_result.output == get_digest(
         rule_runner, {"bad.py": FIXED_BAD_FILE, "bad.pyi": FIXED_BAD_FILE}
     )
