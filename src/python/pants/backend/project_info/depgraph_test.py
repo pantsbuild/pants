@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from textwrap import dedent
 
 import pytest
@@ -8,11 +9,12 @@ from pants.backend.project_info.depgraph import (
     DependencyGraph,
     DependencyGraphRequest,
     Edge,
-    Granularity,
     Vertex,
     rules,
 )
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -32,7 +34,11 @@ class SpecialDepsTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*rules(), QueryRule(DependencyGraph, [DependencyGraphRequest])],
+        rules=[
+            *rules(),
+            QueryRule(DependencyGraph, [DependencyGraphRequest]),
+            QueryRule(Addresses, (AddressSpecs,)),
+        ],
         target_types=[PythonLibrary, PythonRequirementLibrary, SpecialDepsTarget],
     )
 
@@ -63,34 +69,31 @@ def test_depgraph_construction(rule_runner: RuleRunner) -> None:
         }
     )
 
+    addresses = rule_runner.request(Addresses, [AddressSpecs([DescendantAddresses("")])])
     dep_graph = rule_runner.request(
-        DependencyGraph, [DependencyGraphRequest(granularity=Granularity.FILE)]
+        DependencyGraph, [DependencyGraphRequest(addresses=addresses, transitive=True)]
     )
     assert dep_graph == DependencyGraph(
-        granularity=Granularity.FILE,
         vertices=[
             Vertex(
                 "0",
                 {
-                    "path": None,
-                    "target": "3rdparty/python:extlib",
+                    "address": "3rdparty/python:extlib",
                     "type": "python_requirement_library",
-                    "requirements": ["extlib==1.2.3"],
+                    "requirements": ("extlib==1.2.3",),
                 },
             ),
             Vertex(
                 "1",
                 {
-                    "path": "src/python/baz/qux.py",
-                    "target": "src/python/baz:lib",
+                    "address": "src/python/baz:lib",
                     "type": "python_library",
                 },
             ),
             Vertex(
                 "2",
                 {
-                    "path": "src/python/foo/bar.py",
-                    "target": "src/python/foo",
+                    "address": "src/python/foo",
                     "type": "python_library",
                 },
             ),
@@ -104,13 +107,11 @@ def test_depgraph_construction(rule_runner: RuleRunner) -> None:
     assert dep_graph.to_json() == dedent(
         """\
     {
-      "granularity": "FILE",
       "vertices": [
         {
           "id": "0",
           "data": {
-            "path": null,
-            "target": "3rdparty/python:extlib",
+            "address": "3rdparty/python:extlib",
             "type": "python_requirement_library",
             "requirements": [
               "extlib==1.2.3"
@@ -120,16 +121,14 @@ def test_depgraph_construction(rule_runner: RuleRunner) -> None:
         {
           "id": "1",
           "data": {
-            "path": "src/python/baz/qux.py",
-            "target": "src/python/baz:lib",
+            "address": "src/python/baz:lib",
             "type": "python_library"
           }
         },
         {
           "id": "2",
           "data": {
-            "path": "src/python/foo/bar.py",
-            "target": "src/python/foo",
+            "address": "src/python/foo",
             "type": "python_library"
           }
         }
