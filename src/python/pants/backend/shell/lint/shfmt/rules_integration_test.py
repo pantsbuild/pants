@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.shell.lint.shfmt.rules import ShfmtFieldSet, ShfmtRequest
 from pants.backend.shell.lint.shfmt.rules import rules as shfmt_rules
-from pants.backend.shell.target_types import ShellLibrary
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, [ShfmtRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[ShellLibrary],
+        target_types=[ShellSourcesGeneratorTarget],
     )
 
 
