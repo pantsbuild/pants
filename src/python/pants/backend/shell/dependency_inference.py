@@ -12,7 +12,7 @@ from typing import DefaultDict
 
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.shell_setup import ShellSetup
-from pants.backend.shell.target_types import ShellSourceField
+from pants.backend.shell.target_types import ShellSourcesField
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Address
@@ -53,9 +53,9 @@ class ShellMapping:
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
 async def map_shell_files() -> ShellMapping:
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    shell_tgts = tuple(tgt for tgt in all_targets if tgt.has_field(ShellSourceField))
+    shell_tgts = tuple(tgt for tgt in all_targets if tgt.has_field(ShellSourcesField))
     sources_per_target = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourceField])) for tgt in shell_tgts
+        Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourcesField])) for tgt in shell_tgts
     )
 
     files_to_addresses: dict[str, Address] = {}
@@ -153,7 +153,7 @@ async def parse_shell_imports(
 
 
 class InferShellDependencies(InferDependenciesRequest):
-    infer_from = ShellSourceField
+    infer_from = ShellSourcesField
 
 
 @rule(desc="Inferring Shell dependencies by analyzing imports")

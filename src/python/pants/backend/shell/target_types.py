@@ -33,7 +33,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.enums import match
 
 
-class ShellSourceField(Sources):
+class ShellSourcesField(Sources):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
     uses_source_roots = False
@@ -113,7 +113,7 @@ class Shunit2TestTimeoutField(IntField):
         return value
 
 
-class Shunit2TestSourceField(ShellSourceField):
+class Shunit2TestSourcesField(ShellSourcesField):
     pass
 
 
@@ -127,7 +127,7 @@ class Shunit2TestTarget(Target):
     alias = "shunit2_tests"  # TODO(#12954): rename to `shunit_test` when ready. Update `help` too.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Shunit2TestSourceField,
+        Shunit2TestSourcesField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
         Shunit2ShellField,
@@ -196,7 +196,7 @@ async def generate_targets_from_shunit2_tests(
 
 class ShellSourceTarget(Target):
     alias = "shell_library"  # TODO(#12954): rename to `shell_source` when ready.
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesField)
     help = "A Bourne-based shell script, e.g. a Bash script."
 
 
