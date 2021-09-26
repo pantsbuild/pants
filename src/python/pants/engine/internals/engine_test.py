@@ -30,9 +30,7 @@ from pants.engine.internals.engine_testutil import (
 )
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.platform import rules as platform_rules
-from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope, ProcessResult
-from pants.engine.process import rules as process_rules
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
@@ -599,44 +597,6 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         assert workunit["metadata"] == {}
 
-    def test_counters(self) -> None:
-        @dataclass(frozen=True)
-        class TrueResult:
-            pass
-
-        @rule(desc="a_rule")
-        async def a_rule() -> TrueResult:
-            proc = Process(
-                ["/bin/sh", "-c", "true"],
-                description="always true",
-                cache_scope=ProcessCacheScope.PER_SESSION,
-            )
-            _ = await Get(ProcessResult, MultiPlatformProcess({None: proc}))
-            return TrueResult()
-
-        scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *platform_rules()],
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler:
-            scheduler.record_test_observation(128)
-            scheduler.product_request(TrueResult, subjects=[0])
-            histograms_info = scheduler.get_observation_histograms()
-
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunits_with_counters = [item for item in finished if "counters" in item]
-        assert workunits_with_counters[0]["counters"]["local_cache_requests"] == 1
-        assert workunits_with_counters[0]["counters"]["local_cache_requests_uncached"] == 1
-        assert workunits_with_counters[1]["counters"]["local_execution_requests"] == 1
-
-        assert histograms_info["version"] == 0
-        assert "histograms" in histograms_info
-        assert "test_observation" in histograms_info["histograms"]
-        assert (
-            histograms_info["histograms"]["test_observation"]
-            == b"\x1c\x84\x93\x14\x00\x00\x00\x1fx\x9c\x93i\x99,\xcc\xc0\xc0\xc0\xcc\x00\x010\x9a\x11J3\xd9\x7f\x800\xfe32\x01\x00E\x0c\x03\x81"
-        )
-
 
 @dataclass(frozen=True)
 class ComplicatedInput:
@@ -667,6 +627,50 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
         ],
         isolated_local_store=True,
+    )
+
+
+def test_counters(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
+    scheduler = rule_runner.scheduler
+
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        run_tracker=run_tracker,
+        callbacks=[tracker],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.TRACE,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        allow_async_completion=False,
+    )
+
+    with handler:
+        scheduler.record_test_observation(128)
+        rule_runner.request(
+            ProcessResult,
+            [
+                Process(
+                    ["/bin/sh", "-c", "true"],
+                    description="always true",
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                )
+            ],
+        )
+        histograms_info = scheduler.get_observation_histograms()
+
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunits_with_counters = [item for item in finished if "counters" in item]
+    assert workunits_with_counters[0]["counters"]["local_cache_requests"] == 1
+    assert workunits_with_counters[0]["counters"]["local_cache_requests_uncached"] == 1
+    assert workunits_with_counters[1]["counters"]["local_execution_requests"] == 1
+
+    assert histograms_info["version"] == 0
+    assert "histograms" in histograms_info
+    assert "test_observation" in histograms_info["histograms"]
+    assert (
+        histograms_info["histograms"]["test_observation"]
+        == b"\x1c\x84\x93\x14\x00\x00\x00\x1fx\x9c\x93i\x99,\xcc\xc0\xc0\xc0\xcc\x00\x010\x9a\x11J3\xd9\x7f\x800\xfe32\x01\x00E\x0c\x03\x81"
     )
 
 
