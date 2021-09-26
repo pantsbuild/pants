@@ -1,14 +1,15 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import enum
-import io
 import itertools
 import logging
 import os
 import pickle
 from abc import ABC, abstractmethod
-from collections import abc, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
@@ -16,21 +17,27 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
 from pants.backend.python.target_types import (
+    ConfigSettingsField,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
+    SDistField,
     SetupPyCommandsField,
+    WheelField,
 )
+from pants.backend.python.util_rules.dists import DistBuildRequest, DistBuildResult, distutils_repr
+from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
@@ -46,10 +53,8 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
-    RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -65,12 +70,11 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.osutil import is_macos_big_sur
-from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
 
@@ -295,12 +299,14 @@ class SetupPyChroot:
 
 @dataclass(frozen=True)
 class RunSetupPyRequest:
-    """A request to run a setup.py command."""
+    """A request to run setup.py to build a distribution."""
 
     exported_target: ExportedTarget
     interpreter_constraints: InterpreterConstraints
     chroot: SetupPyChroot
-    args: Tuple[str, ...]
+    wheel: bool
+    sdist: bool
+    config_settings: FrozenDict[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -381,13 +387,39 @@ async def package_python_dist(
         SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
     )
 
-    # If commands were provided, run setup.py with them; Otherwise just dump chroots.
+    wheel = exported_target.target.get(WheelField).value
+    sdist = exported_target.target.get(SDistField).value
+    config_settings = exported_target.target.get(ConfigSettingsField).value or FrozenDict()
+
+    # TODO: When the deprecated SetupPyCommandsField is removed, delete everything from here...
     commands = exported_target.target.get(SetupPyCommandsField).value or ()
-    if commands:
-        validate_commands(commands)
+    if commands or wheel or sdist:
+        if commands:
+            # Override with the legacy commands mechanism.
+            validate_commands(commands)
+            wheel = "bdist_wheel" in commands
+            sdist = "sdist" in commands
+            config_settings = FrozenDict(
+                {
+                    "--global-option": tuple(
+                        cmd for cmd in commands if cmd not in {"bdist_wheel", "sdist"}
+                    )
+                }
+            )
+        # ... to here, delete the else branch below, and dedent the remaining code appropriately.
+        # We may then want to validate that at least one of wheel or sdist is True.
+        # Send to benjy for code review.
+
         setup_py_result = await Get(
             RunSetupPyResult,
-            RunSetupPyRequest(exported_target, interpreter_constraints, chroot, commands),
+            RunSetupPyRequest(
+                exported_target,
+                interpreter_constraints,
+                chroot,
+                wheel,
+                sdist,
+                config_settings,
+            ),
         )
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
         return BuiltPackage(
@@ -395,6 +427,11 @@ async def package_python_dist(
             tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
         )
     else:
+        warn_or_error(
+            "2.9.0.dev0",
+            "Creating a raw dump of the generated setup.py and its chroot",
+            "This exposed an internal implementation detail, and is no longer supported.",
+        )
         dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
         return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
@@ -411,31 +448,13 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def run_setup_py(
-    req: RunSetupPyRequest, setuptools: Setuptools, python_setup: PythonSetup
-) -> RunSetupPyResult:
+async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
-    # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
-    # in turn imports from and invokes setuptools.
-
-    setuptools_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="setuptools.pex",
-            internal_only=True,
-            requirements=setuptools.pex_requirements(),
-            interpreter_constraints=req.interpreter_constraints,
-        ),
-    )
 
     # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture any
     # changes setup made within it (e.g., when running 'develop') without also capturing other
     # artifacts of the pex process invocation.
     chroot_prefix = "chroot"
-
-    # The setuptools dist dir, created by it under the chroot (not to be confused with
-    # pants's own dist dir, at the buildroot).
-    dist_dir = "dist"
 
     prefixed_chroot = await Get(Digest, AddPrefix(req.chroot.digest, chroot_prefix))
 
@@ -446,28 +465,22 @@ async def run_setup_py(
     setup_script_reldir, setup_script_name = os.path.split(req.chroot.setup_script)
     working_directory = os.path.join(chroot_prefix, setup_script_reldir)
 
-    if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
-        extra_env = {"MACOSX_DEPLOYMENT_TARGET": "10.16"}
-    else:
-        extra_env = {}
     result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            setuptools_pex,
-            argv=(setup_script_name, *req.args),
-            input_digest=prefixed_chroot,
-            extra_env=extra_env,
+        DistBuildResult,
+        DistBuildRequest(
+            requires=setuptools.pex_requirements(),
+            build_backend="setuptools.build_meta",
+            interpreter_constraints=req.interpreter_constraints,
+            build_wheel=req.wheel,
+            build_sdist=req.sdist,
+            input=prefixed_chroot,
             working_directory=working_directory,
-            # setuptools commands that create dists write them to the distdir.
-            # TODO: Could there be other useful files to capture?
-            output_directories=(dist_dir,),  # Relative to the working_directory.
-            description=f"Run setuptools for {req.exported_target.target.address}",
-            level=LogLevel.DEBUG,
+            target_address_spec=req.exported_target.target.address.spec,
+            config_settings=req.config_settings,
         ),
     )
-    # Note that output_digest paths are relative to the working_directory.
-    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
-    return RunSetupPyResult(output_digest)
+
+    return RunSetupPyResult(result.output)
 
 
 @rule
@@ -823,66 +836,6 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 PackageDatum = Tuple[str, Tuple[str, ...]]
 
 
-# Distutils does not support unicode strings in setup.py, so we must explicitly convert to binary
-# strings as pants uses unicode_literals. A natural and prior technique was to use `pprint.pformat`,
-# but that embeds u's in the string itself during conversion. For that reason we roll out own
-# literal pretty-printer here.
-#
-# Note that we must still keep this code, even though Pants only runs with Python 3, because
-# the created product may still be run by Python 2.
-#
-# For more information, see http://bugs.python.org/issue13943.
-def distutils_repr(obj):
-    """Compute a string repr suitable for use in generated setup.py files."""
-    output = io.StringIO()
-    linesep = os.linesep
-
-    def _write(data):
-        output.write(ensure_text(data))
-
-    def _write_repr(o, indent=False, level=0):
-        pad = " " * 4 * level
-        if indent:
-            _write(pad)
-        level += 1
-
-        if isinstance(o, (bytes, str)):
-            # The py2 repr of str (unicode) is `u'...'` and we don't want the `u` prefix; likewise,
-            # the py3 repr of bytes is `b'...'` and we don't want the `b` prefix so we hand-roll a
-            # repr here.
-            o_txt = ensure_text(o)
-            if linesep in o_txt:
-                _write('"""{}"""'.format(o_txt.replace('"""', r"\"\"\"")))
-            else:
-                _write("'{}'".format(o_txt.replace("'", r"\'")))
-        elif isinstance(o, abc.Mapping):
-            _write("{" + linesep)
-            for k, v in o.items():
-                _write_repr(k, indent=True, level=level)
-                _write(": ")
-                _write_repr(v, indent=False, level=level)
-                _write("," + linesep)
-            _write(pad + "}")
-        elif isinstance(o, abc.Iterable):
-            if isinstance(o, abc.MutableSequence):
-                open_collection, close_collection = "[]"
-            elif isinstance(o, abc.Set):
-                open_collection, close_collection = "{}"
-            else:
-                open_collection, close_collection = "()"
-
-            _write(open_collection + linesep)
-            for i in o:
-                _write_repr(i, indent=True, level=level)
-                _write("," + linesep)
-            _write(pad + close_collection)
-        else:
-            _write(repr(o))  # Numbers and bools.
-
-    _write_repr(obj)
-    return output.getvalue()
-
-
 def find_packages(
     *,
     python_files: Set[str],
@@ -1023,6 +976,7 @@ def merge_entry_points(
 def rules():
     return [
         *python_sources_rules(),
+        *dists_rules(),
         *collect_rules(),
         UnionRule(PackageFieldSet, PythonDistributionFieldSet),
     ]
