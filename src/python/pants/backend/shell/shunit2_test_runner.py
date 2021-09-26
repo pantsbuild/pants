@@ -140,7 +140,9 @@ async def determine_shunit2_shell(
     paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(path_request, rationale=f"run shunit2 on {request.address}")
+        raise BinaryNotFoundError.from_request(
+            path_request, rationale=f"run shunit2 on {request.address}"
+        )
     return Shunit2Runner(tgt_shell, first_path)
 
 
@@ -233,10 +235,16 @@ async def setup_shunit2_for_target(
 
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
-async def run_tests_with_shunit2(field_set: Shunit2FieldSet) -> TestResult:
+async def run_tests_with_shunit2(
+    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+) -> TestResult:
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return TestResult.from_fallible_process_result(result, address=field_set.address)
+    return TestResult.from_fallible_process_result(
+        result,
+        address=field_set.address,
+        output_setting=test_subsystem.output,
+    )
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)

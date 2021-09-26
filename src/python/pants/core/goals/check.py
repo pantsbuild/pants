@@ -20,7 +20,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, _uncacheable_rule, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -64,7 +64,7 @@ class CheckResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class CheckResults:
+class CheckResults(EngineAwareReturnType):
     """Zero or more CheckResult objects for a single type checker.
 
     Typically, type checkers will return one result. If they no-oped, they will return zero results.
@@ -105,14 +105,6 @@ class CheckResults:
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
-
-class EnrichedCheckResults(CheckResults, EngineAwareReturnType):
-    """`CheckResults` that are enriched for the sake of logging results as they come in.
-
-    Plugin authors only need to return `CheckResults`, and a rule will upcast those into
-    `CheckResults`.
-    """
-
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -149,6 +141,10 @@ class EnrichedCheckResults(CheckResults, EngineAwareReturnType):
                 results_msg += msg
         message += results_msg
         return message
+
+    def cacheable(self) -> bool:
+        """Is marked uncacheable to ensure that it always renders."""
+        return False
 
 
 @union
@@ -200,7 +196,7 @@ async def check(
         if request
     )
     all_results = await MultiGet(
-        Get(EnrichedCheckResults, CheckRequest, request) for request in valid_requests
+        Get(CheckResults, CheckRequest, request) for request in valid_requests
     )
 
     def get_tool_name(res: CheckResults) -> str:
@@ -231,14 +227,6 @@ async def check(
         console.print_stderr(f"{sigil} {results.checker_name} {status}.")
 
     return Check(exit_code)
-
-
-# NB: We mark this uncachable to ensure that the results are always streamed, even if the
-# underlying CheckResults is memoized. This rule is very cheap, so there's little performance
-# hit.
-@_uncacheable_rule(desc="check")
-def enrich_typecheck_results(results: CheckResults) -> EnrichedCheckResults:
-    return EnrichedCheckResults(results=results.results, checker_name=results.checker_name)
 
 
 def rules():

@@ -8,13 +8,21 @@ from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 
-from pants.backend.java.compile.javac_binary import JavacBinary
-from pants.backend.java.target_types import JavaSources
+from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, RemovePrefix
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    MergeDigests,
+    RemovePrefix,
+)
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Sources, Targets
@@ -34,9 +42,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class JavacFieldSet(FieldSet):
-    required_fields = (JavaSources,)
+    required_fields = (JavaSourceField,)
 
-    sources: JavaSources
+    sources: JavaSourceField
 
 
 class JavacCheckRequest(CheckRequest):
@@ -119,7 +127,7 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
 async def compile_java_source(
     bash: BashBinary,
     coursier: Coursier,
-    javac_binary: JavacBinary,
+    jdk_setup: JdkSetup,
     request: CompileJavaSourceRequest,
 ) -> FallibleCompiledClassfiles:
     component_members_with_sources = tuple(
@@ -132,7 +140,7 @@ async def compile_java_source(
                 SourceFiles,
                 SourceFilesRequest(
                     (t.get(Sources),),
-                    for_sources_types=(JavaSources,),
+                    for_sources_types=(JavaSourceField,),
                     enable_codegen=True,
                 ),
             )
@@ -185,7 +193,12 @@ async def compile_java_source(
             exit_code=1,
         )
 
-    materialized_classpath, merged_direct_dependency_classfiles_digest = await MultiGet(
+    dest_dir = "classfiles"
+    (
+        materialized_classpath,
+        merged_direct_dependency_classfiles_digest,
+        dest_dir_digest,
+    ) = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
@@ -194,6 +207,10 @@ async def compile_java_source(
             ),
         ),
         Get(Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)),
+        Get(
+            Digest,
+            CreateDigest([Directory(dest_dir)]),
+        ),
     )
 
     usercp_relpath = "__usercp"
@@ -212,7 +229,8 @@ async def compile_java_source(
             (
                 prefixed_direct_dependency_classfiles_digest,
                 materialized_classpath.digest,
-                javac_binary.digest,
+                dest_dir_digest,
+                jdk_setup.digest,
                 *(
                     sources.snapshot.digest
                     for _, sources in component_members_and_java_source_files
@@ -225,12 +243,12 @@ async def compile_java_source(
         FallibleProcessResult,
         Process(
             argv=[
-                bash.path,
-                javac_binary.javac_wrapper_script,
+                *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
+                "com.sun.tools.javac.Main",
                 "-cp",
                 classpath_arg,
                 "-d",
-                "classfiles",
+                dest_dir,
                 *sorted(
                     chain.from_iterable(
                         sources.snapshot.files
@@ -239,7 +257,8 @@ async def compile_java_source(
                 ),
             ],
             input_digest=merged_digest,
-            output_directories=("classfiles",),
+            use_nailgun=jdk_setup.digest,
+            output_directories=(dest_dir,),
             description=f"Compile {request.component.members} with javac",
             level=LogLevel.DEBUG,
         ),
@@ -247,7 +266,7 @@ async def compile_java_source(
     output: CompiledClassfiles | None = None
     if process_result.exit_code == 0:
         stripped_classfiles_digest = await Get(
-            Digest, RemovePrefix(process_result.output_digest, "classfiles")
+            Digest, RemovePrefix(process_result.output_digest, dest_dir)
         )
         output = CompiledClassfiles(stripped_classfiles_digest)
 

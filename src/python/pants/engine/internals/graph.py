@@ -273,16 +273,12 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
     improved performance / concurrency.
     """
-    roots_as_targets: Collection[Target]
-    if request.expanded_targets:
-        roots_as_targets = await Get(Targets, Addresses(request.tt_request.roots))
-    else:
-        roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
+    roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
-    dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
+    dependency_mapping: dict[Address, Tuple[Address, ...]] = {}
     while queued:
-        direct_dependencies: Tuple[Collection[Target], ...]
+        direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(
                 Get(

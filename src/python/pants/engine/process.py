@@ -66,7 +66,7 @@ class Process:
     output_directories: Tuple[str, ...]
     timeout_seconds: int | float
     jdk_home: str | None
-    is_nailgunnable: bool
+    use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
 
@@ -84,7 +84,7 @@ class Process:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
-        is_nailgunnable: bool = False,
+        use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
@@ -128,7 +128,7 @@ class Process:
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
-        self.is_nailgunnable = is_nailgunnable
+        self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
 
@@ -444,13 +444,14 @@ class BinaryPaths(EngineAwareReturnType):
 
 
 class BinaryNotFoundError(EnvironmentError):
-    def __init__(
-        self,
+    @classmethod
+    def from_request(
+        cls,
         request: BinaryPathRequest,
         *,
         rationale: str | None = None,
         alternative_solution: str | None = None,
-    ) -> None:
+    ) -> BinaryNotFoundError:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 
         :param rationale: A short description of why this binary is needed, e.g.
@@ -466,7 +467,7 @@ class BinaryNotFoundError(EnvironmentError):
         msg += f" so that Pants can {rationale}." if rationale else "."
         if alternative_solution:
             msg += f"\n\n{alternative_solution}"
-        super().__init__(msg)
+        return BinaryNotFoundError(msg)
 
 
 class BashBinary(BinaryPath):
@@ -490,7 +491,7 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request)
+        raise BinaryNotFoundError.from_request(request)
     return BashBinary(first_path.path, first_path.fingerprint)
 
 

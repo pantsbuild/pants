@@ -712,25 +712,28 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         expected_spec_path = generator.address.spec_path
         expected_tgt_name = generator.address.target_name
         mapping = {}
-        for tgt in generated_targets:
+        for tgt in sorted(generated_targets, key=lambda t: t.address):
             if tgt.address.spec_path != expected_spec_path:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.spec_path` as their "
                     f"target generator. Expected {generator.address.spec_path}, but got "
                     f"{tgt.address.spec_path} for target generated from {generator.address}: {tgt}"
+                    "\n\nConsider using `request.generator.address.create_generated()`."
                 )
             if tgt.address.target_name != expected_tgt_name:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must have the same `Address.target_name` as their "
                     f"target generator. Expected {generator.address.target_name}, but got "
                     f"{tgt.address.target_name} for target generated from {generator.address}: "
-                    f"{tgt}"
+                    f"{tgt}\n\n"
+                    "Consider using `request.generator.address.create_generated()`."
                 )
             if not tgt.address.is_generated_target:
                 raise InvalidGeneratedTargetException(
                     "All generated targets must set `Address.generator_name` or "
                     "`Address.relative_file_path`. Invalid for target generated from "
-                    f"{generator.address}: {tgt}"
+                    f"{generator.address}: {tgt}\n\n"
+                    "Consider using `request.generator.address.create_generated()`."
                 )
             mapping[tgt.address] = tgt
         super().__init__(mapping)
@@ -777,11 +780,7 @@ def generate_file_level_targets(
     for fp in paths:
         relativized_fp = str(PurePath(fp).relative_to(generator.address.spec_path))
         all_generated_addresses.append(
-            Address(
-                generator.address.spec_path,
-                target_name=generator.address.target_name,
-                generated_name=relativized_fp,
-            )
+            generator.address.create_generated(relativized_fp)
             if use_generated_address_syntax
             else Address(
                 generator.address.spec_path,

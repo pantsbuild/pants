@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -26,7 +24,6 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "43757804"]
 #[macro_use]
 extern crate derivative;
 
@@ -43,7 +40,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use hashing::{Digest, EMPTY_FINGERPRINT};
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use workunit_store::{RunningWorkunit, WorkunitStore};
+use workunit_store::{in_workunit, RunningWorkunit, WorkunitMetadata, WorkunitStore};
 
 pub mod cache;
 #[cfg(test)]
@@ -251,7 +248,13 @@ pub struct Process {
 
   pub platform_constraint: Option<Platform>,
 
-  pub is_nailgunnable: bool,
+  ///
+  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
+  ///
+  /// TODO: Currently this Digest must be a subset of the `input_digest`, but we should consider
+  /// making it disjoint, and then automatically merging it.
+  ///
+  pub use_nailgun: Digest,
 
   pub cache_scope: ProcessCacheScope,
 }
@@ -281,7 +284,7 @@ impl Process {
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       platform_constraint: None,
-      is_nailgunnable: false,
+      use_nailgun: hashing::EMPTY_DIGEST,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
     }
@@ -586,30 +589,37 @@ impl CommandRunner for BoundedCommandRunner {
     workunit: &mut RunningWorkunit,
     mut req: MultiPlatformProcess,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let semaphore = self.inner.1.clone();
-    let inner = self.inner.clone();
-    let blocking_token = workunit.blocking();
-    semaphore
-      .with_acquired(|concurrency_id| {
-        log::debug!(
-          "Running {} under semaphore with concurrency id: {}",
-          req.user_facing_name(),
-          concurrency_id
+    let semaphore_acquisition = self.inner.1.acquire();
+    let permit = in_workunit!(
+      context.workunit_store.clone(),
+      "acquire_command_runner_slot".to_owned(),
+      WorkunitMetadata {
+        level: Level::Trace,
+        ..WorkunitMetadata::default()
+      },
+      |workunit| async move {
+        let _blocking_token = workunit.blocking();
+        semaphore_acquisition.await
+      }
+    )
+    .await;
+
+    log::debug!(
+      "Running {} under semaphore with concurrency id: {}",
+      req.user_facing_name(),
+      permit.concurrency_slot()
+    );
+
+    for (_, process) in req.0.iter_mut() {
+      if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+        process.env.insert(
+          execution_slot_env_var.clone(),
+          format!("{}", permit.concurrency_slot()),
         );
-        std::mem::drop(blocking_token);
+      }
+    }
 
-        for (_, process) in req.0.iter_mut() {
-          if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-            let execution_slot = format!("{}", concurrency_id);
-            process
-              .env
-              .insert(execution_slot_env_var.clone(), execution_slot);
-          }
-        }
-
-        inner.0.run(context, workunit, req)
-      })
-      .await
+    self.inner.0.run(context, workunit, req).await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

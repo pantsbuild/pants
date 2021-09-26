@@ -93,6 +93,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "python_requirements",
                     ("3rdparty/requirements-test.txt",),
                     ("3rdparty/requirements-test.txt",),
+                    addressable=False,
                     kwargs={"requirements_relpath": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(

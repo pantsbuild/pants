@@ -23,7 +23,7 @@ class TerraformTool(TemplatedExternalTool):
     name = "terraform"
     help = "Terraform (https://terraform.io)"
 
-    default_version = "0.14.5"
+    default_version = "1.0.7"
     default_url_template = (
         "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{platform}.zip"
     )
@@ -36,9 +36,9 @@ class TerraformTool(TemplatedExternalTool):
     @classproperty
     def default_known_versions(cls):
         return [
-            "0.14.5|macos_arm64 |363d0e0c5c4cb4e69f5f2c7f64f9bf01ab73af0801665d577441521a24313a07|34341379",
-            "0.14.5|macos_x86_64|363d0e0c5c4cb4e69f5f2c7f64f9bf01ab73af0801665d577441521a24313a07|34341379",
-            "0.14.5|linux_x86_64|2899f47860b7752e31872e4d57b1c03c99de154f12f0fc84965e231bc50f312f|33542124",
+            "1.0.7|macos_arm64 |cbab9aca5bc4e604565697355eed185bb699733811374761b92000cc188a7725|32071346",
+            "1.0.7|macos_x86_64|80ae021d6143c7f7cbf4571f65595d154561a2a25fd934b7a8ccc1ebf3014b9b|33020029",
+            "1.0.7|linux_x86_64|bc79e47649e2529049a356f9e60e06b47462bf6743534a10a4c16594f443be7b|32671441",
         ]
 
 

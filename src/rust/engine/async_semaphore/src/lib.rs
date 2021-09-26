@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -77,7 +75,7 @@ impl AsyncSemaphore {
     res
   }
 
-  async fn acquire(&self) -> Permit<'_> {
+  pub async fn acquire(&self) -> Permit<'_> {
     let permit = self.inner.sema.acquire().await.expect("semaphore closed");
     let id = {
       let mut available_ids = self.inner.available_ids.lock();
@@ -98,6 +96,12 @@ pub struct Permit<'a> {
   // NB: Kept for its `Drop` impl.
   _permit: SemaphorePermit<'a>,
   id: usize,
+}
+
+impl Permit<'_> {
+  pub fn concurrency_slot(&self) -> usize {
+    self.id
+  }
 }
 
 impl<'a> Drop for Permit<'a> {

@@ -9,11 +9,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.compile.javac_binary import rules as javac_binary_rules
-from pants.backend.java.target_types import JavaLibrary, JunitTests
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
+from pants.backend.java.util_rules import rules as java_util_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -30,6 +30,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -48,14 +49,23 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *javac_rules(),
             *junit_rules(),
-            *javac_binary_rules(),
             *util_rules(),
+            *java_util_rules(),
             *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JavaTestFieldSet,)),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact, JavaLibrary, JunitTests],
-        bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
+        target_types=[
+            JvmDependencyLockfile,
+            JvmArtifact,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+        ],
+        bootstrap_args=[
+            "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
+            # Makes JUnit output predictable and parseable across versions (#12933):
+            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        ],
     )
 
 
@@ -103,6 +113,7 @@ JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@maybe_skip_jdk_test
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -145,20 +156,15 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -203,14 +209,8 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -224,6 +224,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -244,7 +245,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',                    ],
@@ -287,14 +288,8 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "ExampleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
@@ -393,6 +388,7 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
+@maybe_skip_jdk_test
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -439,20 +435,15 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -499,14 +490,8 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            )
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 1
     assert (
         re.search(
@@ -520,6 +505,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -542,7 +528,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                     ],
                 )
 
-                java_library(
+                java_sources(
                     name='example-lib',
                     dependencies = [
                         ':lockfile',
@@ -588,20 +574,15 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
 def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     combined_lockfile = CoursierResolvedLockfile(
         entries=(*JUNIT4_RESOLVED_LOCKFILE.entries, *JUNIT5_RESOLVED_LOCKFILE.entries)
@@ -671,14 +652,8 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_result = rule_runner.request(
-        TestResult,
-        [
-            JavaTestFieldSet.create(
-                rule_runner.get_target(address=Address(spec_path="", target_name="example-test"))
-            ),
-        ],
-    )
+    test_result = run_junit_test(rule_runner, "example-test", "JupiterTest.java")
+
     assert test_result.exit_code == 0
     # TODO: Once support for parsing junit.xml is implemented, use that to determine status so we can remove the
     #  hack to use ASCII test output in the `run_junit_test` rule.
@@ -686,3 +661,12 @@ def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
     assert re.search(r"2 tests successful", test_result.stdout) is not None
     assert re.search(r"2 tests found", test_result.stdout) is not None
+
+
+def run_junit_test(
+    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+) -> TestResult:
+    tgt = rule_runner.get_target(
+        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
+    )
+    return rule_runner.request(TestResult, [JavaTestFieldSet.create(tgt)])

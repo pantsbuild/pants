@@ -376,6 +376,13 @@ class Address(EngineAwareParameter):
             )
         return self
 
+    def create_generated(self, generated_name: str) -> Address:
+        if self.is_generated_target:
+            raise AssertionError("Cannot call ")
+        return self.__class__(
+            self.spec_path, target_name=self._target_name, generated_name=generated_name
+        )
+
     def __eq__(self, other):
         if not isinstance(other, Address):
             return False

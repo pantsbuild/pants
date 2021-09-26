@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import textwrap
+import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -26,71 +26,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.ordered_set import OrderedSet
-
-PARSER = FileContent(
-    "__pants_tf_parser.py",
-    textwrap.dedent(
-        """\
-    from pathlib import PurePath
-    import sys
-    from typing import Set
-
-    import hcl2
-
-    # PurePath does not have the Path.resolve method which resolves ".." components, thus we need to
-    # code our own version for PurePath's.
-    def resolve_pure_path(base: PurePath, relative_path: PurePath) -> PurePath:
-        parts = list(base.parts)
-        for component in relative_path.parts:
-            if component == ".":
-                pass
-            elif component == "..":
-                if not parts:
-                    raise ValueError(f"Relative path {relative_path} escapes from path {base}.")
-                parts.pop()
-            else:
-                parts.append(component)
-
-        return PurePath(*parts)
-
-
-    def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
-        content = raw_content.decode("utf-8")
-        parsed_content = hcl2.loads(content)
-
-        # Note: The `module` key is a list where each entry is a dict with a single entry where the key is the
-        # module name and the values are a dict for that module's actual values.
-        paths = set()
-        for wrapped_module in parsed_content.get("module", []):
-            values = list(wrapped_module.values())[
-                0
-            ]  # the module is the sole entry in `wrapped_module`
-            source = values.get("source", "")
-
-            # Local paths to modules must begin with "." or ".." as per
-            # https://www.terraform.io/docs/language/modules/sources.html#local-paths.
-            if source.startswith("./") or source.startswith("../"):
-                try:
-                    resolved_path = resolve_pure_path(path, PurePath(source))
-                    paths.add(str(resolved_path))
-                except ValueError:
-                    pass
-
-        return paths
-
-
-    paths = set()
-    for filename in sys.argv[1:]:
-        with open(filename, "rb") as f:
-            content = f.read()
-        paths |= extract_module_source_paths(PurePath(filename).parent, content)
-
-    for path in paths:
-        print(path)
-    """
-    ).encode("utf-8"),
-    is_executable=True,
-)
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -126,7 +61,20 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_digest = await Get(Digest, CreateDigest([PARSER]))
+    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
+    if not parser_script_content:
+        raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
+
+    parser_content = FileContent(
+        path="__pants_tf_parser.py",
+        content=parser_script_content,
+        is_executable=True,
+    )
+
+    parser_digest = await Get(
+        Digest,
+        CreateDigest([parser_content]),
+    )
 
     parser_pex = await Get(
         VenvPex,
@@ -135,7 +83,7 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
             internal_only=True,
             requirements=hcl2_parser.pex_requirements(),
             interpreter_constraints=hcl2_parser.interpreter_constraints,
-            main=EntryPoint(PurePath(PARSER.path).stem),
+            main=EntryPoint(PurePath(parser_content.path).stem),
             sources=parser_digest,
         ),
     )

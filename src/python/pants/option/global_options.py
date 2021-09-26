@@ -436,7 +436,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cache_namespace=None,
     process_execution_local_cleanup=True,
     process_execution_local_cache=True,
-    process_execution_local_enable_nailgun=False,
+    process_execution_local_enable_nailgun=True,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -1052,7 +1052,10 @@ class GlobalOptions(Subsystem):
             "--process-execution-local-enable-nailgun",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
-            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
+            help=(
+                "Whether or not to use nailgun to run JVM requests that are marked as "
+                "supporting nailgun."
+            ),
             advanced=True,
         )
 

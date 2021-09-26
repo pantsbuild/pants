@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -26,7 +24,6 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "95595489"]
 #![recursion_limit = "256"]
 
 mod snapshot;
@@ -498,6 +495,9 @@ impl Store {
   /// contained in any Directories in the list.
   ///
   /// Returns a structure with the summary of operations.
+  ///
+  /// TODO: This method is only aware of File and Directory typed blobs: in particular, that means
+  /// it will not expand Trees to upload the files that they refer to. See #13006.
   ///
   pub fn ensure_remote_has_recursive(
     &self,
