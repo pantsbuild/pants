@@ -1,7 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""TODO: Add description"""
+"""Autoformatter for removing unused Python imports.
+
+See https://github.com/myint/autoflake for details.
+"""
 
 from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.autoflake import rules as autoflake_rules
