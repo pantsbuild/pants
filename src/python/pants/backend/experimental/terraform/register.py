@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.terraform import dependency_inference, tailor, target_gen, tool, goals
+from pants.backend.terraform import dependency_inference, goals, tailor, target_gen, tool
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
 from pants.backend.terraform.lint.validate.validate import rules as validate_rules

@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pathlib import PurePath
 
 from pants.backend.terraform.target_types import TerraformModuleSources
 from pants.backend.terraform.tool import TerraformProcess
@@ -98,8 +97,8 @@ async def run_terraform_command(
 
     source_dir = list(source_dirs_with_tf_files.keys())[0]
 
-    output_files = ()
-    output_directories = ()
+    output_files: tuple[str, ...] = ()
+    output_directories: tuple[str, ...] = ()
     if tf_run.options.capture_caches:
         output_files = (f"{source_dir}/.terraform.lock.hcl",)
         output_directories = (f"{source_dir}/.terraform",)
