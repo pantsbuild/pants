@@ -22,7 +22,6 @@ from pants.engine.process import (
     Process,
 )
 from pants.engine.rules import collect_rules, rule
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.ordered_set import OrderedSet
@@ -131,7 +130,7 @@ async def find_terraform(terraform: TerraformTool) -> TerraformSetup:
                 "is discoverable via `[terraform].search_paths`."
             )
 
-        return TerraformSetup(digest=EMPTY_DIGEST, path=all_terraform_binary_paths.paths[0])
+        return TerraformSetup(digest=EMPTY_DIGEST, path=all_terraform_binary_paths.paths[0].path)
 
     downloaded_terraform = await Get(
         DownloadedExternalTool,
