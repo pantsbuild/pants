@@ -16,6 +16,7 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilation,
     AssemblyPreCompilationRequest,
 )
+from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
     DownloadExternalModuleRequest,
@@ -28,13 +29,11 @@ from pants.backend.go.util_rules.go_pkg import (
     is_third_party_package_target,
 )
 from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
-from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet
@@ -112,21 +111,10 @@ async def build_target(
     if request.is_main:
         import_path = "main"
 
-    compile_command = [
-        "tool",
-        "compile",
-        "-p",
-        import_path,
-        "-importcfg",
-        "./importcfg",
-        "-pack",
-        "-o",
-        "__pkg__.a",
-    ]
-
     input_digest = await Get(Digest, MergeDigests([gathered_imports.digest, source_files_digest]))
 
     assembly_digests = None
+    symabis_path = None
     if resolved_package.s_files:
         assembly_setup = await Get(
             AssemblyPreCompilation,
@@ -136,18 +124,17 @@ async def build_target(
         )
         input_digest = assembly_setup.merged_compilation_input_digest
         assembly_digests = assembly_setup.assembly_digests
-        compile_command.extend(assembly_setup.EXTRA_COMPILATION_ARGS)
-
-    compile_command.append("--")
-    compile_command.extend(f"./{source_files_subpath}/{name}" for name in resolved_package.go_files)
+        symabis_path = "./symabis"
 
     result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=input_digest,
-            command=tuple(compile_command),
-            description=f"Compile Go package with {pluralize(len(resolved_package.go_files), 'file')}. [{request.address}]",
-            output_files=("__pkg__.a",),
+        CompiledGoSources,
+        CompileGoSourcesRequest(
+            digest=input_digest,
+            sources=tuple(f"./{source_files_subpath}/{name}" for name in resolved_package.go_files),
+            import_path=import_path,
+            description=f"Compile Go package with {pluralize(len(resolved_package.go_files), 'file')}.",
+            import_config_path="./importcfg",
+            symabis_path=symabis_path,
         ),
     )
     output_digest = result.output_digest

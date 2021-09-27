@@ -14,6 +14,7 @@ from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
+    compile,
     external_module,
     go_mod,
     go_pkg,
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
         target_types=[GoBinary, GoPackage, GoModule],
         rules=[
             *assembly.rules(),
+            *compile.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),
