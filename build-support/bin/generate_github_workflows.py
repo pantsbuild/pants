@@ -288,6 +288,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
+                install_go(),
                 *bootstrap_caches(),
                 setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -359,6 +360,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
+                install_go(),
                 pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
@@ -379,6 +381,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
+                install_go(),
                 *bootstrap_caches(),
                 setup_toolchain_auth(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -405,6 +408,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 install_jdk(),
+                install_go(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
