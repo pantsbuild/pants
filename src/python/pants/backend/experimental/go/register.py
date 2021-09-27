@@ -8,6 +8,7 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
+    compile,
     build_go_pkg,
     external_module,
     go_mod,
@@ -25,6 +26,7 @@ def rules():
     return [
         *assembly.rules(),
         *build_go_pkg.rules(),
+        *compile.rules(),
         *external_module.rules(),
         *golang.rules(),
         *go_target_types.rules(),
