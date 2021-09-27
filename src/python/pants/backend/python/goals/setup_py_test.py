@@ -29,7 +29,6 @@ from pants.backend.python.goals.setup_py import (
     SetupPySourcesRequest,
     declares_pkg_resources_namespace_package,
     determine_setup_kwargs,
-    distutils_repr,
     generate_chroot,
     get_exporting_owner,
     get_owned_dependencies,
@@ -1156,39 +1155,6 @@ def test_validate_args() -> None:
 
     validate_commands(("sdist",))
     validate_commands(("bdist_wheel", "--foo"))
-
-
-def test_distutils_repr() -> None:
-    testdata = {
-        "foo": "bar",
-        "baz": {"qux": [123, 456], "quux": ("abc", b"xyz"), "corge": {1, 2, 3}},
-        "various_strings": ["x'y", "aaa\nbbb"],
-    }
-    expected = """
-{
-    'foo': 'bar',
-    'baz': {
-        'qux': [
-            123,
-            456,
-        ],
-        'quux': (
-            'abc',
-            'xyz',
-        ),
-        'corge': {
-            1,
-            2,
-            3,
-        },
-    },
-    'various_strings': [
-        'x\\\'y',
-        \"\"\"aaa\nbbb\"\"\",
-    ],
-}
-""".strip()
-    assert expected == distutils_repr(testdata)
 
 
 @pytest.mark.parametrize(
