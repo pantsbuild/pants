@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
-from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion
+from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion, DockerRegistry
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -21,6 +21,7 @@ class DockerFieldSet(PackageFieldSet):
     required_fields = (DockerImageSources,)
 
     image_version: DockerImageVersion
+    registry: DockerRegistry
     sources: DockerImageSources
 
     @property
@@ -34,8 +35,14 @@ class DockerFieldSet(PackageFieldSet):
         return os.path.join(self.address.spec_path, self.dockerfile_relpath)
 
     @property
-    def image_tag(self) -> str:
+    def image_name(self) -> str:
         return ":".join(s for s in [self.address.target_name, self.image_version.value] if s)
+
+    @property
+    def image_tag(self) -> str:
+        if self.registry.value:
+            return "/".join([self.registry.value, self.image_name])
+        return self.image_name
 
 
 @rule

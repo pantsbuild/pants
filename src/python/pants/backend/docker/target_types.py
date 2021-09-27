@@ -20,6 +20,11 @@ class DockerDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+class DockerRegistry(StringField):
+    alias = "registry"
+    help = "Address to Docker registry to use for the built image."
+
+
 class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
@@ -27,5 +32,6 @@ class DockerImage(Target):
         DockerDependencies,
         DockerImageSources,
         DockerImageVersion,
+        DockerRegistry,
     )
     help = "A Docker image."

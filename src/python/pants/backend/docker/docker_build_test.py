@@ -79,3 +79,20 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     )
 
     assert_build(rule_runner, Address("docker/test"), "Built docker image: test:1.2.3")
+
+
+def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+            docker_image(version="1.2.3", registry="myregistrydomain:port")
+            """
+            ),
+            "docker/test/Dockerfile": "FROM python:3.8",
+        }
+    )
+
+    assert_build(
+        rule_runner, Address("docker/test"), "Built docker image: myregistrydomain:port/test:1.2.3"
+    )
