@@ -15,6 +15,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
   "pants.backend.experimental.docker",
+  "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.python",
   "internal_plugins.releases",
@@ -47,8 +48,7 @@ pants_ignore.add = [
 ]
 
 build_ignore.add = [
-  # Disable Go targets because the Go backend is experimental (as it is under active development),
-  # and thus is not enabled by default.
+  # Disable Go targets by default so Pants developers do not need Go installed.
   "/testprojects/src/go/**",
 ]
 
