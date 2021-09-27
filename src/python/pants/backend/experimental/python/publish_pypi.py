@@ -7,13 +7,13 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonDistribution
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.publish import (
-    PublishedPackage,
+    PublishProcess,
     PublishRequest,
     PublishTarget,
     PublishTargetField,
 )
 from pants.engine.environment import Environment, InterpolatedEnvironmentRequest
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import StringField
 from pants.engine.unions import UnionRule
@@ -102,7 +102,7 @@ async def twine_call_args(target: PypiRepositoryTarget) -> TwineCallArgs:
 
 
 @rule
-async def publish_pypi(request: PypiPublishRequest, twine: Twine) -> PublishedPackage:
+async def publish_pypi(request: PypiPublishRequest, twine: Twine) -> PublishProcess:
     twine_pex = await Get(
         VenvPex,
         PexRequest(
@@ -116,6 +116,9 @@ async def publish_pypi(request: PypiPublishRequest, twine: Twine) -> PublishedPa
     call_args = await Get(TwineCallArgs, PypiRepositoryTarget, request.publish_target)
     paths = [artifact.relpath for artifact in request.built_package.artifacts]
 
+    if not paths:
+        return PublishProcess(process=None, message="No artifacts found.")
+
     process = await Get(
         Process,
         VenvPexProcess,
@@ -128,11 +131,7 @@ async def publish_pypi(request: PypiPublishRequest, twine: Twine) -> PublishedPa
         ),
     )
 
-    await Get(ProcessResult, Process, process)
-
-    return PublishedPackage(
-        package=request.built_package, publish_target=request.publish_target.address
-    )
+    return PublishProcess(process=InteractiveProcess.from_process(process))
 
 
 def rules():

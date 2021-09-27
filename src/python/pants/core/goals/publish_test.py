@@ -9,13 +9,14 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.publish import (
     Publish,
-    PublishedPackage,
+    PublishProcess,
     PublishRequest,
     PublishTarget,
     PublishTargetField,
     publish,
 )
 from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
@@ -75,6 +76,9 @@ def run_publish_rule(
     package_fieldset_types: List[Type[PackageFieldSet]],
     targets: List[Target],
     built_packages: List[BuiltPackage] = (),
+    publish_process: Optional[InteractiveProcess] = InteractiveProcess(argv=[]),
+    publish_exit_code: int = 0,
+    publish_message: Optional[str] = None,
 ):
     def UAI(unparsed_addresses: UnparsedAddressInputs):
         return [t for t in targets if t.address.spec in unparsed_addresses.values]
@@ -92,6 +96,7 @@ def run_publish_rule(
             rule_args=[
                 Targets(targets),
                 union_membership,
+                console,
             ],
             mock_gets=[
                 MockGet(
@@ -105,9 +110,17 @@ def run_publish_rule(
                     mock=lambda _: built_packages.pop(0),
                 ),
                 MockGet(
-                    output_type=PublishedPackage,
+                    output_type=PublishProcess,
                     input_type=PublishRequest,
-                    mock=lambda request: PublishedPackage(request.built_package, Address("//")),
+                    mock=lambda request: PublishProcess(
+                        process=publish_process,
+                        message=publish_message,
+                    ),
+                ),
+                MockGet(
+                    output_type=InteractiveProcessResult,
+                    input_type=InteractiveProcess,
+                    mock=lambda process: InteractiveProcessResult(exit_code=publish_exit_code),
                 ),
             ],
             union_membership=union_membership,
@@ -163,4 +176,43 @@ def test_packageable_with_target(rule_runner):
     )
 
     assert exit_code == 0
-    assert f"Publishing {publishee.address}" in stderr
+    assert f"Published {publishee.address} to {publish_target.address}" in stderr
+
+
+def test_none_publish_process(rule_runner):
+    """When PublishProcess.process is None."""
+    publish_target = make_publish_target()
+    publishee = make_target(publish_targets=[publish_target])
+
+    message_sentinel = "SENTINEL"
+
+    exit_code, stderr = run_publish_rule(
+        rule_runner,
+        publish_request_types=[MockPublishRequest],
+        package_fieldset_types=[MockTargetPackageFieldSet],
+        targets=[publish_target, publishee],
+        built_packages=[make_built_package()],
+        publish_process=None,
+        publish_message=message_sentinel,
+    )
+
+    assert exit_code == 0
+    assert f"Unable to publish {publishee.address} to {publish_target.address}" in stderr
+    assert message_sentinel in stderr
+
+
+def test_packageable_with_target_failure(rule_runner):
+    publish_target = make_publish_target()
+    publishee = make_target(publish_targets=[publish_target])
+
+    exit_code, stderr = run_publish_rule(
+        rule_runner,
+        publish_request_types=[MockPublishRequest],
+        package_fieldset_types=[MockTargetPackageFieldSet],
+        targets=[publish_target, publishee],
+        built_packages=[make_built_package()],
+        publish_exit_code=1,
+    )
+
+    assert exit_code == 1
+    assert f"Failed to publish {publishee.address} to {publish_target.address}" in stderr
