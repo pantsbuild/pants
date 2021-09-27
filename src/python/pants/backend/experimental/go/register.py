@@ -13,6 +13,7 @@ from pants.backend.go.util_rules import (
     go_mod,
     go_pkg,
     import_analysis,
+    link,
     sdk,
 )
 
@@ -31,6 +32,7 @@ def rules():
         *import_analysis.rules(),
         *go_mod.rules(),
         *go_pkg.rules(),
+        *link.rules(),
         *sdk.rules(),
         *tailor.rules(),
         *target_type_rules.rules(),
