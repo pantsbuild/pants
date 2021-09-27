@@ -12,7 +12,6 @@ target(
     'src/python/pants/backend/experimental/docker',
     'src/python/pants/backend/experimental/docker/lint/hadolint',
     'src/python/pants/backend/experimental/go',
-    'src/python/pants/backend/experimental/go/lint/gofmt',
     'src/python/pants/backend/experimental/java',
     'src/python/pants/backend/experimental/python',
     'src/python/pants/backend/experimental/terraform',
