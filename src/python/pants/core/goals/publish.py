@@ -3,13 +3,14 @@
 
 import logging
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
-from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -60,17 +61,19 @@ class Publish(Goal):
 
 
 @dataclass(frozen=True)
-class PublishedPackage:
-    package: BuiltPackage
-    publish_target: Address
+class PublishProcess:
+    # If process is None, consider publish 'skipped'.
+    # e.g. incompatibility between source and destination.
+    process: Optional[InteractiveProcess]
+    message: Optional[str] = None
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PublishedPackageSet:
-    publishes: FrozenOrderedSet[PublishedPackage]
+    publishes: FrozenOrderedSet[PublishProcess]
 
-    def __init__(self, published_packages: Iterable[PublishedPackage]):
+    def __init__(self, published_packages: Iterable[PublishProcess]):
         self.publishes = FrozenOrderedSet(published_packages)
 
 
@@ -88,6 +91,7 @@ def _can_package(target: Target, union_membership: UnionMembership):
 async def publish(
     targets: Targets,
     union_membership: UnionMembership,
+    console: Console,
 ) -> Publish:
     publishable_targets: List[Tuple[Target, PackageFieldSet]] = []
 
@@ -135,7 +139,7 @@ async def publish(
                 return Publish(exit_code=1)
             fieldset = publish_target.publishee_fieldset_type.create(target)
 
-            logger.info(f"Publishing {target.address} to {publish_target.address}")
+            logger.debug(f"Publishing {target.address} to {publish_target.address}")
             requests.append(
                 publish_target.publish_request_type(
                     built_package,
@@ -144,14 +148,38 @@ async def publish(
                 )
             )
 
-    packages = await MultiGet(
-        Get(PublishedPackage, PublishRequest, request) for request in requests
-    )
+    processes = await MultiGet(Get(PublishProcess, PublishRequest, request) for request in requests)
 
-    # ???
-    PublishedPackageSet(packages)
+    exit_code = 0
 
-    return Publish(exit_code=0)
+    for (target, _), request, process in zip(publishable_targets, requests, processes):
+        if process.process is None:
+            sigil = console.sigil_skipped()
+            status = "Unable to publish"
+            message = process.message
+        else:
+            result = await Get(
+                InteractiveProcessResult,
+                InteractiveProcess,
+                process.process,
+            )
+            message = process.message or ""
+
+            if result.exit_code == 0:
+                sigil = console.sigil_succeeded()
+                status = "Published"
+            else:
+                exit_code = 1
+                sigil = console.sigil_failed()
+                status = "Failed to publish"
+
+        console.print_stderr(
+            f"{sigil} {status} {target.address} to {request.publish_target.address}{message}"
+        )
+        if message:
+            console.print_stderr(message)
+
+    return Publish(exit_code=exit_code)
 
 
 def rules():
