@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModule],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 

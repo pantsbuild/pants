@@ -159,9 +159,11 @@ class PythonSetup(Subsystem):
             metavar="<binary-paths>",
             help=(
                 "A list of paths to search for Python interpreters that match your project's "
-                "interpreter constraints. You can specify absolute paths to interpreter binaries "
+                "interpreter constraints.\n\n"
+                "You can specify absolute paths to interpreter binaries "
                 "and/or to directories containing interpreter binaries. The order of entries does "
-                "not matter. The following special strings are supported:\n\n"
+                "not matter.\n\n"
+                "The following special strings are supported:\n\n"
                 '* "<PATH>", the contents of the PATH env var\n'
                 '* "<ASDF>", all Python versions currently configured by ASDF '
                 "(asdf shell, ${HOME}/.tool-versions), with a fallback to all installed versions\n"
