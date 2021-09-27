@@ -97,7 +97,21 @@ class DependencyGraph:
         return tuple(self.vertices_by_id[edge.src_id] for edge in self.edges_by_dep.get(v.id, []))
 
     def to_json(self) -> str:
+        """A full representation from which this object can be parsed."""
         return json.dumps(self, cls=DependencyGraphJSONEncoder, indent=2)
+
+    def to_dependencies_json(self) -> str:
+        """A simplified representation where the dependencies are inlined onto the src vertex."""
+        return json.dumps(
+            [
+                {
+                    **vertex.data,
+                    "dependencies": [v.data["address"] for v in self.get_dependencies(vertex)],
+                }
+                for vertex in self.vertices
+            ],
+            indent=2,
+        )
 
 
 class DependencyGraphJSONEncoder(JSONEncoder):
@@ -129,7 +143,7 @@ async def generate_graph(request: DependencyGraphRequest) -> DependencyGraph:
             TransitiveTargets,
             TransitiveTargetsRequest(request.addresses, include_special_cased_deps=True),
         )
-        targets = set(transitive_targets.roots) | set(transitive_targets.dependencies)
+        targets = set(transitive_targets.closure)
     else:
         unexpanded_targets = await Get(UnexpandedTargets, Addresses, request.addresses)
         targets = set(unexpanded_targets)

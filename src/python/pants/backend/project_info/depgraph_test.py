@@ -147,3 +147,31 @@ def test_depgraph_construction(rule_runner: RuleRunner) -> None:
       ]
     }"""
     )
+
+    assert dep_graph.to_dependencies_json() == dedent(
+        """\
+    [
+      {
+        "address": "3rdparty/python:extlib",
+        "type": "python_requirement_library",
+        "requirements": [
+          "extlib==1.2.3"
+        ],
+        "dependencies": []
+      },
+      {
+        "address": "src/python/baz:lib",
+        "type": "python_library",
+        "dependencies": [
+          "src/python/foo"
+        ]
+      },
+      {
+        "address": "src/python/foo",
+        "type": "python_library",
+        "dependencies": [
+          "3rdparty/python:extlib"
+        ]
+      }
+    ]"""
+    )

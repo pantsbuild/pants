@@ -118,7 +118,7 @@ async def dependencies(
             for requirement_string in sorted(third_party_requirements):
                 print_stdout(requirement_string)
     elif dependencies_subsystem.format == OutputFormat.JSON:
-        console.print_stdout(depgraph.to_json())
+        console.print_stdout(depgraph.to_dependencies_json())
     return Dependencies(exit_code=0)
 
 
