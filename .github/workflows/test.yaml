@@ -48,10 +48,6 @@ jobs:
         }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17.1
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
@@ -206,10 +202,6 @@ jobs:
         }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17.1
     - name: Cache Rust toolchain
       uses: actions/cache@v2
       with:
@@ -511,10 +503,6 @@ jobs:
         }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17.1
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -670,10 +658,6 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17.1
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
