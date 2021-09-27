@@ -117,25 +117,9 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
         )
         for binary_path in all_go_binary_paths.paths
     )
-    env_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                (binary_path.path, "env", "GOROOT"),
-                description=f"Determine Go version and GOROOT for {binary_path.path}",
-                level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
-                env={"GOPATH": "/does/not/matter"},
-            ),
-        )
-        for binary_path in all_go_binary_paths.paths
-    )
 
     invalid_versions = []
-    for binary_path, version_result, env_result in zip(
-        all_go_binary_paths.paths, version_results, env_results
-    ):
-        goroot = env_result.stdout.decode("utf-8").strip()
+    for binary_path, version_result in zip(all_go_binary_paths.paths, version_results):
         try:
             _raw_version = version_result.stdout.decode("utf-8").split()[2]  # e.g. go1.17 or 1.17.1
             _version_components = _raw_version[2:].split(".")  # e.g. [1, 17] or [1, 17, 1]
@@ -149,6 +133,17 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             )
 
         if version == golang_subsystem.expected_version:
+            env_result = await Get(
+                ProcessResult,
+                Process(
+                    (binary_path.path, "env", "GOROOT"),
+                    description=f"Determine Go version and GOROOT for {binary_path.path}",
+                    level=LogLevel.DEBUG,
+                    cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                    env={"GOPATH": "/does/not/matter"},
+                ),
+            )
+            goroot = env_result.stdout.decode("utf-8").strip()
             return GoRoot(goroot)
 
         logger.debug(
