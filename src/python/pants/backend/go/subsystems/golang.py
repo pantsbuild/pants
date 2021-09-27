@@ -137,7 +137,9 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
     ):
         goroot = env_result.stdout.decode("utf-8").strip()
         try:
-            version = version_result.stdout.decode("utf-8").split()[2][2:]
+            _raw_version = version_result.stdout.decode("utf-8").split()[2]  # e.g. go1.17 or 1.17.1
+            _version_components = _raw_version[2:].split(".")  # e.g. [1, 17] or [1, 17, 1]
+            version = f"{_version_components[0]}.{_version_components[1]}"
         except IndexError:
             raise AssertionError(
                 f"Failed to parse `go version` output for {binary_path}. Please open a bug at "
