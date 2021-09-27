@@ -11,7 +11,7 @@ python_distribution(
   ],
   wheel=True,
   sdist=True,
-  config_settings={"--global-option": ["--python-tag", "py37.py38.py39"]},
+  wheel_config_settings={"--global-option": ["--python-tag", "py37.py38.py39"]},
   provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',

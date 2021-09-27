@@ -17,7 +17,7 @@ python_distribution(
         setup_script='setup.py',
     ),
     wheel = True,
-    config_settings = {"--global-option": ["--python-tag", "py36.py37"]}
+    wheel_config_settings = {"--global-option": ["--python-tag", "py36.py37"]}
 )
 
 python_library(

@@ -17,15 +17,16 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
 from pants.backend.python.target_types import (
-    ConfigSettingsField,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
+    SDistConfigSettingsField,
     SDistField,
     SetupPyCommandsField,
+    WheelConfigSettingsField,
     WheelField,
 )
 from pants.backend.python.util_rules.dists import DistBuildRequest, DistBuildResult, distutils_repr
@@ -306,7 +307,8 @@ class RunSetupPyRequest:
     chroot: SetupPyChroot
     wheel: bool
     sdist: bool
-    config_settings: FrozenDict[str, tuple[str, ...]]
+    wheel_config_settings: FrozenDict[str, tuple[str, ...]]
+    sdist_config_settings: FrozenDict[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -387,9 +389,11 @@ async def package_python_dist(
         SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
     )
 
-    wheel = exported_target.target.get(WheelField).value
-    sdist = exported_target.target.get(SDistField).value
-    config_settings = exported_target.target.get(ConfigSettingsField).value or FrozenDict()
+    dist_tgt = exported_target.target
+    wheel = dist_tgt.get(WheelField).value
+    sdist = dist_tgt.get(SDistField).value
+    wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
+    sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
 
     # TODO: When the deprecated SetupPyCommandsField is removed, delete everything from here...
     commands = exported_target.target.get(SetupPyCommandsField).value or ()
@@ -397,15 +401,28 @@ async def package_python_dist(
         if commands:
             # Override with the legacy commands mechanism.
             validate_commands(commands)
-            wheel = "bdist_wheel" in commands
-            sdist = "sdist" in commands
-            config_settings = FrozenDict(
-                {
-                    "--global-option": tuple(
-                        cmd for cmd in commands if cmd not in {"bdist_wheel", "sdist"}
-                    )
-                }
-            )
+            # The original commands might have some options scoped to bdist_wheel and others
+            # scoped to sdist, and possibly some unscoped ones preceeding both. E.g.,
+            # ["--unscoped", "bdist_wheel", "--scoped-to-bdist", "sdist", "--scoped-to-sdist"]
+            # We untangle this as best we can.
+            wheel_cmds: list[str] = []
+            sdist_cmds: list[str] = []
+            scoped_cmds = None  # Will point to one of the above, as we enter its scope.
+            for cmd in commands:
+                if cmd == "bdist_wheel":
+                    wheel = True
+                    scoped_cmds = wheel_cmds
+                elif cmd == "sdist":
+                    sdist = True
+                    scoped_cmds = sdist_cmds
+                elif scoped_cmds:
+                    scoped_cmds.append(cmd)
+                else:
+                    # Unscoped, so use in both.
+                    wheel_cmds.append(cmd)
+                    sdist_cmds.append(cmd)
+            wheel_config_settings = FrozenDict({"--global-option": tuple(wheel_cmds)})
+            sdist_config_settings = FrozenDict({"--global-option": tuple(sdist_cmds)})
         # ... to here, delete the else branch below, and dedent the remaining code appropriately.
         # We may then want to validate that at least one of wheel or sdist is True.
         # Send to benjy for code review.
@@ -418,7 +435,8 @@ async def package_python_dist(
                 chroot,
                 wheel,
                 sdist,
-                config_settings,
+                wheel_config_settings,
+                sdist_config_settings,
             ),
         )
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
@@ -476,7 +494,8 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             input=prefixed_chroot,
             working_directory=working_directory,
             target_address_spec=req.exported_target.target.address.spec,
-            config_settings=req.config_settings,
+            wheel_config_settings=req.wheel_config_settings,
+            sdist_config_settings=req.sdist_config_settings,
         ),
     )
 

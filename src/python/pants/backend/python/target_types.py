@@ -1010,8 +1010,15 @@ class ConfigSettingsField(DictStringToStringSequenceField):
     to an as-yet-nonexistent "DictStringToStringOrStringSequenceField".
     """
 
-    alias = "config_settings"
-    help = "PEP-517 config settings to pass to the build backend."
+
+class WheelConfigSettingsField(ConfigSettingsField):
+    alias = "wheel_config_settings"
+    help = "PEP-517 config settings to pass to the build backend when building a wheel."
+
+
+class SDistConfigSettingsField(ConfigSettingsField):
+    alias = "sdist_config_settings"
+    help = "PEP-517 config settings to pass to the build backend when building an sdist."
 
 
 class SetupPyCommandsField(StringSequenceField):
@@ -1039,7 +1046,8 @@ class PythonDistribution(Target):
         PythonProvidesField,
         WheelField,
         SDistField,
-        ConfigSettingsField,
+        WheelConfigSettingsField,
+        SDistConfigSettingsField,
         SetupPyCommandsField,
     )
     help = (
