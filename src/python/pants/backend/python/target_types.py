@@ -972,7 +972,59 @@ class ResolvePythonDistributionEntryPointsRequest:
         assert self.entry_points_field or self.provides_field
 
 
+class WheelField(BoolField):
+    alias = "wheel"
+    default = True
+    help = "Whether to build a wheel for the distribution."
+
+
+class SDistField(BoolField):
+    alias = "sdist"
+    default = True
+    help = "Whether to build an sdist for the distribution."
+
+
+class ConfigSettingsField(DictStringToStringSequenceField):
+    """Values for config_settings (see https://www.python.org/dev/peps/pep-0517/#config-settings).
+
+    NOTE: PEP-517 appears to be ill-defined wrt value types in config_settings. It mentions that:
+
+    - Build backends may assign any semantics they like to this dictionary, i.e., the backend
+      decides what the value types it accepts are.
+
+    - Build frontends should support string values, and may also support other mechanisms
+      (apparently meaning other types).
+
+    Presumably, a well-behaved frontend is supposed to work with any backend, but it cannot
+    do so without knowledge of what types each backend expects in the config_settings values,
+    as it has to set those values.
+
+    See a similar discussion in the context of Pip: https://github.com/pypa/pip/issues/5771 .
+
+    In practice, the backend we currently care about, setuptools.build_meta, expects a
+    dict with one key, --global-option, whose value is a sequence of cmd-line setup options.
+    It ignores all other keys.  So, to accommodate setuptools, the type of this field is
+    DictStringToStringSequenceField, and hopefully other backends we may encounter in the future
+    can work with this too.  If we need to handle values that can be strings or string sequences,
+    as demonstrated in the example in PEP-517, then we will need to change this field's type
+    to an as-yet-nonexistent "DictStringToStringOrStringSequenceField".
+    """
+
+
+class WheelConfigSettingsField(ConfigSettingsField):
+    alias = "wheel_config_settings"
+    help = "PEP-517 config settings to pass to the build backend when building a wheel."
+
+
+class SDistConfigSettingsField(ConfigSettingsField):
+    alias = "sdist_config_settings"
+    help = "PEP-517 config settings to pass to the build backend when building an sdist."
+
+
 class SetupPyCommandsField(StringSequenceField):
+    removal_version = "2.9.0.dev0"
+    removal_hint = "Set the boolean `wheel` and/or `sdist` fields instead."
+
     alias = "setup_py_commands"
     expected_type_help = (
         "an iterable of string commands to invoke setup.py with, or "
@@ -992,6 +1044,10 @@ class PythonDistribution(Target):
         PythonDistributionDependencies,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
+        WheelField,
+        SDistField,
+        WheelConfigSettingsField,
+        SDistConfigSettingsField,
         SetupPyCommandsField,
     )
     help = (
