@@ -15,6 +15,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
   "pants.backend.experimental.docker",
+  "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.python",
   "internal_plugins.releases",
@@ -44,12 +45,6 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
-]
-
-build_ignore.add = [
-  # Disable Go targets because the Go backend is experimental (as it is under active development),
-  # and thus is not enabled by default.
-  "/testprojects/src/go/**",
 ]
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
