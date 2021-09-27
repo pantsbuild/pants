@@ -8,8 +8,8 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
-    compile,
     build_go_pkg,
+    compile,
     external_module,
     go_mod,
     go_pkg,
