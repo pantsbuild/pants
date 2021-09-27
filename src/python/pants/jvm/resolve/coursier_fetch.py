@@ -521,14 +521,15 @@ class MaterializedClasspath:
             directory for the process input `Digest`.
         """
 
-        def maybe_add_prefix(file_name: str) -> str:
+        return ":".join(self._reified_filenames(root))
+
+    def _reified_filenames(self, root: Optional[str] = None) -> Iterable[str]:
+        for file_name in self.file_names:
             if self.prefix is not None:
                 file_name = os.path.join(self.prefix, file_name)
             if root is not None:
                 file_name = os.path.join(root, file_name)
-            return file_name
-
-        return ":".join(maybe_add_prefix(file_name) for file_name in self.file_names)
+            yield file_name
 
 
 @rule(level=LogLevel.DEBUG)
