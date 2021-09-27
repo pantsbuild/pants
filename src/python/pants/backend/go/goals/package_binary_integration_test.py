@@ -14,15 +14,17 @@ from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
+    compile,
     external_module,
     go_mod,
     go_pkg,
     import_analysis,
+    link,
     sdk,
 )
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -30,23 +32,26 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         target_types=[GoBinary, GoPackage, GoModule],
         rules=[
-            *external_tool.rules(),
             *assembly.rules(),
+            *compile.rules(),
             *source_files.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),
             *build_go_pkg.rules(),
             *go_pkg.rules(),
             *go_mod.rules(),
+            *link.rules(),
             *target_type_rules.rules(),
             *external_module.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:

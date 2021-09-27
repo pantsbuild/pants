@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import ProcessResult
@@ -49,6 +50,7 @@ class AssemblyPostCompilationRequest:
 @rule
 async def setup_assembly_pre_compilation(
     request: AssemblyPreCompilationRequest,
+    goroot: GoRoot,
 ) -> AssemblyPreCompilation:
     # From Go tooling comments:
     #
@@ -68,7 +70,7 @@ async def setup_assembly_pre_compilation(
                 "tool",
                 "asm",
                 "-I",
-                "go/pkg/include",
+                str(PurePath(goroot.path, "pkg", "include")),
                 "-gensymabis",
                 "-o",
                 "symabis",
@@ -93,7 +95,7 @@ async def setup_assembly_pre_compilation(
                     "tool",
                     "asm",
                     "-I",
-                    "go/pkg/include",
+                    str(PurePath(goroot.path, "pkg", "include")),
                     "-o",
                     f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
                     f"./{request.source_files_subpath}/{s_file}",

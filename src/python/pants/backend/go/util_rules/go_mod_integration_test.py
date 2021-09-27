@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
+
+from __future__ import annotations
+
+from textwrap import dedent
 
 import pytest
 
@@ -29,7 +32,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModule],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -37,8 +40,14 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/pkg/foo.go": "package pkg\n",
-            "foo/go.mod": "module go.example.com/foo\ngo 1.16\nrequire github.com/golang/protobuf v1.4.2\n",
-            "foo/go.sum": textwrap.dedent(
+            "foo/go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                require github.com/golang/protobuf v1.4.2
+                """
+            ),
+            "foo/go.sum": dedent(
                 """\
                 github.com/golang/protobuf v1.4.0-rc.1/go.mod h1:ceaxUfeHdC40wWswd/P6IGgMaK3YpKi5j83Wpe3EHw8=
                 github.com/golang/protobuf v1.4.0-rc.1.0.20200221234624-67d41d38c208/go.mod h1:xKAWHe0F5eneWXFV3EuXVDTCmh+JuBKY0li0aMyXATA=
@@ -68,7 +77,7 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
         ResolvedGoModule, [ResolveGoModuleRequest(Address("foo", target_name="mod"))]
     )
     assert resolved_go_module.import_path == "go.example.com/foo"
-    assert resolved_go_module.minimum_go_version == "1.16"
+    assert resolved_go_module.minimum_go_version == "1.17"
     assert len(resolved_go_module.modules) > 0
     found_protobuf_module = False
     for module_descriptor in resolved_go_module.modules:

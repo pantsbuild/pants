@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import ijson
 
-from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
@@ -42,7 +41,6 @@ async def determine_go_std_lib_imports() -> GoStdLibImports:
         GoSdkProcess(
             command=("list", "-json", "std"),
             description="Ask Go for its available import paths",
-            absolutify_goroot=False,
         ),
     )
     result = {}
@@ -68,7 +66,7 @@ class GatheredImports:
 
 @rule
 async def generate_import_config(
-    request: GatherImportsRequest, stdlib_imports: GoStdLibImports, goroot: GoRoot
+    request: GatherImportsRequest, stdlib_imports: GoStdLibImports
 ) -> GatheredImports:
     import_config_digests: dict[str, tuple[str, Digest]] = {}
     for pkg in request.packages:
@@ -84,7 +82,6 @@ async def generate_import_config(
         import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
 
     if request.include_stdlib:
-        pkg_digests.add(goroot.digest)
         import_config.extend(
             f"packagefile {import_path}={os.path.normpath(static_file_path)}"
             for import_path, static_file_path in stdlib_imports.items()

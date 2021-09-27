@@ -8,7 +8,7 @@ from pants.backend.go.target_types import GoModule, GoPackage
 from pants.backend.go.util_rules import go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.build_graph.address import Address
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -17,7 +17,6 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *external_tool.rules(),
             *source_files.rules(),
             *go_mod.rules(),
             *go_pkg.rules(),
@@ -26,7 +25,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModule],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -37,7 +36,8 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
             "foo/go.mod": textwrap.dedent(
                 """\
                 module go.example.com/foo
-                go 1.16"""
+                go 1.17
+                """
             ),
             "foo/go.sum": "",
             "foo/pkg/BUILD": "go_package()\n",

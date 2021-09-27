@@ -16,7 +16,7 @@ from pants.backend.go.target_types import GoSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -65,19 +65,14 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((source_files_snapshot.digest, goroot.digest)),
-    )
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-l" if setup_request.check_only else "-w",
         *source_files_snapshot.files,
     )
-
     process = Process(
         argv=argv,
-        input_digest=input_digest,
+        input_digest=source_files_snapshot.digest,
         output_files=source_files_snapshot.files,
         description=f"Run gofmt on {pluralize(len(source_files_snapshot.files), 'file')}.",
         level=LogLevel.DEBUG,

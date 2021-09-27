@@ -10,6 +10,7 @@ from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoP
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
+    compile,
     external_module,
     go_mod,
     go_pkg,
@@ -17,7 +18,7 @@ from pants.backend.go.util_rules import (
     sdk,
 )
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -27,11 +28,11 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *external_tool.rules(),
             *source_files.rules(),
             *sdk.rules(),
             *assembly.rules(),
             *build_go_pkg.rules(),
+            *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
             *go_pkg.rules(),
@@ -41,7 +42,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModule, GoExternalPackageTarget],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -51,7 +52,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "go.mod": dedent(
                 """\
                 module example.com/assembly
-                go 1.16
+                go 1.17
                 """
             ),
             "main.go": dedent(

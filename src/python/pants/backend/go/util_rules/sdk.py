@@ -24,15 +24,10 @@ class GoSdkProcess:
     working_dir: str | None = None
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
-    # TODO: Remove when Goroot comes from user PATH, rather than being installed.
-    absolutify_goroot: bool = True
 
 
 @rule
 async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: BashBinary) -> Process:
-    # TODO: Use `goroot.path` when Goroot comes from user PATH, rather than being installed.
-    #  For now, that would break working_dir support.
-    goroot_val = '"$(/bin/pwd)/go"' if request.absolutify_goroot else "./go"
     working_dir_cmd = f"cd '{request.working_dir}'" if request.working_dir else ""
 
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
@@ -42,25 +37,21 @@ async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: Bash
         "__run_go.sh",
         textwrap.dedent(
             f"""\
-            export GOROOT={goroot_val}
+            export GOROOT={goroot.path}
             export GOPATH="$(/bin/pwd)/gopath"
             export GOCACHE="$(/bin/pwd)/cache"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             {working_dir_cmd}
-            exec "${{GOROOT}}/bin/go" {' '.join(shlex.quote(arg) for arg in request.command)}
+            exec "{goroot.path}/bin/go" {' '.join(shlex.quote(arg) for arg in request.command)}
             """
         ).encode("utf-8"),
     )
 
     script_digest = await Get(Digest, CreateDigest([go_run_script]))
-    input_root_digest = await Get(
-        Digest,
-        MergeDigests([goroot.digest, script_digest, request.input_digest]),
-    )
-
+    input_digest = await Get(Digest, MergeDigests([script_digest, request.input_digest]))
     return Process(
         argv=[bash.path, go_run_script.path],
-        input_digest=input_root_digest,
+        input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,

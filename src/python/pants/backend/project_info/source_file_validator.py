@@ -97,37 +97,37 @@ class SourceFileValidation(Subsystem):
     @classmethod
     def register_options(cls, register):
         schema_help = textwrap.dedent(
+            """\
+            Config schema is as follows:
+
+                {
+                  'required_matches': {
+                    'path_pattern1': [content_pattern1, content_pattern2],
+                    'path_pattern2': [content_pattern1, content_pattern3],
+                    ...
+                  },
+                  'path_patterns': [
+                    {
+                      'name': path_pattern1',
+                      'pattern': <path regex pattern>,
+                      'inverted': True|False (defaults to False),
+                      'content_encoding': <encoding> (defaults to utf8)
+                    },
+                    ...
+                  ],
+                  'content_patterns': [
+                    {
+                      'name': 'content_pattern1',
+                      'pattern': <content regex pattern>,
+                      'inverted': True|False (defaults to False)
+                    }
+                    ...
+                  ]
+                }
+
+            Meaning: if a file matches some path pattern, its content must match all
+            the corresponding content patterns.
             """
-        Config schema is as follows:
-
-        {
-          'path_patterns': [
-            {
-              'name': path_pattern1',
-              'pattern': <path regex pattern>,
-              'inverted': True|False (defaults to False),
-              'content_encoding': <encoding> (defaults to utf8)
-            },
-            ...
-          ],
-          'content_patterns': [
-            {
-              'name': 'content_pattern1',
-              'pattern': <content regex pattern>,
-              'inverted': True|False (defaults to False)
-            }
-            ...
-          ],
-          'required_matches': {
-            'path_pattern1': [content_pattern1, content_pattern2],
-            'path_pattern2': [content_pattern1, content_pattern3],
-            ...
-          }
-        }
-
-        Meaning: if a file matches some path pattern, its content must match all
-        the corresponding content patterns.
-        """
         )
         super().register_options(register)
         register("--config", type=dict, fromfile=True, help=schema_help)

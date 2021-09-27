@@ -13,7 +13,7 @@ from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import GoBinary, GoPackage
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -26,7 +26,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[GoBinary, GoPackage],
         rules=[
-            *external_tool.rules(),
             *fmt.rules(),
             *gofmt_rules(),
             *source_files.rules(),
@@ -85,8 +84,7 @@ def run_gofmt(
     *,
     extra_args: list[str] | None = None,
 ) -> tuple[tuple[LintResult, ...], FmtResult]:
-    args = ["--backend-packages=pants.backend.go", *(extra_args or ())]
-    rule_runner.set_options(args)
+    rule_runner.set_options(extra_args or (), env_inherit={"PATH"})
     field_sets = [GofmtFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [GofmtRequest(field_sets)])
     input_sources = rule_runner.request(
