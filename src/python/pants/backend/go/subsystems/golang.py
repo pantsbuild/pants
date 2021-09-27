@@ -157,7 +157,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
 
     bulleted_list_sep = "\n  * "
     invalid_versions_str = bulleted_list_sep.join(
-        f"{path}, {version}" for path, version in sorted(invalid_versions)
+        f"{path}: {version}" for path, version in sorted(invalid_versions)
     )
     raise BinaryNotFoundError(
         "Cannot find a `go` binary with the expected version of "
