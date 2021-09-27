@@ -395,38 +395,14 @@ async def package_python_dist(
     wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
 
-    # TODO: When the deprecated SetupPyCommandsField is removed, delete everything from here...
-    commands = exported_target.target.get(SetupPyCommandsField).value or ()
-    if commands or wheel or sdist:
-        if commands:
-            # Override with the legacy commands mechanism.
-            validate_commands(commands)
-            # The original commands might have some options scoped to bdist_wheel and others
-            # scoped to sdist, and possibly some unscoped ones preceeding both. E.g.,
-            # ["--unscoped", "bdist_wheel", "--scoped-to-bdist", "sdist", "--scoped-to-sdist"]
-            # We untangle this as best we can.
-            wheel_cmds: list[str] = []
-            sdist_cmds: list[str] = []
-            scoped_cmds = None  # Will point to one of the above, as we enter its scope.
-            for cmd in commands:
-                if cmd == "bdist_wheel":
-                    wheel = True
-                    scoped_cmds = wheel_cmds
-                elif cmd == "sdist":
-                    sdist = True
-                    scoped_cmds = sdist_cmds
-                elif scoped_cmds:
-                    scoped_cmds.append(cmd)
-                else:
-                    # Unscoped, so use in both.
-                    wheel_cmds.append(cmd)
-                    sdist_cmds.append(cmd)
-            wheel_config_settings = FrozenDict({"--global-option": tuple(wheel_cmds)})
-            sdist_config_settings = FrozenDict({"--global-option": tuple(sdist_cmds)})
-        # ... to here, delete the else branch below, and dedent the remaining code appropriately.
-        # We may then want to validate that at least one of wheel or sdist is True.
-        # Send to benjy for code review.
+    # TODO: Delete the next three lines in 2.9.0.dev0.
+    commands = dist_tgt.get(SetupPyCommandsField).value or ()
+    if commands:
+        wheel, sdist, wheel_config_settings, sdist_config_settings = _override_from_legacy_commands(
+            commands
+        )
 
+    if wheel or sdist:
         setup_py_result = await Get(
             RunSetupPyResult,
             RunSetupPyRequest(
@@ -453,6 +429,40 @@ async def package_python_dist(
         dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
         return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
+
+
+# Returns overridden values for wheel, sdist, wheel_config_settings, sdist_config_settings
+# TODO: Delete this in 2.9.dev0.
+def _override_from_legacy_commands(
+    commands: tuple[str, ...]
+) -> tuple[bool, bool, FrozenDict[str, tuple[str, ...]], FrozenDict[str, tuple[str, ...]]]:
+    # Override with the legacy commands mechanism.
+    validate_commands(commands)
+    wheel = False
+    sdist = False
+    # The original commands might have some options scoped to bdist_wheel and others
+    # scoped to sdist, and possibly some unscoped ones preceeding both. E.g.,
+    # ["--unscoped", "bdist_wheel", "--scoped-to-bdist", "sdist", "--scoped-to-sdist"]
+    # We untangle this as best we can.
+    wheel_cmds: list[str] = []
+    sdist_cmds: list[str] = []
+    scoped_cmds = None  # Will point to one of the above, as we enter its scope.
+    for cmd in commands:
+        if cmd == "bdist_wheel":
+            wheel = True
+            scoped_cmds = wheel_cmds
+        elif cmd == "sdist":
+            sdist = True
+            scoped_cmds = sdist_cmds
+        elif scoped_cmds:
+            scoped_cmds.append(cmd)
+        else:
+            # Unscoped, so use in both.
+            wheel_cmds.append(cmd)
+            sdist_cmds.append(cmd)
+    wheel_config_settings = FrozenDict({"--global-option": tuple(wheel_cmds)})
+    sdist_config_settings = FrozenDict({"--global-option": tuple(sdist_cmds)})
+    return wheel, sdist, wheel_config_settings, sdist_config_settings
 
 
 SETUP_BOILERPLATE = """

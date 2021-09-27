@@ -974,13 +974,13 @@ class ResolvePythonDistributionEntryPointsRequest:
 
 class WheelField(BoolField):
     alias = "wheel"
-    default = False
+    default = True
     help = "Whether to build a wheel for the distribution."
 
 
 class SDistField(BoolField):
     alias = "sdist"
-    default = False
+    default = True
     help = "Whether to build an sdist for the distribution."
 
 

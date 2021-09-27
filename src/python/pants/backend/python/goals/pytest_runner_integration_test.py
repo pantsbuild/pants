@@ -547,7 +547,7 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
                     name="dist",
                     dependencies=[":lib"],
                     provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
-                    wheel=True,
+                    sdist=False,
                 )
 
                 # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.

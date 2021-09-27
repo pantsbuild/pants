@@ -184,7 +184,7 @@ def test_local_dist() -> None:
                 name="dist",
                 dependencies=[":lib"],
                 provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
-                wheel=True,
+                sdist=False,
             )
 
             pex_binary(

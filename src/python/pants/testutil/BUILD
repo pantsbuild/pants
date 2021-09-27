@@ -9,8 +9,6 @@ python_distribution(
     ':rule_runner',
     ':py_typed',
   ],
-  wheel=True,
-  sdist=True,
   wheel_config_settings={"--global-option": ["--python-tag", "py37.py38.py39"]},
   provides=setup_py(
     name='pantsbuild.pants.testutil',
