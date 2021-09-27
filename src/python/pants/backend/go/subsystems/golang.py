@@ -103,11 +103,25 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             "that it is discoverable via `[golang].go_search_paths`."
         )
 
+    # `go env GOVERSION` does not work in earlier Go versions (like 1.15), so we must run
+    # `go version` and `go env GOROOT` to calculate both the version and GOROOT.
+    version_results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                (binary_path.path, "version"),
+                description=f"Determine Go version for {binary_path.path}",
+                level=LogLevel.DEBUG,
+                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            ),
+        )
+        for binary_path in all_go_binary_paths.paths
+    )
     env_results = await MultiGet(
         Get(
             ProcessResult,
             Process(
-                (binary_path.path, "env", "GOVERSION", "GOROOT"),
+                (binary_path.path, "env", "GOROOT"),
                 description=f"Determine Go version and GOROOT for {binary_path.path}",
                 level=LogLevel.DEBUG,
                 cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
@@ -118,9 +132,20 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
     )
 
     invalid_versions = []
-    for binary_path, env_result in zip(all_go_binary_paths.paths, env_results):
-        _raw_version, goroot = env_result.stdout.decode("utf-8").strip().splitlines()
-        version = _raw_version[2:]
+    for binary_path, version_result, env_result in zip(
+        all_go_binary_paths.paths, version_results, env_results
+    ):
+        goroot = env_result.stdout.decode("utf-8").strip()
+        try:
+            version = version_result.stdout.decode("utf-8").split()[2][2:]
+        except IndexError:
+            raise AssertionError(
+                f"Failed to parse `go version` output for {binary_path}. Please open a bug at "
+                f"https://github.com/pantsbuild/pants/issues/new/choose with the below data."
+                f"\n\n"
+                f"{version_result}"
+            )
+
         if version == golang_subsystem.expected_version:
             return GoRoot(goroot)
 
