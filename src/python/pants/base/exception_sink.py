@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import datetime
 import faulthandler
 import logging
@@ -10,7 +12,8 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator
+from pathlib import Path
+from typing import Callable, Iterator
 
 import psutil
 import setproctitle
@@ -19,6 +22,21 @@ from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.osutil import Pid
 
 logger = logging.getLogger(__name__)
+
+
+_UNHANDLED_EXCEPTION_LOG_FORMAT = """\
+Exception caught: ({exception_type}){backtrace}
+Exception message: {exception_message}{maybe_newline}
+"""
+
+# NB: This includes a trailing newline, but no leading newline.
+_EXCEPTION_LOG_FORMAT = """\
+timestamp: {timestamp}
+process title: {process_title}
+sys.argv: {args}
+pid: {pid}
+{message}
+"""
 
 
 class SignalHandler:
@@ -33,7 +51,7 @@ class SignalHandler:
     """
 
     @property
-    def signal_handler_mapping(self) -> Dict[signal.Signals, Callable]:
+    def signal_handler_mapping(self) -> dict[signal.Signals, Callable]:
         """A dict mapping (signal number) -> (a method handling the signal)."""
         # Could use an enum here, but we never end up doing any matching on the specific signal value,
         # instead just iterating over the registered signals to set handlers, so a dict is probably
@@ -135,9 +153,7 @@ class ExceptionSink:
 
     def __new__(cls, *args, **kwargs):
         raise TypeError(
-            "Instances of {} are not allowed to be constructed! Call install() instead.".format(
-                cls.__name__
-            )
+            f"Instances of {cls.__name__} are not allowed to be constructed! Call install() instead."
         )
 
     class ExceptionSinkError(Exception):
@@ -148,7 +164,7 @@ class ExceptionSink:
         """Setup global state for this process, such as signal handlers and sys.excepthook."""
 
         # Set the log location for writing logs before bootstrap options are parsed.
-        cls.reset_log_location(log_location)
+        cls.reset_log_location(Path(log_location))
 
         # NB: Mutate process-global state!
         sys.excepthook = ExceptionSink.log_exception
@@ -158,7 +174,7 @@ class ExceptionSink:
 
     # All reset_* methods are ~idempotent!
     @classmethod
-    def reset_log_location(cls, new_log_location: str) -> None:
+    def reset_log_location(cls, new_log_location: Path) -> None:
         """Re-acquire file handles to error logs based in the new location.
 
         Class state:
@@ -175,27 +191,23 @@ class ExceptionSink:
         # additional safety of re-acquiring file descriptors each time (and erroring out early if the
         # location is no longer writable).
         try:
-            safe_mkdir(new_log_location)
+            safe_mkdir(new_log_location.as_posix())
         except Exception as e:
             raise cls.ExceptionSinkError(
-                "The provided log location path at '{}' is not writable or could not be created: {}.".format(
-                    new_log_location, str(e)
-                ),
-                e,
+                f"The provided log location path at '{new_log_location.as_posix()}' is not writable or could not be created: {e!r}."
             )
 
         pid = os.getpid()
+
         pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
         shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
         assert pid_specific_log_path != shared_log_path
         try:
-            pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
-            shared_error_stream = safe_open(shared_log_path, mode="a")
+            pid_specific_error_stream = safe_open(pid_specific_log_path.as_posix(), mode="w")
+            shared_error_stream = safe_open(shared_log_path.as_posix(), mode="a")
         except Exception as e:
             raise cls.ExceptionSinkError(
-                "Error opening fatal error log streams for log location '{}': {}".format(
-                    new_log_location, str(e)
-                )
+                f"Error opening fatal error log streams for log location '{new_log_location.as_posix()}': {e!r}"
             )
 
         # NB: mutate process-global state!
@@ -213,17 +225,17 @@ class ExceptionSink:
         cls._shared_error_fileobj = shared_error_stream
 
     @classmethod
-    def exceptions_log_path(cls, for_pid=None, in_dir=None):
+    def exceptions_log_path(cls, for_pid=None, in_dir: Path | None = None) -> Path:
         """Get the path to either the shared or pid-specific fatal errors log file."""
         if for_pid is None:
             intermediate_filename_component = ""
         else:
             assert isinstance(for_pid, Pid)
-            intermediate_filename_component = ".{}".format(for_pid)
+            intermediate_filename_component = f".{for_pid}"
         in_dir = in_dir or cls._log_dir
-        return os.path.join(
-            in_dir, ".pids", "exceptions{}.log".format(intermediate_filename_component)
-        )
+        if not in_dir:
+            raise cls.ExceptionSinkError("Exception in_dir not set properly.")
+        return in_dir / ".pids" / f"exceptions{intermediate_filename_component}.log"
 
     @classmethod
     def _log_exception(cls, msg):
@@ -239,9 +251,7 @@ class ExceptionSink:
             cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
         except Exception as e:
             logger.error(
-                "Error logging the message '{}' to the pid-specific file handle for {} at pid {}:\n{}".format(
-                    msg, cls._log_dir, pid, e
-                )
+                f"Error logging the message '{msg}' to the pid-specific file handle for {cls._log_dir} at pid {pid}:\n{e!r}"
             )
 
         # Write to the shared log.
@@ -251,9 +261,7 @@ class ExceptionSink:
             cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
         except Exception as e:
             logger.error(
-                "Error logging the message '{}' to the shared file handle for {} at pid {}:\n{}".format(
-                    msg, cls._log_dir, pid, e
-                )
+                f"Error logging the message '{msg}' to the shared file handle for {cls._log_dir} at pid {pid}:\n{e!r}"
             )
 
     @classmethod
@@ -321,15 +329,6 @@ class ExceptionSink:
     def _iso_timestamp_for_now(cls):
         return datetime.datetime.now().isoformat()
 
-    # NB: This includes a trailing newline, but no leading newline.
-    _EXCEPTION_LOG_FORMAT = """\
-timestamp: {timestamp}
-process title: {process_title}
-sys.argv: {args}
-pid: {pid}
-{message}
-"""
-
     @classmethod
     def _format_exception_message(cls, msg, pid):
         return cls._EXCEPTION_LOG_FORMAT.format(
@@ -345,20 +344,15 @@ pid: {pid}
     @classmethod
     def _format_traceback(cls, traceback_lines, should_print_backtrace):
         if should_print_backtrace:
-            traceback_string = "\n{}".format("".join(traceback_lines))
+            traceback_string = f"\n{''.join(traceback_lines)}"
         else:
-            traceback_string = " {}".format(cls._traceback_omitted_default_text)
+            traceback_string = f" {cls._traceback_omitted_default_text}"
         return traceback_string
-
-    _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
-Exception caught: ({exception_type}){backtrace}
-Exception message: {exception_message}{maybe_newline}
-"""
 
     @classmethod
     def _format_unhandled_exception_log(cls, exc, tb, add_newline, should_print_backtrace):
         exc_type = type(exc)
-        exception_full_name = "{}.{}".format(exc_type.__module__, exc_type.__name__)
+        exception_full_name = f"{exc_type.__module__}.{exc_type.__name__}"
         exception_message = str(exc) if exc else "(no message)"
         maybe_newline = "\n" if add_newline else ""
         return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
@@ -391,7 +385,7 @@ Exception message: {exception_message}{maybe_newline}
             )
             cls._log_exception(exception_log_entry)
         except Exception as e:
-            extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
+            extra_err_msg = f"Additional error logging unhandled exception {exc}: {e!r}"
             logger.error(extra_err_msg)
 
         # The rust logger implementation will have its own stacktrace, but at import time, we want

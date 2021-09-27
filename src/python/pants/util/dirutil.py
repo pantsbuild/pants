@@ -250,7 +250,7 @@ def safe_rmtree(directory: str) -> None:
         shutil.rmtree(directory, ignore_errors=True)
 
 
-def safe_open(filename, *args, **kwargs):
+def safe_open(filename: str, *args, **kwargs):
     """Open a file safely, ensuring that its directory exists.
 
     :API: public

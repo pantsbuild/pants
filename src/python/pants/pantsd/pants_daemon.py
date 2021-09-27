@@ -145,7 +145,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             fd.close()
 
             # Open the new.
-            temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
+            temp_fd = safe_open(log_path.as_posix(), "w") if writable else open(os.devnull)
             os.dup2(temp_fd.fileno(), fileno)
             setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr

@@ -4,12 +4,12 @@
 import os
 import re
 import unittest.mock
+from pathlib import Path
 
 import pytest
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.platform import Platform
-from pants.util.contextutil import temporary_dir
 from pants.util.enums import match
 
 pytestmark = pytest.mark.platform_specific_behavior
@@ -23,18 +23,17 @@ def _gen_sink_subclass():
     return AnonymousSink
 
 
-def test_reset_log_location():
+def test_reset_log_location(tmp_path: Path) -> None:
     sink = _gen_sink_subclass()
-    with temporary_dir() as tmpdir:
-        sink.reset_log_location(tmpdir)
-        assert tmpdir == sink._log_dir
+    sink.reset_log_location(tmp_path)
+    assert tmp_path == sink._log_dir
 
 
 def test_set_invalid_log_location():
     assert os.path.isdir("/does/not/exist") is False
     sink = _gen_sink_subclass()
     with pytest.raises(ExceptionSink.ExceptionSinkError) as exc:
-        sink.reset_log_location("/does/not/exist")
+        sink.reset_log_location(Path("/does/not/exist"))
     assert (
         "The provided log location path at '/does/not/exist' is not writable or could not be "
         "created"
@@ -45,7 +44,7 @@ def test_set_invalid_log_location():
     # for its log files with safe_open(). This may be due to differences in the filesystems.
     # TODO: figure out why we error out at different points here!
     with pytest.raises(ExceptionSink.ExceptionSinkError) as exc:
-        sink.reset_log_location("/")
+        sink.reset_log_location(Path("/"))
     err_str = {
         Platform.macos_arm64: (
             "The provided log location path at '/' is not writable or could not be created: "
@@ -63,53 +62,51 @@ def test_set_invalid_log_location():
     assert match(Platform.current, err_str) in str(exc.value)
 
 
-def test_log_exception():
+def test_log_exception(tmp_path: Path) -> None:
     sink = _gen_sink_subclass()
 
-    with temporary_dir() as tmpdir:
-        # Check that tmpdir exists, and log an exception into that directory.
-        sink.reset_log_location(tmpdir)
-        pid = os.getpid()
+    # Check that tmpdir exists, and log an exception into that directory.
+    sink.reset_log_location(tmp_path)
+    pid = os.getpid()
 
-        with unittest.mock.patch(
-            "setproctitle.getproctitle", autospec=True, spec_set=True
-        ) as getproctitle_mock:
-            getproctitle_mock.return_value = "fake_title"
-            sink._log_exception("XXX")
-            getproctitle_mock.assert_called_once()
+    with unittest.mock.patch(
+        "setproctitle.getproctitle", autospec=True, spec_set=True
+    ) as getproctitle_mock:
+        getproctitle_mock.return_value = "fake_title"
+        sink._log_exception("XXX")
+        getproctitle_mock.assert_called_once()
 
-        # This should have created two log files, one specific to the current pid.
-        assert os.listdir(tmpdir) == [".pids"]
+    # This should have created two log files, one specific to the current pid.
+    assert [pt.as_posix() for pt in tmp_path.iterdir()] == [".pids"]
 
-        cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
-        assert os.path.isfile(cur_process_error_log_path) is True
+    cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmp_path)
+    assert cur_process_error_log_path.is_file() is True
 
-        shared_error_log_path = ExceptionSink.exceptions_log_path(in_dir=tmpdir)
-        assert os.path.isfile(shared_error_log_path) is True
-        # Ensure we're creating two separate files.
-        assert cur_process_error_log_path != shared_error_log_path
+    shared_error_log_path = ExceptionSink.exceptions_log_path(in_dir=tmp_path)
+    assert shared_error_log_path.is_file() is True
+    # Ensure we're creating two separate files.
+    assert cur_process_error_log_path != shared_error_log_path
 
-        # We only logged a single error, so the files should both contain only that single log entry.
-        err_rx = f"""\
+    # We only logged a single error, so the files should both contain only that single log entry.
+    err_rx = f"""\
 timestamp: ([^\n]+)
 process title: fake_title
 sys.argv: ([^\n]+)
 pid: {pid}
 XXX
 """
-        with open(cur_process_error_log_path, "r") as cur_pid_file:
-            assert bool(re.search(err_rx, cur_pid_file.read()))
-        with open(shared_error_log_path, "r") as shared_log_file:
-            assert bool(re.search(err_rx, shared_log_file.read()))
+    with open(cur_process_error_log_path, "r") as cur_pid_file:
+        assert bool(re.search(err_rx, cur_pid_file.read()))
+    with open(shared_error_log_path, "r") as shared_log_file:
+        assert bool(re.search(err_rx, shared_log_file.read()))
 
 
-def test_backup_logging_on_fatal_error(caplog):
+def test_backup_logging_on_fatal_error(caplog, tmp_path: Path) -> None:
     sink = _gen_sink_subclass()
-    with temporary_dir() as tmpdir:
-        sink.reset_log_location(tmpdir)
-        with unittest.mock.patch.object(sink, "_try_write_with_flush", autospec=sink) as mock_write:
-            mock_write.side_effect = ExceptionSink.ExceptionSinkError("fake write failure")
-            sink._log_exception("XXX")
+    sink.reset_log_location(tmp_path)
+    with unittest.mock.patch.object(sink, "_try_write_with_flush", autospec=sink) as mock_write:
+        mock_write.side_effect = ExceptionSink.ExceptionSinkError("fake write failure")
+        sink._log_exception("XXX")
 
     errors = [record for record in caplog.records if record.levelname == "ERROR"]
     assert len(errors) == 2

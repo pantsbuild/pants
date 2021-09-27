@@ -1,26 +1,26 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import re
 import signal
 import time
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Tuple
 
 import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.testutil.pants_integration_test import run_pants_with_workdir
-from pants.util.dirutil import read_file
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 pytestmark = pytest.mark.platform_specific_behavior
 
 
-def lifecycle_stub_cmdline() -> List[str]:
+def lifecycle_stub_cmdline() -> list[str]:
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
     testproject_backend_src_dir = os.path.join(
         get_buildroot(), "testprojects/pants-plugins/src/python"
@@ -37,12 +37,12 @@ def lifecycle_stub_cmdline() -> List[str]:
     return lifecycle_stub_cmdline
 
 
-def get_log_file_paths(workdir: str, pid: int) -> Tuple[str, str]:
-    pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=workdir)
-    assert os.path.isfile(pid_specific_log_file)
+def get_log_file_paths(workdir: str, pid: int) -> tuple[Path, Path]:
+    pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=Path(workdir))
+    assert pid_specific_log_file.is_file() is True
 
-    shared_log_file = ExceptionSink.exceptions_log_path(in_dir=workdir)
-    assert os.path.isfile(shared_log_file)
+    shared_log_file = ExceptionSink.exceptions_log_path(in_dir=Path(workdir))
+    assert shared_log_file.is_file() is True
 
     assert pid_specific_log_file != shared_log_file
 
@@ -101,10 +101,10 @@ def test_logs_unhandled_exception(tmp_path: Path) -> None:
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
     assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(pid_specific_log_file), namespace=directory
+        pants_run.pid, pid_specific_log_file.read_text(), namespace=directory
     )
     assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(shared_log_file), namespace=directory
+        pants_run.pid, shared_log_file.read_text(), namespace=directory
     )
 
 
@@ -129,8 +129,8 @@ def test_fails_ctrl_c_on_import(tmp_path: Path) -> None:
     )
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
-    assert "" == read_file(pid_specific_log_file)
-    assert "" == read_file(shared_log_file)
+    assert "" == pid_specific_log_file.read_text()
+    assert "" == shared_log_file.read_text()
 
 
 def test_fails_ctrl_c_ffi(tmp_path: Path) -> None:
@@ -143,8 +143,8 @@ def test_fails_ctrl_c_ffi(tmp_path: Path) -> None:
     assert "KeyboardInterrupt: ctrl-c interrupted execution during FFI" in pants_run.stderr
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
-    assert "" == read_file(pid_specific_log_file)
-    assert "" == read_file(shared_log_file)
+    assert "" == pid_specific_log_file.read_text()
+    assert "" == shared_log_file.read_text()
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
@@ -167,9 +167,11 @@ class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
                 # Check that the logs show a graceful exit by signal.
                 pid_specific_log_file, shared_log_file = get_log_file_paths(ctx.workdir, pid)
                 assert_graceful_signal_log_matches(
-                    pid, signum, signame, read_file(pid_specific_log_file)
+                    pid, signum, signame, pid_specific_log_file.read_text()
                 )
-                assert_graceful_signal_log_matches(pid, signum, signame, read_file(shared_log_file))
+                assert_graceful_signal_log_matches(
+                    pid, signum, signame, shared_log_file.read_text()
+                )
 
     def test_dumps_traceback_on_sigabrt(self):
         # SIGABRT sends a traceback to the log file for the current process thanks to
@@ -189,7 +191,7 @@ Fatal Python error: Aborted
 Thread [^\n]+ \\(most recent call first\\):
 """
 
-            assert re.search(regex_str, read_file(pid_specific_log_file))
+            assert re.search(regex_str, pid_specific_log_file.read_text())
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-            self.assertEqual("", read_file(shared_log_file))
+            assert "" == shared_log_file.read_text()
