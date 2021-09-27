@@ -18,6 +18,7 @@ from pants.backend.go.util_rules import (
     go_mod,
     go_pkg,
     import_analysis,
+    link,
     sdk,
 )
 from pants.build_graph.address import Address
@@ -40,6 +41,7 @@ def rule_runner() -> RuleRunner:
             *build_go_pkg.rules(),
             *go_pkg.rules(),
             *go_mod.rules(),
+            *link.rules(),
             *target_type_rules.rules(),
             *external_module.rules(),
             *sdk.rules(),

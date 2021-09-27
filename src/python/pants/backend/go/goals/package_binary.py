@@ -11,7 +11,7 @@ from pants.backend.go.util_rules.go_pkg import (
     is_third_party_package_target,
 )
 from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
-from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
     BuiltPackage,
@@ -21,7 +21,6 @@ from pants.core.goals.package import (
 )
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
@@ -79,27 +78,20 @@ async def package_go_binary(
     )
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
-    result = await Get(
-        ProcessResult,
-        GoSdkProcess(
+
+    binary = await Get(
+        LinkedGoBinary,
+        LinkGoBinaryRequest(
             input_digest=input_digest,
-            command=(
-                "tool",
-                "link",
-                "-importcfg",
-                "./importcfg",
-                "-o",
-                f"./{output_filename.name}",
-                "-buildmode=exe",  # seen in `go build -x` output
-                "./__pkg__.a",
-            ),
+            archives=("./__pkg__.a",),
+            import_config_path="./importcfg",
+            output_filename=f"./{output_filename.name}",
             description="Link Go binary.",
-            output_files=(f"./{output_filename.name}",),
         ),
     )
 
     renamed_output_digest = await Get(
-        Digest, AddPrefix(result.output_digest, str(output_filename.parent))
+        Digest, AddPrefix(binary.output_digest, str(output_filename.parent))
     )
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
