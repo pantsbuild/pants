@@ -28,8 +28,8 @@ class DockerRegistry(StringField):
     default = DEFAULT_REGISTRY
     help = (
         "Address to Docker registry to use for the built image.\n\n"
-        "This is either the domain name with optional port to your registry, or an registry alias "
-        "prefix with `@` to a registry configuration listed in the [docker].registries "
+        "This is either the domain name with optional port for your registry, or a registry alias "
+        "prefixed with `@` for a registry configuration listed in the [docker].registries "
         "configuration section.\n"
         + dedent(
             """\
@@ -52,7 +52,7 @@ class DockerRegistry(StringField):
             """
         )
         + (
-            "The above example show three valid `registry` options using an alias to a configured "
+            "The above example shows three valid `registry` options: using an alias to a configured "
             "registry, the address to a registry verbatim in the BUILD file, and last explicitly no "
             "registry even if there is a default registry configured."
         )
