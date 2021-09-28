@@ -29,7 +29,8 @@ class DockerRegistry(StringField):
     help = (
         "Address to Docker registry to use for the built image.\n\n"
         "This is either the domain name with optional port to your registry, or an registry alias "
-        "to a registry configuration listed in the [docker].registries configuration section."
+        "prefix with `@` to a registry configuration listed in the [docker].registries "
+        "configuration section.\n"
         + dedent(
             """\
             Example:
@@ -39,13 +40,13 @@ class DockerRegistry(StringField):
                 registries = "@registries.yaml"
 
                 # registries.yaml
-                my-registry:
+                my-registry-alias:
                     address = "myregistrydomain:port"
                     default = False  # optional
 
                 # example/BUILD
                 docker_image(
-                    registry = "my-registry" | "myregistrydomain:port" | ""
+                    registry = "@my-registry-alias" | "myregistrydomain:port" | ""
                 )
 
             """
