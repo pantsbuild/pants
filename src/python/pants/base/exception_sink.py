@@ -193,7 +193,7 @@ pid: {pid}
             safe_mkdir(new_log_location.as_posix())
         except Exception as e:
             raise cls.ExceptionSinkError(
-                f"The provided log location path at '{new_log_location.as_posix()}' is not writable or could not be created: {e!r}."
+                f"The provided log location path at '{new_log_location.as_posix()}' is not writable or could not be created: {e}."
             )
 
         pid = os.getpid()

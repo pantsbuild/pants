@@ -77,7 +77,7 @@ def test_log_exception(tmp_path: Path) -> None:
         getproctitle_mock.assert_called_once()
 
     # This should have created two log files, one specific to the current pid.
-    assert [pt.as_posix() for pt in tmp_path.iterdir()] == [".pids"]
+    assert [pt.name for pt in tmp_path.iterdir()] == [".pids"]
 
     cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmp_path)
     assert cur_process_error_log_path.is_file() is True
