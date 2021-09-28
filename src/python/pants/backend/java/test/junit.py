@@ -10,7 +10,15 @@ from pants.backend.java.target_types import JavaTestSourceField
 from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -52,6 +60,7 @@ async def run_junit_test(
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(t.address for t in transitive_targets.closure)
     )
+
     lockfile = await Get(
         CoursierResolvedLockfile,
         CoursierLockfileForTargetRequest(Targets(transitive_targets.closure)),
@@ -104,31 +113,41 @@ async def run_junit_test(
             )
         ),
     )
-    proc = Process(
-        argv=[
-            *jdk_setup.args(bash, [materialized_classpath.classpath_arg()]),
-            "org.junit.platform.console.ConsoleLauncher",
-            "--classpath",
-            usercp_relpath,
-            "--scan-class-path",
-            usercp_relpath,
-            *junit.options.args,
-        ],
-        input_digest=merged_digest,
-        description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
-        level=LogLevel.DEBUG,
-    )
+
+    reports_dir_prefix = "__reports_dir"
+    reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
     process_result = await Get(
         FallibleProcessResult,
-        Process,
-        proc,
+        Process(
+            argv=[
+                *jdk_setup.args(bash, [materialized_classpath.classpath_arg()]),
+                "org.junit.platform.console.ConsoleLauncher",
+                "--classpath",
+                usercp_relpath,
+                "--scan-class-path",
+                usercp_relpath,
+                "--reports-dir",
+                reports_dir,
+                *junit.options.args,
+            ],
+            input_digest=merged_digest,
+            output_directories=(reports_dir,),
+            description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
+            level=LogLevel.DEBUG,
+        ),
     )
+
+    xml_result_subset = await Get(
+        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+    )
+    xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
         process_result,
         address=field_set.address,
         output_setting=test_subsystem.output,
+        xml_results=xml_results,
     )
 
 
