@@ -24,21 +24,6 @@ from pants.util.osutil import Pid
 logger = logging.getLogger(__name__)
 
 
-_UNHANDLED_EXCEPTION_LOG_FORMAT = """\
-Exception caught: ({exception_type}){backtrace}
-Exception message: {exception_message}{maybe_newline}
-"""
-
-# NB: This includes a trailing newline, but no leading newline.
-_EXCEPTION_LOG_FORMAT = """\
-timestamp: {timestamp}
-process title: {process_title}
-sys.argv: {args}
-pid: {pid}
-{message}
-"""
-
-
 class SignalHandler:
     """A specification for how to handle a fixed set of nonfatal signals.
 
@@ -150,6 +135,20 @@ class ExceptionSink:
     # (and lets faulthandler figure out signal safety).
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
+
+    _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
+Exception caught: ({exception_type}){backtrace}
+Exception message: {exception_message}{maybe_newline}
+"""
+
+    # NB: This includes a trailing newline, but no leading newline.
+    _EXCEPTION_LOG_FORMAT = """\
+timestamp: {timestamp}
+process title: {process_title}
+sys.argv: {args}
+pid: {pid}
+{message}
+"""
 
     def __new__(cls, *args, **kwargs):
         raise TypeError(
