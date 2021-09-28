@@ -559,17 +559,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--colors",
-            type=bool,
-            default=sys.stdout.isatty(),
-            help=(
-                "Whether Pants should use colors in output or not. This may also impact whether "
-                "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
-                "whether the output destination supports color."
-            ),
-        )
-
-        register(
             "--ignore-warnings",
             type=list,
             member_type=str,
@@ -1314,6 +1303,16 @@ class GlobalOptions(Subsystem):
         # global-scope options, for convenience.
         cls.register_bootstrap_options(register)
 
+        register(
+            "--colors",
+            type=bool,
+            default=sys.stdout.isatty(),
+            help=(
+                "Whether Pants should use colors in output or not. This may also impact whether "
+                "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
+                "whether the output destination supports color."
+            ),
+        )
         register(
             "--dynamic-ui",
             type=bool,
