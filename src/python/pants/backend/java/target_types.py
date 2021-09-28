@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -12,6 +13,7 @@ from pants.engine.target import (
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
+    StringField,
     Target,
     generate_file_level_targets,
 )
@@ -139,6 +141,25 @@ async def generate_targets_from_java_sources(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=False,
+    )
+
+
+# Things for JARs
+#
+
+
+class JvmMainClassAddress(StringField):
+    alias = "main"
+    required = True
+    help = "Address of the main Java class for this JAR."
+
+
+class FatJar(Target):
+    alias = "fat_jar"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, OutputPathField, JvmMainClassAddress)
+    help = (
+        "A `jar` file that continains the compiled source code, as well as all of its "
+        "dependencies."
     )
 
 

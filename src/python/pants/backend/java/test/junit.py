@@ -93,6 +93,7 @@ async def run_junit_test(
             ),
         ),
     )
+
     transitive_user_classfiles = await MultiGet(
         Get(CompiledClassfiles, CompileJavaSourceRequest(component=t)) for t in coarsened_targets
     )
