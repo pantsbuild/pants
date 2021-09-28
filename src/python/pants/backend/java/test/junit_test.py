@@ -438,6 +438,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
+    assert test_result.xml_results and test_result.xml_results.files
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
@@ -493,6 +494,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 1
+    assert test_result.xml_results and test_result.xml_results.files
     assert (
         re.search(
             r"Finished:.*?testHello.*?Exception: org.opentest4j.AssertionFailedError: expected: <Goodbye!> but was: <Hello!>",

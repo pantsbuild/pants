@@ -23,6 +23,8 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
+    JunitXMLDir,
+    JunitXMLDirSource,
     RuntimePackageDependenciesField,
     TestDebugRequest,
     TestExtraEnv,
@@ -37,7 +39,6 @@ from pants.engine.collection import Collection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestSubset,
@@ -257,7 +258,7 @@ async def setup_pytest_for_target(
     output_files = []
 
     results_file_name = None
-    if pytest.options.junit_xml_dir and not request.is_debug:
+    if not request.is_debug:
         results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
         add_opts.extend(
             (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.options.junit_family}")
@@ -339,12 +340,7 @@ async def run_python_test(
         xml_results_snapshot = await Get(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
-        if xml_results_snapshot.files == (setup.results_file_name,):
-            xml_results_snapshot = await Get(
-                Snapshot,
-                AddPrefix(xml_results_snapshot.digest, pytest.options.junit_xml_dir),
-            )
-        else:
+        if xml_results_snapshot.files != (setup.results_file_name,):
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
     extra_output_snapshot = await Get(
         Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
@@ -369,6 +365,17 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     return TestDebugRequest(
         InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)
     )
+
+
+@union
+class PytestJunitXMLDirSource:
+    pass
+
+
+@rule
+def builtin_xml_dir_source(_: PytestJunitXMLDirSource, pytest: PyTest) -> JunitXMLDir:
+    # TODO: When this field access is removed, the entire union should be as well.
+    return JunitXMLDir(pytest.options.junit_xml_dir)
 
 
 # -----------------------------------------------------------------------------------------
@@ -398,4 +405,5 @@ def rules():
         *collect_rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+        UnionRule(JunitXMLDirSource, PytestJunitXMLDirSource),
     ]
