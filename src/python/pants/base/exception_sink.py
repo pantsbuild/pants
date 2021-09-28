@@ -206,7 +206,7 @@ pid: {pid}
             shared_error_stream = safe_open(shared_log_path.as_posix(), mode="a")
         except Exception as e:
             raise cls.ExceptionSinkError(
-                f"Error opening fatal error log streams for log location '{new_log_location.as_posix()}': {e!r}"
+                f"Error opening fatal error log streams for log location '{new_log_location.as_posix()}': {e}"
             )
 
         # NB: mutate process-global state!
