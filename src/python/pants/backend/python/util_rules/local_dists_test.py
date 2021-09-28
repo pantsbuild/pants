@@ -52,7 +52,7 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
                 name = "dist",
                 dependencies = [":foo"],
                 provides = python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
-                setup_py_commands = ["bdist_wheel",]
+                sdist = False
             )
             """
             ),

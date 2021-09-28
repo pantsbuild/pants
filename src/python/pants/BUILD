@@ -20,7 +20,7 @@ python_distribution(
   ],
   # Because we have native code, this will cause the wheel to use whatever the ABI is for the
   # interpreter used to run setup.py, e.g. `cp36m-macosx_10_15_x86_64`.
-  setup_py_commands=["bdist_wheel"],
+  sdist = False,
   provides=setup_py(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',

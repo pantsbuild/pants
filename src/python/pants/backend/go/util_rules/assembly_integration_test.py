@@ -10,6 +10,7 @@ from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoP
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
+    compile,
     external_module,
     go_mod,
     go_pkg,
@@ -31,6 +32,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *assembly.rules(),
             *build_go_pkg.rules(),
+            *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
             *go_pkg.rules(),

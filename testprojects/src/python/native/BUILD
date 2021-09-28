@@ -16,7 +16,8 @@ python_distribution(
         version = "2.3.4",
         setup_script='setup.py',
     ),
-    setup_py_commands = ["bdist_wheel",],
+    sdist = False,
+    wheel_config_settings = {"--global-option": ["--python-tag", "py36.py37"]}
 )
 
 python_library(
