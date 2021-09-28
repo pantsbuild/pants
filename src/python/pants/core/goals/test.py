@@ -312,7 +312,7 @@ class TestSubsystem(GoalSubsystem):
             advanced=True,
             help=(
                 "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run."
+                "that dir for each test run that supports producing them."
             ),
         )
         register(
