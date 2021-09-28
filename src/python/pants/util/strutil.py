@@ -154,6 +154,16 @@ def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
     ]
 
 
+def bullet_list(elements: Iterable[str]) -> str:
+    """Format the elements with `  * ` as a prefix and a newline separating each element.
+
+    Callers should normally use `\n\n` before and after this so that the bullets ."""
+    if not elements:
+        return ""
+    sep = "\n  * "
+    return f"  * {sep.join(elements)}"
+
+
 def first_paragraph(s: str) -> str:
     """Get the first paragraph, where paragraphs are separated by blank lines."""
     lines = s.splitlines()
