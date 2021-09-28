@@ -518,6 +518,13 @@ def mock_console(
     stdin_content: bytes | str | None = None,
 ) -> Iterator[Tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    colors = (
+        options_bootstrapper.full_options_for_scopes(
+            [GlobalOptions.get_scope_info()], allow_unknown_options=True
+        )
+        .for_global_scope()
+        .colors
+    )
 
     @contextmanager
     def stdin_context():
@@ -539,7 +546,7 @@ def mock_console(
         # NB: We yield a Console without overriding the destination argument, because we have
         # already done a sys.std* level replacement. The replacement is necessary in order for
         # InteractiveProcess to have native file handles to interact with.
-        yield Console(use_colors=global_bootstrap_options.colors), StdioReader(
+        yield Console(use_colors=colors), StdioReader(
             _stdout=Path(stdout.name), _stderr=Path(stderr.name)
         )
 
