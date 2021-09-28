@@ -52,7 +52,11 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
         [
             TerraformModule(
                 {
-                    TerraformModuleSources.alias: ("versions.tf",),
+                    TerraformModuleSources.alias: (
+                        "versions.tf",
+                        ".terraform/**",
+                        ".terraform.lock.hcl",
+                    ),
                 },
                 generator_addr.create_generated("src/tf/foo"),
             ),
@@ -61,6 +65,8 @@ def test_target_generation(rule_runner: RuleRunner) -> None:
                     TerraformModuleSources.alias: (
                         "outputs.tf",
                         "versions.tf",
+                        ".terraform/**",
+                        ".terraform.lock.hcl",
                     ),
                 },
                 generator_addr.create_generated("src/tf"),
