@@ -119,8 +119,12 @@ class PyTest(PythonToolBase):
             metavar="<DIR>",
             default=None,
             advanced=True,
-            help="Specifying a directory causes Junit XML result files to be emitted under "
-            "that dir for each test run.",
+            removal_version="2.9.0.dev0",
+            removal_hint="Moved to `[test] xml_dir`.",
+            help=(
+                "Specifying a directory causes Junit XML result files to be emitted under "
+                "that dir for each test run."
+            ),
         )
         register(
             "--junit-family",
@@ -128,7 +132,7 @@ class PyTest(PythonToolBase):
             default="xunit2",
             advanced=True,
             help=(
-                "The format of the generated XML file. See "
+                "The format of generated junit XML files. See "
                 "https://docs.pytest.org/en/latest/reference.html#confval-junit_family."
             ),
         )

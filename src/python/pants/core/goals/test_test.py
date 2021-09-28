@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from functools import partial
@@ -16,11 +18,14 @@ from pants.backend.python.target_types_rules import rules as python_target_type_
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
+    BuiltinXMLDirSource,
     BuiltPackageDependencies,
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
+    JunitXMLDir,
+    JunitXMLDirSource,
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
@@ -133,6 +138,7 @@ def run_test_rule(
     targets: List[Target],
     debug: bool = False,
     use_coverage: bool = False,
+    xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
     include_sources: bool = True,
     valid_targets: bool = True,
@@ -141,13 +147,18 @@ def run_test_rule(
         TestSubsystem,
         debug=debug,
         use_coverage=use_coverage,
+        xml_dir=xml_dir,
         output=output,
         extra_env_vars=[],
     )
     interactive_runner = InteractiveRunner(rule_runner.scheduler)
     workspace = Workspace(rule_runner.scheduler)
     union_membership = UnionMembership(
-        {TestFieldSet: [field_set], CoverageDataCollection: [MockCoverageDataCollection]}
+        {
+            TestFieldSet: [field_set],
+            CoverageDataCollection: [MockCoverageDataCollection],
+            JunitXMLDirSource: [BuiltinXMLDirSource],
+        }
     )
 
     def mock_find_valid_field_sets(
@@ -174,6 +185,9 @@ def run_test_rule(
             coverage_insufficient=False, report=f"Ran coverage on {addresses}"
         )
         return CoverageReports(reports=(console_report,))
+
+    def mock_xml_dir(_: BuiltinXMLDirSource) -> JunitXMLDir:
+        return JunitXMLDir(xml_dir)
 
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Test = run_rule_with_mocks(
@@ -214,6 +228,11 @@ def run_test_rule(
                     output_type=Digest,
                     input_type=MergeDigests,
                     mock=lambda _: EMPTY_DIGEST,
+                ),
+                MockGet(
+                    output_type=JunitXMLDir,
+                    input_type=JunitXMLDirSource,
+                    mock=mock_xml_dir,
                 ),
                 MockGet(
                     output_type=CoverageReports,
@@ -281,6 +300,20 @@ def test_debug_target(rule_runner: RuleRunner) -> None:
         debug=True,
     )
     assert exit_code == 0
+
+
+def test_xml_dir(rule_runner: RuleRunner) -> None:
+    xml_dir = "dist/test-results"
+    addr1 = Address("", target_name="t1")
+    addr2 = Address("", target_name="t2")
+    exit_code, stderr = run_test_rule(
+        rule_runner,
+        field_set=SuccessfulFieldSet,
+        targets=[make_target(addr1), make_target(addr2)],
+        xml_dir=xml_dir,
+    )
+    assert exit_code == 0
+    assert f"Wrote test XML to `{xml_dir}`" in stderr
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:

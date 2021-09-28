@@ -38,7 +38,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     Targets,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -305,6 +305,17 @@ class TestSubsystem(GoalSubsystem):
             ),
         )
         register(
+            "--xml-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help=(
+                "Specifying a directory causes Junit XML result files to be emitted under "
+                "that dir for each test run."
+            ),
+        )
+        register(
             "--extra-env-vars",
             type=list,
             member_type=str,
@@ -345,6 +356,25 @@ class Test(Goal):
     subsystem_cls = TestSubsystem
 
     __test__ = False
+
+
+@union
+class JunitXMLDirSource:
+    """A pre-deprecated union to support reading the XML directory from its previous location."""
+
+
+@dataclass(frozen=True)
+class JunitXMLDir:
+    directory: str | None
+
+
+class BuiltinXMLDirSource:
+    pass
+
+
+@rule
+def builtin_xml_dir_source(_: BuiltinXMLDirSource, test_subsystem: TestSubsystem) -> JunitXMLDir:
+    return JunitXMLDir(test_subsystem.options.xml_dir)
 
 
 @goal_rule
@@ -411,11 +441,22 @@ async def run_tests(
                 path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    merged_xml_results = await Get(
-        Digest,
-        MergeDigests(result.xml_results.digest for result in results if result.xml_results),
+    # TODO: After the deprecation of the `[pytest] junit_xml_dir` option, this should directly use
+    # `[test] xml_dir` instead.
+    xml_dir_results = await MultiGet(
+        Get(JunitXMLDir, JunitXMLDirSource, source_cls())
+        for source_cls in union_membership.get(JunitXMLDirSource)
     )
-    workspace.write_digest(merged_xml_results)
+    for xml_dir_result in xml_dir_results:
+        xml_dir = xml_dir_result.directory
+        if not xml_dir:
+            continue
+        merged_xml_results = await Get(
+            Digest,
+            MergeDigests(result.xml_results.digest for result in results if result.xml_results),
+        )
+        workspace.write_digest(merged_xml_results, path_prefix=xml_dir)
+        console.print_stderr(f"\nWrote test XML to `{xml_dir}`")
 
     if test_subsystem.use_coverage:
         # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
@@ -525,4 +566,7 @@ async def build_runtime_package_dependencies(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(JunitXMLDirSource, BuiltinXMLDirSource),
+    ]

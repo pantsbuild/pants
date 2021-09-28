@@ -128,6 +128,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         tgt,
         extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
+    assert result.xml_results is not None
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -307,21 +308,6 @@ def test_force(rule_runner: RuleRunner) -> None:
     result_two = run_pytest(rule_runner, tgt)
     assert result_one.exit_code == 0
     assert result_one is result_two
-
-
-def test_junit(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-junit-xml-dir=dist/test-results"])
-    assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
-    assert result.xml_results is not None
-    digest_contents = rule_runner.request(DigestContents, [result.xml_results.digest])
-    file = digest_contents[0]
-    assert file.path.startswith("dist/test-results")
-    assert b"pants_test.tests" in file.content
 
 
 def test_extra_output(rule_runner: RuleRunner) -> None:
