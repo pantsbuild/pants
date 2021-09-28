@@ -104,7 +104,9 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(process_result)
+    result = LintResult.from_fallible_process_result(
+        process_result, (fs.address for fs in request.field_sets)
+    )
     return LintResults([result], linter_name="Shellcheck")
 
 

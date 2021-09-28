@@ -85,6 +85,7 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
         result,
+        (fs.address for fs in partition.field_sets),
         partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
         report=report,
     )

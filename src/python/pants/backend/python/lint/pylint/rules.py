@@ -163,7 +163,9 @@ async def pylint_lint_partition(
         ),
     )
     return LintResult.from_fallible_process_result(
-        result, partition_description=str(sorted(str(c) for c in partition.interpreter_constraints))
+        result,
+        (fs.address for fs in partition.field_sets),
+        partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
     )
 
 

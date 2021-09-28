@@ -97,7 +97,9 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
         return LintResults([], linter_name="gofmt")
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    lint_result = LintResult.from_fallible_process_result(result)
+    lint_result = LintResult.from_fallible_process_result(
+        result, (fs.address for fs in request.field_sets)
+    )
     if lint_result.exit_code == 0 and lint_result.stdout.strip() != "":
         # Note: gofmt returns success even if it would have reformatted the files.
         # When this occurs, convert the LintResult into a failure.

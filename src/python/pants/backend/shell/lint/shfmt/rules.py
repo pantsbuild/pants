@@ -112,7 +112,14 @@ async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
         return LintResults([], linter_name="shfmt")
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults([LintResult.from_fallible_process_result(result)], linter_name="shfmt")
+    return LintResults(
+        [
+            LintResult.from_fallible_process_result(
+                result, (fs.address for fs in request.field_sets)
+            )
+        ],
+        linter_name="shfmt",
+    )
 
 
 def rules():

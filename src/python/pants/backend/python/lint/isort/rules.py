@@ -153,7 +153,13 @@ async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        [
+            LintResult.from_fallible_process_result(
+                result,
+                (fs.address for fs in request.field_sets),
+                strip_chroot_path=True,
+            )
+        ],
         linter_name="isort",
     )
 

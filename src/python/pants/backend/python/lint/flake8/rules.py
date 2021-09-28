@@ -82,6 +82,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
         result,
+        (fs.address for fs in partition.field_sets),
         partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
         report=report,
     )

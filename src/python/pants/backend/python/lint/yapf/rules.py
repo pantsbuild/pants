@@ -135,7 +135,11 @@ async def yapf_lint(request: YapfRequest, yapf: Yapf) -> LintResults:
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [LintResult.from_fallible_process_result(result)],
+        [
+            LintResult.from_fallible_process_result(
+                result, (fs.address for fs in request.field_sets)
+            )
+        ],
         linter_name="yapf",
     )
 

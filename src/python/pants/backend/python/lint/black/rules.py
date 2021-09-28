@@ -153,7 +153,11 @@ async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
     setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        [
+            LintResult.from_fallible_process_result(
+                result, (fs.address for fs in field_sets.field_sets), strip_chroot_path=True
+            )
+        ],
         linter_name="Black",
     )
 

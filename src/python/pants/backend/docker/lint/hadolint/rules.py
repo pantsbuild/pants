@@ -82,7 +82,12 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
         ),
     )
     return LintResults(
-        [LintResult.from_fallible_process_result(process_result)], linter_name="hadolint"
+        [
+            LintResult.from_fallible_process_result(
+                process_result, (fs.address for fs in request.field_sets)
+            )
+        ],
+        linter_name="hadolint",
     )
 
 

@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
+from pants.build_graph.address import Address
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
@@ -40,6 +41,7 @@ class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
+    addresses: tuple[Address, ...]
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
 
@@ -47,6 +49,7 @@ class LintResult(EngineAwareReturnType):
     def from_fallible_process_result(
         cls,
         process_result: FallibleProcessResult,
+        addresses: Iterable[Address],
         *,
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
@@ -59,12 +62,16 @@ class LintResult(EngineAwareReturnType):
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            addresses=tuple(addresses),
             partition_description=partition_description,
             report=report,
         )
 
     def metadata(self) -> Dict[str, Any]:
-        return {"partition": self.partition_description}
+        return {
+            "partition": self.partition_description,
+            "addresses": tuple(a.spec for a in self.addresses),
+        }
 
 
 @frozen_after_init
