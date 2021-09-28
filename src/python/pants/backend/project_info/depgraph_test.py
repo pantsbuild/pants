@@ -71,7 +71,8 @@ def test_depgraph_construction(rule_runner: RuleRunner) -> None:
 
     addresses = rule_runner.request(Addresses, [AddressSpecs([DescendantAddresses("")])])
     dep_graph = rule_runner.request(
-        DependencyGraph, [DependencyGraphRequest(addresses=addresses, transitive=True)]
+        DependencyGraph,
+        [DependencyGraphRequest(addresses=addresses, transitive=True, exclude_defaults=True)],
     )
     assert dep_graph == DependencyGraph(
         vertices=[

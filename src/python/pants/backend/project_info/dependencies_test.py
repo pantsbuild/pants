@@ -8,7 +8,6 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
-from pants.backend.project_info.depgraph import rules as depgraph_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -28,8 +27,7 @@ class SpecialDepsTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*rules(), *depgraph_rules()],
-        target_types=[PythonLibrary, PythonRequirementLibrary, SpecialDepsTarget],
+        rules=rules(), target_types=[PythonLibrary, PythonRequirementLibrary, SpecialDepsTarget]
     )
 
 

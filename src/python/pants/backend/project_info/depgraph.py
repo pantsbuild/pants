@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+import collections.abc
 import itertools
 import json
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from json import JSONEncoder
 from typing import Iterable
 
-from pants.backend.python.target_types import PythonRequirementsField
+from pkg_resources import Requirement
+
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
@@ -115,22 +117,37 @@ class DependencyGraph:
 
 
 class DependencyGraphJSONEncoder(JSONEncoder):
+    safe_to_str_types = (Requirement,)
+
     def default(self, o):
         if isinstance(o, DependencyGraph):
             return {"vertices": o.vertices, "edges": o.edges}
-        elif isinstance(o, Vertex):
+        if isinstance(o, Vertex):
             return {"id": o.id, "data": o.data}
-        elif isinstance(o, Edge):
+        if isinstance(o, Edge):
             return {"src_id": o.src_id, "dep_id": o.dep_id, "data": o.data}
-        elif isinstance(o, FrozenDict):
+        if isinstance(o, FrozenDict):
             return dict(o)  # Unfortunately, FrozenDict is not JSON serializable.
-        return super().default(o)
+        if is_dataclass(o):
+            return asdict(o)
+        if isinstance(o, collections.abc.Mapping):
+            return dict(o)
+        if isinstance(o, collections.abc.Sequence):
+            return list(o)
+        try:
+            return super().default(o)
+        except TypeError:
+            return str(o)
 
 
 @dataclass(frozen=True)
 class DependencyGraphRequest:
     addresses: Addresses
     transitive: bool
+    exclude_defaults: bool  # Whether to omit data values that match their defaults.
+
+
+_nothing = object()
 
 
 @rule
@@ -171,15 +188,13 @@ async def generate_graph(request: DependencyGraphRequest) -> DependencyGraph:
         addr = tgt.address
         vertex_data: dict = {
             "address": addr.spec,
-            "type": tgt.alias,
+            "target_type": tgt.alias,
+            **{
+                k.alias: v.value
+                for k, v in tgt.field_values.items()
+                if not (request.exclude_defaults and getattr(k, "default", _nothing) == v.value)
+            },
         }
-        # TODO: Code in project_info shouldn't import from, or know about, Python-specific fields.
-        #  We need a generic way to express "this target represents these 3rdparty dep coordinates".
-        if tgt.has_field(PythonRequirementsField):
-            vertex_data["requirements"] = tuple(
-                str(python_req) for python_req in tgt[PythonRequirementsField].value
-            )
-
         vertex = Vertex(tgt_id, vertex_data)
         vertices.append(vertex)
         vertices_by_tgt[tgt] = vertex
