@@ -12,6 +12,8 @@ from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 
+DEFAULT_REGISTRY = "<default>"
+
 
 @dataclass(frozen=True)
 class DockerRegistryOptions:
@@ -56,10 +58,10 @@ class DockerRegistries:
     def get(
         self, alias_or_address: str | None, implicit_options: bool = True
     ) -> DockerRegistryOptions | None:
-        if alias_or_address == "":
+        if not alias_or_address:
             return None
 
-        if alias_or_address is not None and alias_or_address in self.registries:
+        if alias_or_address in self.registries:
             return self.registries.get(alias_or_address)
 
         # The registries are expected to be very few, so this for loop is not that expensive.
@@ -70,16 +72,19 @@ class DockerRegistries:
             if registry.default:
                 default = registry
 
-        if alias_or_address:
-            if implicit_options:
-                return DockerRegistryOptions(address=alias_or_address)
+        if alias_or_address == DEFAULT_REGISTRY:
+            if default or implicit_options:
+                return default
+            else:
+                raise ValueError("There is no default Docker registry configured.")
 
-            raise ValueError(f"Unknown Docker registry: {alias_or_address}.")
-
-        if default or implicit_options:
-            return default
-
-        raise ValueError("There is no default Docker registry configured.")
+        if implicit_options:
+            return DockerRegistryOptions(address=alias_or_address)
+        else:
+            raise ValueError(
+                f"Unknown Docker registry: {alias_or_address}.\n\n"
+                "Use the [docker].registries configuration option to define custom registries."
+            )
 
 
 class DockerOptions(Subsystem):
@@ -91,25 +96,25 @@ class DockerOptions(Subsystem):
         registries_help = (
             dedent(
                 """\
-            Configure Docker registries. The schema for a registry entry is as follows:
+                Configure Docker registries. The schema for a registry entry is as follows:
 
-                {
-                    "registry-alias": {
-                        "address": "registry-domain:port",
-                        "default": bool,
-                    },
-                    ...
-                }
+                    {
+                        "registry-alias": {
+                            "address": "registry-domain:port",
+                            "default": bool,
+                        },
+                        ...
+                    }
 
-            """
+                """
             )
             + (
                 "Only one registry may be declared as the default registry. If a registry value "
                 "is not provided in a `docker_image` target, the address of the default registry "
                 "will be used, if any.\n"
                 "The `docker_image.registry` may be provided with either the registry address or "
-                "the registry alias, or `None` if the image should not be associated with a custom "
-                "registry."
+                'the registry alias, or the empty string `""` if the image should not be '
+                "associated with a custom registry."
             )
         )
         super().register_options(register)

@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
+
+from pants.backend.docker.subsystem import DEFAULT_REGISTRY
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
 
 
@@ -22,7 +25,37 @@ class DockerDependencies(Dependencies):
 
 class DockerRegistry(StringField):
     alias = "registry"
-    help = "Address to Docker registry to use for the built image."
+    default = DEFAULT_REGISTRY
+    help = (
+        "Address to Docker registry to use for the built image.\n\n"
+        "This is either the domain name with optional port to your registry, or an registry alias "
+        "to a registry configuration listed in the [docker].registries configuration section."
+        + dedent(
+            """\
+            Example:
+
+                # pants.toml
+                [docker]
+                registries = "@registries.yaml"
+
+                # registries.yaml
+                my-registry:
+                    address = "myregistrydomain:port"
+                    default = False  # optional
+
+                # example/BUILD
+                docker_image(
+                    registry = "my-registry" | "myregistrydomain:port" | ""
+                )
+
+            """
+        )
+        + (
+            "The above example show three valid `registry` options using an alias to a configured "
+            "registry, the address to a registry verbatim in the BUILD file, and last explicitly no "
+            "registry even if there is a default registry configured."
+        )
+    )
 
 
 class DockerImage(Target):
