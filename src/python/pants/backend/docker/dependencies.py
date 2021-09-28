@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.docker.parser import DockerfileInfo, DockerfileParseRequest
+from pants.backend.docker.parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerDependencies, DockerImageSources
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -28,7 +28,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     if not sources.value:
         return InjectedDependencies()
 
-    dockerfile = await Get(DockerfileInfo, DockerfileParseRequest(sources))
+    dockerfile = await Get(DockerfileInfo, DockerImageSources, sources)
     targets = await Get(
         Targets,
         UnparsedAddressInputs(

@@ -3,21 +3,109 @@
 
 from __future__ import annotations
 
-import re
+import pkgutil
 from dataclasses import dataclass
-from typing import Generator
-
-from dockerfile import Command, parse_string
+from pathlib import PurePath
 
 from pants.backend.docker.target_types import DockerImageSources
-from pants.engine.fs import DigestContents, PathGlobs
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.unions import UnionRule
+from pants.util.docutil import git_url
+
+
+class DockerfileParser(PythonToolRequirementsBase):
+    options_scope = "dockerfile-parser"
+    help = "Used to parse Dockerfile build specs to infer their dependencies."
+
+    default_version = "dockerfile==3.2.0"
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.docker", "dockerfile_lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/docker/dockerfile_lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
+
+
+class DockerfileParserLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = DockerfileParser.options_scope
+
+
+@rule
+def setup_lockfile_request(
+    _: DockerfileParserLockfileSentinel, dockerfile_parser: DockerfileParser
+) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(dockerfile_parser)
+
+
+@dataclass(frozen=True)
+class ParserSetup:
+    pex: VenvPex
+
+
+@rule
+async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
+    parser_script_content = pkgutil.get_data("pants.backend.docker", "dockerfile_parser.py")
+
+    # this check not needed?
+
+    # FileNotFoundError: [Errno 2] No such file or directory:
+    # '/private/var/folders/8j/../src/python/pants/backend/docker/dockerfile_parser.py'
+
+    # if not parser_script_content:
+    #    raise ValueError("Unable to find source to dockerfile_parser.py wrapper script.")
+
+    parser_content = FileContent(
+        path="__pants_df_parser.py",
+        content=parser_script_content,
+        is_executable=True,
+    )
+
+    parser_digest = await Get(Digest, CreateDigest([parser_content]))
+
+    parser_pex = await Get(
+        VenvPex,
+        PexRequest(
+            output_filename="dockerfile_parser.pex",
+            internal_only=True,
+            requirements=dockerfile_parser.pex_requirements(),
+            interpreter_constraints=dockerfile_parser.interpreter_constraints,
+            main=EntryPoint(PurePath(parser_content.path).stem),
+            sources=parser_digest,
+        ),
+    )
+
+    return ParserSetup(parser_pex)
 
 
 @dataclass(frozen=True)
 class DockerfileParseRequest:
-    sources: DockerImageSources
+    sources_digest: Digest
+    paths: tuple[str, ...]
+
+
+@rule
+async def setup_process_for_parse_dockerfile(
+    request: DockerfileParseRequest, parser: ParserSetup
+) -> Process:
+    process = await Get(
+        Process,
+        VenvPexProcess(
+            parser.pex,
+            argv=request.paths,
+            input_digest=request.sources_digest,
+            description="Parse Dockerfile.",
+        ),
+    )
+    return process
 
 
 @dataclass(frozen=True)
@@ -25,79 +113,23 @@ class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
 
 
-_pex_target_regexp = re.compile(
-    r"""
-    (?# optional path, one level with dot-separated parts)
-    (?:(?P<path>(?:\w[.0-9_-]?)+) /)?
-
-    (?# binary name, with .pex file extension)
-    (?P<name>(?:\w[.0-9_-]?)+) \.pex$
-    """,
-    re.VERBOSE,
-)
-
-
-@dataclass(frozen=True)
-class ParsedDockerfile:
-    commands: tuple[Command, ...]
-
-    @classmethod
-    def parse(cls, dockerfile_contents: str) -> "ParsedDockerfile":
-        return cls(parse_string(dockerfile_contents))
-
-    def get_all(self, command_name: str) -> Generator[Command, None, None]:
-        for command in self.commands:
-            if command.cmd.upper() == command_name:
-                yield command
-
-    @staticmethod
-    def translate_to_address(value: str) -> str | None:
-        # Translate something that resembles a packaged pex binary to its corresponding target
-        # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
-        pex = re.match(_pex_target_regexp, value)
-        if pex:
-            path = (pex.group("path") or "").replace(".", "/")
-            name = pex.group("name")
-            return ":".join([path, name])
-
-        return None
-
-    def copy_source_addresses(self) -> Generator[str, None, None]:
-        for copy in self.get_all("COPY"):
-            if copy.flags:
-                # Do not consider COPY --from=... instructions etc.
-                continue
-            # The last element of copy.value is the destination.
-            for source in copy.value[:-1]:
-                address = self.translate_to_address(source)
-                if address:
-                    yield address
-
-    def putative_target_addresses(self) -> tuple[str, ...]:
-        addresses: list[str] = []
-        addresses.extend(self.copy_source_addresses())
-        return tuple(addresses)
-
-
 @rule
-async def parse_dockerfile(
-    request: DockerfileParseRequest, global_options: GlobalOptions
-) -> DockerfileInfo:
-    if not request.sources.value:
-        return DockerfileInfo()
-
-    contents = await Get(
-        DigestContents,
-        PathGlobs,
-        request.sources.path_globs(global_options.options.files_not_found_behavior),
+async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources))
+    result = await Get(
+        ProcessResult,
+        DockerfileParseRequest(hydrated_sources.snapshot.digest, hydrated_sources.snapshot.files),
     )
 
-    parsed = ParsedDockerfile.parse(contents[0].content.decode())
+    putative_target_addresses = [line for line in result.stdout.decode("utf-8").split("\n") if line]
 
     return DockerfileInfo(
-        putative_target_addresses=parsed.putative_target_addresses(),
+        putative_target_addresses=putative_target_addresses,
     )
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(PythonToolLockfileSentinel, DockerfileParserLockfileSentinel),
+    )

@@ -26,6 +26,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.docker.parser import DockerfileParser
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,12 @@ def main() -> None:
             f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
             f"--terraform-hcl2-parser-interpreter-constraints={repr(TerraformHcl2Parser.default_interpreter_constraints)}",
             f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
+            # Dockerfile for Docker dependency inference
+            # "--backend-packages=+['pants.backend.experimental.docker']",
+            # f"--dockerfile-parser-version={DockerfileParser.default_version}",
+            # f"--dockerfile-parser-extra-requirements={repr(DockerfileParser.default_extra_requirements)}",
+            # f"--dockerfile-parser-interpreter-constraints={repr(DockerfileParser.default_interpreter_constraints)}",
+            # f"--dockerfile-parser-lockfile={DockerfileParser.default_lockfile_path}",
             # Run the goal.
             "generate-lockfiles",
         ],
