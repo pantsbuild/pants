@@ -52,7 +52,7 @@ class JunitTestTarget(Target):
 
 
 class JavaTestsGeneratorSourcesField(JavaGeneratorSources):
-    default = ("*Test.java",)
+    default = ("**/*Test.java",)
 
 
 class JunitTestsGeneratorTarget(Target):
@@ -109,7 +109,7 @@ class JavaSourceTarget(Target):
 
 
 class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
-    default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
+    default = ("**/*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
 
 
 class JavaSourcesGeneratorTarget(Target):
@@ -117,7 +117,7 @@ class JavaSourcesGeneratorTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JavaSourcesGeneratorSourcesField)
     help = (
         "Generate a `java_source` target for each file in the `sources` field (defaults to "
-        "all files named in the directory whose names end in `.java` except for those which "
+        "all files in or under the current directory whose names end in `.java` except for those which "
         "end in `Test.java`)."
     )
 
