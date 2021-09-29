@@ -135,11 +135,12 @@ async def setup_black(
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
-        return FmtResult.skip(formatter_name="Black")
+        return FmtResult.skip(field_sets.field_sets, formatter_name="Black")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
+        field_sets.field_sets,
         original_digest=setup.original_digest,
         formatter_name="Black",
         strip_chroot_path=True,

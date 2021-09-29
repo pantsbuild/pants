@@ -135,11 +135,12 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
-        return FmtResult.skip(formatter_name="isort")
+        return FmtResult.skip(request.field_sets, formatter_name="isort")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
+        request.field_sets,
         original_digest=setup.original_digest,
         formatter_name="isort",
         strip_chroot_path=True,

@@ -83,11 +83,11 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
     if gofmt.options.skip:
-        return FmtResult.skip(formatter_name="gofmt")
+        return FmtResult.skip(request.field_sets, formatter_name="gofmt")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="gofmt"
+        result, request.field_sets, original_digest=setup.original_digest, formatter_name="gofmt"
     )
 
 

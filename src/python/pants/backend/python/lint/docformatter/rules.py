@@ -103,11 +103,14 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
-        return FmtResult.skip(formatter_name="Docformatter")
+        return FmtResult.skip(request.field_sets, formatter_name="Docformatter")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="Docformatter"
+        result,
+        request.field_sets,
+        original_digest=setup.original_digest,
+        formatter_name="Docformatter",
     )
 
 

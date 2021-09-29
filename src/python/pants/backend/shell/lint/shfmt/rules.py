@@ -98,11 +98,11 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
     if shfmt.skip:
-        return FmtResult.skip(formatter_name="shfmt")
+        return FmtResult.skip(request.field_sets, formatter_name="shfmt")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="shfmt"
+        result, request.field_sets, original_digest=setup.original_digest, formatter_name="shfmt"
     )
 
 

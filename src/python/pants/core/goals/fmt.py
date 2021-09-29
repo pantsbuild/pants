@@ -6,8 +6,9 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Tuple, Type, TypeVar, cast
 
+from pants.build_graph.address import Address
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -15,7 +16,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Field, Target, Targets
+from pants.engine.target import Field, FieldSet, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
@@ -30,21 +31,24 @@ class FmtResult(EngineAwareReturnType):
     stdout: str
     stderr: str
     formatter_name: str
+    addresses: tuple[Address, ...]
 
     @classmethod
-    def skip(cls: Type[_F], *, formatter_name: str) -> _F:
+    def skip(cls: Type[_F], field_sets: Iterable[FieldSet], *, formatter_name: str) -> _F:
         return cls(
             input=EMPTY_DIGEST,
             output=EMPTY_DIGEST,
             stdout="",
             stderr="",
             formatter_name=formatter_name,
+            addresses=tuple(fs.address for fs in field_sets),
         )
 
     @classmethod
     def from_process_result(
         cls,
         process_result: ProcessResult,
+        field_sets: Iterable[FieldSet],
         *,
         original_digest: Digest,
         formatter_name: str,
@@ -59,6 +63,7 @@ class FmtResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             formatter_name=formatter_name,
+            addresses=tuple(fs.address for fs in field_sets),
         )
 
     @property
@@ -73,6 +78,11 @@ class FmtResult(EngineAwareReturnType):
     @property
     def did_change(self) -> bool:
         return self.output != self.input
+
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "addresses": tuple(a.spec for a in self.addresses),
+        }
 
     def level(self) -> Optional[LogLevel]:
         if self.skipped:

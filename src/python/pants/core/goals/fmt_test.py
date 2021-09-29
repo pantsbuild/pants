@@ -73,6 +73,7 @@ class FortranTargets(MockLanguageTargets):
                     stdout="",
                     stderr="",
                     formatter_name="FortranConditionallyDidChange",
+                    addresses=tuple(),
                 ),
             ),
             input=EMPTY_DIGEST,
@@ -92,8 +93,9 @@ class SmalltalkTargets(MockLanguageTargets):
                     stdout="",
                     stderr="",
                     formatter_name="SmalltalkDidNotChange",
+                    addresses=tuple(),
                 ),
-                FmtResult.skip(formatter_name="SmalltalkSkipped"),
+                FmtResult.skip([], formatter_name="SmalltalkSkipped"),
             ),
             input=EMPTY_DIGEST,
             output=result_digest,
@@ -114,6 +116,7 @@ class InvalidTargets(MockLanguageTargets):
                     stdout="",
                     stderr="",
                     formatter_name="InvalidFormatter",
+                    addresses=tuple(),
                 ),
             ),
             input=EMPTY_DIGEST,
@@ -284,7 +287,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
 
 
 def test_streaming_output_skip() -> None:
-    result = FmtResult.skip(formatter_name="formatter")
+    result = FmtResult.skip([], formatter_name="formatter")
     assert result.level() == LogLevel.DEBUG
     assert result.message() == "formatter skipped."
 
@@ -297,6 +300,7 @@ def test_streaming_output_changed() -> None:
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
+        addresses=tuple(),
     )
     assert result.level() == LogLevel.WARN
     assert result.message() == dedent(
@@ -316,6 +320,7 @@ def test_streaming_output_not_changed() -> None:
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
+        addresses=tuple(),
     )
     assert result.level() == LogLevel.INFO
     assert result.message() == dedent(

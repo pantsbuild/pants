@@ -106,11 +106,12 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(field_sets: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
-        return FmtResult.skip(formatter_name="Autoflake")
+        return FmtResult.skip(field_sets.field_sets, formatter_name="Autoflake")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
+        field_sets.field_sets,
         original_digest=setup.original_digest,
         formatter_name="Autoflake",
         strip_chroot_path=True,

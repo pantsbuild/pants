@@ -49,7 +49,7 @@ class TffmtRequest(TerraformFmtRequest):
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
     if tffmt.options.skip:
-        return FmtResult.skip(formatter_name="tffmt")
+        return FmtResult.skip(request.field_sets, formatter_name="tffmt")
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt",)))
     results = await MultiGet(
         Get(ProcessResult, TerraformProcess, process)
@@ -83,6 +83,7 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
         stdout=stdout_content,
         stderr=stderr_content,
         formatter_name="tffmt",
+        addresses=tuple(fs.address for fs in request.field_sets),
     )
     return fmt_result
 

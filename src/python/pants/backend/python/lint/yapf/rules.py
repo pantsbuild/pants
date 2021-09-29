@@ -118,11 +118,12 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
-        return FmtResult.skip(formatter_name="yapf")
+        return FmtResult.skip(request.field_sets, formatter_name="yapf")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
+        request.field_sets,
         original_digest=setup.original_digest,
         formatter_name="yapf",
     )
