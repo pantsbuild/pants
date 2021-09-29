@@ -1,6 +1,7 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::context::Context;
 use crate::core::Value;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
@@ -8,9 +9,9 @@ use crate::Failure;
 use crate::Types;
 
 use cpython::{PyDict, PyString, Python};
-use workunit_store::{ArtifactOutput, Level};
+use workunit_store::{ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue};
 
-pub struct EngineAwareReturnType {}
+pub struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
   pub fn level(value: &Value) -> Option<Level> {
@@ -34,38 +35,8 @@ impl EngineAwareReturnType {
       .ok()
   }
 
-  pub fn metadata(value: &Value) -> Option<Vec<(String, Value)>> {
-    let metadata_val = match externs::call_method(value, "metadata", &[]) {
-      Ok(value) => value,
-      Err(py_err) => {
-        let failure = Failure::from_py_err(py_err);
-        log::error!("Error calling `metadata` method: {}", failure);
-        return None;
-      }
-    };
-
-    let metadata_val = externs::check_for_python_none(metadata_val)?;
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-
-    let mut output = Vec::new();
-    let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
-
-    for (key, value) in metadata_dict.items(py).into_iter() {
-      let key_name: String = match key.extract(py) {
-        Ok(s) => s,
-        Err(e) => {
-          log::error!(
-            "Error in EngineAware.metadata() implementation - non-string key: {:?}",
-            e
-          );
-          return None;
-        }
-      };
-
-      output.push((key_name, Value::from(value)));
-    }
-    Some(output)
+  pub fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
+    metadata(context, value)
   }
 
   pub fn artifacts(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
@@ -124,13 +95,56 @@ impl EngineAwareReturnType {
   }
 }
 
-pub struct DebugHint {}
+pub struct EngineAwareParameter;
 
-impl DebugHint {
-  pub fn retrieve(value: &Value) -> Option<String> {
+impl EngineAwareParameter {
+  pub fn debug_hint(value: &Value) -> Option<String> {
     externs::call_method(value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
       .map(|val| externs::val_to_str(&val))
   }
+
+  pub fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
+    metadata(context, value)
+  }
+}
+
+fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
+  let metadata_val = match externs::call_method(value, "metadata", &[]) {
+    Ok(value) => value,
+    Err(py_err) => {
+      let failure = Failure::from_py_err(py_err);
+      log::error!("Error calling `metadata` method: {}", failure);
+      return None;
+    }
+  };
+
+  let metadata_val = externs::check_for_python_none(metadata_val)?;
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let mut output = Vec::new();
+  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
+
+  for (key, value) in metadata_dict.items(py).into_iter() {
+    let key_name: String = match key.extract(py) {
+      Ok(s) => s,
+      Err(e) => {
+        log::error!(
+          "Error in EngineAware.metadata() implementation - non-string key: {:?}",
+          e
+        );
+        return None;
+      }
+    };
+
+    let py_value_handle = UserMetadataPyValue::new();
+    let umi = UserMetadataItem::PyValue(py_value_handle.clone());
+    context.session.with_metadata_map(|map| {
+      map.insert(py_value_handle.clone(), value.into());
+    });
+    output.push((key_name, umi));
+  }
+  Some(output)
 }

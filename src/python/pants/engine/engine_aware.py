@@ -23,6 +23,15 @@ class EngineAwareParameter(ABC):
         the annotated type as a parameter."""
         return None
 
+    def metadata(self) -> dict[str, Any] | None:
+        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`.
+
+        If multiple Params to a `@rule` have metadata, the metadata will be merged in a
+        deterministic but unspecified order.
+        """
+
+        return None
+
 
 class EngineAwareReturnType(ABC):
     """A marker class for types that are returned by rules to allow sending additional metadata to
@@ -68,7 +77,10 @@ class EngineAwareReturnType(ABC):
         return None
 
     def metadata(self) -> dict[str, Any] | None:
-        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
-        workunit."""
+        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`.
+
+        If a @rule has `metadata` supplied by `EngineAwareParameter`s, the data will be merged, with
+        only colliding keys overwritten.
+        """
 
         return None
