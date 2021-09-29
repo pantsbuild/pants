@@ -106,13 +106,13 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(field_sets: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
-        return FmtResult.skip(formatter_name="Autoflake")
+        return FmtResult.skip(formatter_name="autoflake")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="Autoflake",
+        formatter_name="autoflake",
         strip_chroot_path=True,
     )
 
@@ -123,8 +123,18 @@ async def autoflake_lint(request: AutoflakeRequest, autoflake: Autoflake) -> Lin
         return LintResults([], linter_name="autoflake")
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
+
+    def strip_check_result(output: str) -> str:
+        return "\n".join(line for line in output.splitlines() if line != "No issues detected!")
+
     return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        [
+            LintResult(
+                result.exit_code,
+                strip_check_result(result.stdout.decode()),
+                result.stderr.decode(),
+            )
+        ],
         linter_name="autoflake",
     )
 
@@ -133,5 +143,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(PythonFmtRequest, AutoflakeRequest),
+        UnionRule(LintRequest, AutoflakeRequest),
         *pex.rules(),
     ]
