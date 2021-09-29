@@ -99,10 +99,24 @@ async def package_fat_jar(
     compiled_class_files_digest = await Get(Digest, MergeDigests(i.digest for i in class_files))
     compiled_class_files_snapshot = await Get(Snapshot, Digest, compiled_class_files_digest)
 
+
     # 2. Produce thin JAR
 
-    # TODO write JAR manifest file containing `.`-separated address of `main()` method.
-    # and merge into our digest
+    manifest_content = FileContent(
+        "META-INF/MANIFEST.MF",
+        "\n".join(
+            [
+                "Manifest-Version: 1.0",
+                "Main-Class: org.pantsbuild.example.ExampleLib",
+                "",  # THIS BLANK LINE WILL BREAK EVERYTHING IF DELETED. DON'T DELETE IT.
+            ]
+        ).encode("utf-8"),
+    )
+
+    manifest_digest = await Get(Digest, CreateDigest([manifest_content]))
+    thin_jar_inputs = await Get(
+        Digest, MergeDigests([compiled_class_files_digest, manifest_digest])
+    )
 
     thin_jar_result = await Get(
         ProcessResult,
@@ -110,10 +124,10 @@ async def package_fat_jar(
             argv=[
                 "/usr/bin/zip",
                 "pants_thin_jar.jar",
-                *compiled_class_files_snapshot.files,
+                *compiled_class_files_snapshot.files + ("META-INF/MANIFEST.MF",),
             ],
             description="Build thin JAR file.",
-            input_digest=compiled_class_files_digest,
+            input_digest=thin_jar_inputs,
             output_files=["pants_thin_jar.jar"],
         ),
     )
@@ -122,6 +136,7 @@ async def package_fat_jar(
     logger.info(thin_jar_result.stderr.decode())
 
     thin_jar = thin_jar_result.output_digest
+
 
     # 3. Create broken fat JAR
 
@@ -153,8 +168,6 @@ async def package_fat_jar(
         ).encode("utf-8"),
     )
 
-    # raise Exception(cat_script.content)
-
     cat_script_digest = await Get(Digest, CreateDigest([cat_script]))
     broken_fat_jar_inputs_digest = await Get(
         Digest, MergeDigests([materialized_classpath.digest, cat_script_digest, thin_jar])
@@ -171,6 +184,7 @@ async def package_fat_jar(
     )
 
     broken_fat_jar_digest = cat.output_digest
+
 
     # 4. Correct the fat JAR
 
