@@ -79,7 +79,10 @@ async def package_fat_jar(
         AddressInput.parse(field_set.root_address.value, relative_to=field_set.address.spec_path),
     )
 
+    #
     # 1. Collect Java source files and compile them all
+    #
+
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([root_class_address])
     )
@@ -105,7 +108,10 @@ async def package_fat_jar(
     compiled_class_files_digest = await Get(Digest, MergeDigests(i.digest for i in class_files))
     compiled_class_files_snapshot = await Get(Snapshot, Digest, compiled_class_files_digest)
 
-    # 2. Produce thin JAR
+    #
+    # # 2. Produce thin JAR
+    #
+
     main_class = field_set.main_class.value
 
     manifest_content = FileContent(
@@ -146,7 +152,10 @@ async def package_fat_jar(
 
     thin_jar = thin_jar_result.output_digest
 
+    #
     # 3. Create broken fat JAR
+    #
+
     lockfile_requests = [
         Get(
             CoursierResolvedLockfile,
@@ -166,6 +175,16 @@ async def package_fat_jar(
         ),
     )
 
+    # NB(chrisjrn) Concatenating multiple ZIP files produces a zip file that is _mostly_ safe to
+    # be distributed (it can be fixed with `-FF`), so that's how we construct our fat JAR
+    # without exploding the files to disk.
+    #
+    # `ZIP` files are extracted top-to-bottom and archives can have duplicate names
+    # (e.g. `META-INF/MANIFEST.MF`). In the case of a `JAR` file, the JVM will understand the 
+    # last file with that file name to be the actual one. Therefore, our thin JAR needs to be
+    # appear at the end of the file for (in particular) our manifest to take precedence.
+    # If there are duplicate classnames at a given package address fro JARs, then 
+    # behaviour will be non-deterministic. Sorry!
     cat_script = FileContent(
         "_cat_zip_files.sh",
         textwrap.dedent(
@@ -192,7 +211,9 @@ async def package_fat_jar(
 
     broken_fat_jar_digest = cat.output_digest
 
+    #
     # 4. Correct the fat JAR
+    #
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
     fix_zip = await Get(
         ProcessResult,
