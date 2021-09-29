@@ -43,9 +43,9 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
 
     @property
     def lint_results(self) -> LintResults:
-        addresses = [config.address for config in self.field_sets]
+        addresses = tuple(config.address for config in self.field_sets)
         return LintResults(
-            [LintResult(self.exit_code(addresses), "", "")], linter_name=self.linter_name
+            [LintResult(self.exit_code(addresses), "", "", addresses)], linter_name=self.linter_name
         )
 
 
@@ -228,7 +228,7 @@ def test_streaming_output_skip() -> None:
 
 
 def test_streaming_output_success() -> None:
-    results = LintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
+    results = LintResults([LintResult(0, "stdout", "stderr", tuple())], linter_name="linter")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -241,7 +241,7 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = LintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
+    results = LintResults([LintResult(18, "stdout", "stderr", tuple())], linter_name="linter")
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
@@ -256,8 +256,8 @@ def test_streaming_output_failure() -> None:
 def test_streaming_output_partitions() -> None:
     results = LintResults(
         [
-            LintResult(21, "", "", partition_description="ghc8.1"),
-            LintResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+            LintResult(21, "", "", tuple(), partition_description="ghc8.1"),
+            LintResult(0, "stdout", "stderr", tuple(), partition_description="ghc9.2"),
         ],
         linter_name="linter",
     )
