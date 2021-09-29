@@ -423,7 +423,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-    # For live files, we use ExpandedTargets, which causes more precise, often file-level, targets
+    # For live files, we use Targets, which causes more precise, often file-level, targets
     # to be created. For deleted files we use UnexpandedTargets, which have the original declared
     # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)

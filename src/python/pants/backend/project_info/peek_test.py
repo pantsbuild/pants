@@ -6,14 +6,16 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.project_info import peek
-from pants.backend.project_info.peek import Peek
-from pants.core.target_types import ArchiveTarget, Files
+from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
+from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.core.target_types import ArchiveTarget, Files, GenericTarget
 from pants.engine.addresses import Address
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.mark.parametrize(
-    "targets, exclude_defaults, expected_output",
+    "expanded_target_infos, exclude_defaults, expected_output",
     [
         pytest.param(
             [],
@@ -22,7 +24,13 @@ from pants.testutil.rule_runner import RuleRunner
             id="null-case",
         ),
         pytest.param(
-            [Files({"sources": []}, Address("example", target_name="files_target"))],
+            [
+                TargetData(
+                    Files({"sources": ["*.txt"]}, Address("example", target_name="files_target")),
+                    ("foo.txt", "bar.txt"),
+                    tuple(),
+                )
+            ],
             True,
             dedent(
                 """\
@@ -30,7 +38,14 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "sources": []
+                    "sources": [
+                      "*.txt"
+                    ],
+                    "expanded_sources": [
+                      "foo.txt",
+                      "bar.txt"
+                    ],
+                    "expanded_dependencies": []
                   }
                 ]
                 """
@@ -38,7 +53,13 @@ from pants.testutil.rule_runner import RuleRunner
             id="single-files-target/exclude-defaults",
         ),
         pytest.param(
-            [Files({"sources": []}, Address("example", target_name="files_target"))],
+            [
+                TargetData(
+                    Files({"sources": []}, Address("example", target_name="files_target")),
+                    tuple(),
+                    tuple(),
+                )
+            ],
             False,
             dedent(
                 """\
@@ -49,7 +70,9 @@ from pants.testutil.rule_runner import RuleRunner
                     "dependencies": null,
                     "description": null,
                     "sources": [],
-                    "tags": null
+                    "tags": null,
+                    "expanded_sources": [],
+                    "expanded_dependencies": []
                   }
                 ]
                 """
@@ -58,17 +81,25 @@ from pants.testutil.rule_runner import RuleRunner
         ),
         pytest.param(
             [
-                Files(
-                    {"sources": ["*.txt"], "tags": ["zippable"]},
-                    Address("example", target_name="files_target"),
+                TargetData(
+                    Files(
+                        {"sources": ["*.txt"], "tags": ["zippable"]},
+                        Address("example", target_name="files_target"),
+                    ),
+                    tuple(),
+                    tuple(),
                 ),
-                ArchiveTarget(
-                    {
-                        "output_path": "my-archive.zip",
-                        "format": "zip",
-                        "files": ["example:files_target"],
-                    },
-                    Address("example", target_name="archive_target"),
+                TargetData(
+                    ArchiveTarget(
+                        {
+                            "output_path": "my-archive.zip",
+                            "format": "zip",
+                            "files": ["example:files_target"],
+                        },
+                        Address("example", target_name="archive_target"),
+                    ),
+                    None,
+                    ("foo/bar:baz", "qux:quux"),
                 ),
             ],
             True,
@@ -83,7 +114,9 @@ from pants.testutil.rule_runner import RuleRunner
                     ],
                     "tags": [
                       "zippable"
-                    ]
+                    ],
+                    "expanded_sources": [],
+                    "expanded_dependencies": []
                   },
                   {
                     "address": "example:archive_target",
@@ -92,7 +125,11 @@ from pants.testutil.rule_runner import RuleRunner
                       "example:files_target"
                     ],
                     "format": "zip",
-                    "output_path": "my-archive.zip"
+                    "output_path": "my-archive.zip",
+                    "expanded_dependencies": [
+                      "foo/bar:baz",
+                      "qux:quux"
+                    ]
                   }
                 ]
                 """
@@ -101,14 +138,60 @@ from pants.testutil.rule_runner import RuleRunner
         ),
     ],
 )
-def test_render_targets_as_json(targets, exclude_defaults, expected_output):
-    actual_output = peek._render_json(targets, exclude_defaults)
+def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
+    actual_output = peek._render_json(expanded_target_infos, exclude_defaults)
     assert actual_output == expected_output
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=peek.rules(), target_types=[Files])
+    return RuleRunner(
+        rules=[
+            *peek.rules(),
+            QueryRule(TargetDatas, [AddressSpecs]),
+        ],
+        target_types=[Files, GenericTarget],
+    )
+
+
+def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file("some_name", "files(sources=[])")
+    result = rule_runner.run_goal_rule(Peek, args=["other_name"])
+    assert result.stdout == "[]\n"
+
+
+def test_get_target_data(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": dedent(
+                """\
+            target(name="bar", dependencies=[":baz"])
+
+            files(name="baz", sources=["*.txt"])
+            """
+            ),
+            "foo/a.txt": "",
+            "foo/b.txt": "",
+        }
+    )
+    tds = rule_runner.request(TargetDatas, [AddressSpecs([DescendantAddresses("foo")])])
+    assert tds == TargetDatas(
+        [
+            TargetData(
+                GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
+                None,
+                ("foo:baz",),
+            ),
+            TargetData(
+                Files({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+                ("foo/a.txt", "foo/b.txt"),
+                tuple(),
+            ),
+        ]
+    )
+
+
+# TODO: Delete everything below this in 2.9.0.dev0.
 
 
 def test_raw_output_single_build_file(rule_runner: RuleRunner) -> None:
@@ -152,9 +235,3 @@ def test_raw_output_non_matching_build_target(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file("some_name", "files(sources=[])")
     result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "other_name"])
     assert result.stdout == ""
-
-
-def test_standard_json_output_non_matching_build_target(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("some_name", "files(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["other_name"])
-    assert result.stdout == "[]\n"
