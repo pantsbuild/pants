@@ -1,11 +1,20 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
+
 from pants.engine.rules import collect_rules
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Target
+from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, FieldSet, Sources, Target
 
 
 class TerraformSources(Sources):
     expected_file_extensions = (".tf",)
+
+
+@dataclass(frozen=True)
+class TerraformFieldSet(FieldSet):
+    required_fields = (TerraformSources,)
+
+    sources: TerraformSources
 
 
 class TerraformModuleSources(TerraformSources):
