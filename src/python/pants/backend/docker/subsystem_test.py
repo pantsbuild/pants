@@ -57,7 +57,7 @@ def test_docker_registries() -> None:
         DockerRegistryError,
         match=(
             r"Multiple default Docker registries in the \[docker\]\.registries "
-            r"configuration: reg1, reg2\."
+            r"configuration: reg[12], reg[12]\."
         ),
     ):
         registries = DockerRegistries.from_dict(
