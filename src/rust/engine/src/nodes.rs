@@ -42,7 +42,7 @@ use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
-  UserMetadataPyValue, WorkunitMetadata,
+  WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -1241,7 +1241,8 @@ impl WrappedNode for Task {
           engine_aware::EngineAwareReturnType::message(&result_val),
           engine_aware::EngineAwareReturnType::artifacts(&context.core.types, &result_val)
             .unwrap_or_else(Vec::new),
-          engine_aware::EngineAwareReturnType::metadata(&result_val).unwrap_or_else(Vec::new),
+          engine_aware::EngineAwareReturnType::metadata(&context, &result_val)
+            .unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new(), Vec::new())
@@ -1252,17 +1253,7 @@ impl WrappedNode for Task {
         }
         metadata.message = message;
         metadata.artifacts.extend(new_artifacts);
-        metadata
-          .user_metadata
-          .extend(new_metadata.into_iter().map(|(key, val)| {
-            let py_value_handle = UserMetadataPyValue::new();
-            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
-            context.session.with_metadata_map(|map| {
-              let val = val.clone();
-              map.insert(py_value_handle.clone(), val);
-            });
-            (key, umi)
-          }));
+        metadata.user_metadata.extend(new_metadata);
         metadata
       });
       Ok(result_val)
@@ -1434,57 +1425,48 @@ impl Node for NodeKey {
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let workunit_store_handle = workunit_store::expect_workunit_store_handle();
 
-    let user_facing_name = self.user_facing_name();
     let workunit_name = self.workunit_name();
-    let failure_name = match &self {
+    let user_facing_name = self.user_facing_name();
+    let engine_aware_params: Vec<_> = match &self {
       NodeKey::Task(ref task) => {
-        let name = workunit_name.clone();
         let engine_aware_param_ty =
           externs::type_for_type_id(context.core.types.engine_aware_parameter);
-        let displayable_param_names: Vec<_> = task
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        task
           .params
           .keys()
           .filter_map(|key| {
-            let value = externs::val_for(key);
-
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            let python_type = value.get_type(py);
-            if python_type.is_subtype_of(py, &engine_aware_param_ty) {
-              engine_aware::DebugHint::retrieve(&value)
+            if key
+              .type_id()
+              .as_py_type(py)
+              .is_subtype_of(py, &engine_aware_param_ty)
+            {
+              Some(externs::val_for(key))
             } else {
               None
             }
           })
-          .collect();
-        if displayable_param_names.is_empty() {
-          name
-        } else if displayable_param_names.len() == 1 {
-          format!(
-            "{} ({})",
-            name,
-            display_sorted_in_parens(displayable_param_names.iter())
-          )
-        } else {
-          format!(
-            "{} {}",
-            name,
-            display_sorted_in_parens(displayable_param_names.iter())
-          )
-        }
+          .collect()
       }
-      _ => workunit_name.clone(),
+      _ => vec![],
     };
+    let user_metadata = engine_aware_params
+      .iter()
+      .filter_map(|val| engine_aware::EngineAwareParameter::metadata(&context, val))
+      .flatten()
+      .collect();
 
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
       level: self.workunit_level(),
+      user_metadata,
       ..WorkunitMetadata::default()
     };
 
     in_workunit!(
       workunit_store_handle.store,
-      workunit_name,
+      self.workunit_name(),
       metadata,
       |workunit| async move {
         // To avoid races, we must ensure that we have installed a watch for the subject before
@@ -1567,7 +1549,31 @@ impl Node for NodeKey {
           }
         }
 
-        result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
+        // If the node failed, expand the Failure with a new frame.
+        result = result.map_err(|failure| {
+          let name = workunit_name;
+          let displayable_param_names: Vec<_> = engine_aware_params
+            .iter()
+            .filter_map(|val| engine_aware::EngineAwareParameter::debug_hint(val))
+            .collect();
+          let failure_name = if displayable_param_names.is_empty() {
+            name
+          } else if displayable_param_names.len() == 1 {
+            format!(
+              "{} ({})",
+              name,
+              display_sorted_in_parens(displayable_param_names.iter())
+            )
+          } else {
+            format!(
+              "{} {}",
+              name,
+              display_sorted_in_parens(displayable_param_names.iter())
+            )
+          };
+
+          failure.with_pushed_frame(&failure_name)
+        });
 
         result
       }
@@ -1618,7 +1624,7 @@ impl Display for NodeKey {
         let params = task
           .params
           .keys()
-          .filter_map(|k| engine_aware::DebugHint::retrieve(&externs::val_for(k)))
+          .filter_map(|k| engine_aware::EngineAwareParameter::debug_hint(&externs::val_for(k)))
           .collect::<Vec<_>>();
         write!(
           f,
