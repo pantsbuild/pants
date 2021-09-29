@@ -136,7 +136,7 @@ func main() {
 	var allMetadata TestSourcesMetadata
 
 	fileSet := token.NewFileSet()
-	for _, arg := range os.Args {
+	for _, arg := range os.Args[1:] {
 		fileMetadata, err := processFile(fileSet, arg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", arg, err)
