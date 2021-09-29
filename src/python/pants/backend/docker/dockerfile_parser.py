@@ -1,12 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import annotations
-
 import re
 import sys
 from dataclasses import dataclass
-from typing import Generator
+from typing import Generator, List, Optional, Tuple
 
 #
 # Note: This file is used as an pex entry point in the execution sandbox.
@@ -25,7 +23,7 @@ _pex_target_regexp = re.compile(
 )
 
 
-def translate_to_address(value: str) -> str | None:
+def translate_to_address(value: str) -> Optional[str]:
     # Translate something that resembles a packaged pex binary to its corresponding target
     # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
     pex = re.match(_pex_target_regexp, value)
@@ -43,14 +41,14 @@ def main(args):
 
     @dataclass(frozen=True)
     class ParsedDockerfile:
-        commands: tuple[Command, ...]
+        commands: Tuple[Command, ...]
 
         @classmethod
-        def from_file(cls, dockerfile: str) -> ParsedDockerfile:
+        def from_file(cls, dockerfile: str) -> "ParsedDockerfile":
             return cls(parse_file(dockerfile))
 
         @classmethod
-        def from_string(cls, dockerfile_contents: str) -> ParsedDockerfile:
+        def from_string(cls, dockerfile_contents: str) -> "ParsedDockerfile":
             return cls(parse_string(dockerfile_contents))
 
         def get_all(self, command_name: str) -> Generator[Command, None, None]:
@@ -69,8 +67,8 @@ def main(args):
                     if address:
                         yield address
 
-        def putative_target_addresses(self) -> tuple[str, ...]:
-            addresses: list[str] = []
+        def putative_target_addresses(self) -> Tuple[str, ...]:
+            addresses: List[str] = []
             addresses.extend(self.copy_source_addresses())
             return tuple(addresses)
 
