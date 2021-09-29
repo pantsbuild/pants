@@ -54,7 +54,8 @@ class GolangSubsystem(Subsystem):
             help=(
                 "The Go version you are using, such as `1.17`.\n\n"
                 "Pants will only use Go distributions from `--go-search-paths` that have the "
-                "expected version, and it will error if none are found. "
+                "expected version, and it will error if none are found.\n\n"
+                "Do not include the patch version."
             ),
         )
 
