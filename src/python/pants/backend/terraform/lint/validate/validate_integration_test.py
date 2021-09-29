@@ -5,11 +5,11 @@ from typing import List, Sequence
 
 import pytest
 
-from pants.backend.terraform import tool
+from pants.backend.terraform import style, tool
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.validate import validate
-from pants.backend.terraform.lint.validate.validate import ValidateFieldSet, ValidateRequest
-from pants.backend.terraform.target_types import TerraformModule
+from pants.backend.terraform.lint.validate.validate import ValidateRequest
+from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModule
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -28,6 +28,7 @@ def rule_runner() -> RuleRunner:
             *fmt.rules(),
             *validate.rules(),
             *tool.rules(),
+            *style.rules(),
             *source_files.rules(),
             QueryRule(LintResults, (ValidateRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
@@ -85,7 +86,7 @@ def run_terraform_validate(
     if skip:
         args.append("--terraform-validate-skip")
     rule_runner.set_options(args)
-    field_sets = [ValidateFieldSet.create(tgt) for tgt in targets]
+    field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [ValidateRequest(field_sets)])
     return lint_results.results
 

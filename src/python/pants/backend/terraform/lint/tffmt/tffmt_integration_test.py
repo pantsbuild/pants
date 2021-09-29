@@ -5,11 +5,11 @@ from typing import List, Sequence, Tuple
 
 import pytest
 
-from pants.backend.terraform import tool
+from pants.backend.terraform import style, tool
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.tffmt import tffmt
-from pants.backend.terraform.lint.tffmt.tffmt import TffmtFieldSet, TffmtRequest
-from pants.backend.terraform.target_types import TerraformModule
+from pants.backend.terraform.lint.tffmt.tffmt import TffmtRequest
+from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModule
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
@@ -29,6 +29,7 @@ def rule_runner() -> RuleRunner:
             *fmt.rules(),
             *tffmt.rules(),
             *tool.rules(),
+            *style.rules(),
             *source_files.rules(),
             QueryRule(LintResults, (TffmtRequest,)),
             QueryRule(FmtResult, (TffmtRequest,)),
@@ -104,7 +105,7 @@ def run_tffmt(
     if skip:
         args.append("--terraform-fmt-skip")
     rule_runner.set_options(args)
-    field_sets = [TffmtFieldSet.create(tgt) for tgt in targets]
+    field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [TffmtRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
