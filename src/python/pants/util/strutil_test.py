@@ -6,6 +6,7 @@ from textwrap import dedent
 import pytest
 
 from pants.util.strutil import (
+    bullet_list,
     ensure_binary,
     ensure_text,
     first_paragraph,
@@ -139,3 +140,14 @@ def test_path_safe() -> None:
     assert "abcDEF123" == path_safe("abcDEF123")
     assert "CPython>=2.7,<3 (fun times)" == path_safe("CPython>=2.7,<3 (fun times)")
     assert "foo bar_ baz_" == path_safe("foo bar! baz@")
+
+
+def test_bullet_list() -> None:
+    assert bullet_list(["a", "b", "c"]) == (
+        """\
+  * a
+  * b
+  * c"""
+    )
+    assert bullet_list(["a"]) == "  * a"
+    assert bullet_list([]) == ""

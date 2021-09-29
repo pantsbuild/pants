@@ -10,6 +10,7 @@ from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
 from pants.engine.collection import Collection
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list
 
 
 def assert_single_address(addresses: Sequence[Address]) -> None:
@@ -17,10 +18,9 @@ def assert_single_address(addresses: Sequence[Address]) -> None:
     if len(addresses) == 0:
         raise ResolveError("No targets were matched.")
     if len(addresses) > 1:
-        output = "\n  * ".join(address.spec for address in addresses)
         raise ResolveError(
             "Expected a single target, but was given multiple targets.\n\n"
-            f"Did you mean one of:\n  * {output}"
+            f"Did you mean one of these?\n\n{bullet_list(address.spec for address in addresses)}"
         )
 
 

@@ -22,6 +22,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -155,15 +156,14 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
         )
         invalid_versions.append((binary_path.path, version))
 
-    bulleted_list_sep = "\n  * "
-    invalid_versions_str = bulleted_list_sep.join(
+    invalid_versions_str = bullet_list(
         f"{path}: {version}" for path, version in sorted(invalid_versions)
     )
     raise BinaryNotFoundError(
         "Cannot find a `go` binary with the expected version of "
         f"{golang_subsystem.expected_version} (set by `[golang].expected_version`).\n\n"
-        f"Found these `go` binaries, but they had different versions:\n"
-        f"{bulleted_list_sep}{invalid_versions_str}\n\n"
+        f"Found these `go` binaries, but they had different versions:\n\n"
+        f"{invalid_versions_str}\n\n"
         "To fix, please install the expected version (https://golang.org/doc/install) and ensure "
         "that it is discoverable via the option `[golang].go_search_paths`, or change "
         "`[golang].expected_version`."
