@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
 from pants.base.deprecated import deprecated_conditional
+from pants.build_graph.address import Address
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
@@ -36,12 +37,14 @@ class CheckResult:
     exit_code: int
     stdout: str
     stderr: str
+    addresses: tuple[Address, ...]
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
 
     @staticmethod
     def from_fallible_process_result(
         process_result: FallibleProcessResult,
+        addresses: Iterable[Address],
         *,
         partition_description: str | None = None,
         strip_chroot_path: bool = False,
@@ -54,12 +57,10 @@ class CheckResult:
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            addresses=tuple(addresses),
             partition_description=partition_description,
             report=report,
         )
-
-    def metadata(self) -> Dict[str, Any]:
-        return {"partition": self.partition_description}
 
 
 @frozen_after_init
@@ -141,6 +142,9 @@ class CheckResults(EngineAwareReturnType):
                 results_msg += msg
         message += results_msg
         return message
+
+    def metadata(self) -> Dict[str, Any]:
+        return {"addresses": tuple(a for result in self.results for a in result.addresses)}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""

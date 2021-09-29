@@ -306,6 +306,7 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
                 result.exit_code,
                 stdout="",
                 stderr="",
+                addresses=tuple(t.address for t in coarsened_target.members),
                 partition_description=str(coarsened_target),
             )
             for result, coarsened_target in zip(results, coarsened_targets)

@@ -41,13 +41,14 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
 
     @property
     def check_results(self) -> CheckResults:
-        addresses = [config.address for config in self.field_sets]
+        addresses = tuple(config.address for config in self.field_sets)
         return CheckResults(
             [
                 CheckResult(
                     self.exit_code(addresses),
                     "",
                     "",
+                    addresses,
                 )
             ],
             checker_name=self.checker_name,
@@ -196,7 +197,9 @@ def test_streaming_output_skip() -> None:
 
 
 def test_streaming_output_success() -> None:
-    results = CheckResults([CheckResult(0, "stdout", "stderr")], checker_name="typechecker")
+    results = CheckResults(
+        [CheckResult(0, "stdout", "stderr", tuple())], checker_name="typechecker"
+    )
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -209,7 +212,9 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = CheckResults([CheckResult(18, "stdout", "stderr")], checker_name="typechecker")
+    results = CheckResults(
+        [CheckResult(18, "stdout", "stderr", tuple())], checker_name="typechecker"
+    )
     assert results.level() == LogLevel.ERROR
     assert results.message() == dedent(
         """\
@@ -224,8 +229,8 @@ def test_streaming_output_failure() -> None:
 def test_streaming_output_partitions() -> None:
     results = CheckResults(
         [
-            CheckResult(21, "", "", partition_description="ghc8.1"),
-            CheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+            CheckResult(21, "", "", tuple(), partition_description="ghc8.1"),
+            CheckResult(0, "stdout", "stderr", tuple(), partition_description="ghc9.2"),
         ],
         checker_name="typechecker",
     )
