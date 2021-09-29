@@ -6,7 +6,7 @@
 # {
 #   "version": 2,
 #   "valid_for_interpreter_constraints": [
-#     "CPython>=3.6.1"
+#     "CPython>=3.7"
 #   ],
 #   "generated_with_requirements": [
 #     "dockerfile==3.2.0"

@@ -27,7 +27,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_version = "dockerfile==3.2.0"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6.1"]
+    default_interpreter_constraints = ["CPython>=3.7"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.docker", "dockerfile_lockfile.txt")
