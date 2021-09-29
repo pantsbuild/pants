@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Sequence
+from typing import Any, Sequence
 
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -419,6 +419,9 @@ class Address(EngineAwareParameter):
 
     def debug_hint(self) -> str:
         return self.spec
+
+    def metadata(self) -> dict[str, Any]:
+        return {"address": self.spec}
 
 
 @dataclass(frozen=True)

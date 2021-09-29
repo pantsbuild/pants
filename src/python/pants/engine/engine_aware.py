@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Optional
+from typing import Any
 
 from pants.engine.fs import FileDigest, Snapshot
 from pants.util.logging import LogLevel
@@ -18,7 +18,7 @@ class EngineAwareParameter(ABC):
     will do nothing; otherwise, it will use the additional metadata provided.
     """
 
-    def debug_hint(self) -> Optional[str]:
+    def debug_hint(self) -> str | None:
         """If implemented, this string will be shown in `@rule` debug contexts if that rule takes
         the annotated type as a parameter."""
         return None

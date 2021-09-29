@@ -618,6 +618,9 @@ class CoarsenedTarget(EngineAwareParameter):
     def debug_hint(self) -> str:
         return str(self)
 
+    def metadata(self) -> Dict[str, Any]:
+        return {"addresses": [t.address.spec for t in self.members]}
+
     def __str__(self) -> str:
         if len(self.members) > 1:
             others = len(self.members) - 1
@@ -926,6 +929,9 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     def debug_hint(self) -> str:
         return self.address.spec
+
+    def metadata(self) -> Dict[str, Any]:
+        return {"address": self.address.spec}
 
     def __repr__(self) -> str:
         # We use a short repr() because this often shows up in stack traces. We don't need any of
@@ -1560,7 +1566,7 @@ class HydratedSources:
 
 @union
 @dataclass(frozen=True)
-class GenerateSourcesRequest(EngineAwareParameter):
+class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
 
     This should be subclassed for each distinct codegen implementation. The subclasses must define
@@ -1592,9 +1598,6 @@ class GenerateSourcesRequest(EngineAwareParameter):
 
     input: ClassVar[Type[Sources]]
     output: ClassVar[Type[Sources]]
-
-    def debug_hint(self) -> str:
-        return "{self.protocol_target.address.spec}"
 
 
 @dataclass(frozen=True)

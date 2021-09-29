@@ -7,12 +7,13 @@ import logging
 import os.path
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Generic, Iterable, Optional, Sequence, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Optional, Sequence, Type, TypeVar
 
 from typing_extensions import Protocol
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot, Workspace
 from pants.engine.target import FieldSet
 from pants.util.meta import frozen_after_init
@@ -25,7 +26,7 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class StyleRequest(Generic[_FS], metaclass=ABCMeta):
+class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     """A request to style or lint a collection of `FieldSet`s.
 
     Should be subclassed for a particular style engine in order to support autoformatting or
@@ -45,6 +46,9 @@ class StyleRequest(Generic[_FS], metaclass=ABCMeta):
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
         self.prior_formatter_result = prior_formatter_result
+
+    def metadata(self) -> dict[str, Any]:
+        return {"addresses": [fs.address.spec for fs in self.field_sets]}
 
 
 class _ResultWithReport(Protocol):
