@@ -13,6 +13,7 @@ import subprocess
 
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
+from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
@@ -58,6 +59,11 @@ def main() -> None:
             "./pants",
             "--concurrent",
             f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+            # Autoflake.
+            f"--autoflake-version={Autoflake.default_version}",
+            f"--autoflake-extra-requirements={repr(Autoflake.default_extra_requirements)}",
+            f"--autoflake-interpreter-constraints={repr(Autoflake.default_interpreter_constraints)}",
+            f"--autoflake-lockfile={Autoflake.default_lockfile_path}",
             # Bandit.
             "--backend-packages=+['pants.backend.python.lint.bandit']",
             f"--bandit-version={Bandit.default_version}",
