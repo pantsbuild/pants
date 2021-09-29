@@ -74,7 +74,7 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
 
     # Should still work even if there are other Go versions with an invalid version.
     invalid_version = mock_go_binary(
-        version_output=f"go version go1.8 darwin/arm64", env_output="/not/valid"
+        version_output="go version go1.8 darwin/arm64", env_output="/not/valid"
     )
     assert (
         get_goroot(rule_runner, [("go", valid_without_patch), ("go", invalid_version)]).path
@@ -102,10 +102,10 @@ def test_no_binaries(rule_runner: RuleRunner) -> None:
 
 def test_no_valid_versions(rule_runner: RuleRunner) -> None:
     invalid1 = mock_go_binary(
-        version_output=f"go version go1.8 darwin/arm64", env_output="/not/valid1"
+        version_output="go version go1.8 darwin/arm64", env_output="/not/valid1"
     )
     invalid2 = mock_go_binary(
-        version_output=f"go version go1.8 darwin/arm64", env_output="/not/valid2"
+        version_output="go version go1.8 darwin/arm64", env_output="/not/valid2"
     )
     with pytest.raises(ExecutionError) as e:
         get_goroot(rule_runner, [("go", invalid1), ("go", invalid2)])
