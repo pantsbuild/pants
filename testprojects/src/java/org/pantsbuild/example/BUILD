@@ -3,7 +3,8 @@
 
 fat_jar(
     name="example_lib_fat_jar",
-    main=":example",
+    main="org.pantsbuild.example.ExampleLib",
+    root_address=":example",
 )
 
 java_sources(

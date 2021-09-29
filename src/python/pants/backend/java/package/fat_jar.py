@@ -11,7 +11,7 @@ from pants.backend.java.compile.javac import (
     CompileResult,
     FallibleCompiledClassfiles,
 )
-from pants.backend.java.target_types import JavaSourceField, JvmMainClassAddress
+from pants.backend.java.target_types import JavaSourceField, JvmMainClassName, JvmRootClassAddress
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
     BuiltPackage,
@@ -43,9 +43,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FatJarFieldSet(PackageFieldSet):
-    required_fields = (JvmMainClassAddress,)
+    required_fields = (
+        JvmMainClassName,
+        JvmRootClassAddress,
+    )
 
-    main_class: JvmMainClassAddress
+    main_class: JvmMainClassName
+    root_address: JvmRootClassAddress
     output_path: OutputPathField
 
 
@@ -63,19 +67,21 @@ async def package_fat_jar(
     4. using the unix `zip` utility's repair function to fix the broken fat jar
     """
 
-    if field_set.main_class.value is None:
-        raise Exception("Needs a `main_class` argument")
+    if field_set.root_address.value is None:
+        raise Exception("Needs a `root_address` argument")
 
-    # TODO rename main class to `root_code_target` and add java main class name
-    main_class_address = await Get(
+    if field_set.main_class.value is None:
+        raise Exception("Needs a `main` argument")
+
+    root_class_address = await Get(
         Address,
         AddressInput,
-        AddressInput.parse(field_set.main_class.value, relative_to=field_set.address.spec_path),
+        AddressInput.parse(field_set.root_address.value, relative_to=field_set.address.spec_path),
     )
 
     # 1. Collect Java source files and compile them all
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([main_class_address])
+        TransitiveTargets, TransitiveTargetsRequest([root_class_address])
     )
 
     sources_to_compile = await Get(
@@ -99,15 +105,18 @@ async def package_fat_jar(
     compiled_class_files_digest = await Get(Digest, MergeDigests(i.digest for i in class_files))
     compiled_class_files_snapshot = await Get(Snapshot, Digest, compiled_class_files_digest)
 
-
     # 2. Produce thin JAR
+    main_class = field_set.main_class.value
 
     manifest_content = FileContent(
         "META-INF/MANIFEST.MF",
+        # NB(chrisjrn): we're joining strings with newlines, becuase the JAR manfiest format
+        # needs precise indentation, and _cannot_ start with a blank line. `dedent` seriously
+        # messes up those requirements.
         "\n".join(
             [
                 "Manifest-Version: 1.0",
-                "Main-Class: org.pantsbuild.example.ExampleLib",
+                f"Main-Class: {main_class}",
                 "",  # THIS BLANK LINE WILL BREAK EVERYTHING IF DELETED. DON'T DELETE IT.
             ]
         ).encode("utf-8"),
@@ -137,9 +146,7 @@ async def package_fat_jar(
 
     thin_jar = thin_jar_result.output_digest
 
-
     # 3. Create broken fat JAR
-
     lockfile_requests = [
         Get(
             CoursierResolvedLockfile,
@@ -185,9 +192,7 @@ async def package_fat_jar(
 
     broken_fat_jar_digest = cat.output_digest
 
-
     # 4. Correct the fat JAR
-
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
     fix_zip = await Get(
         ProcessResult,

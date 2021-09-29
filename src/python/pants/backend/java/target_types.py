@@ -148,15 +148,30 @@ async def generate_targets_from_java_sources(
 #
 
 
-class JvmMainClassAddress(StringField):
+class JvmMainClassName(StringField):
     alias = "main"
     required = True
-    help = "Address of the main Java class for this JAR."
+    help = (
+        "`.`-separated name of the JVM class containing the `main()` method to be called when "
+        "executing this JAR."
+    )
+
+
+class JvmRootClassAddress(StringField):
+    alias = "root_address"
+    required = True
+    help = "Address that contains the Java source which contains the `main` class."
 
 
 class FatJar(Target):
     alias = "fat_jar"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, OutputPathField, JvmMainClassAddress)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        OutputPathField,
+        JvmMainClassName,
+        JvmRootClassAddress,
+    )
     help = (
         "A `jar` file that continains the compiled source code, as well as all of its "
         "dependencies."
