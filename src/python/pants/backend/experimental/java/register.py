@@ -4,9 +4,9 @@
 from pants.backend.java import tailor
 from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile import javac
-from pants.backend.java.package import fat_jar
+from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
-    FatJar,
+    DeployJar,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
     JunitTestsGeneratorTarget,
@@ -22,7 +22,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 
 def target_types():
     return [
-        FatJar,
+        DeployJar,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
@@ -36,7 +36,7 @@ def rules():
     return [
         *javac.rules(),
         *junit.rules(),
-        *fat_jar.rules(),
+        *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),

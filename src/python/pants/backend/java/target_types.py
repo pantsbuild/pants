@@ -163,8 +163,8 @@ class JvmRootClassAddress(StringField):
     help = "Address that contains the Java source which contains the `main` class."
 
 
-class FatJar(Target):
-    alias = "fat_jar"
+class DeployJar(Target):
+    alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,

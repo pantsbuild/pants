@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class FatJarFieldSet(PackageFieldSet):
+class DeployJarFieldSet(PackageFieldSet):
     required_fields = (
         JvmMainClassName,
         JvmRootClassAddress,
@@ -54,12 +54,12 @@ class FatJarFieldSet(PackageFieldSet):
 
 
 @rule
-async def package_fat_jar(
+async def package_deploy_jar(
     bash: BashBinary,
-    field_set: FatJarFieldSet,
+    field_set: DeployJarFieldSet,
 ) -> BuiltPackage:
     """
-    Constructs a "fat" JAR file (currently from Java sources only) by
+    Constructs a deploy ("fat") JAR file (currently from Java sources only) by
     1. compiling all Java sources
     2. building a JAR containing all of those built class files
     3. creating a fat jar with a broken ZIP index by concatenating all dependency JARs together,
@@ -116,7 +116,7 @@ async def package_fat_jar(
 
     manifest_content = FileContent(
         "META-INF/MANIFEST.MF",
-        # NB(chrisjrn): we're joining strings with newlines, becuase the JAR manfiest format
+        # NB: we're joining strings with newlines, becuase the JAR manfiest format
         # needs precise indentation, and _cannot_ start with a blank line. `dedent` seriously
         # messes up those requirements.
         "\n".join(
@@ -147,13 +147,10 @@ async def package_fat_jar(
         ),
     )
 
-    logger.info(thin_jar_result.stdout.decode())
-    logger.info(thin_jar_result.stderr.decode())
-
     thin_jar = thin_jar_result.output_digest
 
     #
-    # 3. Create broken fat JAR
+    # 3/4. Create broken deploy JAR and repair by JAR
     #
 
     lockfile_requests = [
@@ -175,7 +172,7 @@ async def package_fat_jar(
         ),
     )
 
-    # NB(chrisjrn) Concatenating multiple ZIP files produces a zip file that is _mostly_ safe to
+    # NB. Concatenating multiple ZIP files produces a zip file that is _mostly_ safe to
     # be distributed (it can be fixed with `-FF`), so that's how we construct our fat JAR
     # without exploding the files to disk.
     #
@@ -183,50 +180,38 @@ async def package_fat_jar(
     # (e.g. `META-INF/MANIFEST.MF`). In the case of a `JAR` file, the JVM will understand the 
     # last file with that file name to be the actual one. Therefore, our thin JAR needs to be
     # appear at the end of the file for (in particular) our manifest to take precedence.
-    # If there are duplicate classnames at a given package address fro JARs, then 
-    # behaviour will be non-deterministic. Sorry!
-    cat_script = FileContent(
-        "_cat_zip_files.sh",
+    # If there are duplicate classnames at a given package address fat JARs, then 
+    # behaviour will be non-deterministic. Sorry!  --chrisjrn
+    
+    output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
+    input_filenames = " ".join(materialized_classpath._reified_filenames())
+    cat_and_repair_script = FileContent(
+        "_cat_and_repair_zip_files.sh",
         textwrap.dedent(
             f"""
-            /bin/cat {" ".join(materialized_classpath._reified_filenames())} pants_thin_jar.jar > pants_broken_fat_jar.jar
+            /bin/cat {input_filenames} pants_thin_jar.jar > pants_broken_deploy_jar.jar
+            /usr/bin/zip -FF pants_broken_deploy_jar.jar --out {output_filename.name}
             """
         ).encode("utf-8"),
     )
 
-    cat_script_digest = await Get(Digest, CreateDigest([cat_script]))
-    broken_fat_jar_inputs_digest = await Get(
-        Digest, MergeDigests([materialized_classpath.digest, cat_script_digest, thin_jar])
+    cat_and_repair_script_digest = await Get(Digest, CreateDigest([cat_and_repair_script]))
+    broken_deploy_jar_inputs_digest = await Get(
+        Digest, MergeDigests([materialized_classpath.digest, cat_and_repair_script_digest, thin_jar])
     )
 
-    cat = await Get(
+    cat_and_repair = await Get(
         ProcessResult,
         Process(
-            argv=[bash.path, "_cat_zip_files.sh"],
-            input_digest=broken_fat_jar_inputs_digest,
-            output_files=["pants_broken_fat_jar.jar"],
-            description="Assemble combined JAR file for postprocessing",
-        ),
-    )
-
-    broken_fat_jar_digest = cat.output_digest
-
-    #
-    # 4. Correct the fat JAR
-    #
-    output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    fix_zip = await Get(
-        ProcessResult,
-        Process(
-            argv=["/usr/bin/zip", "-FF", "pants_broken_fat_jar.jar", "--out", output_filename.name],
-            input_digest=broken_fat_jar_digest,
-            description="Post-process combined JAR file",
+            argv=[bash.path, "_cat_and_repair_zip_files.sh"],
+            input_digest=broken_deploy_jar_inputs_digest,
             output_files=[output_filename.name],
+            description="Assemble combined JAR file",
         ),
     )
 
     renamed_output_digest = await Get(
-        Digest, AddPrefix(fix_zip.output_digest, str(output_filename.parent))
+        Digest, AddPrefix(cat_and_repair.output_digest, str(output_filename.parent))
     )
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
@@ -237,5 +222,5 @@ async def package_fat_jar(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, FatJarFieldSet),
+        UnionRule(PackageFieldSet, DeployJarFieldSet),
     ]
