@@ -27,7 +27,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_version = "dockerfile==3.2.0"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.6.1"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.docker", "dockerfile_lockfile.txt")
@@ -54,14 +54,8 @@ class ParserSetup:
 @rule
 async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
     parser_script_content = pkgutil.get_data("pants.backend.docker", "dockerfile_parser.py")
-
-    # this check not needed?
-
-    # FileNotFoundError: [Errno 2] No such file or directory:
-    # '/private/var/folders/8j/../src/python/pants/backend/docker/dockerfile_parser.py'
-
-    # if not parser_script_content:
-    #    raise ValueError("Unable to find source to dockerfile_parser.py wrapper script.")
+    if not parser_script_content:
+        raise ValueError("Unable to find source to dockerfile_parser.py wrapper script.")
 
     parser_content = FileContent(
         path="__pants_df_parser.py",
@@ -124,7 +118,7 @@ async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
     putative_target_addresses = [line for line in result.stdout.decode("utf-8").split("\n") if line]
 
     return DockerfileInfo(
-        putative_target_addresses=putative_target_addresses,
+        putative_target_addresses=tuple(putative_target_addresses),
     )
 
 

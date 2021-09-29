@@ -8,8 +8,6 @@ import sys
 from dataclasses import dataclass
 from typing import Generator
 
-from dockerfile import Command, parse_file, parse_string
-
 #
 # Note: This file is used as an pex entry point in the execution sandbox.
 #
@@ -27,53 +25,55 @@ _pex_target_regexp = re.compile(
 )
 
 
-@dataclass(frozen=True)
-class ParsedDockerfile:
-    commands: tuple[Command, ...]
+def translate_to_address(value: str) -> str | None:
+    # Translate something that resembles a packaged pex binary to its corresponding target
+    # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
+    pex = re.match(_pex_target_regexp, value)
+    if pex:
+        path = (pex.group("path") or "").replace(".", "/")
+        name = pex.group("name")
+        return ":".join([path, name])
 
-    @classmethod
-    def from_file(cls, dockerfile: str) -> ParsedDockerfile:
-        return cls(parse_file(dockerfile))
-
-    @classmethod
-    def from_string(cls, dockerfile_contents: str) -> ParsedDockerfile:
-        return cls(parse_string(dockerfile_contents))
-
-    def get_all(self, command_name: str) -> Generator[Command, None, None]:
-        for command in self.commands:
-            if command.cmd.upper() == command_name:
-                yield command
-
-    @staticmethod
-    def translate_to_address(value: str) -> str | None:
-        # Translate something that resembles a packaged pex binary to its corresponding target
-        # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
-        pex = re.match(_pex_target_regexp, value)
-        if pex:
-            path = (pex.group("path") or "").replace(".", "/")
-            name = pex.group("name")
-            return ":".join([path, name])
-
-        return None
-
-    def copy_source_addresses(self) -> Generator[str, None, None]:
-        for copy in self.get_all("COPY"):
-            if copy.flags:
-                # Do not consider COPY --from=... instructions etc.
-                continue
-            # The last element of copy.value is the destination.
-            for source in copy.value[:-1]:
-                address = self.translate_to_address(source)
-                if address:
-                    yield address
-
-    def putative_target_addresses(self) -> tuple[str, ...]:
-        addresses: list[str] = []
-        addresses.extend(self.copy_source_addresses())
-        return tuple(addresses)
+    return None
 
 
 def main(args):
+    # import here to allow the rest of the file to be tested without a dependency on dockerfile
+    from dockerfile import Command, parse_file, parse_string
+
+    @dataclass(frozen=True)
+    class ParsedDockerfile:
+        commands: tuple[Command, ...]
+
+        @classmethod
+        def from_file(cls, dockerfile: str) -> ParsedDockerfile:
+            return cls(parse_file(dockerfile))
+
+        @classmethod
+        def from_string(cls, dockerfile_contents: str) -> ParsedDockerfile:
+            return cls(parse_string(dockerfile_contents))
+
+        def get_all(self, command_name: str) -> Generator[Command, None, None]:
+            for command in self.commands:
+                if command.cmd.upper() == command_name:
+                    yield command
+
+        def copy_source_addresses(self) -> Generator[str, None, None]:
+            for copy in self.get_all("COPY"):
+                if copy.flags:
+                    # Do not consider COPY --from=... instructions etc.
+                    continue
+                # The last element of copy.value is the destination.
+                for source in copy.value[:-1]:
+                    address = translate_to_address(source)
+                    if address:
+                        yield address
+
+        def putative_target_addresses(self) -> tuple[str, ...]:
+            addresses: list[str] = []
+            addresses.extend(self.copy_source_addresses())
+            return tuple(addresses)
+
     for parsed in map(ParsedDockerfile.from_file, args):
         for addr in parsed.putative_target_addresses():
             print(addr)

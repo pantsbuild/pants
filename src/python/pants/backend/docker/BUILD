@@ -13,8 +13,10 @@ python_library(
 python_library(
   name="parser",
   sources=["parser.py"],
-  dependencies=[":dockerfile_parser"], # ":lockfile"],
+  dependencies=[":dockerfile_parser", ":lockfile"],
 )
+
+resources(name="lockfile", sources=["dockerfile_lockfile.txt"])
 
 python_library(
   name="dockerfile_parser",
@@ -25,5 +27,3 @@ python_tests(
     name="tests",
     timeout=120,
 )
-
-#resources(name="lockfile", sources=["dockerfile_lockfile.txt"])

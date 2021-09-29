@@ -2,29 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from textwrap import dedent
-
 import pytest
 
-from pants.backend.docker.dockerfile_parser import ParsedDockerfile
-
-
-def test_putative_target_addresses() -> None:
-    parsed = ParsedDockerfile.parse(
-        dedent(
-            """\
-            FROM base
-            COPY some.target/binary.pex some.target/tool.pex /bin
-            COPY --from=scratch this.is/ignored.pex /opt
-            COPY binary another/cli.pex tool /bin
-            """
-        )
-    )
-    assert parsed.putative_target_addresses() == (
-        "some/target:binary",
-        "some/target:tool",
-        "another:cli",
-    )
+from pants.backend.docker.dockerfile_parser import translate_to_address
 
 
 @pytest.mark.parametrize(
@@ -44,5 +24,4 @@ def test_putative_target_addresses() -> None:
     ],
 )
 def test_translate_to_address(copy_source, putative_target_address) -> None:
-    actual = ParsedDockerfile.translate_to_address(copy_source)
-    assert actual == putative_target_address
+    assert translate_to_address(copy_source) == putative_target_address

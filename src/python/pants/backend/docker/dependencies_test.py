@@ -17,7 +17,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *parser.rules(),
             *pex.rules(),
@@ -26,6 +26,11 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[DockerImage, PexBinary],
     )
+    rule_runner.set_options(
+        [],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    return rule_runner
 
 
 def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
