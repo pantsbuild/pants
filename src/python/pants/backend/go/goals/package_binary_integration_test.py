@@ -10,7 +10,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinary, GoModule, GoPackage
+from pants.backend.go.target_types import GoBinary, GoModTarget, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -33,7 +33,7 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoBinary, GoPackage, GoModule],
+        target_types=[GoBinary, GoPackage, GoModTarget],
         rules=[
             *assembly.rules(),
             *compile.rules(),

@@ -228,10 +228,7 @@ async def resolve_external_module_to_go_packages(
             left_go_sum_contents = fc.content
             break
 
-    go_sum_only_digest = await Get(
-        Digest, DigestSubset(request.go_sum_digest, PathGlobs(["go.sum"]))
-    )
-    go_sum_prefixed_digest = await Get(Digest, AddPrefix(go_sum_only_digest, "__sources__"))
+    go_sum_prefixed_digest = await Get(Digest, AddPrefix(request.go_sum_digest, "__sources__"))
     right_digest_contents = await Get(DigestContents, Digest, go_sum_prefixed_digest)
     right_go_sum_contents = b""
     for fc in right_digest_contents:

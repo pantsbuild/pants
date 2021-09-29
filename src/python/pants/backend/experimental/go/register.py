@@ -8,7 +8,7 @@ from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt import skip_field as gofmt_skip_field
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.subsystems import golang
-from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModule, GoPackage
+from pants.backend.go.target_types import GoBinary, GoExternalPackageTarget, GoModTarget, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -23,7 +23,7 @@ from pants.backend.go.util_rules import (
 
 
 def target_types():
-    return [GoBinary, GoPackage, GoModule, GoExternalPackageTarget]
+    return [GoBinary, GoPackage, GoModTarget, GoExternalPackageTarget]
 
 
 def rules():

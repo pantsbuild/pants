@@ -14,7 +14,7 @@ from pants.backend.go.target_types import (
     GoExternalPackageImportPathField,
     GoExternalPackageTarget,
     GoImportPath,
-    GoModule,
+    GoModTarget,
     GoPackageDependencies,
     GoPackageSources,
 )
@@ -25,10 +25,10 @@ from pants.backend.go.util_rules.external_module import (
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
-    FindNearestGoModuleRequest,
-    ResolvedGoModule,
-    ResolvedOwningGoModule,
-    ResolveGoModuleRequest,
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
@@ -66,14 +66,14 @@ class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
 async def inject_go_package_dependencies(
     request: InjectGoPackageDependenciesRequest,
 ) -> InjectedDependencies:
-    owning_go_module_result = await Get(
-        ResolvedOwningGoModule,
-        FindNearestGoModuleRequest(request.dependencies_field.address.spec_path),
+    owning_go_mod = await Get(
+        OwningGoMod, OwningGoModRequest(request.dependencies_field.address.spec_path)
     )
-    if owning_go_module_result.module_address:
-        return InjectedDependencies([owning_go_module_result.module_address])
-    else:
-        return InjectedDependencies()
+    return (
+        InjectedDependencies([owning_go_mod.address])
+        if owning_go_mod.address
+        else InjectedDependencies()
+    )
 
 
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
@@ -232,7 +232,7 @@ async def inject_go_external_package_dependencies(
 
 
 class GenerateGoExternalPackageTargetsRequest(GenerateTargetsRequest):
-    generate_from = GoModule
+    generate_from = GoModTarget
 
 
 @rule(desc="Generate targets for each external package in `go.mod`", level=LogLevel.DEBUG)
@@ -240,17 +240,17 @@ async def generate_go_external_package_targets(
     request: GenerateGoExternalPackageTargetsRequest,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    resolved_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(generator_addr))
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
     all_resolved_packages = await MultiGet(
         Get(
             ResolveExternalGoModuleToPackagesResult,
             ResolveExternalGoModuleToPackagesRequest(
                 path=module_descriptor.path,
                 version=module_descriptor.version,
-                go_sum_digest=resolved_module.digest,
+                go_sum_digest=go_mod_info.go_sum_stripped_digest,
             ),
         )
-        for module_descriptor in resolved_module.modules
+        for module_descriptor in go_mod_info.modules
     )
 
     def create_tgt(pkg: ResolvedGoPackage) -> GoExternalPackageTarget:

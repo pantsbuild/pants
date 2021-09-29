@@ -9,22 +9,20 @@ from dataclasses import dataclass
 from pants.backend.go.target_types import (
     GoExternalPackageDependencies,
     GoImportPath,
-    GoModuleSources,
     GoPackageSources,
 )
 from pants.backend.go.util_rules.go_mod import (
-    FindNearestGoModuleRequest,
-    ResolvedGoModule,
-    ResolvedOwningGoModule,
-    ResolveGoModuleRequest,
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, Target, WrappedTarget
 
 logger = logging.getLogger(__name__)
 
@@ -192,20 +190,26 @@ def is_third_party_package_target(tgt: Target) -> bool:
 async def resolve_go_package(
     request: ResolveGoPackageRequest,
 ) -> ResolvedGoPackage:
-    wrapped_target, owning_go_module_result = await MultiGet(
+    wrapped_target, owning_go_mod = await MultiGet(
         Get(WrappedTarget, Address, request.address),
-        Get(ResolvedOwningGoModule, FindNearestGoModuleRequest(request.address.spec_path)),
+        Get(OwningGoMod, OwningGoModRequest(request.address.spec_path)),
     )
     target = wrapped_target.target
 
-    if not owning_go_module_result.module_address:
+    if not owning_go_mod.address:
         raise ValueError(f"The go_package at address {request.address} has no owning go_module.")
-    resolved_go_module = await Get(
-        ResolvedGoModule, ResolveGoModuleRequest(owning_go_module_result.module_address)
+
+    go_mod_spec_path = owning_go_mod.address.spec_path
+    assert request.address.spec_path.startswith(go_mod_spec_path)
+    spec_subpath = request.address.spec_path[len(go_mod_spec_path) :]
+
+    go_mod_info, pkg_sources = await MultiGet(
+        Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
+        Get(HydratedSources, HydrateSourcesRequest(target[GoPackageSources])),
     )
-    go_module_spec_path = resolved_go_module.target.address.spec_path
-    assert request.address.spec_path.startswith(go_module_spec_path)
-    spec_subpath = request.address.spec_path[len(go_module_spec_path) :]
+    input_digest = await Get(
+        Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])
+    )
 
     # Compute the import_path for this go_package.
     import_path_field = target.get(GoImportPath)
@@ -213,37 +217,22 @@ async def resolve_go_package(
         # Use any explicit import path set on the `go_package` target.
         import_path = import_path_field.value
     else:
-        # Otherwise infer the import path from the owning `go_module` target. The inferred import path will be the
-        # module's import path plus any subdirectories in the spec_path between the go_module and go_package target.
-        if not resolved_go_module.import_path:
-            raise ValueError(
-                f"Unable to infer import path for the `go_package` at address {request.address} "
-                f"because the owning go_module at address {resolved_go_module.target.address} "
-                "does not have an import path defined nor could one be inferred."
-            )
-        import_path = f"{resolved_go_module.import_path}/"
+        # Otherwise infer the import path from the owning `go_module` target. The inferred import
+        # path will be the module's import path plus any subdirectories in the spec_path
+        # between the go_module and go_package target.
+        import_path = f"{go_mod_info.import_path}/"
         if spec_subpath.startswith("/"):
             import_path += spec_subpath[1:]
         else:
             import_path += spec_subpath
 
-    sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [
-                target.get(GoPackageSources),
-                resolved_go_module.target.get(GoModuleSources),
-            ]
-        ),
-    )
-
     result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=sources.snapshot.digest,
+            input_digest=input_digest,
             command=("list", "-json", f"./{spec_subpath}"),
             description="Resolve go_package metadata.",
-            working_dir=resolved_go_module.target.address.spec_path,
+            working_dir=go_mod_spec_path,
         ),
     )
 
@@ -252,7 +241,7 @@ async def resolve_go_package(
         metadata,
         import_path=import_path,
         address=request.address,
-        module_address=owning_go_module_result.module_address,
+        module_address=owning_go_mod.address,
     )
 
 

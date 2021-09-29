@@ -48,23 +48,46 @@ class GoPackage(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoModuleSources(Sources):
+class GoModSourcesField(Sources):
     alias = "_sources"
     default = ("go.mod", "go.sum")
-    expected_num_files = range(1, 3)
+    expected_num_files = range(1, 3)  # i.e. 1 or 2.
+
+    @property
+    def go_mod_path(self) -> str:
+        return os.path.join(self.address.spec_path, "go.mod")
+
+    @property
+    def go_sum_path(self) -> str:
+        return os.path.join(self.address.spec_path, "go.sum")
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
-        if "go.mod" not in [os.path.basename(f) for f in files]:
-            raise InvalidFieldException(f"""No go.mod file was found for target {self.address}.""")
+        if self.go_mod_path not in files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must include "
+                f"{self.go_mod_path}, but only had: {list(files)}\n\n"
+                f"Make sure that you're declaring the `{GoModTarget.alias}` target in the same "
+                "directory as your `go.mod` file."
+            )
+        invalid_files = set(files) - {self.go_mod_path, self.go_sum_path}
+        if invalid_files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must only include "
+                f"`{self.go_mod_path}` and optionally {self.go_sum_path}, but had: "
+                f"{sorted(invalid_files)}\n\n"
+                f"Make sure that you're declaring the `{GoModTarget.alias}` target in the same "
+                f"directory as your `go.mod` file and that you don't override the `{self.alias}` "
+                "field."
+            )
 
 
-class GoModule(Target):
+class GoModTarget(Target):
     alias = "go_module"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        GoModuleSources,
+        GoModSourcesField,
     )
     help = "First-party Go module."
 

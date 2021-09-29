@@ -9,7 +9,7 @@ from pants.backend.go.goals.tailor import (
     PutativeGoPackageTargetsRequest,
 )
 from pants.backend.go.goals.tailor import rules as go_tailor_rules
-from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.backend.go.util_rules import external_module, go_mod, sdk
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PutativeTargets, [PutativeGoPackageTargetsRequest, AllOwnedSources]),
             QueryRule(PutativeTargets, [PutativeGoModuleTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[GoPackage, GoModule],
+        target_types=[GoPackage, GoModTarget],
     )
     rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
     return rule_runner
@@ -80,5 +80,5 @@ def test_find_putative_go_module_targets(rule_runner: RuleRunner) -> None:
         ],
     )
     assert putative_targets == PutativeTargets(
-        [PutativeTarget.for_target_type(GoModule, "src/go/unowned", "unowned", ["go.mod"])]
+        [PutativeTarget.for_target_type(GoModTarget, "src/go/unowned", "unowned", ["go.mod"])]
     )
