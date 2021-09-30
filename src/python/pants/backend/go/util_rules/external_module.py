@@ -11,11 +11,11 @@ from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoExternalPackageImportPathField,
+    GoExternalPackageTarget,
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.build_graph.address import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -34,7 +34,6 @@ from pants.engine.fs import (
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -139,41 +138,39 @@ async def download_external_module(
 
 @dataclass(frozen=True)
 class ResolveExternalGoPackageRequest:
-    address: Address
+    tgt: GoExternalPackageTarget
 
 
 @rule
 async def resolve_external_go_package(
     request: ResolveExternalGoPackageRequest,
 ) -> ResolvedGoPackage:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
-    target = wrapped_target.target
+    module_path = request.tgt[GoExternalModulePathField].value
+    module_version = request.tgt[GoExternalModuleVersionField].value
 
-    import_path = target[GoExternalPackageImportPathField].value
-    module_path = target[GoExternalModulePathField].value
-    module_version = target[GoExternalModuleVersionField].value
-
-    module = await Get(
-        DownloadedExternalModule,
-        DownloadExternalModuleRequest(path=module_path, version=module_version),
-    )
+    import_path = request.tgt[GoExternalPackageImportPathField].value
     assert import_path.startswith(module_path)
     subpath = import_path[len(module_path) :]
 
-    result = await Get(
+    downloaded_module = await Get(
+        DownloadedExternalModule,
+        DownloadExternalModuleRequest(module_path, module_version),
+    )
+
+    json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=module.digest,
+            input_digest=downloaded_module.digest,
             command=("list", "-json", f"./{subpath}"),
             description="Resolve _go_external_package metadata.",
         ),
     )
 
-    metadata = json.loads(result.stdout)
+    metadata = json.loads(json_result.stdout)
     return ResolvedGoPackage.from_metadata(
         metadata,
         import_path=import_path,
-        address=request.address,
+        address=request.tgt.address,
         module_address=None,
         module_path=module_path,
         module_version=module_version,

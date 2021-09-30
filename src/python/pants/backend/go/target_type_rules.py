@@ -49,6 +49,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     Targets,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -190,9 +191,10 @@ async def inject_go_external_package_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: GoImportPathToPackageMapping,
 ) -> InjectedDependencies:
-    this_go_package = await Get(
-        ResolvedGoPackage, ResolveExternalGoPackageRequest(request.dependencies_field.address)
-    )
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    tgt = wrapped_target.target
+    assert isinstance(tgt, GoExternalPackageTarget)
+    this_go_package = await Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt))
 
     # Loop through all of the imports of this package and add dependencies on other packages and
     # external modules.
