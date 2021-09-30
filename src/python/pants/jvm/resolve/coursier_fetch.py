@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Iterable, Iterator, Optional, Tuple
 
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -21,6 +21,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -504,9 +505,19 @@ class MaterializedClasspathRequest:
 class MaterializedClasspath:
     """A fully fetched and merged classpath, ready to hand to a JVM process invocation."""
 
-    digest: Digest
-    file_names: Tuple[str, ...]
-    prefix: Optional[str]
+    content: Snapshot
+
+    @property
+    def digest(self) -> Digest:
+        return self.content.digest
+
+    def classpath_args(self, root: Optional[str] = None) -> Iterator[str]:
+        def maybe_add_prefix(file_name: str) -> str:
+            if root is not None:
+                file_name = os.path.join(root, file_name)
+            return file_name
+
+        return (maybe_add_prefix(file_name) for file_name in self.content.files)
 
     def classpath_arg(self, root: Optional[str] = None) -> str:
         """Construct the argument to be passed to `-classpath`.
@@ -516,14 +527,7 @@ class MaterializedClasspath:
             directory for the process input `Digest`.
         """
 
-        def maybe_add_prefix(file_name: str) -> str:
-            if self.prefix is not None:
-                file_name = os.path.join(self.prefix, file_name)
-            if root is not None:
-                file_name = os.path.join(root, file_name)
-            return file_name
-
-        return ":".join(maybe_add_prefix(file_name) for file_name in self.file_names)
+        return ":".join(self.classpath_args(root))
 
 
 @rule(level=LogLevel.DEBUG)
@@ -546,8 +550,8 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
         *lockfile_and_requirements_classpath_entries,
         *request.resolved_classpaths,
     )
-    merged_digest = await Get(
-        Digest,
+    merged_snapshot = await Get(
+        Snapshot,
         MergeDigests(
             classpath_entry.digest
             for classpath_entries in all_classpath_entries
@@ -555,14 +559,8 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
         ),
     )
     if request.prefix is not None:
-        merged_digest = await Get(Digest, AddPrefix(merged_digest, request.prefix))
-
-    file_names = tuple(
-        classpath_entry.file_name
-        for classpath_entries in all_classpath_entries
-        for classpath_entry in classpath_entries
-    )
-    return MaterializedClasspath(prefix=request.prefix, digest=merged_digest, file_names=file_names)
+        merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
+    return MaterializedClasspath(content=merged_snapshot)
 
 
 def rules():

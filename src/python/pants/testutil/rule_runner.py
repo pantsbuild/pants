@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import os
 import sys
 from contextlib import contextmanager
@@ -61,6 +62,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 def logging(func):
     """A decorator that enables logging (optionally at the given level)."""
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
         with temporary_dir() as tempdir, initialize_stdio_raw(

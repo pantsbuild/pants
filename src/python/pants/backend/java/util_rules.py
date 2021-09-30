@@ -19,6 +19,7 @@ from pants.jvm.resolve.coursier_fetch import (
     ResolvedClasspathEntry,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
             append_only_caches=coursier.append_only_caches,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            level=LogLevel.DEBUG,
         ),
     )
 

@@ -11,6 +11,7 @@ from itertools import chain
 from pants.backend.java.target_types import JavaSourceField
 from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -21,9 +22,9 @@ from pants.engine.fs import (
     Digest,
     Directory,
     MergeDigests,
-    RemovePrefix,
+    Snapshot,
 )
-from pants.engine.process import BashBinary, FallibleProcessResult, Process
+from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Sources, Targets
 from pants.engine.unions import UnionRule
@@ -58,6 +59,11 @@ class CompileJavaSourceRequest:
 
 @dataclass(frozen=True)
 class CompiledClassfiles:
+    """The outputs of a compilation contained in either zero or one JAR file.
+
+    TODO: Rename this type to align with the guarantee about its content.
+    """
+
     digest: Digest
 
 
@@ -128,6 +134,7 @@ async def compile_java_source(
     bash: BashBinary,
     coursier: Coursier,
     jdk_setup: JdkSetup,
+    zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
 ) -> FallibleCompiledClassfiles:
     component_members_with_sources = tuple(
@@ -196,7 +203,7 @@ async def compile_java_source(
     dest_dir = "classfiles"
     (
         materialized_classpath,
-        merged_direct_dependency_classfiles_digest,
+        merged_direct_dependency_classpath_digest,
         dest_dir_digest,
     ) = await MultiGet(
         Get(
@@ -213,21 +220,19 @@ async def compile_java_source(
         ),
     )
 
-    usercp_relpath = "__usercp"
-    prefixed_direct_dependency_classfiles_digest = await Get(
-        Digest, AddPrefix(merged_direct_dependency_classfiles_digest, usercp_relpath)
+    prefixed_direct_dependency_classpath = await Get(
+        Snapshot, AddPrefix(merged_direct_dependency_classpath_digest, "__usercp")
     )
 
-    classpath_arg = usercp_relpath
-    third_party_classpath_arg = materialized_classpath.classpath_arg()
-    if third_party_classpath_arg:
-        classpath_arg = ":".join([classpath_arg, third_party_classpath_arg])
+    classpath_arg = ":".join(
+        [*prefixed_direct_dependency_classpath.files, *materialized_classpath.classpath_args()]
+    )
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_direct_dependency_classfiles_digest,
+                prefixed_direct_dependency_classpath.digest,
                 materialized_classpath.digest,
                 dest_dir_digest,
                 jdk_setup.digest,
@@ -239,14 +244,14 @@ async def compile_java_source(
         ),
     )
 
-    process_result = await Get(
+    # Compile.
+    compile_result = await Get(
         FallibleProcessResult,
         Process(
             argv=[
                 *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
                 "com.sun.tools.javac.Main",
-                "-cp",
-                classpath_arg,
+                *(("-cp", classpath_arg) if classpath_arg else ()),
                 "-d",
                 dest_dir,
                 *sorted(
@@ -260,21 +265,41 @@ async def compile_java_source(
             use_nailgun=jdk_setup.digest,
             append_only_caches=jdk_setup.append_only_caches,
             output_directories=(dest_dir,),
-            description=f"Compile {request.component.members} with javac",
+            description=f"Compile {request.component} with javac",
             level=LogLevel.DEBUG,
         ),
     )
-    output: CompiledClassfiles | None = None
-    if process_result.exit_code == 0:
-        stripped_classfiles_digest = await Get(
-            Digest, RemovePrefix(process_result.output_digest, dest_dir)
+    if compile_result.exit_code != 0:
+        return FallibleCompiledClassfiles.from_fallible_process_result(
+            str(request.component),
+            compile_result,
+            None,
         )
-        output = CompiledClassfiles(stripped_classfiles_digest)
+
+    # Jar.
+    # NB: We jar up the outputs in a separate process because the nailgun runner cannot support
+    # invoking via a `bash` wrapper (since the trailing portion of the command is executed by
+    # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
+    output_file = f"{request.component.representative.address.path_safe_spec}.jar"
+    jar_result = await Get(
+        ProcessResult,
+        Process(
+            argv=[
+                bash.path,
+                "-c",
+                " ".join(["cd", dest_dir, ";", zip_binary.path, "-r", f"../{output_file}", "."]),
+            ],
+            input_digest=compile_result.output_digest,
+            output_files=(output_file,),
+            description=f"Capture outputs of {request.component} for javac",
+            level=LogLevel.TRACE,
+        ),
+    )
 
     return FallibleCompiledClassfiles.from_fallible_process_result(
         str(request.component),
-        process_result,
-        output,
+        compile_result,
+        CompiledClassfiles(jar_result.output_digest),
     )
 
 
