@@ -53,6 +53,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
 class BuiltGoPackage:
     import_path: str
     object_digest: Digest
+    imports_digest: Digest
 
 
 @rule
@@ -148,7 +149,11 @@ async def build_target(
         )
         output_digest = assembly_result.merged_output_digest
 
-    return BuiltGoPackage(import_path=import_path, object_digest=output_digest)
+    return BuiltGoPackage(
+        import_path=import_path,
+        object_digest=output_digest,
+        imports_digest=gathered_imports.digest,
+    )
 
 
 def rules():

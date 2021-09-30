@@ -3,7 +3,7 @@
 
 python_library()
 
-python_tests(name='target_types_test', sources=["target_types_test.py"])
+python_tests(name='target_types_test', sources=["target_types_test.py"], timeout=120)
 python_tests(
     name="rules_test",
     sources=["rules_test.py"],

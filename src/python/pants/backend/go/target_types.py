@@ -144,6 +144,7 @@ class GoBinaryMainAddress(StringField):
     alias = "main"
     required = True
     help = "Address of the main Go package for this binary."
+    value: str
 
 
 class GoBinary(Target):
