@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.go.target_types import GoModSourcesField
+from pants.backend.go.target_types import GoExternalPackageTarget, GoModSourcesField
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
@@ -82,16 +82,16 @@ class GoPkgDebugGoal(Goal):
 
 @goal_rule
 async def run_go_pkg_debug(targets: UnexpandedTargets, console: Console) -> GoPkgDebugGoal:
-    first_party_package_targets = [tgt for tgt in targets if is_first_party_package_target(tgt)]
     first_party_requests = [
         Get(ResolvedGoPackage, ResolveGoPackageRequest(address=tgt.address))
-        for tgt in first_party_package_targets
+        for tgt in targets
+        if is_first_party_package_target(tgt)
     ]
 
-    third_party_package_targets = [tgt for tgt in targets if is_third_party_package_target(tgt)]
     third_party_requests = [
-        Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=tgt.address))
-        for tgt in third_party_package_targets
+        Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt))
+        for tgt in targets
+        if isinstance(tgt, GoExternalPackageTarget)
     ]
 
     resolved_packages = await MultiGet([*first_party_requests, *third_party_requests])  # type: ignore
