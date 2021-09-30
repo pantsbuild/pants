@@ -293,7 +293,6 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
-    # TODO: This should be fallible so that we exit cleanly.
     results = await MultiGet(
         Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=t))
         for t in coarsened_targets
