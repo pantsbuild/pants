@@ -88,11 +88,13 @@ def create_path_env_var(
     return delimiter.join(path_dirs)
 
 
-def pluralize(count: int, item_type: str) -> str:
+def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
     """Pluralizes the item_type if the count does not equal one.
 
     For example `pluralize(1, 'apple')` returns '1 apple',
     while `pluralize(0, 'apple') returns '0 apples'.
+
+    When `include_count=False` does not add the count in front of the pluralized `item_type`.
 
     :return The count and inflected item_type together as a string
     """
@@ -103,8 +105,12 @@ def pluralize(count: int, item_type: str) -> str:
         else:
             return x + "s"
 
-    text = f"{count} {(item_type if count == 1 else pluralize_string(item_type))}"
-    return text
+    pluralized_item = item_type if count == 1 else pluralize_string(item_type)
+    if not include_count:
+        return pluralized_item
+    else:
+        text = f"{count} {pluralized_item}"
+        return text
 
 
 def strip_prefix(string: str, prefix: str) -> str:

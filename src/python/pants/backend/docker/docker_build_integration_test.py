@@ -52,4 +52,4 @@ def test_docker_build(rule_runner) -> None:
     target = rule_runner.get_target(Address("src", target_name="test-image"))
     result = run_docker(rule_runner, target)
     assert len(result.artifacts) == 1
-    assert "Built docker image: test-image:1.0" in result.artifacts[0].extra_log_lines
+    assert "Built docker image: src/test-image:1.0" in result.artifacts[0].extra_log_lines

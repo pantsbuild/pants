@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.strutil import bullet_list
 
 
 class DockerOptions(Subsystem):
@@ -40,8 +42,33 @@ class DockerOptions(Subsystem):
                 'or with an alias of `"default"`.'
             )
         )
+        image_name_default = "{repository}/{name}"
+        image_name_help = (
+            "Configure the default template used to construct the final Docker image name.\n\n"
+            "The template is a format string that may use these variables:\n\n"
+            + bullet_list(["name", "repository", "sub_repository"])
+            + "\n\n"
+            "The `name` is the value of the `docker_image(image_name)` field, which defaults to "
+            "the target name, and the `repository` is the `docker_image(repository)` field, which "
+            "defaults to the name of the directory in which the BUILD file is for the target, and "
+            "finally the `sub_repository` is like that of repository but including the parent "
+            "directory as well.\n\n"
+            "Use the `docker_image(image_name_template)` field to override this default template.\n"
+            "Any registries or tags are added to the image name as required, and should not be "
+            "part of the name template."
+        )
         super().register_options(register)
         register("--registries", type=dict, fromfile=True, help=registries_help)
+        register(
+            "--default-image-name-template",
+            type=str,
+            help=image_name_help,
+            default=image_name_default,
+        )
+
+    @property
+    def default_image_name_template(self) -> str:
+        return cast(str, self.options.default_image_name_template)
 
     @memoized_method
     def registries(self) -> DockerRegistries:

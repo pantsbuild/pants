@@ -26,6 +26,31 @@ class DockerImageVersion(StringField):
     help = "Image tag to apply to built images."
 
 
+class DockerImageName(StringField):
+    alias = "image_name"
+    help = (
+        "The Docker image name, defaults is to use the target name.\n\n"
+        "Note that the final image name(s) is made up of registries, repository, name and "
+        "tags, which involves several fields from this target."
+    )
+
+
+class DockerImageNameTemplate(StringField):
+    alias = "image_name_template"
+    help = (
+        "To override the default `[docker].default_image_name_template` configuration. See the "
+        "documentation for that configuration option for how to use this value."
+    )
+
+
+class DockerImageTags(StringSequenceField):
+    alias = "image_tags"
+    help = (
+        "Any tags to apply to the Docker image name, in addition to the default from the "
+        "`version` field."
+    )
+
+
 class DockerDependencies(Dependencies):
     supports_transitive_excludes = True
 
@@ -70,13 +95,25 @@ class DockerRegistriesField(StringSequenceField):
     )
 
 
+class DockerRepository(StringField):
+    alias = "repository"
+    help = (
+        "The repository part for the Docker image name.\n\n"
+        "By default, it uses the directory name of the BUILD file for this target."
+    )
+
+
 class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerDependencies,
+        DockerImageName,
+        DockerImageNameTemplate,
         DockerImageSources,
+        DockerImageTags,
         DockerImageVersion,
         DockerRegistriesField,
+        DockerRepository,
     )
     help = "A Docker image."
