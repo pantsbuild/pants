@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 import os
@@ -7,12 +8,18 @@ from dataclasses import dataclass
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
-from pants.backend.docker.subsystem import DockerOptions, DockerRegistries
-from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion, DockerRegistry
+from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.target_types import (
+    DockerImageSources,
+    DockerImageVersion,
+    DockerRegistriesField,
+)
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +29,7 @@ class DockerFieldSet(PackageFieldSet):
     required_fields = (DockerImageSources,)
 
     image_version: DockerImageVersion
-    registry: DockerRegistry
+    registries: DockerRegistriesField
     sources: DockerImageSources
 
     @property
@@ -39,11 +46,13 @@ class DockerFieldSet(PackageFieldSet):
     def image_name(self) -> str:
         return ":".join(s for s in [self.address.target_name, self.image_version.value] if s)
 
-    def image_tag(self, registries: DockerRegistries) -> str:
-        registry = registries.get(self.registry.value)
-        if registry:
-            return "/".join([registry.address, self.image_name])
-        return self.image_name
+    def image_tags(self, registries: DockerRegistries) -> tuple[str, ...]:
+        image_name = self.image_name
+        registries_options = tuple(registries.get(*(self.registries.value or [])))
+        if not registries_options:
+            return (image_name,)
+
+        return tuple("/".join([registry.address, image_name]) for registry in registries_options)
 
 
 @rule
@@ -62,22 +71,24 @@ async def build_docker_image(
         ),
     )
 
-    image_tag = field_set.image_tag(options.registries())
+    image_tags = field_set.image_tags(options.registries())
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
-            tag=image_tag,
+            tags=image_tags,
             digest=context.digest,
             dockerfile=field_set.dockerfile_path,
         ),
     )
 
     logger.debug(
-        f"Docker build output for {image_tag}:\n"
+        f"Docker build output for {image_tags[0]}:\n"
         f"{result.stdout.decode()}\n"
         f"{result.stderr.decode()}"
     )
+
+    image_tags_string = image_tags[0] if len(image_tags) == 1 else (f"\n{bullet_list(image_tags)}")
 
     return BuiltPackage(
         result.output_digest,
@@ -85,11 +96,11 @@ async def build_docker_image(
             BuiltPackageArtifact(
                 relpath=None,
                 extra_log_lines=(
-                    f"Built docker image: {image_tag}",
+                    f"Built docker image: {image_tags_string}",
                     "To try out the image interactively:",
-                    f"    docker run -it --rm {image_tag} [entrypoint args...]",
+                    f"    docker run -it --rm {image_tags[0]} [entrypoint args...]",
                     "To push your image:",
-                    f"    docker push {image_tag}",
+                    f"    docker push {image_tags[0]}",
                     "",
                 ),
             ),

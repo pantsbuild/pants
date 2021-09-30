@@ -95,19 +95,20 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     assert_build(rule_runner, Address("docker/test"), "Built docker image: test:1.2.3")
 
 
-def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
+def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
                 """\
-                docker_image(name="addr1", version="1.2.3", registry="myregistry1domain:port")
-                docker_image(name="addr2", version="1.2.3", registry="myregistry2domain:port")
-                docker_image(name="addr3", version="1.2.3", registry="myregistry3domain:port")
-                docker_image(name="alias1", version="1.2.3", registry="@reg1")
-                docker_image(name="alias2", version="1.2.3", registry="@reg2")
-                docker_image(name="alias3", version="1.2.3", registry="reg3")
-                docker_image(name="unreg", version="1.2.3", registry="")
+                docker_image(name="addr1", version="1.2.3", registries=["myregistry1domain:port"])
+                docker_image(name="addr2", version="1.2.3", registries=["myregistry2domain:port"])
+                docker_image(name="addr3", version="1.2.3", registries=["myregistry3domain:port"])
+                docker_image(name="alias1", version="1.2.3", registries=["@reg1"])
+                docker_image(name="alias2", version="1.2.3", registries=["@reg2"])
+                docker_image(name="alias3", version="1.2.3", registries=["reg3"])
+                docker_image(name="unreg", version="1.2.3", registries=[])
                 docker_image(name="def", version="1.2.3")
+                docker_image(name="multi", version="1.2.3", registries=["@reg2", "@reg1"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -167,5 +168,15 @@ def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="def"),
         "Built docker image: myregistry2domain:port/def:1.2.3",
+        options=options,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="multi"),
+        (
+            "Built docker image: \n"
+            "  * myregistry2domain:port/multi:1.2.3\n"
+            "  * myregistry1domain:port/multi:1.2.3"
+        ),
         options=options,
     )
