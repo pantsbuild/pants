@@ -66,14 +66,8 @@ class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
 async def inject_go_package_dependencies(
     request: InjectGoPackageDependenciesRequest,
 ) -> InjectedDependencies:
-    owning_go_mod = await Get(
-        OwningGoMod, OwningGoModRequest(request.dependencies_field.address.spec_path)
-    )
-    return (
-        InjectedDependencies([owning_go_mod.address])
-        if owning_go_mod.address
-        else InjectedDependencies()
-    )
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.dependencies_field.address))
+    return InjectedDependencies([owning_go_mod.address])
 
 
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
