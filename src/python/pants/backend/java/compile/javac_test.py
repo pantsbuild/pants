@@ -156,7 +156,6 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-@pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -204,7 +203,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         rule_runner.request(CompiledClassfiles, [request])
 
 
-@maybe_skip_jdk_test
+@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -451,7 +450,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     )
 
 
-@maybe_skip_jdk_test
+@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
     rather than explicitly."""
