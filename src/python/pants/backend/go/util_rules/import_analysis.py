@@ -39,7 +39,8 @@ async def determine_go_std_lib_imports() -> GoStdLibImports:
     list_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            command=("list", "-json", "std"),
+            # "-find" skips determining dependencies and imports for each package.
+            command=("list", "-find", "-json", "std"),
             description="Ask Go for its available import paths",
         ),
     )

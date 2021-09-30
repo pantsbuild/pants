@@ -205,7 +205,8 @@ async def compute_package_import_paths_from_external_module(
         ProcessResult,
         GoSdkProcess(
             input_digest=downloaded_module.digest,
-            command=("list", "-json", "./..."),
+            # "-find" skips determining dependencies and imports for each package.
+            command=("list", "-find", "-json", "./..."),
             description=(
                 "Determine import paths in Go external module "
                 f"{request.module_path}@{request.version}"
