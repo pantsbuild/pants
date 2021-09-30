@@ -304,17 +304,17 @@ async fn output_overlapping_file_and_dir() {
 #[tokio::test]
 async fn append_only_cache_created() {
   let name = "geo";
-  let dest = format!(".cache/{}", name);
+  let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = CacheDest::new(dest.clone()).unwrap();
+  let cache_dest = CacheDest::new(format!("{}/{}", dest_base, name)).unwrap();
   let result = run_command_locally(
-    Process::new(vec!["/bin/ls".to_owned(), dest.clone()])
+    Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
   )
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!("{}\n", dest).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);

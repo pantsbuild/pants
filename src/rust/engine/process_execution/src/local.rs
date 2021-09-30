@@ -466,106 +466,16 @@ pub trait CapturedWorkdir {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
 
-    // If named caches are configured, collect the symlinks to create.
-    let named_cache_symlinks = self
-      .named_caches()
-      .local_paths(&req.append_only_caches)
-      .collect::<Vec<_>>();
-
-    // Capture argv0 as the executable path so that we can test whether we have created it in the
-    // sandbox.
-    let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
-      if let Some(working_directory) = &req.working_directory {
-        working_directory.join(relative_path)
-      } else {
-        relative_path
-      }
-    });
-
-    // Start with async materialization of input snapshots, followed by synchronous materialization
-    // of other configured inputs. Note that we don't do this in parallel, as that might cause
-    // non-determinism when paths overlap.
-    let store2 = store.clone();
-    let workdir_path_2 = workdir_path.clone();
-    let input_files = req.input_files;
-    in_workunit!(
-      context.workunit_store.clone(),
-      "setup_sandbox".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
-      |_workunit| async move {
-        store2
-          .materialize_directory(workdir_path_2, input_files)
-          .await
-      },
+    // Prepare the workdir.
+    let exclusive_spawn = prepare_workdir(
+      workdir_path.clone(),
+      &req,
+      context.clone(),
+      store.clone(),
+      executor.clone(),
+      self.named_caches(),
     )
     .await?;
-
-    let workdir_path2 = workdir_path.clone();
-    let output_file_paths = req.output_files.clone();
-    let output_dir_paths = req.output_directories.clone();
-    let maybe_jdk_home = req.jdk_home.clone();
-    let exclusive_spawn = executor
-      .spawn_blocking(move || {
-        if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path2.join(".jdk"))
-            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
-        }
-
-        // The bazel remote execution API specifies that the parent directories for output files and
-        // output directories should be created before execution completes: see
-        //   https://github.com/pantsbuild/pants/issues/7084.
-        // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
-        // even more efficient to only retain the directories at greatest nesting depth, as
-        // create_dir_all() will ensure all parents are created. At that point, we might consider
-        // explicitly enumerating all the directories to be created and just using create_dir(),
-        // unless there is some optimization in create_dir_all() that makes that less efficient.
-        let parent_paths_to_create: HashSet<_> = output_file_paths
-          .iter()
-          .chain(output_dir_paths.iter())
-          .map(|relative_path| relative_path.as_ref())
-          .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
-          .filter_map(|rel_path| rel_path.parent())
-          .map(|parent_relpath| workdir_path2.join(parent_relpath))
-          .collect();
-        for path in parent_paths_to_create {
-          create_dir_all(path.clone()).map_err(|err| {
-            format!(
-              "Error making parent directory {:?} for local execution: {:?}",
-              path, err
-            )
-          })?;
-        }
-
-        for named_cache_symlink in named_cache_symlinks {
-          symlink(
-            &named_cache_symlink.src,
-            workdir_path2.join(&named_cache_symlink.dst),
-          )
-          .map_err(|err| {
-            format!(
-              "Error making {:?} for local execution: {:?}",
-              named_cache_symlink, err
-            )
-          })?;
-        }
-
-        let exe_was_materialized = maybe_executable_path
-          .as_ref()
-          .map_or(false, |p| workdir_path2.join(&p).exists());
-        if exe_was_materialized {
-          debug!(
-            "Obtaining exclusive spawn lock for process since \
-                 we materialized its executable {:?}.",
-            maybe_executable_path
-          );
-        }
-        let res: Result<_, String> = Ok(exe_was_materialized);
-        res
-      })
-      .await?;
 
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
@@ -595,7 +505,7 @@ pub trait CapturedWorkdir {
       }
     };
 
-    // Capture the process outputs, and optionally clean up the workdir.
+    // Capture the process outputs.
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
@@ -694,6 +604,128 @@ pub trait CapturedWorkdir {
     context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+}
+
+///
+/// Prepares the given workdir for use by the given Process.
+///
+/// Returns true if the executable for the Process was created in the workdir, indicating that
+/// `exclusive_spawn` is required.
+///
+pub async fn prepare_workdir(
+  workdir_path: PathBuf,
+  req: &Process,
+  context: Context,
+  store: Store,
+  executor: task_executor::Executor,
+  named_caches: &NamedCaches,
+) -> Result<bool, String> {
+  // If named caches are configured, collect the symlinks to create.
+  let named_cache_symlinks = named_caches
+    .local_paths(&req.append_only_caches)
+    .collect::<Vec<_>>();
+
+  // Capture argv0 as the executable path so that we can test whether we have created it in the
+  // sandbox.
+  let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
+    if let Some(working_directory) = &req.working_directory {
+      working_directory.join(relative_path)
+    } else {
+      relative_path
+    }
+  });
+
+  // Start with async materialization of input snapshots, followed by synchronous materialization
+  // of other configured inputs. Note that we don't do this in parallel, as that might cause
+  // non-determinism when paths overlap.
+  let store2 = store.clone();
+  let workdir_path_2 = workdir_path.clone();
+  let input_files = req.input_files;
+  in_workunit!(
+    context.workunit_store.clone(),
+    "setup_sandbox".to_owned(),
+    WorkunitMetadata {
+      level: Level::Trace,
+      ..WorkunitMetadata::default()
+    },
+    |_workunit| async move {
+      store2
+        .materialize_directory(workdir_path_2, input_files)
+        .await
+    },
+  )
+  .await?;
+
+  let workdir_path2 = workdir_path.clone();
+  let output_file_paths = req.output_files.clone();
+  let output_dir_paths = req.output_directories.clone();
+  let maybe_jdk_home = req.jdk_home.clone();
+  let exclusive_spawn = executor
+    .spawn_blocking(move || {
+      if let Some(jdk_home) = maybe_jdk_home {
+        symlink(jdk_home, workdir_path2.join(".jdk"))
+          .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
+      }
+
+      // The bazel remote execution API specifies that the parent directories for output files and
+      // output directories should be created before execution completes: see
+      //   https://github.com/pantsbuild/pants/issues/7084.
+      // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
+      // even more efficient to only retain the directories at greatest nesting depth, as
+      // create_dir_all() will ensure all parents are created. At that point, we might consider
+      // explicitly enumerating all the directories to be created and just using create_dir(),
+      // unless there is some optimization in create_dir_all() that makes that less efficient.
+      let parent_paths_to_create: HashSet<_> = output_file_paths
+        .iter()
+        .chain(output_dir_paths.iter())
+        .map(|relative_path| relative_path.as_ref())
+        .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
+        .filter_map(|rel_path| rel_path.parent())
+        .map(|parent_relpath| workdir_path2.join(parent_relpath))
+        .collect();
+      for path in parent_paths_to_create {
+        create_dir_all(path.clone()).map_err(|err| {
+          format!(
+            "Error making parent directory {:?} for local execution: {:?}",
+            path, err
+          )
+        })?;
+      }
+
+      for named_cache_symlink in named_cache_symlinks {
+        safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+          format!(
+            "Error making {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            err
+          )
+        })?;
+        let dst = workdir_path2.join(&named_cache_symlink.dst);
+        symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+          format!(
+            "Error linking {} -> {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            dst.display(),
+            err
+          )
+        })?;
+      }
+
+      let exe_was_materialized = maybe_executable_path
+        .as_ref()
+        .map_or(false, |p| workdir_path2.join(&p).exists());
+      if exe_was_materialized {
+        debug!(
+          "Obtaining exclusive spawn lock for process since \
+               we materialized its executable {:?}.",
+          maybe_executable_path
+        );
+      }
+      let res: Result<_, String> = Ok(exe_was_materialized);
+      res
+    })
+    .await?;
+  Ok(exclusive_spawn)
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.

@@ -18,7 +18,8 @@ use store::Store;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use crate::{MultiPlatformProcess, Process, ProcessMetadata};
+use crate::local::prepare_workdir;
+use crate::{Context, MultiPlatformProcess, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -49,16 +50,24 @@ pub struct NailgunPool {
   size: usize,
   store: Store,
   executor: Executor,
+  named_caches: NamedCaches,
   processes: Arc<Mutex<Vec<PoolEntry>>>,
 }
 
 impl NailgunPool {
-  pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
+  pub fn new(
+    workdir_base: PathBuf,
+    size: usize,
+    store: Store,
+    executor: Executor,
+    named_caches: NamedCaches,
+  ) -> Self {
     NailgunPool {
       workdir_base,
       size,
       store,
       executor,
+      named_caches,
       processes: Arc::default(),
     }
   }
@@ -70,7 +79,11 @@ impl NailgunPool {
   /// If the server is not running, or if it's running with a different configuration,
   /// this code will start a new server as a side effect.
   ///
-  pub async fn acquire(&self, server_process: Process) -> Result<BorrowedNailgunProcess, String> {
+  pub async fn acquire(
+    &self,
+    server_process: Process,
+    context: Context,
+  ) -> Result<BorrowedNailgunProcess, String> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
     let mut processes = self.processes.lock().await;
@@ -98,8 +111,10 @@ impl NailgunPool {
         name.clone(),
         server_process,
         &self.workdir_base,
+        context,
         &self.store,
         self.executor.clone(),
+        &self.named_caches,
         requested_fingerprint.clone(),
       )
       .await?,
@@ -262,8 +277,10 @@ impl NailgunProcess {
     name: String,
     startup_options: Process,
     workdir_base: &Path,
+    context: Context,
     store: &Store,
     executor: Executor,
+    named_caches: &NamedCaches,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
     let workdir = tempfile::Builder::new()
@@ -271,6 +288,15 @@ impl NailgunProcess {
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
+    prepare_workdir(
+      workdir.path().to_owned(),
+      &startup_options,
+      context.clone(),
+      store.clone(),
+      executor.clone(),
+      named_caches,
+    )
+    .await?;
     store
       .materialize_directory(workdir.path().to_owned(), startup_options.input_files)
       .await?;
@@ -303,6 +329,9 @@ impl NailgunProcess {
       child.id(),
       port
     );
+
+    // Now that we've started it, clear its directory before the first client can access it.
+    clear_workdir(workdir.path(), &executor).await?;
 
     Ok(NailgunProcess {
       port,
@@ -384,42 +413,7 @@ impl BorrowedNailgunProcess {
   pub async fn release(&mut self) -> Result<(), String> {
     let process = self.0.as_ref().expect("release may only be called once.");
 
-    // Move all content into a temporary directory.
-    let garbage_dir = tempfile::Builder::new()
-      .prefix("process-execution")
-      .tempdir_in(process.workdir.path().parent().unwrap())
-      .map_err(|err| {
-        format!(
-          "Error making garbage directory for nailgun cleanup: {:?}",
-          err
-        )
-      })?;
-    let mut dir_entries = tokio::fs::read_dir(process.workdir.path())
-      .await
-      .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
-    while let Some(dir_entry) = dir_entries
-      .next_entry()
-      .await
-      .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
-    {
-      tokio::fs::rename(
-        dir_entry.path(),
-        garbage_dir.path().join(dir_entry.file_name()),
-      )
-      .await
-      .map_err(|e| {
-        format!(
-          "Failed to move {} to garbage: {}",
-          dir_entry.path().display(),
-          e
-        )
-      })?;
-    }
-
-    // And drop it in the background.
-    let _ = process
-      .executor
-      .spawn_blocking(move || std::mem::drop(garbage_dir));
+    clear_workdir(process.workdir.path(), &process.executor).await?;
 
     // Once we've successfully cleaned up, remove the process.
     let _ = self.0.take();
@@ -438,4 +432,43 @@ impl Drop for BorrowedNailgunProcess {
       let _ = process.handle.kill();
     }
   }
+}
+
+async fn clear_workdir(workdir: &Path, executor: &Executor) -> Result<(), String> {
+  // Move all content into a temporary directory.
+  let garbage_dir = tempfile::Builder::new()
+    .prefix("process-execution")
+    .tempdir_in(workdir.parent().unwrap())
+    .map_err(|err| {
+      format!(
+        "Error making garbage directory for nailgun cleanup: {:?}",
+        err
+      )
+    })?;
+  let mut dir_entries = tokio::fs::read_dir(workdir)
+    .await
+    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
+  while let Some(dir_entry) = dir_entries
+    .next_entry()
+    .await
+    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
+  {
+    tokio::fs::rename(
+      dir_entry.path(),
+      garbage_dir.path().join(dir_entry.file_name()),
+    )
+    .await
+    .map_err(|e| {
+      format!(
+        "Failed to move {} to garbage: {}",
+        dir_entry.path().display(),
+        e
+      )
+    })?;
+  }
+
+  // And drop it in the background.
+  let _ = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
+
+  Ok(())
 }
