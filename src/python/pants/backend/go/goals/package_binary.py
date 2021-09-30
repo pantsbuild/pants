@@ -6,11 +6,6 @@ from pathlib import PurePath
 
 from pants.backend.go.target_types import GoBinaryMainAddress
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.go_pkg import (
-    is_first_party_package_target,
-    is_third_party_package_target,
-)
-from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -20,11 +15,9 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -36,45 +29,18 @@ class GoBinaryFieldSet(PackageFieldSet):
 
 
 @rule
-async def package_go_binary(
-    field_set: GoBinaryFieldSet,
-) -> BuiltPackage:
-    main_address = field_set.main_address.value or ""
+async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_go_package_address = await Get(
         Address,
         AddressInput,
-        AddressInput.parse(main_address, relative_to=field_set.address.spec_path),
-    )
-    wrapped_main_go_package_target = await Get(WrappedTarget, Address, main_go_package_address)
-    main_go_package_target = wrapped_main_go_package_target.target
-    built_main_go_package = await Get(
-        BuiltGoPackage, BuildGoPackageRequest(address=main_go_package_target.address, is_main=True)
+        AddressInput.parse(field_set.main_address.value, relative_to=field_set.address.spec_path),
     )
 
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(roots=[main_go_package_target.address])
+    built_package = await Get(
+        BuiltGoPackage, BuildGoPackageRequest(main_go_package_address, is_main=True)
     )
-    buildable_deps = [
-        tgt
-        for tgt in transitive_targets.dependencies
-        if is_first_party_package_target(tgt) or is_third_party_package_target(tgt)
-    ]
-
-    built_transitive_go_deps_requests = [
-        Get(BuiltGoPackage, BuildGoPackageRequest(address=tgt.address)) for tgt in buildable_deps
-    ]
-    built_transitive_go_deps = await MultiGet(built_transitive_go_deps_requests)
-
-    gathered_imports = await Get(
-        GatheredImports,
-        GatherImportsRequest(
-            packages=FrozenOrderedSet(built_transitive_go_deps),
-            include_stdlib=True,
-        ),
-    )
-
     input_digest = await Get(
-        Digest, MergeDigests([gathered_imports.digest, built_main_go_package.object_digest])
+        Digest, MergeDigests([built_package.object_digest, built_package.imports_digest])
     )
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
@@ -86,7 +52,7 @@ async def package_go_binary(
             archives=("./__pkg__.a",),
             import_config_path="./importcfg",
             output_filename=f"./{output_filename.name}",
-            description="Link Go binary.",
+            description=f"Link Go binary for {field_set.address}",
         ),
     )
 
@@ -99,7 +65,4 @@ async def package_go_binary(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(PackageFieldSet, GoBinaryFieldSet),
-    ]
+    return [*collect_rules(), UnionRule(PackageFieldSet, GoBinaryFieldSet)]

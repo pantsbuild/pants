@@ -19,6 +19,7 @@ from pants.backend.go.util_rules import (
     import_analysis,
     link,
     sdk,
+    tests_analysis,
 )
 
 
@@ -39,6 +40,7 @@ def rules():
         *go_pkg.rules(),
         *link.rules(),
         *sdk.rules(),
+        *tests_analysis.rules(),
         *tailor.rules(),
         *target_type_rules.rules(),
         *custom_goals.rules(),

@@ -10,7 +10,7 @@ import ijson
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix
 from pants.engine.process import ProcessResult
@@ -71,7 +71,7 @@ def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
 
 
 @rule
-async def resolve_go_module(
+async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
@@ -115,34 +115,36 @@ async def resolve_go_module(
     )
 
 
+# TODO: Have `go_package` have a required field associating with `go_mod` target.
 @dataclass(frozen=True)
 class OwningGoModRequest:
-    spec_path: str
+    address: Address
 
 
 @dataclass(frozen=True)
 class OwningGoMod:
-    address: Address | None
+    address: Address
 
 
 @rule
-async def find_nearest_go_module(request: OwningGoModRequest) -> OwningGoMod:
-    spec_path = request.spec_path
+async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     candidate_targets = await Get(
-        UnexpandedTargets,
-        AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),
+        UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
     )
-    go_module_targets = [tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)]
-
-    # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
-    sorted_go_module_targets = sorted(
-        go_module_targets, key=lambda tgt: tgt.address.spec_path, reverse=True
+    # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
+    go_mod_targets = sorted(
+        (tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)),
+        key=lambda tgt: tgt.address.spec_path,
+        reverse=True,
     )
-    if sorted_go_module_targets:
-        nearest_go_module_target = sorted_go_module_targets[0]
-        return OwningGoMod(nearest_go_module_target.address)
-    # TODO: Consider eventually requiring all go_package's to associate with a go_module.
-    return OwningGoMod(None)
+    if not go_mod_targets:
+        raise Exception(
+            f"The target {request.address} does not have any `go_mod` target in any ancestor "
+            "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
+            "`go_mod` target (you can run `./pants tailor` to do this)."
+        )
+    nearest_go_mod_target = go_mod_targets[0]
+    return OwningGoMod(nearest_go_mod_target.address)
 
 
 def rules():
