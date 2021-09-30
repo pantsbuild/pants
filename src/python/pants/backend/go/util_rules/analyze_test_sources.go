@@ -14,7 +14,6 @@ import (
 	"strings"
 )
 
-
 //
 // Parse Go sources and extract various metadata about the tests contained therein.
 // Based in part on:
@@ -36,7 +35,7 @@ import (
 
 type TestCase struct {
 	Package string `json:"package"`
-	Name string `json:"name"`
+	Name    string `json:"name"`
 }
 
 // TestSourcesMetadata contains metadata about tests/benchmarks extracted from the parsed sources.
@@ -114,7 +113,7 @@ func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata,
 				continue
 			}
 			metadata.Tests = append(metadata.Tests, &TestCase{
-				Name: fn.Name.Name,
+				Name:    fn.Name.Name,
 				Package: pkgName,
 			})
 		}
@@ -123,7 +122,7 @@ func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata,
 				continue
 			}
 			metadata.Benchmarks = append(metadata.Benchmarks, &TestCase{
-				Name: fn.Name.Name,
+				Name:    fn.Name.Name,
 				Package: pkgName,
 			})
 		}
@@ -168,8 +167,6 @@ func main() {
 		}
 		amtWritten += n
 	}
-
-
 
 	os.Exit(0)
 }
