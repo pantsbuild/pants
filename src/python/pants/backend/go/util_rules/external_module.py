@@ -178,8 +178,7 @@ async def resolve_external_go_package(
 class ExternalModulePkgImportPathsRequest:
     """Request the import paths for all packages belonging to an external Go module.
 
-    The `go_sum_digest` must have a `go.sum` file that includes the module and its dependencies,
-    else the user will get a `missing go.sum entry` error.
+    The `go_sum_digest` must have a `go.sum` file that includes the module.
     """
 
     module_path: str
