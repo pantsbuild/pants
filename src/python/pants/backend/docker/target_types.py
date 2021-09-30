@@ -3,8 +3,15 @@
 
 from textwrap import dedent
 
-from pants.backend.docker.subsystem import DEFAULT_REGISTRY
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
+from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    Sources,
+    StringField,
+    StringSequenceField,
+    Target,
+)
 
 
 class DockerImageSources(Sources):
@@ -23,14 +30,16 @@ class DockerDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class DockerRegistry(StringField):
-    alias = "registry"
-    default = DEFAULT_REGISTRY
+class DockerRegistriesField(StringSequenceField):
+    alias = "registries"
+    default = (ALL_DEFAULT_REGISTRIES,)
     help = (
-        "Address to Docker registry to use for the built image.\n\n"
-        "This is either the domain name with optional port for your registry, or a registry alias "
-        "prefixed with `@` for a registry configuration listed in the [docker].registries "
-        "configuration section.\n"
+        "List of addresses or configured aliases to any Docker registries to use for the "
+        "built image.\n\n"
+        "The address is a domain name with optional port for your registry, and any registry "
+        "aliases are prefixed with `@` for addresses in the [docker].registries configuration "
+        "section.\n\n"
+        "By default, all configured registries with `default = true` are used.\n\n"
         + dedent(
             """\
             Example:
@@ -46,15 +55,17 @@ class DockerRegistry(StringField):
 
                 # example/BUILD
                 docker_image(
-                    registry = "@my-registry-alias" | "myregistrydomain:port" | ""
+                    registries = [
+                        "@my-registry-alias",
+                        "myregistrydomain:port",
+                    ],
                 )
 
             """
         )
         + (
-            "The above example shows three valid `registry` options: using an alias to a configured "
-            "registry, the address to a registry verbatim in the BUILD file, and last explicitly no "
-            "registry even if there is a default registry configured."
+            "The above example shows two valid `registry` options: using an alias to a configured "
+            "registry and the address to a registry verbatim in the BUILD file."
         )
     )
 
@@ -66,6 +77,6 @@ class DockerImage(Target):
         DockerDependencies,
         DockerImageSources,
         DockerImageVersion,
-        DockerRegistry,
+        DockerRegistriesField,
     )
     help = "A Docker image."
