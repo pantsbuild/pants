@@ -23,26 +23,33 @@ class AnalyzeTestSourcesRequest:
 
 
 @dataclass(frozen=True)
-class TestCase:
+class GoTestCase:
     name: str
     package: str
 
     @classmethod
-    def from_json_dict(cls, data: dict) -> TestCase:
+    def from_json_dict(cls, data: dict) -> GoTestCase:
         return cls(name=data["name"], package=data["package"])
 
 
 @dataclass(frozen=True)
 class AnalyzedTestSources:
-    tests: FrozenOrderedSet[TestCase]
-    benchmarks: FrozenOrderedSet[TestCase]
+    tests: FrozenOrderedSet[GoTestCase]
+    benchmarks: FrozenOrderedSet[GoTestCase]
     has_test_main: bool
 
     @classmethod
     def from_json_dict(cls, data: dict) -> AnalyzedTestSources:
+        def ensure_list(xs):
+            return xs if xs is not None else []
+
         return cls(
-            tests=FrozenOrderedSet([TestCase.from_json_dict(d) for d in data["tests"]]),
-            benchmarks=FrozenOrderedSet([TestCase.from_json_dict(d) for d in data["benchmarks"]]),
+            tests=FrozenOrderedSet(
+                [GoTestCase.from_json_dict(d) for d in ensure_list(data.get("tests", []))]
+            ),
+            benchmarks=FrozenOrderedSet(
+                [GoTestCase.from_json_dict(d) for d in ensure_list(data.get("benchmarks", []))]
+            ),
             has_test_main=data["has_test_main"],
         )
 
@@ -119,7 +126,7 @@ async def analyze_test_sources(
         ),
     )
 
-    metadata = json.loads(result.stdout)
+    metadata = json.loads(result.stdout.decode("utf-8"))
     return AnalyzedTestSources.from_json_dict(metadata)
 
 
