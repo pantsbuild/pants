@@ -20,8 +20,8 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
 from pants.backend.go.util_rules.external_module import (
-    ResolveExternalGoModuleToPackagesRequest,
-    ResolveExternalGoModuleToPackagesResult,
+    PackagesFromExternalModule,
+    PackagesFromExternalModuleRequest,
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
@@ -239,9 +239,9 @@ async def generate_go_external_package_targets(
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
     all_resolved_packages = await MultiGet(
         Get(
-            ResolveExternalGoModuleToPackagesResult,
-            ResolveExternalGoModuleToPackagesRequest(
-                path=module_descriptor.path,
+            PackagesFromExternalModule,
+            PackagesFromExternalModuleRequest(
+                module_path=module_descriptor.path,
                 version=module_descriptor.version,
                 go_sum_digest=go_mod_info.go_sum_stripped_digest,
             ),
@@ -266,11 +266,7 @@ async def generate_go_external_package_targets(
 
     return GeneratedTargets(
         request.generator,
-        (
-            create_tgt(pkg)
-            for resolved_pkgs in all_resolved_packages
-            for pkg in resolved_pkgs.packages
-        ),
+        (create_tgt(pkg) for resolved_pkgs in all_resolved_packages for pkg in resolved_pkgs),
     )
 
 

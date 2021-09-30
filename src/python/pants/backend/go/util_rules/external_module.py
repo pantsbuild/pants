@@ -16,6 +16,7 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -34,7 +35,6 @@ from pants.engine.fs import (
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
 
@@ -178,30 +178,26 @@ async def resolve_external_go_package(
 
 
 @dataclass(frozen=True)
-class ResolveExternalGoModuleToPackagesRequest:
-    path: str
+class PackagesFromExternalModuleRequest:
+    module_path: str
     version: str
     go_sum_digest: Digest
 
 
-@dataclass(frozen=True)
-class ResolveExternalGoModuleToPackagesResult:
-    # TODO: Consider using DeduplicatedCollection if this is the only field.
-    packages: FrozenOrderedSet[ResolvedGoPackage]
+class PackagesFromExternalModule(DeduplicatedCollection[ResolvedGoPackage]):
+    pass
 
 
 @rule
-async def resolve_external_module_to_go_packages(
-    request: ResolveExternalGoModuleToPackagesRequest,
-) -> ResolveExternalGoModuleToPackagesResult:
-    module_path = request.path
-    assert module_path
+async def compute_packages_from_external_module(
+    request: PackagesFromExternalModuleRequest,
+) -> PackagesFromExternalModule:
+    module_path = request.module_path
     module_version = request.version
-    assert module_version
 
     downloaded_module = await Get(
         DownloadedExternalModule,
-        DownloadExternalModuleRequest(path=module_path, version=module_version),
+        DownloadExternalModuleRequest(module_path, module_version),
     )
     sources_digest = await Get(Digest, AddPrefix(downloaded_module.digest, "__sources__"))
 
@@ -224,15 +220,7 @@ async def resolve_external_module_to_go_packages(
             break
     go_sum_contents = left_go_sum_contents + b"\n" + right_go_sum_contents
     go_sum_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    path="__sources__/go.sum",
-                    content=go_sum_contents,
-                )
-            ]
-        ),
+        Digest, CreateDigest([FileContent("__sources__/go.sum", go_sum_contents)])
     )
 
     sources_digest_no_go_sum = await Get(
@@ -250,7 +238,7 @@ async def resolve_external_module_to_go_packages(
 
     input_digest = await Get(Digest, MergeDigests([sources_digest_no_go_sum, go_sum_digest]))
 
-    result = await Get(
+    json_result = await Get(
         ProcessResult,
         GoSdkProcess(
             input_digest=input_digest,
@@ -260,14 +248,12 @@ async def resolve_external_module_to_go_packages(
         ),
     )
 
-    packages: OrderedSet[ResolvedGoPackage] = OrderedSet()
-    for metadata in ijson.items(result.stdout, "", multiple_values=True):
-        package = ResolvedGoPackage.from_metadata(
+    return PackagesFromExternalModule(
+        ResolvedGoPackage.from_metadata(
             metadata, module_path=module_path, module_version=module_version
         )
-        packages.add(package)
-
-    return ResolveExternalGoModuleToPackagesResult(packages=FrozenOrderedSet(packages))
+        for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
+    )
 
 
 def rules():
