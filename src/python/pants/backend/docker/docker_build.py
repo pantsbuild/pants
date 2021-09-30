@@ -50,13 +50,14 @@ class DockerFieldSet(PackageFieldSet):
     def dockerfile_path(self) -> str:
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
-    def image_names(self, name_template: str, registries: DockerRegistries) -> tuple[str, ...]:
-        if self.name_template.value:
-            name_template = self.name_template.value
-
+    def image_names(
+        self, default_name_template: str, registries: DockerRegistries
+    ) -> tuple[str, ...]:
+        """This method will always return a non-empty tuple."""
         default_parent = path.basename(path.dirname(self.address.spec_path))
         default_repo = path.basename(self.address.spec_path)
         repo = self.repository.value or default_repo
+        name_template = self.name_template.value or default_name_template
         image_name = name_template.format(
             name=self.name.value or self.address.target_name,
             repository=repo,
