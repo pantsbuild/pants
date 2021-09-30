@@ -321,6 +321,9 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
+    named_caches_dir = (
+        rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+    )
     sources = rule_runner.request(
         Digest,
         [
@@ -387,10 +390,8 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
                 ["--backend-packages=pants.backend.python"],
                 env_inherit={"PATH", "PYENV_ROOT", "HOME"},
             )
+
             # Clear the cache.
-            named_caches_dir = (
-                rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-            )
             venv_dir = os.path.join(named_caches_dir, "pex_root", pex_data.pex.venv_rel_dir)
             assert os.path.isdir(venv_dir)
             safe_rmtree(venv_dir)
