@@ -6,8 +6,8 @@ import textwrap
 
 import pytest
 
-from pants.backend.go.util_rules import compile, import_analysis, link, sdk, test_analysis
-from pants.backend.go.util_rules.test_analysis import (
+from pants.backend.go.util_rules import compile, import_analysis, link, sdk, tests_analysis
+from pants.backend.go.util_rules.tests_analysis import (
     AnalyzedTestSources,
     AnalyzeTestSourcesRequest,
     GoTestCase,
@@ -22,7 +22,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *test_analysis.rules(),
+            *tests_analysis.rules(),
             *import_analysis.rules(),
             *compile.rules(),
             *link.rules(),
