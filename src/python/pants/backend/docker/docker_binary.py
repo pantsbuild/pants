@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -16,6 +18,7 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
+from pants.util.strutil import pluralize
 
 
 class DockerBinary(BinaryPath):
@@ -23,8 +26,12 @@ class DockerBinary(BinaryPath):
 
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
-    def build_image(self, tag: str, digest: Digest, dockerfile: Optional[str] = None) -> Process:
-        args = [self.path, "build", "-t", tag]
+    def build_image(
+        self, tags: tuple[str, ...], digest: Digest, dockerfile: Optional[str] = None
+    ) -> Process:
+        args = [self.path, "build"]
+        for tag in tags:
+            args.extend(["-t", tag])
         if dockerfile:
             args.extend(["-f", dockerfile])
 
@@ -34,7 +41,10 @@ class DockerBinary(BinaryPath):
         return Process(
             argv=tuple(args),
             input_digest=digest,
-            description=f"Building docker image {tag}",
+            description=(
+                f"Building docker image {tags[0]}"
+                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else ".")
+            ),
         )
 
 

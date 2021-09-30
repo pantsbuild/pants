@@ -4,9 +4,7 @@
 import pytest
 
 from pants.backend.docker.registries import (
-    DEFAULT_REGISTRY,
     DockerRegistries,
-    DockerRegistryError,
     DockerRegistryOptions,
     DockerRegistryOptionsNotFoundError,
 )
@@ -20,49 +18,42 @@ def test_docker_registries() -> None:
         }
     )
 
-    assert registries["@reg1"].address == "myregistry1domain:port"
-    assert registries["@reg2"].address == "myregistry2domain:port"
-    assert registries["@reg2"].default is False
+    assert registries.default == ()
+    assert list(registries.get()) == []
+    assert len(list(registries.get("@reg1"))) == 1
+    assert len(list(registries.get("@reg2"))) == 1
+    assert len(list(registries.get("@reg1", "@reg2"))) == 2
+    assert next(registries.get("@reg1")).address == "myregistry1domain:port"
+    assert next(registries.get("@reg2")).address == "myregistry2domain:port"
+    assert next(registries.get("@reg2")).default is False
+    assert [r.address for r in registries.get("@reg1", "@reg2")] == [
+        "myregistry1domain:port",
+        "myregistry2domain:port",
+    ]
 
     with pytest.raises(DockerRegistryOptionsNotFoundError):
-        registries.get("@reg3")
+        list(registries.get("@reg3"))
 
-    assert registries.get("myregistry3domain:port") == DockerRegistryOptions(
-        address="myregistry3domain:port"
-    )
+    assert list(registries.get("myregistry3domain:port")) == [
+        DockerRegistryOptions(address="myregistry3domain:port")
+    ]
 
-    assert registries.get(None) is None
-    assert registries.get(DEFAULT_REGISTRY) is None
-
-    # Test default.
+    # Test defaults.
     registries = DockerRegistries.from_dict(
         {
-            "reg1": {"address": "myregistry1domain:port"},
+            "reg1": {"address": "myregistry1domain:port", "default": "false"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
+            "reg3": {"address": "myregistry3domain:port", "default": "true"},
         }
     )
 
-    assert registries["@reg2"].default is True
-    assert registries.get(DEFAULT_REGISTRY) == registries["@reg2"]
-    assert registries.get(None) is None
-    assert registries.get("") is None
+    assert next(registries.get("@reg2")).default is True
+    assert [r.address for r in registries.default] == [
+        "myregistry2domain:port",
+        "myregistry3domain:port",
+    ]
 
     # Implicit registry options from address.
-    assert registries.get("myunregistereddomain:port") == DockerRegistryOptions(
+    assert next(registries.get("myunregistereddomain:port")) == DockerRegistryOptions(
         address="myunregistereddomain:port"
     )
-
-    # There may be at most one default.
-    with pytest.raises(
-        DockerRegistryError,
-        match=(
-            r"Multiple default Docker registries in the \[docker\]\.registries "
-            r"configuration: reg[12], reg[12]\."
-        ),
-    ):
-        registries = DockerRegistries.from_dict(
-            {
-                "reg1": {"address": "myregistry1domain:port", "default": "true"},
-                "reg2": {"address": "myregistry2domain:port", "default": "true"},
-            }
-        )

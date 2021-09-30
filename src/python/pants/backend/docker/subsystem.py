@@ -32,14 +32,12 @@ class DockerOptions(Subsystem):
                 """
             )
             + (
-                "Only one registry may be declared as the default registry. If a registry value "
-                "is not provided in a `docker_image` target, the address of the default registry "
-                "will be used, if any.\n"
-                "The `docker_image.registry` may be provided with either the registry address or "
-                'the registry alias prefixed with `@`, or the empty string `""` if the image '
-                "should not be associated with a custom registry.\n"
-                "A configured registry is made default either by setting `default = true` or with "
-                'an alias of `"default"`.'
+                "If no registries are provided in a `docker_image` target, then all default "
+                "addresses will be used, if any.\n"
+                "The `docker_image.registries` may be provided with a list of registry addresses "
+                "and registry aliases prefixed with `@` to be used instead of the defaults.\n"
+                "A configured registry is marked as default either by setting `default = true` "
+                'or with an alias of `"default"`.'
             )
         )
         super().register_options(register)

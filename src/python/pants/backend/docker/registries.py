@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Generator
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
 
-DEFAULT_REGISTRY = "@<default>"
+ALL_DEFAULT_REGISTRIES = "<all default registries>"
 
 
 class DockerRegistryError(ValueError):
@@ -42,58 +42,36 @@ class DockerRegistryOptions:
         registries[self.address] = self
         if self.alias:
             registries[f"@{self.alias}"] = self
-        if self.default:
-            registries[DEFAULT_REGISTRY] = self
 
 
 @dataclass(frozen=True)
 class DockerRegistries:
+    default: tuple[DockerRegistryOptions, ...]
     registries: FrozenDict[str, DockerRegistryOptions]
-
-    def __post_init__(self):
-        defaults = set()
-        for alias, registry in self.registries.items():
-            if registry.default:
-                defaults.add(registry)
-        if len(defaults) > 1:
-            raise DockerRegistryError(
-                "Multiple default Docker registries in the [docker].registries configuration: "
-                + ", ".join(registry.alias for registry in defaults)
-                + "."
-            )
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> DockerRegistries:
         registries: dict[str, DockerRegistryOptions] = {}
         for alias, options in d.items():
             DockerRegistryOptions.from_dict(alias, options).register(registries)
-        return cls(FrozenDict(registries))
+        return cls(
+            default=tuple(
+                sorted({r for r in registries.values() if r.default}, key=lambda r: r.address)
+            ),
+            registries=FrozenDict(registries),
+        )
 
-    def __getitem__(self, alias_or_address: str | None) -> DockerRegistryOptions:
-        return cast(DockerRegistryOptions, self.get(alias_or_address, implicit_options=False))
-
-    def get(
-        self, alias_or_address: str | None, implicit_options: bool = True
-    ) -> DockerRegistryOptions | None:
-        if not alias_or_address:
-            return None
-
-        if alias_or_address in self.registries:
-            return self.registries[alias_or_address]
-        elif alias_or_address == DEFAULT_REGISTRY:
-            if not implicit_options:
+    def get(self, *aliases_or_addresses: str) -> Generator[DockerRegistryOptions, None, None]:
+        for alias_or_address in aliases_or_addresses:
+            if alias_or_address in self.registries:
+                # Get configured registry by "@alias" or "address".
+                yield self.registries[alias_or_address]
+            elif alias_or_address.startswith("@"):
                 raise DockerRegistryOptionsNotFoundError(
-                    "There is no default Docker registry configured."
+                    f"There is no Docker registry configured with alias: {alias_or_address[1:]}."
                 )
+            elif alias_or_address == ALL_DEFAULT_REGISTRIES:
+                yield from self.default
             else:
-                return None
-        elif alias_or_address.startswith("@"):
-            raise DockerRegistryOptionsNotFoundError(
-                f"There is no Docker registry configured with alias: {alias_or_address[1:]}."
-            )
-        elif implicit_options:
-            return DockerRegistryOptions(address=alias_or_address)
-        else:
-            raise DockerRegistryOptionsNotFoundError(
-                f"Unknown Docker registry: {alias_or_address}."
-            )
+                # Assume a explicit address from the BUILD file.
+                yield DockerRegistryOptions(address=alias_or_address)

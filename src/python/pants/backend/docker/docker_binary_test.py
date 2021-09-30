@@ -13,11 +13,12 @@ def test_docker_binary_build_image():
     dockerfile = "src/test/repo/Dockerfile"
     docker = DockerBinary(docker_path)
     digest = Digest(sha256().hexdigest(), 123)
-    tag = "test:latest"
-    build_request = docker.build_image(tag, digest, dockerfile)
+    tags = ["test:0.1.0", "test:latest"]
+    build_request = docker.build_image(tags, digest, dockerfile)
 
     assert build_request == Process(
-        argv=(docker_path, "build", "-t", tag, "-f", dockerfile, "."),
+        argv=(docker_path, "build", "-t", tags[0], "-t", tags[1], "-f", dockerfile, "."),
         input_digest=digest,
-        description=f"Building docker image {tag}",
+        description="",
     )
+    assert build_request.description == "Building docker image test:0.1.0 +1 additional tag."
