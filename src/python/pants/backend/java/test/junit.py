@@ -133,6 +133,7 @@ async def run_junit_test(
             ],
             input_digest=merged_digest,
             output_directories=(reports_dir,),
+            append_only_caches=jdk_setup.append_only_caches,
             description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
             level=LogLevel.DEBUG,
         ),

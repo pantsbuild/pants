@@ -237,16 +237,14 @@ async def coursier_resolve_lockfile(
     process_result = await Get(
         ProcessResult,
         Process(
-            argv=[
-                bash.path,
-                coursier.wrapper_script,
-                coursier.coursier.exe,
-                coursier_report_file_name,
-                *(req.to_coord_str() for req in artifact_requirements),
-            ],
+            argv=coursier.args(
+                [coursier_report_file_name, *(req.to_coord_str() for req in artifact_requirements)],
+                wrapper=[bash.path, coursier.wrapper_script],
+            ),
             input_digest=coursier.digest,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
+            append_only_caches=coursier.append_only_caches,
             description=(
                 "Running `coursier fetch` against "
                 f"{pluralize(len(artifact_requirements), 'requirement')}: "
@@ -340,17 +338,14 @@ async def coursier_fetch_one_coord(
     process_result = await Get(
         ProcessResult,
         Process(
-            argv=[
-                bash.path,
-                coursier.wrapper_script,
-                coursier.coursier.exe,
-                coursier_report_file_name,
-                "--intransitive",
-                request.coord.to_coord_str(),
-            ],
+            argv=coursier.args(
+                [coursier_report_file_name, "--intransitive", request.coord.to_coord_str()],
+                wrapper=[bash.path, coursier.wrapper_script],
+            ),
             input_digest=coursier.digest,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
+            append_only_caches=coursier.append_only_caches,
             description="Run coursier resolve",
             level=LogLevel.DEBUG,
         ),

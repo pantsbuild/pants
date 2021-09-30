@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import textwrap
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Iterable
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -81,6 +81,15 @@ class Coursier:
     digest: Digest
     wrapper_script: ClassVar[str] = "coursier_wrapper_script.sh"
     post_processing_script: ClassVar[str] = "coursier_post_processing_script.py"
+    cache_name: ClassVar[str] = "coursier"
+    cache_dir: ClassVar[str] = ".cache"
+
+    def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
+        return tuple((*wrapper, self.coursier.exe, *args, "--cache", f"{self.cache_dir}"))
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {self.cache_name: self.cache_dir}
 
 
 @rule

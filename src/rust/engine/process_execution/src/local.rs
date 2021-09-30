@@ -16,7 +16,8 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+  self, safe_create_dir_all_ioerror, GlobExpansionConjunction, GlobMatching, PathGlobs,
+  RelativePath, StrictGlobMatching,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};

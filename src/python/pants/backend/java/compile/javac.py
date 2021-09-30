@@ -258,6 +258,7 @@ async def compile_java_source(
             ],
             input_digest=merged_digest,
             use_nailgun=jdk_setup.digest,
+            append_only_caches=jdk_setup.append_only_caches,
             output_directories=(dest_dir,),
             description=f"Compile {request.component.members} with javac",
             level=LogLevel.DEBUG,
