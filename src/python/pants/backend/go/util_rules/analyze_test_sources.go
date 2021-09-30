@@ -35,21 +35,21 @@ import (
 //
 
 type TestCase struct {
-	Package string
-	Name string
+	Package string `json:"package"`
+	Name string `json:"name"`
 }
 
 // TestSourcesMetadata contains metadata about tests/benchmarks extracted from the parsed sources.
 // TODO: "Examples" and "fuzz targets" (Go 1.18+).
 type TestSourcesMetadata struct {
 	// Names of all functions in the test sources that heuristically look like test functions.
-	Tests []TestCase
+	Tests []*TestCase `json:"tests,omit_empty"`
 
 	// Names of all functions in the test sources that heuristically look like benchmark functions.
-	Benchmarks []TestCase
+	Benchmarks []*TestCase `json:"benchmarks,omit_empty"`
 
 	// True if the sources already contain a `TestMain` function (which is the entry point for test binaries).
-	HasTestMain bool
+	HasTestMain bool `json:"has_test_main"`
 }
 
 func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata, error) {
@@ -113,7 +113,7 @@ func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata,
 			if selExpr.Sel.Name != "T" {
 				continue
 			}
-			metadata.Tests = append(metadata.Tests, TestCase{
+			metadata.Tests = append(metadata.Tests, &TestCase{
 				Name: fn.Name.Name,
 				Package: pkgName,
 			})
@@ -122,7 +122,7 @@ func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata,
 			if selExpr.Sel.Name != "B" {
 				continue
 			}
-			metadata.Benchmarks = append(metadata.Benchmarks, TestCase{
+			metadata.Benchmarks = append(metadata.Benchmarks, &TestCase{
 				Name: fn.Name.Name,
 				Package: pkgName,
 			})
@@ -143,8 +143,11 @@ func main() {
 			os.Exit(1)
 		}
 
+		// TODO: Flag duplicate test and benchmark names.
 		allMetadata.Tests = append(allMetadata.Tests, fileMetadata.Tests...)
 		allMetadata.Benchmarks = append(allMetadata.Benchmarks, fileMetadata.Benchmarks...)
+
+		// TODO: Ensure only one TestMain function and flag duplicates.
 		allMetadata.HasTestMain = allMetadata.HasTestMain || fileMetadata.HasTestMain
 	}
 
@@ -153,6 +156,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unable to marshall JSON output: %s", err)
 		os.Exit(1)
 	}
+
+	output = append(output, []byte{'\n'}...)
 
 	amtWritten := 0
 	for amtWritten < len(output) {
@@ -163,6 +168,8 @@ func main() {
 		}
 		amtWritten += n
 	}
+
+
 
 	os.Exit(0)
 }
