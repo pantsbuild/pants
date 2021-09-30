@@ -61,10 +61,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
-        # TODO(#12293): use a fixed JDK version.
-        bootstrap_args=[
-            "--javac-jdk=system",
-        ],
     )
 
 
