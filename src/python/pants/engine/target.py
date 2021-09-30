@@ -605,7 +605,7 @@ class UnexpandedTargets(Collection[Target]):
 
 @dataclass(frozen=True)
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisable."""
+    """A set of Targets which cyclicly reach one another, and are thus indivisible."""
 
     # The members of the cycle.
     members: Tuple[Target, ...]
