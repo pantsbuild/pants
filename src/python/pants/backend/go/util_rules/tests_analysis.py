@@ -36,19 +36,17 @@ class GoTestCase:
 class AnalyzedTestSources:
     tests: FrozenOrderedSet[GoTestCase]
     benchmarks: FrozenOrderedSet[GoTestCase]
+    # TODO: Account for TestMain in internal and/or external test packages.
     has_test_main: bool
 
     @classmethod
     def from_json_dict(cls, data: dict) -> AnalyzedTestSources:
-        def ensure_list(xs):
-            return xs if xs is not None else []
-
+        # Note: The Go `json` package is producing `null` values so the keys may be present but set to `null` so
+        # this code uses `data.get("foo") or []` instead of `data.get("foo", []) to handle that case.
         return cls(
-            tests=FrozenOrderedSet(
-                [GoTestCase.from_json_dict(d) for d in ensure_list(data.get("tests", []))]
-            ),
+            tests=FrozenOrderedSet([GoTestCase.from_json_dict(d) for d in data.get("tests") or []]),
             benchmarks=FrozenOrderedSet(
-                [GoTestCase.from_json_dict(d) for d in ensure_list(data.get("benchmarks", []))]
+                [GoTestCase.from_json_dict(d) for d in data.get("benchmarks") or []]
             ),
             has_test_main=data["has_test_main"],
         )
@@ -66,7 +64,7 @@ async def setup_analyzer() -> AnalyzerSetup:
         "pants.backend.go.util_rules", "analyze_test_sources.go"
     )
     if not source_entry_content:
-        raise ValueError("Unable to find resouce for `analyze_test_sources.go`.")
+        raise AssertionError("Unable to find resource for `analyze_test_sources.go`.")
 
     source_entry = FileContent(
         "analyze_test_sources.go",
@@ -88,7 +86,7 @@ async def setup_analyzer() -> AnalyzerSetup:
             digest=input_digest,
             sources=(source_entry.path,),
             import_path="main",
-            description="Compile Go test sources analyzer.",
+            description="Compile Go test sources analyzer",
             import_config_path="./importcfg",
         ),
     )
@@ -104,7 +102,7 @@ async def setup_analyzer() -> AnalyzerSetup:
             archives=("__pkg__.a",),
             import_config_path="./importcfg",
             output_filename="./analyzer",
-            description="Link Go test sources analyzer.",
+            description="Link Go test sources analyzer",
         ),
     )
 
