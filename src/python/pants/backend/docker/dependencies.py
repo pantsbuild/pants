@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.docker.parser import DockerfileInfo
+from pants.backend.docker.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerDependencies, DockerImageSources
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs

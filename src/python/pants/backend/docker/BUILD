@@ -6,21 +6,21 @@ python_library(
       "*.py",
       "!*_test.py",
       "!dockerfile_parser.py",
-      "!parser.py",
+      "!dockerfile_wrapper_script.py",
   ],
 )
 
 python_library(
-  name="parser",
-  sources=["parser.py"],
-  dependencies=[":dockerfile_parser", ":lockfile"],
+  name="dockerfile_parser",
+  sources=["dockerfile_parser.py"],
+  dependencies=[":dockerfile_tool", ":lockfile"],
 )
 
 resources(name="lockfile", sources=["dockerfile_lockfile.txt"])
 
 python_library(
-  name="dockerfile_parser",
-  sources=["dockerfile_parser.py"],
+  name="dockerfile_tool",
+  sources=["dockerfile_wrapper_script.py"],
 )
 
 python_tests(
