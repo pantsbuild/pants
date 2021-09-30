@@ -19,6 +19,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
+from pants.core.util_rules.archive import ZipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.selectors import MultiGet
@@ -37,7 +38,6 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.core.util_rules.archive import ZipBinary
 
 logger = logging.getLogger(__name__)
 
@@ -179,12 +179,12 @@ async def package_deploy_jar(
     # without exploding the files to disk.
     #
     # `ZIP` files are extracted top-to-bottom and archives can have duplicate names
-    # (e.g. `META-INF/MANIFEST.MF`). In the case of a `JAR` file, the JVM will understand the 
+    # (e.g. `META-INF/MANIFEST.MF`). In the case of a `JAR` file, the JVM will understand the
     # last file with that file name to be the actual one. Therefore, our thin JAR needs to be
     # appear at the end of the file for (in particular) our manifest to take precedence.
-    # If there are duplicate classnames at a given package address fat JARs, then 
+    # If there are duplicate classnames at a given package address fat JARs, then
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
-    
+
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
     input_filenames = " ".join(materialized_classpath.reified_filenames())
     cat_and_repair_script = FileContent(
@@ -200,7 +200,8 @@ async def package_deploy_jar(
 
     cat_and_repair_script_digest = await Get(Digest, CreateDigest([cat_and_repair_script]))
     broken_deploy_jar_inputs_digest = await Get(
-        Digest, MergeDigests([materialized_classpath.digest, cat_and_repair_script_digest, thin_jar])
+        Digest,
+        MergeDigests([materialized_classpath.digest, cat_and_repair_script_digest, thin_jar]),
     )
 
     cat_and_repair = await Get(
