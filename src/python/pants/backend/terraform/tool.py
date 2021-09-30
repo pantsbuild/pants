@@ -2,67 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
+
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
+from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import (
     BinaryNotFoundError,
+    BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
     Process,
+    ProcessCacheScope,
+    ProcessResult,
 )
 from pants.engine.rules import collect_rules, rule
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.ordered_set import OrderedSet
 
+logger = logging.getLogger(__name__)
 
-class TerraformTool(TemplatedExternalTool):
+
+class TerraformSubsystem(Subsystem):
     options_scope = "terraform"
-    name = "terraform"
     help = "Terraform (https://terraform.io)"
-
-    default_version = "1.0.7"
-    default_url_template = (
-        "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{platform}.zip"
-    )
-    default_url_platform_mapping = {
-        "macos_arm64": "darwin_arm64",
-        "macos_x86_64": "darwin_amd64",
-        "linux_x86_64": "linux_amd64",
-    }
-
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "1.0.7|macos_arm64 |cbab9aca5bc4e604565697355eed185bb699733811374761b92000cc188a7725|32071346",
-            "1.0.7|macos_x86_64|80ae021d6143c7f7cbf4571f65595d154561a2a25fd934b7a8ccc1ebf3014b9b|33020029",
-            "1.0.7|linux_x86_64|bc79e47649e2529049a356f9e60e06b47462bf6743534a10a4c16594f443be7b|32671441",
-        ]
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-
-        register(
-            "--path",
-            type=str,
-            default=None,
-            help=(
-                "Use the provided absolute path as the path to the `terraform` binary. "
-                "Prevents the automatic download of Terraform and search of paths.",
-            ),
-        )
 
         register(
             "--search-paths",
@@ -76,6 +50,27 @@ class TerraformTool(TemplatedExternalTool):
                 "The special string '<PATH>' will expand to the contents of the PATH env var."
             ),
         )
+
+        register(
+            "--version-constraint",
+            type=str,
+            default=">=1.0",
+            help=(
+                "One or more semantic version constraints separated by commas used to filter the Terraform "
+                "binaries found by searching `[terraform].search_paths`. For example, to use only 1.0.x releases "
+                "of Terraform, the version constraint could be `>=1.0.0,<1.1`."
+            ),
+        )
+
+    @property
+    def version_constraint_set(self) -> SpecifierSet:
+        try:
+            return SpecifierSet(self.options.version_constraint)
+        except InvalidSpecifier as ex:
+            raise ValueError(
+                f"The --terraform-version-constraint option {self.options.version_constraint} contained "
+                f"an invalid specifier: {ex}"
+            )
 
     def search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
@@ -93,52 +88,76 @@ class TerraformTool(TemplatedExternalTool):
 
 @dataclass(frozen=True)
 class TerraformSetup:
-    digest: Digest
-    path: str
+    path: BinaryPath
 
 
 @rule
-async def find_terraform(terraform: TerraformTool) -> TerraformSetup:
-    if terraform.options.path:
-        return TerraformSetup(digest=EMPTY_DIGEST, path=terraform.options.path)
-
+async def find_terraform(terraform: TerraformSubsystem) -> TerraformSetup:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
     search_paths = terraform.search_paths(env)
-    if search_paths:
-        all_terraform_binary_paths = await Get(
-            BinaryPaths,
-            BinaryPathRequest(
-                search_path=search_paths,
-                binary_name="terraform",
-                test=BinaryPathTest(["version"]),
-            ),
-        )
 
-        if not all_terraform_binary_paths.paths:
-            raise BinaryNotFoundError(
-                "Cannot find any `terraform` binaries using the option "
-                f"`[terraform].search_paths`: {list(search_paths)}\n\n"
-                "To fix, please install one copy of Terraform and ensure "
-                "that it is discoverable via `[terraform].search_paths`."
-            )
-
-        if len(all_terraform_binary_paths.paths) > 1:
-            raise BinaryNotFoundError(
-                "Found multiple `terraform` binaries using the option "
-                f"`[terraform].search_paths`: {list(search_paths)}\n\n"
-                "To fix, please ensure that only one copy of Terraform "
-                "is discoverable via `[terraform].search_paths`."
-            )
-
-        return TerraformSetup(digest=EMPTY_DIGEST, path=all_terraform_binary_paths.paths[0].path)
-
-    downloaded_terraform = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        terraform.get_request(Platform.current),
+    all_terraform_binary_paths = await Get(
+        BinaryPaths,
+        BinaryPathRequest(
+            search_path=search_paths,
+            binary_name="terraform",
+            test=BinaryPathTest(["version"]),
+        ),
     )
 
-    return TerraformSetup(digest=downloaded_terraform.digest, path="./terraform")
+    if not all_terraform_binary_paths.paths:
+        raise BinaryNotFoundError(
+            "Cannot find any `terraform` binaries using the option "
+            f"`[terraform].search_paths`: {list(search_paths)}\n\n"
+            "To fix, please install Terraform and ensure that the `terraform` binary "
+            "is discoverable via `[terraform].search_paths`."
+        )
+
+    version_results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                (binary_path.path, "version"),
+                description=f"Determine Terraform version for {binary_path.path}",
+                level=LogLevel.DEBUG,
+                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            ),
+        )
+        for binary_path in all_terraform_binary_paths.paths
+    )
+
+    constraints_set = terraform.version_constraint_set
+
+    invalid_versions = []
+    for binary_path, version_result in zip(all_terraform_binary_paths.paths, version_results):
+        try:
+            version = Version(version_result.stdout.decode("utf-8").strip())
+        except InvalidVersion:
+            raise AssertionError(
+                f"Failed to parse `terraform version` output for {binary_path}. Please open an issue at "
+                f"https://github.com/pantsbuild/pants/issues/new/choose with the below data."
+                f"\n\n"
+                f"{version_result}"
+            )
+
+        if constraints_set.contains(version):
+            return TerraformSetup(binary_path)
+
+        invalid_versions.append((binary_path.path, version))
+
+    bulleted_list_sep = "\n  * "
+    invalid_versions_str = bulleted_list_sep.join(
+        f"{path}: {version}" for path, version in sorted(invalid_versions)
+    )
+    raise BinaryNotFoundError(
+        "Cannot find a `terraform` binary which satisfies the version constraint "
+        f"`{terraform.options.version_constraint}`.\n\n"
+        f"Found these `terraform` binaries, but they had versions which did not match that constraint:\n"
+        f"{bulleted_list_sep}{invalid_versions_str}\n\n"
+        "To fix, please install a matching version (https://terraform.io) and ensure "
+        "that it is discoverable via the option `[terraform].search_paths`, or change "
+        "`[terraform].version_constraint`."
+    )
 
 
 @dataclass(frozen=True)
@@ -155,14 +174,9 @@ class TerraformProcess:
 async def setup_terraform_process(
     request: TerraformProcess, terraform_setup: TerraformSetup
 ) -> Process:
-    input_digest = await Get(
-        Digest,
-        MergeDigests((request.input_digest, terraform_setup.digest)),
-    )
-
     return Process(
-        argv=(terraform_setup.path,) + request.args,
-        input_digest=input_digest,
+        argv=(terraform_setup.path.path,) + request.args,
+        input_digest=request.input_digest,
         output_files=request.output_files,
         description=request.description,
         level=LogLevel.DEBUG,
