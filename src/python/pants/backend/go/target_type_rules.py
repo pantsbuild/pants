@@ -20,13 +20,14 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
 from pants.backend.go.util_rules.external_module import (
-    PackagesFromExternalModule,
-    PackagesFromExternalModuleRequest,
+    ExternalModulePkgImportPaths,
+    ExternalModulePkgImportPathsRequest,
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
+    ModuleDescriptor,
     OwningGoMod,
     OwningGoModRequest,
 )
@@ -237,10 +238,10 @@ async def generate_go_external_package_targets(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
-    all_resolved_packages = await MultiGet(
+    all_pkg_import_paths = await MultiGet(
         Get(
-            PackagesFromExternalModule,
-            PackagesFromExternalModuleRequest(
+            ExternalModulePkgImportPaths,
+            ExternalModulePkgImportPathsRequest(
                 module_path=module_descriptor.path,
                 version=module_descriptor.version,
                 go_sum_digest=go_mod_info.go_sum_stripped_digest,
@@ -249,24 +250,32 @@ async def generate_go_external_package_targets(
         for module_descriptor in go_mod_info.modules
     )
 
-    def create_tgt(pkg: ResolvedGoPackage) -> GoExternalPackageTarget:
+    def create_tgt(
+        module_descriptor: ModuleDescriptor, pkg_import_path: str
+    ) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(
             {
-                GoExternalModulePathField.alias: pkg.module_path,
-                GoExternalModuleVersionField.alias: pkg.module_version,
-                GoExternalPackageImportPathField.alias: pkg.import_path,
+                GoExternalModulePathField.alias: module_descriptor.path,
+                GoExternalModuleVersionField.alias: module_descriptor.version,
+                GoExternalPackageImportPathField.alias: pkg_import_path,
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             Address(
                 generator_addr.spec_path,
                 target_name=generator_addr.target_name,
-                generated_name=pkg.import_path,
+                generated_name=pkg_import_path,
             ),
         )
 
     return GeneratedTargets(
         request.generator,
-        (create_tgt(pkg) for resolved_pkgs in all_resolved_packages for pkg in resolved_pkgs),
+        (
+            create_tgt(module_descriptor, pkg_import_path)
+            for module_descriptor, pkg_import_paths in zip(
+                go_mod_info.modules, all_pkg_import_paths
+            )
+            for pkg_import_path in pkg_import_paths
+        ),
     )
 
 

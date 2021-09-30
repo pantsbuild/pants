@@ -19,15 +19,11 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestEntries,
     DigestSubset,
-    FileContent,
     FileEntry,
-    GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -42,6 +38,7 @@ from pants.util.strutil import strip_v2_chroot_path
 class DownloadExternalModuleRequest:
     path: str
     version: str
+    go_sum_digest: Digest = EMPTY_DIGEST
 
 
 @dataclass(frozen=True)
@@ -178,80 +175,45 @@ async def resolve_external_go_package(
 
 
 @dataclass(frozen=True)
-class PackagesFromExternalModuleRequest:
+class ExternalModulePkgImportPathsRequest:
+    """Request the import paths for all packages belonging to an external Go module.
+
+    The `go_sum_digest` must have a `go.sum` file that includes the module.
+    """
+
     module_path: str
     version: str
     go_sum_digest: Digest
 
 
-class PackagesFromExternalModule(DeduplicatedCollection[ResolvedGoPackage]):
-    pass
+class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
+    """The import paths for all packages belonging to an external Go module."""
+
+    sort_input = True
 
 
 @rule
-async def compute_packages_from_external_module(
-    request: PackagesFromExternalModuleRequest,
-) -> PackagesFromExternalModule:
-    module_path = request.module_path
-    module_version = request.version
-
+async def compute_package_import_paths_from_external_module(
+    request: ExternalModulePkgImportPathsRequest,
+) -> ExternalModulePkgImportPaths:
     downloaded_module = await Get(
         DownloadedExternalModule,
-        DownloadExternalModuleRequest(module_path, module_version),
+        DownloadExternalModuleRequest(request.module_path, request.version, request.go_sum_digest),
     )
-    sources_digest = await Get(Digest, AddPrefix(downloaded_module.digest, "__sources__"))
-
-    # TODO: Super hacky merge of go.sum from both digests. We should really just pass in the fully-resolved
-    # go.sum and use that, but this allows the go.sum from the downloaded module to have some effect. Not sure
-    # if that is right call, but hackity hack!
-    left_digest_contents = await Get(DigestContents, Digest, sources_digest)
-    left_go_sum_contents = b""
-    for fc in left_digest_contents:
-        if fc.path == "__sources__/go.sum":
-            left_go_sum_contents = fc.content
-            break
-
-    go_sum_prefixed_digest = await Get(Digest, AddPrefix(request.go_sum_digest, "__sources__"))
-    right_digest_contents = await Get(DigestContents, Digest, go_sum_prefixed_digest)
-    right_go_sum_contents = b""
-    for fc in right_digest_contents:
-        if fc.path == "__sources__/go.sum":
-            right_go_sum_contents = fc.content
-            break
-    go_sum_contents = left_go_sum_contents + b"\n" + right_go_sum_contents
-    go_sum_digest = await Get(
-        Digest, CreateDigest([FileContent("__sources__/go.sum", go_sum_contents)])
-    )
-
-    sources_digest_no_go_sum = await Get(
-        Digest,
-        DigestSubset(
-            sources_digest,
-            PathGlobs(
-                ["!__sources__/go.sum", "__sources__/**"],
-                conjunction=GlobExpansionConjunction.all_match,
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="FUNKY",
-            ),
-        ),
-    )
-
-    input_digest = await Get(Digest, MergeDigests([sources_digest_no_go_sum, go_sum_digest]))
-
     json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=input_digest,
-            command=("list", "-json", "./..."),
-            working_dir="__sources__",
-            description=f"Resolve packages in Go external module {module_path}@{module_version}",
+            input_digest=downloaded_module.digest,
+            # "-find" skips determining dependencies and imports for each package.
+            command=("list", "-find", "-json", "./..."),
+            description=(
+                "Determine import paths in Go external module "
+                f"{request.module_path}@{request.version}"
+            ),
         ),
     )
-
-    return PackagesFromExternalModule(
-        ResolvedGoPackage.from_metadata(
-            metadata, module_path=module_path, module_version=module_version
-        )
+    return ExternalModulePkgImportPaths(
+        metadata["ImportPath"]
         for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
     )
 

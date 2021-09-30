@@ -1,16 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.go.util_rules import external_module, sdk
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
     DownloadExternalModuleRequest,
-    PackagesFromExternalModule,
-    PackagesFromExternalModuleRequest,
+    ExternalModulePkgImportPaths,
+    ExternalModulePkgImportPathsRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, Snapshot
+from pants.engine.fs import Snapshot
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -22,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *external_module.rules(),
             QueryRule(DownloadedExternalModule, [DownloadExternalModuleRequest]),
-            QueryRule(PackagesFromExternalModule, [PackagesFromExternalModuleRequest]),
+            QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -64,19 +66,33 @@ def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None
 
 
 def test_resolve_packages_of_go_external_module(rule_runner: RuleRunner) -> None:
-    result = rule_runner.request(
-        PackagesFromExternalModule,
-        [
-            PackagesFromExternalModuleRequest(
-                "github.com/google/go-cmp", "v0.5.6", go_sum_digest=EMPTY_DIGEST
+    go_sum_digest = rule_runner.make_snapshot(
+        {
+            "go.sum": dedent(
+                """\
+                github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
+                github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+                """
             )
-        ],
+        }
+    ).digest
+    result = rule_runner.request(
+        ExternalModulePkgImportPaths,
+        [ExternalModulePkgImportPathsRequest("github.com/google/go-cmp", "v0.5.6", go_sum_digest)],
     )
-
-    import_path_to_package = {pkg.import_path: pkg for pkg in result}
-    assert len(import_path_to_package) > 1
-
-    pkg = import_path_to_package["github.com/google/go-cmp/cmp"]
-    assert pkg.address is None
-    assert pkg.package_name == "cmp"
-    assert len(pkg.go_files) > 0
+    assert result == ExternalModulePkgImportPaths(
+        [
+            "github.com/google/go-cmp/cmp",
+            "github.com/google/go-cmp/cmp/cmpopts",
+            "github.com/google/go-cmp/cmp/internal/diff",
+            "github.com/google/go-cmp/cmp/internal/flags",
+            "github.com/google/go-cmp/cmp/internal/function",
+            "github.com/google/go-cmp/cmp/internal/testprotos",
+            "github.com/google/go-cmp/cmp/internal/teststructs",
+            "github.com/google/go-cmp/cmp/internal/teststructs/foo1",
+            "github.com/google/go-cmp/cmp/internal/teststructs/foo2",
+            "github.com/google/go-cmp/cmp/internal/value",
+        ]
+    )
