@@ -521,9 +521,9 @@ class MaterializedClasspath:
             directory for the process input `Digest`.
         """
 
-        return ":".join(self._reified_filenames(root))
+        return ":".join(self.reified_filenames(root))
 
-    def _reified_filenames(self, root: Optional[str] = None) -> Iterable[str]:
+    def reified_filenames(self, root: Optional[str] = None) -> Iterable[str]:
         for file_name in self.file_names:
             if self.prefix is not None:
                 file_name = os.path.join(self.prefix, file_name)
