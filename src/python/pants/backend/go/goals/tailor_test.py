@@ -64,10 +64,10 @@ def test_find_putative_go_package_targets(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_find_putative_go_module_targets(rule_runner: RuleRunner) -> None:
+def test_find_putative_go_mod_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/go/owned/BUILD": "go_module()\n",
+            "src/go/owned/BUILD": "go_mod()\n",
             "src/go/owned/go.mod": "module example.com/src/go/owned\n",
             "src/go/unowned/go.mod": "module example.com/src/go/unowned\n",
         }

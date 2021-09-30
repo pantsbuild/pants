@@ -58,7 +58,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-# Inject a dependency between a go_package and its owning go_module.
+# Inject a dependency between a go_package and its owning go_mod.
 class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
     inject_for = GoPackageDependencies
 
@@ -115,7 +115,7 @@ async def infer_go_dependencies(
         ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
     )
 
-    # Obtain all go_package targets under this package's go_module.
+    # Obtain all go_package targets under this package's go_mod.
     assert this_go_package.module_address is not None
     spec_path = this_go_package.module_address.spec_path
     address_specs = [
@@ -136,7 +136,7 @@ async def infer_go_dependencies(
     )
     for first_party_go_package in first_party_go_packages:
         # Skip packages that are not part of this package's module.
-        # TODO: This requires that all first-party code in the monorepo be part of the same go_module. Will need
+        # TODO: This requires that all first-party code in the monorepo be part of the same go_mod. Will need
         # figure out how multiple modules in a monorepo can interact.
         if first_party_go_package.module_address != this_go_package.module_address:
             continue
@@ -154,7 +154,7 @@ async def infer_go_dependencies(
         if import_path in std_lib_imports:
             continue
 
-        # Infer first-party dependencies to other packages in same go_module.
+        # Infer first-party dependencies to other packages in same go_mod.
         if import_path in first_party_import_path_to_address:
             inferred_dependencies.append(first_party_import_path_to_address[import_path])
             continue

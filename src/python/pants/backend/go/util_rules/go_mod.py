@@ -71,7 +71,7 @@ def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
 
 
 @rule
-async def resolve_go_module(
+async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
@@ -127,24 +127,24 @@ class OwningGoMod:
 
 
 @rule
-async def find_nearest_go_module(request: OwningGoModRequest) -> OwningGoMod:
+async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     candidate_targets = await Get(
         UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
     )
-    # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
-    go_module_targets = sorted(
+    # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
+    go_mod_targets = sorted(
         (tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
-    if not go_module_targets:
+    if not go_mod_targets:
         raise Exception(
-            f"The target {request.address} does not have any `go_module` target in any ancestor "
+            f"The target {request.address} does not have any `go_mod` target in any ancestor "
             "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
-            "`go_module` target (you can run `./pants tailor` to do this)."
+            "`go_mod` target (you can run `./pants tailor` to do this)."
         )
-    nearest_go_module_target = go_module_targets[0]
-    return OwningGoMod(nearest_go_module_target.address)
+    nearest_go_mod_target = go_mod_targets[0]
+    return OwningGoMod(nearest_go_mod_target.address)
 
 
 def rules():

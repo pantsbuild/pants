@@ -58,40 +58,40 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def assert_go_module_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
+def assert_go_mod_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
     addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
     targets = rule_runner.request(Targets, [addresses])
-    go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModSourcesField)]
-    assert len(go_module_targets) == 1
-    assert go_module_targets[0].address == expected_address
+    go_mod_targets = [tgt for tgt in targets if tgt.has_field(GoModSourcesField)]
+    assert len(go_mod_targets) == 1
+    assert go_mod_targets[0].address == expected_address
 
 
 def test_go_package_dependency_injection(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_module()\n",
+            "foo/BUILD": "go_mod()\n",
             "foo/go.mod": "module foo\n",
             "foo/go.sum": "",
             "foo/pkg/BUILD": "go_package()\n",
             "foo/pkg/foo.go": "package pkg\n",
-            "foo/bar/BUILD": "go_module(name='mod')\ngo_package(name='pkg')\n",
+            "foo/bar/BUILD": "go_mod()\ngo_package(name='pkg')\n",
             "foo/bar/go.mod": "module bar\n",
             "foo/bar/src.go": "package bar\n",
         }
     )
 
     target = rule_runner.get_target(Address("foo/pkg", target_name="pkg"))
-    assert_go_module_address(rule_runner, target, Address("foo"))
+    assert_go_mod_address(rule_runner, target, Address("foo"))
 
     target = rule_runner.get_target(Address("foo/bar", target_name="pkg"))
-    assert_go_module_address(rule_runner, target, Address("foo/bar", target_name="mod"))
+    assert_go_mod_address(rule_runner, target, Address("foo/bar"))
 
 
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         (
             {
-                "foo/BUILD": "go_module()",
+                "foo/BUILD": "go_mod()",
                 "foo/go.mod": textwrap.dedent(
                     """\
                     module go.example.com/foo
@@ -157,7 +157,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/go/BUILD": "go_module()\n",
+            "src/go/BUILD": "go_mod()\n",
             "src/go/go.mod": textwrap.dedent(
                 """\
                 module example.com/src/go
