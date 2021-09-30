@@ -25,6 +25,7 @@ from pants.jvm.resolve.coursier_setup import Coursier
 class JdkSetup:
     digest: Digest
     nailgun_jar: str
+    coursier: Coursier
     jdk_preparation_script: ClassVar[str] = "__jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
@@ -36,6 +37,10 @@ class JdkSetup:
             "-cp",
             ":".join([self.nailgun_jar, *classpath_entries]),
         )
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return self.coursier.append_only_caches
 
 
 @rule
@@ -58,7 +63,9 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         coursier_jdk_option = "--system-jvm"
     else:
         coursier_jdk_option = f"--jvm={javac.options.jdk}"
-    java_home_command = f"{coursier.coursier.exe} java-home {coursier_jdk_option}"
+    java_home_command = " ".join(
+        coursier.args(["java-home", coursier_jdk_option, "--jvm-dir", f"{coursier.cache_dir}/jdk"])
+    )
 
     java_version_result = await Get(
         FallibleProcessResult,
@@ -69,6 +76,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
                 f"$({java_home_command})/bin/java -version",
             ),
             input_digest=coursier.digest,
+            append_only_caches=coursier.append_only_caches,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
@@ -116,6 +124,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
             ),
         ),
         nailgun_jar=nailgun.file_name,
+        coursier=coursier,
     )
 
 

@@ -104,6 +104,13 @@ class RuleRunner:
 
         bootstrap_args = [*bootstrap_args]
 
+        # TODO: Until https://github.com/coursier/coursier/pull/2197 is resolved, we avoid concurrent
+        # use of the named caches via `[pytest] execution_slot_var`.
+        bootstrap_args.append(
+            "--named-caches-dir="
+            f"{os.environ['HOME']}/.cache/pants/named_caches/tests/{os.environ['EXECUTION_SLOT']}"
+        )
+
         root_dir: Path | None = None
         if preserve_tmpdirs:
             root_dir = Path(mkdtemp(prefix="RuleRunner."))

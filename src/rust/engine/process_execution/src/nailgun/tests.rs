@@ -4,24 +4,36 @@ use store::Store;
 use task_executor::Executor;
 use tempfile::TempDir;
 use testutil::owned_string_vec;
+use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::Process;
+use crate::{Context, NamedCaches, Process};
 
 fn pool(size: usize) -> NailgunPool {
+  let _ = WorkunitStore::setup_for_tests();
+  let named_caches_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
   let executor = Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  NailgunPool::new(std::env::temp_dir(), size, store, executor)
+  NailgunPool::new(
+    std::env::temp_dir(),
+    size,
+    store,
+    executor,
+    NamedCaches::new(named_caches_dir.path().to_owned()),
+  )
 }
 
 async fn run(pool: &NailgunPool, port: u16) -> PathBuf {
   let mut p = pool
-    .acquire(Process::new(owned_string_vec(&[
-      "/bin/bash",
-      "-c",
-      &format!("echo Mock port {}.; sleep 10", port),
-    ])))
+    .acquire(
+      Process::new(owned_string_vec(&[
+        "/bin/bash",
+        "-c",
+        &format!("echo Mock port {}.; sleep 10", port),
+      ])),
+      Context::default(),
+    )
     .await
     .unwrap();
   assert_eq!(port, p.port());

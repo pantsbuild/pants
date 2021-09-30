@@ -61,7 +61,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
-        bootstrap_args=["--javac-jdk=system"],  # TODO(#12293): use a fixed JDK version.
     )
 
 
