@@ -82,7 +82,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """
@@ -133,7 +133,7 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
             "go.mod": "module foo.example.com\n",
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """

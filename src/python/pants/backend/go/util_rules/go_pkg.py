@@ -35,10 +35,10 @@ class ResolvedGoPackage:
     # Address of the `go_package` target (if any).
     address: Address | None
 
-    # Import path of this package. The import path will be inferred from an owning `go_module` if present.
+    # Import path of this package. The import path will be inferred from an owning `go_mod` if present.
     import_path: str
 
-    # Address of the owning `go_module` if present. The owning `go_module` is the nearest go_module at the same
+    # Address of the owning `go_mod` if present. The owning `go_mod` is the nearest go_mod at the same
     # or higher level of the source tree.
     module_address: Address | None
 
@@ -109,7 +109,7 @@ class ResolvedGoPackage:
         # TODO: Raise an exception on errors. They are only emitted as warnings for now because the `go` tool is
         # flagging missing first-party code as a dependency error. But we want dependency inference and won't know
         # what the dependency actually is unless we first resolve the package with that dependency. So circular
-        # reasoning. We may need to hydrate the sources for all go_package targets that share a `go_module`.
+        # reasoning. We may need to hydrate the sources for all go_package targets that share a `go_mod`.
         if metadata.get("Incomplete"):
             error_dict = metadata.get("Error", {})
             if error_dict:
@@ -214,9 +214,9 @@ async def resolve_go_package(
         # Use any explicit import path set on the `go_package` target.
         import_path = import_path_field.value
     else:
-        # Otherwise infer the import path from the owning `go_module` target. The inferred import
+        # Otherwise infer the import path from the owning `go_mod` target. The inferred import
         # path will be the module's import path plus any subdirectories in the spec_path
-        # between the go_module and go_package target.
+        # between the go_mod and go_package target.
         import_path = f"{go_mod_info.import_path}/"
         if spec_subpath.startswith("/"):
             import_path += spec_subpath[1:]

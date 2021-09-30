@@ -29,10 +29,10 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_resolve_go_module(rule_runner: RuleRunner) -> None:
+def test_resolve_go_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_module()\n",
+            "foo/BUILD": "go_mod()\n",
             "foo/go.mod": textwrap.dedent(
                 """\
                 module go.example.com/foo

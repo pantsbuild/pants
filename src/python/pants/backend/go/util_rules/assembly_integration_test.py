@@ -95,7 +95,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": dedent(
                 """\
-                go_module(name="mod")
+                go_mod(name="mod")
                 go_package(name="main")
                 """
             ),
