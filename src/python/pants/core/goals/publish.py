@@ -1,185 +1,185 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from pants.engine.unions import UnionRule
+from typing_extensions import final
+from typing import TypeVar, ClassVar, Generic, Type
 import logging
-from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from abc import ABCMeta
+from dataclasses import dataclass, field, replace
+from itertools import chain
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.process import InteractiveProcess, InteractiveRunner
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, Rule
 from pants.engine.target import (
-    COMMON_TARGET_FIELDS,
     FieldSet,
-    SpecialCasedDependencies,
-    Target,
-    Targets,
+    NoApplicableTargetsBehavior,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership, union
-from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.engine.unions import union
 
 logger = logging.getLogger(__name__)
 
 
-class PublishTargetField(SpecialCasedDependencies):
-    alias = "publish_targets"
-    help = "Repositories to publish to."
-
-
-@dataclass(frozen=True)
-class PublishTargetFieldSet(FieldSet):
-    required_fields = (PublishTargetField,)
-
+_F = TypeVar("_F", bound=FieldSet)
 
 @union
 @dataclass(frozen=True)
-class PublishRequest:
-    built_package: BuiltPackage
-    fieldset: PublishTargetFieldSet
-    publish_target: "PublishTarget"
+class PublishPackagesRequest(Generic[_F]):
+    field_set: _F
+    packages: tuple[BuiltPackage, ...]
 
 
-class PublishTarget(Target):
-    core_fields = (*COMMON_TARGET_FIELDS,)
+_T = TypeVar("_T", bound=PublishPackagesRequest)
 
-    publish_request_type: ClassVar[Type[PublishRequest]]
-    publishee_fieldset_type: ClassVar[Type[PublishTargetFieldSet]] = PublishTargetFieldSet
+@union
+@dataclass(frozen=True)
+class PublishFieldSet(FieldSet, metaclass=ABCMeta):
+    """The fields necessary to publish an asset from a target.
+
+    Implementing rules should subclass this class ... and return a PublishPackageArtifactRequest as
+    output.
+
+    """
+    publish_request_type: ClassVar[Type[_T]]
+
+    @final
+    def request(self, packages: tuple[BuiltPackage, ...]) -> _T:
+        return self.publish_request_type(field_set=self, packages=packages)
+
+    @final
+    @classmethod
+    def rules(cls) -> tuple[Rule, ...]:
+        return (
+            UnionRule(PublishFieldSet, cls),
+            UnionRule(PublishPackagesRequest, cls.publish_request_type),
+        )
+
+
+@dataclass(frozen=True)
+class PublishPackageProcesses:
+    """Process to run in order to publish named artifact.
+
+    This is returned from implementing rules in response to processing a PublishFieldSet.
+
+    There are multiple names to support processes working on several packages for each process.
+    There are multiple processes to support publishing to several upstream services for each package.
+    """
+
+    names: tuple[str, ...]
+    processes: tuple[InteractiveProcess, ...]
+
+
+@dataclass(frozen=True)
+class PublishPackagesProcesses:
+    packages: tuple[PublishPackageProcesses, ...]
+
+
+@dataclass(frozen=True)
+class PublishPackagesProcessesRequest:
+    package_field_sets: tuple[PackageFieldSet, ...]
+    publish_field_sets: tuple[PublishFieldSet, ...]
+
 
 
 class PublishSubsystem(GoalSubsystem):
     name = "publish"
-    help = "Publish packages."
+    help = "Publish deliverables (assets, distributions, images, etc)."
+
+    required_union_implementations = (PublishFieldSet,)
 
 
 class Publish(Goal):
     subsystem_cls = PublishSubsystem
 
 
-@dataclass(frozen=True)
-class PublishProcess:
-    # If process is None, consider publish 'skipped'.
-    # e.g. incompatibility between source and destination.
-    process: Optional[InteractiveProcess]
-    message: Optional[str] = None
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PublishedPackageSet:
-    publishes: FrozenOrderedSet[PublishProcess]
-
-    def __init__(self, published_packages: Iterable[PublishProcess]):
-        self.publishes = FrozenOrderedSet(published_packages)
-
-
-def _can_package(target: Target, union_membership: UnionMembership):
-    package_request_types = cast(Iterable[Type[PackageFieldSet]], union_membership[PackageFieldSet])
-
-    for fieldset in package_request_types:
-        if fieldset.is_applicable(target):
-            return fieldset
-
-    return False
-
-
 @goal_rule
-async def publish(
-    targets: Targets,
-    union_membership: UnionMembership,
-    console: Console,
-) -> Publish:
-    publishable_targets: List[Tuple[Target, PackageFieldSet]] = []
-
-    # Retrieve publishable targets and their package type.
-    for target in targets:
-        if PublishTargetFieldSet.is_applicable(target):
-            package_fieldset = _can_package(target, union_membership)
-            if package_fieldset:
-                publishable_targets.append((target, package_fieldset))
-            else:
-                logger.warn(
-                    f"Unable to publish {target.address} as it is not a packageable target."
-                )
-                return Publish(exit_code=1)
-
-    # Get the publish targets (destination)
-    publish_targets_set = cast(
-        Iterable[Iterable[PublishTarget]],
-        await MultiGet(
-            Get(
-                Targets,
-                UnparsedAddressInputs,
-                publishable[PublishTargetField].to_unparsed_address_inputs(),
-            )
-            for (publishable, _) in publishable_targets
-        ),
-    )
-
-    # get the built packages.
-    built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, package_fieldset.create(target))
-        for (target, package_fieldset) in publishable_targets
-    )
-
-    # Build a list of requests, ensuring that the publishable is valid for the
-    # publish target. Error if not.
-    requests: List[PublishRequest] = []
-
-    for (target, _), publish_targets, built_package in zip(
-        publishable_targets, publish_targets_set, built_packages
-    ):
-        for publish_target in publish_targets:
-            if not publish_target.publishee_fieldset_type.is_applicable(target):
-                logger.warn(f"Cannot publish {target.address} to {publish_target.address}.")
-                return Publish(exit_code=1)
-            fieldset = publish_target.publishee_fieldset_type.create(target)
-
-            logger.debug(f"Publishing {target.address} to {publish_target.address}")
-            requests.append(
-                publish_target.publish_request_type(
-                    built_package,
-                    fieldset,
-                    publish_target,
-                )
-            )
-
-    processes = await MultiGet(Get(PublishProcess, PublishRequest, request) for request in requests)
-
-    exit_code = 0
-
-    for (target, _), request, process in zip(publishable_targets, requests, processes):
-        if process.process is None:
-            sigil = console.sigil_skipped()
-            status = "Unable to publish"
-            message = process.message
-        else:
-            result = await Get(
-                InteractiveProcessResult,
-                InteractiveProcess,
-                process.process,
-            )
-            message = process.message or ""
-
-            if result.exit_code == 0:
-                sigil = console.sigil_succeeded()
-                status = "Published"
-            else:
-                exit_code = 1
-                sigil = console.sigil_failed()
-                status = "Failed to publish"
-
-        console.print_stderr(
-            f"{sigil} {status} {target.address} to {request.publish_target.address}{message}"
+async def publish_asset(console: Console, interactive_runner: InteractiveRunner) -> Publish:
+    target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
+        Get(
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                field_set,
+                goal_description="the `publish` goal",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            ),
         )
-        if message:
-            console.print_stderr(message)
+        for field_set in [PackageFieldSet, PublishFieldSet]
+    )
 
-    return Publish(exit_code=exit_code)
+    # Only keep field sets that both package someething, and have something to publish.
+    targets = set(target_roots_to_package_field_sets.targets).intersection(
+        set(target_roots_to_publish_field_sets.targets)
+    )
+
+    if not targets:
+        return Publish(exit_code=0)
+
+    # Build all packages and request the processes to run for each field set.
+    work = await MultiGet(
+        Get(
+            PublishPackagesProcesses,
+            PublishPackagesProcessesRequest(
+                target_roots_to_package_field_sets.mapping[tgt],
+                target_roots_to_publish_field_sets.mapping[tgt],
+            ),
+        )
+        for tgt in targets
+    )
+
+    # Run all processes interactively.
+    exit_code = 0
+    for pkg in chain.from_iterable(wrk.packages for wrk in work):
+        if not pkg.processes:
+            sigil = console.sigil_skipped()
+            for name in pkg.names:
+                console.print_stderr(f"{sigil} {name} skipped.")
+            continue
+
+        for res in (interactive_runner.run(proc) for proc in pkg.processes):
+            if res.exit_code == 0:
+                sigil = console.sigil_succeeded()
+                status = "published"
+            else:
+                sigil = console.sigil_failed()
+                status = "failed"
+                exit_code = res.exit_code
+
+            for name in pkg.names:
+                console.print_stderr(f"{sigil} {name} {status}.")
+
+    return Publish(exit_code)
+
+
+@rule
+async def package_for_publish(request: PublishPackagesProcessesRequest) -> PublishPackagesProcesses:
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in request.package_field_sets
+    )
+
+    for pkg in packages:
+        for artifact in pkg.artifacts:
+            if artifact.relpath:
+                logger.info(f"Packaged {artifact.relpath}")
+            elif artifact.extra_log_lines:
+                logger.info(str(artifact.extra_log_lines[0]))
+
+    publish = await MultiGet(
+        Get(
+            PublishPackagesProcesses,
+            PublishPackagesRequest,
+            field_set.request(packages),
+        ) for field_set in request.publish_field_sets
+    )
+
+    # Merge all PublishPackagesProcesses into one.
+    return PublishPackagesProcesses(tuple(chain.from_iterable(pub.packages for pub in publish)))
 
 
 def rules():
