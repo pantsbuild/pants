@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.backend.docker.subsystem import DEFAULT_REGISTRY
+from pants.backend.docker.registries import DEFAULT_REGISTRY
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, StringField, Target
 
 

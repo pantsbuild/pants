@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.docker.subsystem import (
+from pants.backend.docker.registries import (
     DEFAULT_REGISTRY,
     DockerRegistries,
     DockerRegistryError,

@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
 from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
-from pants.backend.docker.subsystem import DockerOptions, DockerRegistries
+from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.subsystem import DockerOptions
 from pants.backend.docker.target_types import DockerImageSources, DockerImageVersion, DockerRegistry
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.process import Process, ProcessResult
