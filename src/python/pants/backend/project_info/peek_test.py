@@ -38,14 +38,14 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "sources": [
+                    "sources_raw": [
                       "*.txt"
                     ],
-                    "expanded_sources": [
+                    "sources": [
                       "foo.txt",
                       "bar.txt"
                     ],
-                    "expanded_dependencies": []
+                    "dependencies": []
                   }
                 ]
                 """
@@ -67,12 +67,12 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "dependencies": null,
+                    "dependencies_raw": null,
                     "description": null,
-                    "sources": [],
+                    "sources_raw": [],
                     "tags": null,
-                    "expanded_sources": [],
-                    "expanded_dependencies": []
+                    "sources": [],
+                    "dependencies": []
                   }
                 ]
                 """
@@ -109,14 +109,14 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "sources": [
+                    "sources_raw": [
                       "*.txt"
                     ],
                     "tags": [
                       "zippable"
                     ],
-                    "expanded_sources": [],
-                    "expanded_dependencies": []
+                    "sources": [],
+                    "dependencies": []
                   },
                   {
                     "address": "example:archive_target",
@@ -126,7 +126,7 @@ from pants.testutil.rule_runner import RuleRunner
                     ],
                     "format": "zip",
                     "output_path": "my-archive.zip",
-                    "expanded_dependencies": [
+                    "dependencies": [
                       "foo/bar:baz",
                       "qux:quux"
                     ]
