@@ -14,8 +14,8 @@ from pants.backend.go.target_types import (
     GoExternalModuleVersionField,
     GoExternalPackageImportPathField,
     GoExternalPackageTarget,
-    GoModule,
-    GoModuleSources,
+    GoModSourcesField,
+    GoModTarget,
     GoPackage,
     GoPackageSources,
 )
@@ -52,7 +52,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, [InferGoPackageDependenciesRequest]),
             QueryRule(GeneratedTargets, [GenerateGoExternalPackageTargetsRequest]),
         ],
-        target_types=[GoPackage, GoModule, GoExternalPackageTarget],
+        target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -61,7 +61,7 @@ def rule_runner() -> RuleRunner:
 def assert_go_module_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
     addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
     targets = rule_runner.request(Targets, [addresses])
-    go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModuleSources)]
+    go_module_targets = [tgt for tgt in targets if tgt.has_field(GoModSourcesField)]
     assert len(go_module_targets) == 1
     assert go_module_targets[0].address == expected_address
 

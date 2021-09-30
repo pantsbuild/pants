@@ -7,13 +7,10 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.backend.go.util_rules import go_mod, sdk
-from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.build_graph.address import Address
-from pants.core.util_rules import external_tool, source_files
-from pants.engine import fs
-from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -22,21 +19,17 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *external_tool.rules(),
-            *source_files.rules(),
-            *fs.rules(),
             *sdk.rules(),
             *go_mod.rules(),
-            QueryRule(ResolvedGoModule, [ResolveGoModuleRequest]),
-            QueryRule(DigestContents, [Digest]),
+            QueryRule(GoModInfo, [GoModInfoRequest]),
         ],
-        target_types=[GoPackage, GoModule],
+        target_types=[GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
-def test_resolve_go_module(rule_runner: RuleRunner) -> None:
+def test_go_mod_info(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/pkg/foo.go": "package pkg\n",
@@ -70,17 +63,20 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
                 """
             ),
             "foo/main.go": "package main\nfunc main() { }\n",
-            "foo/BUILD": "go_module(name='mod')\ngo_package(name='pkg')\n",
+            "foo/BUILD": dedent(
+                """\
+                go_module(name='mod')
+                go_package(name='pkg')
+                """
+            ),
         }
     )
     resolved_go_module = rule_runner.request(
-        ResolvedGoModule, [ResolveGoModuleRequest(Address("foo", target_name="mod"))]
+        GoModInfo, [GoModInfoRequest(Address("foo", target_name="mod"))]
     )
     assert resolved_go_module.import_path == "go.example.com/foo"
-    assert resolved_go_module.minimum_go_version == "1.17"
-    assert len(resolved_go_module.modules) > 0
-    found_protobuf_module = False
-    for module_descriptor in resolved_go_module.modules:
-        if module_descriptor.path == "github.com/golang/protobuf":
-            found_protobuf_module = True
-    assert found_protobuf_module
+    assert resolved_go_module.modules
+    assert any(
+        module_descriptor.path == "github.com/golang/protobuf"
+        for module_descriptor in resolved_go_module.modules
+    )

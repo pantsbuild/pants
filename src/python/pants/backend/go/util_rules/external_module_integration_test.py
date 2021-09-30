@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.backend.go.util_rules import external_module, sdk
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             ),
             QueryRule(DigestContents, [Digest]),
         ],
-        target_types=[GoPackage, GoModule],
+        target_types=[GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

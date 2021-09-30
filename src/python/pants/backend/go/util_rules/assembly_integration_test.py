@@ -6,7 +6,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoExternalPackageTarget, GoModule, GoPackage
+from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -40,7 +40,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
         ],
-        target_types=[GoPackage, GoModule, GoExternalPackageTarget],
+        target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

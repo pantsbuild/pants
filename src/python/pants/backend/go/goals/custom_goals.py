@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
-from pants.backend.go.util_rules.go_mod import ResolvedGoModule, ResolveGoModuleRequest
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.go_pkg import (
     ResolvedGoPackage,
     ResolveGoPackageRequest,
@@ -16,7 +16,7 @@ from pants.backend.go.util_rules.go_pkg import (
     is_third_party_package_target,
 )
 from pants.engine.console import Console
-from pants.engine.fs import Workspace
+from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
@@ -38,16 +38,17 @@ class GoResolveGoal(Goal):
 
 @goal_rule
 async def run_go_resolve(targets: UnexpandedTargets, workspace: Workspace) -> GoResolveGoal:
-    # TODO: Use MultiGet to resolve the go_module targets.
-    # TODO: Combine all of the go.sum's into a single Digest to write.
-    for target in targets:
-        if target.has_field(GoModuleSources):
-            resolved_go_module = await Get(ResolvedGoModule, ResolveGoModuleRequest(target.address))
-            # TODO: Only update the files if they actually changed.
-            workspace.write_digest(resolved_go_module.digest, path_prefix=target.address.spec_path)
-            logger.info(f"{target.address}: Updated go.mod and go.sum.\n")
-        else:
-            logger.info(f"{target.address}: Skipping because target is not a `go_module`.\n")
+    all_go_mod_info = await MultiGet(
+        Get(GoModInfo, GoModInfoRequest(target.address))
+        for target in targets
+        if target.has_field(GoModSourcesField)
+    )
+    result = await Get(
+        Snapshot, MergeDigests(go_mod_info.digest for go_mod_info in all_go_mod_info)
+    )
+    logger.info(f"Updating these files: {list(result.files)}")
+    # TODO: Only update the files if they actually changed.
+    workspace.write_digest(result.digest)
     return GoResolveGoal(exit_code=0)
 
 

@@ -5,7 +5,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.backend.go.util_rules import compile, sdk
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Snapshot, [Digest]),
             QueryRule(CompiledGoSources, [CompileGoSourcesRequest]),
         ],
-        target_types=[GoPackage, GoModule],
+        target_types=[GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
