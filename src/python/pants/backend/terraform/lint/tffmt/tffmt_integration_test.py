@@ -22,7 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         target_types=[TerraformModuleTarget],
         rules=[
             *external_tool.rules(),
@@ -36,6 +36,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 GOOD_SOURCE = FileContent(
@@ -100,11 +102,10 @@ def run_tffmt(
 ) -> Tuple[Sequence[LintResult], FmtResult]:
     args = [
         "--backend-packages=pants.backend.experimental.terraform",
-        "--backend-packages=pants.backend.experimental.terraform.lint.tffmt",
     ]
     if skip:
         args.append("--terraform-fmt-skip")
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH"})
     field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [TffmtRequest(field_sets)])
     input_sources = rule_runner.request(

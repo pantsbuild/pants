@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -42,7 +43,7 @@ class TerraformSubsystem(Subsystem):
             "--search-paths",
             type=list,
             member_type=str,
-            default=[],
+            default=["<PATH>"],
             help=(
                 "A list of paths to search for Terraform.\n\n"
                 "Specify absolute paths to directories with the `terraform` binary, e.g. `/usr/bin`. "
@@ -117,7 +118,7 @@ async def find_terraform(terraform: TerraformSubsystem) -> TerraformSetup:
         Get(
             ProcessResult,
             Process(
-                (binary_path.path, "version"),
+                (binary_path.path, "version", "-json"),
                 description=f"Determine Terraform version for {binary_path.path}",
                 level=LogLevel.DEBUG,
                 cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
@@ -131,7 +132,9 @@ async def find_terraform(terraform: TerraformSubsystem) -> TerraformSetup:
     invalid_versions = []
     for binary_path, version_result in zip(all_terraform_binary_paths.paths, version_results):
         try:
-            version = Version(version_result.stdout.decode("utf-8").strip())
+            version = Version(
+                json.loads(version_result.stdout.decode("utf-8"))["terraform_version"]
+            )
         except InvalidVersion:
             raise AssertionError(
                 f"Failed to parse `terraform version` output for {binary_path}. Please open an issue at "

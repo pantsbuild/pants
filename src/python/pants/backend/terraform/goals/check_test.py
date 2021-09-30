@@ -36,6 +36,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 GOOD_SOURCE = FileContent(
@@ -79,9 +81,20 @@ def run_terraform_validate(
     rule_runner: RuleRunner,
     targets: List[Target],
     *,
+<<<<<<< HEAD:src/python/pants/backend/terraform/goals/check_test.py
     args: list[str] | None = None,
 ) -> Sequence[CheckResult]:
     rule_runner.set_options(args or ())
+=======
+    skip: bool = False,
+) -> Sequence[LintResult]:
+    args = [
+        "--backend-packages=pants.backend.experimental.terraform",
+    ]
+    if skip:
+        args.append("--terraform-validate-skip")
+    rule_runner.set_options(args, env_inherit={"PATH"})
+>>>>>>> 91c42fdc7 (fix tests):src/python/pants/backend/terraform/lint/validate/validate_integration_test.py
     field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     check_results = rule_runner.request(CheckResults, [TerraformCheckRequest(field_sets)])
     return check_results.results
