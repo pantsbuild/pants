@@ -183,14 +183,15 @@ class DescendantAddresses(MaybeEmptyDescendantAddresses):
 
 @dataclass(frozen=True)
 class AscendantAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located recursively _above_ the given directory."""
+    """An AddressSpec representing all addresses located recursively in and above the given
+    directory."""
 
     directory: str
 
     def __str__(self) -> str:
         return f"{self.directory}^"
 
-    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
         return tuple(
             os.path.join(f, pattern)
             for pattern in build_patterns
@@ -198,8 +199,8 @@ class AscendantAddresses(AddressGlobSpec):
         )
 
     def matching_address_families(
-        self, address_families_dict: Mapping[str, "AddressFamily"]
-    ) -> Tuple["AddressFamily", ...]:
+        self, address_families_dict: Mapping[str, AddressFamily]
+    ) -> tuple[AddressFamily, ...]:
         return tuple(
             af
             for ns, af in address_families_dict.items()

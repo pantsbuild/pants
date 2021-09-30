@@ -192,12 +192,9 @@ async def resolve_go_package(
 ) -> ResolvedGoPackage:
     wrapped_target, owning_go_mod = await MultiGet(
         Get(WrappedTarget, Address, request.address),
-        Get(OwningGoMod, OwningGoModRequest(request.address.spec_path)),
+        Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
     target = wrapped_target.target
-
-    if not owning_go_mod.address:
-        raise ValueError(f"The go_package at address {request.address} has no owning go_module.")
 
     go_mod_spec_path = owning_go_mod.address.spec_path
     assert request.address.spec_path.startswith(go_mod_spec_path)

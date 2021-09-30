@@ -164,15 +164,15 @@ class PythonSetup(Subsystem):
                 "and/or to directories containing interpreter binaries. The order of entries does "
                 "not matter.\n\n"
                 "The following special strings are supported:\n\n"
-                '* "<PATH>", the contents of the PATH env var\n'
-                '* "<ASDF>", all Python versions currently configured by ASDF '
-                "(asdf shell, ${HOME}/.tool-versions), with a fallback to all installed versions\n"
-                '* "<ASDF_LOCAL>", the ASDF interpreter with the version in '
+                "* `<PATH>`, the contents of the PATH env var\n"
+                "* `<ASDF>`, all Python versions currently configured by ASDF "
+                "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
+                "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
                 "BUILD_ROOT/.tool-versions\n"
-                '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
-                '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
+                "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
+                "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
                 "BUILD_ROOT/.python-version\n"
-                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc'
+                "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
             ),
         )
         register(
