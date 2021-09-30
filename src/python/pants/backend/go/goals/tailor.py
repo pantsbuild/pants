@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 
-from pants.backend.go.target_types import GoModule, GoPackage
+from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -61,7 +61,7 @@ async def find_putative_go_module_targets(
     for dirname, filenames in group_by_dir(unowned_go_mod_files).items():
         putative_targets.append(
             PutativeTarget.for_target_type(
-                GoModule,
+                GoModTarget,
                 dirname,
                 os.path.basename(dirname),
                 sorted(filenames),

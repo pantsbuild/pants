@@ -8,6 +8,7 @@ from typing import Optional
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
+    GoExternalPackageTarget,
     GoPackageSources,
 )
 from pants.backend.go.util_rules.assembly import (
@@ -53,6 +54,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
 class BuiltGoPackage:
     import_path: str
     object_digest: Digest
+    imports_digest: Digest
 
 
 @rule
@@ -73,6 +75,7 @@ async def build_target(
         source_files_digest = source_files.snapshot.digest
         source_files_subpath = target.address.spec_path
     elif is_third_party_package_target(target):
+        assert isinstance(target, GoExternalPackageTarget)
         module_path = target[GoExternalModulePathField].value
         module, resolved_package = await MultiGet(
             Get(
@@ -82,7 +85,7 @@ async def build_target(
                     version=target[GoExternalModuleVersionField].value,
                 ),
             ),
-            Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=request.address)),
+            Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(target)),
         )
 
         source_files_digest = module.digest
@@ -148,7 +151,11 @@ async def build_target(
         )
         output_digest = assembly_result.merged_output_digest
 
-    return BuiltGoPackage(import_path=import_path, object_digest=output_digest)
+    return BuiltGoPackage(
+        import_path=import_path,
+        object_digest=output_digest,
+        imports_digest=gathered_imports.digest,
+    )
 
 
 def rules():

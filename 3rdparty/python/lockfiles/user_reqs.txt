@@ -11,7 +11,6 @@
 #   "generated_with_requirements": [
 #     "PyYAML<5.5,>=5.4",
 #     "ansicolors==1.1.8",
-#     "dockerfile==3.2.0",
 #     "fasteners==0.16",
 #     "freezegun==1.1.0",
 #     "humbug==0.2.6",
@@ -53,10 +52,6 @@ charset-normalizer==2.0.5; python_full_version >= "3.6.0" and python_version >= 
 colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and sys_platform == "win32" or sys_platform == "win32" and python_version >= "3.6" and python_full_version >= "3.5.0" \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
-dockerfile==3.2.0; python_full_version >= "3.6.1" \
-    --hash=sha256:e6e00b82b82042fb4df569ae00bd2648ac6c8823f51c406da31ab01c728926c2 \
-    --hash=sha256:e6bd64408386b7ba2259d85820e0fe90de1b6b8269f560f18aba100c6aa40b7d \
-    --hash=sha256:e13fd3768216a788189e0667521e1435a273a4129119a8453085d897fc34aac8
 fasteners==0.16 \
     --hash=sha256:74b6847e0a6bb3b56c8511af8e24c40e4cf7a774dfff5b251c260ed338096a4b \
     --hash=sha256:c995d8c26b017c5d6a6de9ad29a0f9cdd57de61ae1113d28fac26622b06a0933

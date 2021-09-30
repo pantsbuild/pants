@@ -5,20 +5,22 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 import ijson
 
-from pants.backend.go.target_types import GoModuleSources
+from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptySiblingAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import Get
+from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target, UnexpandedTargets, WrappedTarget
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    UnexpandedTargets,
+    WrappedTarget,
+)
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -30,39 +32,33 @@ class ModuleDescriptor:
     version: str
 
 
-# TODO: Add class docstring with info on the fields.
 @dataclass(frozen=True)
-class ResolvedGoModule:
-    # The go_module target.
-    target: Target
-
-    # Import path of the Go module. Inferred from the import path in the go.mod file.
+class GoModInfo:
+    # Import path of the Go module, based on the `module` in `go.mod`.
     import_path: str
-
-    # Minimum Go version of the module from `go` statement in go.mod.
-    minimum_go_version: Optional[str]
 
     # Modules referenced by this go.mod with resolved versions.
     modules: FrozenOrderedSet[ModuleDescriptor]
 
-    # Digest containing go.mod and updated go.sum.
+    # Digest containing the full paths to `go.mod` and `go.sum`.
     digest: Digest
+
+    # Digest containing only the `go.sum` with no leading directory prefix.
+    go_sum_stripped_digest: Digest
 
 
 @dataclass(frozen=True)
-class ResolveGoModuleRequest:
+class GoModInfoRequest:
     address: Address
 
 
-# Parse the output of `go mod download` into a list of module descriptors.
-def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
-    # `ijson` cannot handle empty input so short-circuit if there is no data.
-    if len(raw_json) == 0:
+def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
+    """Parse the JSON output of `go list -m`."""
+    if not raw_json:
         return []
 
     module_descriptors = []
     for raw_module_descriptor in ijson.items(raw_json, "", multiple_values=True):
-        # Skip listing the main module.
         if raw_module_descriptor.get("Main", False):
             continue
 
@@ -76,80 +72,79 @@ def parse_module_descriptors(raw_json: bytes) -> List[ModuleDescriptor]:
 
 @rule
 async def resolve_go_module(
-    request: ResolveGoModuleRequest,
-) -> ResolvedGoModule:
+    request: GoModInfoRequest,
+) -> GoModInfo:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
-    target = wrapped_target.target
+    sources_field = wrapped_target.target[GoModSourcesField]
 
-    sources = await Get(SourceFiles, SourceFilesRequest([target.get(GoModuleSources)]))
-    flattened_sources_snapshot = await Get(
-        Snapshot, RemovePrefix(sources.snapshot.digest, request.address.spec_path)
+    # Get the `go.mod` (and `go.sum`) and strip so the file has no directory prefix.
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources_field))
+    sources_without_prefix = await Get(
+        Digest, RemovePrefix(hydrated_sources.snapshot.digest, request.address.spec_path)
     )
+    go_sum_digest_get = Get(Digest, DigestSubset(sources_without_prefix, PathGlobs(["go.sum"])))
 
-    # Parse the go.mod for the module path and minimum Go version.
-    parse_result = await Get(
+    mod_json_get = Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=flattened_sources_snapshot.digest,
             command=("mod", "edit", "-json"),
-            description=f"Parse go.mod for {request.address}.",
+            input_digest=sources_without_prefix,
+            description=f"Parse {sources_field.go_mod_path}",
         ),
     )
-    module_metadata = json.loads(parse_result.stdout)
-    module_path = module_metadata["Module"]["Path"]
-    minimum_go_version = module_metadata.get(
-        "Go", "1.16"
-    )  # TODO: Figure out better default if missing. Use the SDKs version versus this hard-code.
-
-    # Resolve the dependencies in the go.mod.
-    list_modules_result = await Get(
+    list_modules_get = Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=flattened_sources_snapshot.digest,
+            input_digest=sources_without_prefix,
             command=("list", "-m", "-json", "all"),
-            description=f"List modules in build of {request.address}.",
+            description=f"List modules in {sources_field.go_mod_path}",
         ),
     )
-    modules = parse_module_descriptors(list_modules_result.stdout)
 
-    return ResolvedGoModule(
-        target=target,
-        import_path=module_path,
-        minimum_go_version=minimum_go_version,
+    mod_json, list_modules, go_sum_digest = await MultiGet(
+        mod_json_get, list_modules_get, go_sum_digest_get
+    )
+
+    module_metadata = json.loads(mod_json.stdout)
+    modules = parse_module_descriptors(list_modules.stdout)
+    return GoModInfo(
+        import_path=module_metadata["Module"]["Path"],
         modules=FrozenOrderedSet(modules),
-        digest=flattened_sources_snapshot.digest,  # TODO: Is this a resolved version? Need to update for go-resolve goal?
+        digest=hydrated_sources.snapshot.digest,
+        go_sum_stripped_digest=go_sum_digest,
     )
 
 
+# TODO: Have `go_package` have a required field associating with `go_mod` target.
 @dataclass(frozen=True)
-class FindNearestGoModuleRequest:
-    spec_path: str
+class OwningGoModRequest:
+    address: Address
 
 
 @dataclass(frozen=True)
-class ResolvedOwningGoModule:
-    module_address: Optional[Address]
+class OwningGoMod:
+    address: Address
 
 
 @rule
-async def find_nearest_go_module(request: FindNearestGoModuleRequest) -> ResolvedOwningGoModule:
-    spec_path = request.spec_path
+async def find_nearest_go_module(request: OwningGoModRequest) -> OwningGoMod:
     candidate_targets = await Get(
-        UnexpandedTargets,
-        AddressSpecs([AscendantAddresses(spec_path), MaybeEmptySiblingAddresses(spec_path)]),
+        UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
     )
-    go_module_targets = [tgt for tgt in candidate_targets if tgt.has_field(GoModuleSources)]
-
     # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
-    sorted_go_module_targets = sorted(
-        go_module_targets, key=lambda tgt: tgt.address.spec_path, reverse=True
+    go_module_targets = sorted(
+        (tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)),
+        key=lambda tgt: tgt.address.spec_path,
+        reverse=True,
     )
-    if sorted_go_module_targets:
-        nearest_go_module_target = sorted_go_module_targets[0]
-        return ResolvedOwningGoModule(module_address=nearest_go_module_target.address)
-    else:
-        # TODO: Consider eventually requiring all go_package's to associate with a go_module.
-        return ResolvedOwningGoModule(module_address=None)
+    if not go_module_targets:
+        raise Exception(
+            f"The target {request.address} does not have any `go_module` target in any ancestor "
+            "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
+            "`go_module` target (you can run `./pants tailor` to do this)."
+        )
+    nearest_go_module_target = go_module_targets[0]
+    return OwningGoMod(nearest_go_module_target.address)
 
 
 def rules():

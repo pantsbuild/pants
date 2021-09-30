@@ -187,7 +187,6 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         Implementations should raise ExternalToolError if they cannot resolve the arguments
         to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
-        pass
 
     def generate_exe(self, plat: Platform) -> str:
         """Returns the path to the tool executable.

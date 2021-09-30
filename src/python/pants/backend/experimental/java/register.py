@@ -4,6 +4,13 @@
 from pants.backend.java import tailor
 from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile import javac
+from pants.backend.java.dependency_inference import (
+    import_parser,
+    java_parser,
+    java_parser_launcher,
+    package_mapper,
+)
+from pants.backend.java.dependency_inference import rules as dependency_inference_rules
 from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
     DeployJar,
@@ -40,6 +47,11 @@ def rules():
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
+        *import_parser.rules(),
+        *java_parser.rules(),
+        *java_parser_launcher.rules(),
+        *package_mapper.rules(),
+        *dependency_inference_rules.rules(),
         *tailor.rules(),
         *jvm_util_rules.rules(),
         *java_util_rules.rules(),

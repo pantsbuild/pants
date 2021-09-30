@@ -229,7 +229,7 @@ impl Session {
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
   where
-    F: Fn(&mut HashMap<UserMetadataPyValue, Value>) -> T,
+    F: FnOnce(&mut HashMap<UserMetadataPyValue, Value>) -> T,
   {
     f(&mut self.state.workunit_metadata_map.write())
   }

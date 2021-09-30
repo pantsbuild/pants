@@ -22,8 +22,9 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
+from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
@@ -390,6 +391,15 @@ class RuleRunner:
         :API: public
         """
         return self.request(WrappedTarget, [address]).target
+
+    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
+        """Write a digest to disk, relative to the test's build root.
+
+        Access the written files by using `os.path.join(rule_runner.build_root, <relpath>)`.
+        """
+        native_engine.write_digest(
+            self.scheduler.py_scheduler, self.scheduler.py_session, digest, path_prefix or ""
+        )
 
 
 # -----------------------------------------------------------------------------------------------

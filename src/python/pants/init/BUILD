@@ -18,6 +18,7 @@ target(
     'src/python/pants/backend/google_cloud_function/python',
     'src/python/pants/backend/project_info',
     'src/python/pants/backend/python',
+    'src/python/pants/backend/python/lint/autoflake',
     'src/python/pants/backend/python/lint/bandit',
     'src/python/pants/backend/python/lint/black',
     'src/python/pants/backend/python/lint/docformatter',

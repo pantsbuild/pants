@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,
     EMPTY_SNAPSHOT,
@@ -489,6 +489,28 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
         assert workunit["level"] == "ERROR"
+
+    def test_engine_aware_param(self):
+        @dataclass(frozen=True)
+        class ModifiedMetadata(EngineAwareParameter):
+            def metadata(self):
+                return {"example": "thing"}
+
+        @rule
+        def a_rule(_: ModifiedMetadata) -> int:
+            return 1
+
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(int, (ModifiedMetadata,))], max_workunit_verbosity=LogLevel.TRACE
+        )
+        with handler:
+            scheduler.product_request(int, subjects=[ModifiedMetadata()])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
+        assert workunit["metadata"] == {"example": "thing"}
 
     def test_engine_aware_none_case(self):
         @dataclass(frozen=True)
