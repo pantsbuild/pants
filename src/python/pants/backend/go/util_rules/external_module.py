@@ -38,6 +38,7 @@ from pants.util.strutil import strip_v2_chroot_path
 class DownloadExternalModuleRequest:
     path: str
     version: str
+    go_sum_digest: Digest = EMPTY_DIGEST
 
 
 @dataclass(frozen=True)
@@ -196,30 +197,21 @@ class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
 async def compute_package_import_paths_from_external_module(
     request: ExternalModulePkgImportPathsRequest,
 ) -> ExternalModulePkgImportPaths:
-    module_path = request.module_path
-    module_version = request.version
-
     downloaded_module = await Get(
-        DownloadedExternalModule, DownloadExternalModuleRequest(module_path, module_version)
-    )
-    downloaded_digest_without_go_sum = await Get(
-        Digest, DigestSubset(downloaded_module.digest, PathGlobs(["**", "!go.sum"]))
-    )
-
-    input_digest = await Get(
-        Digest, MergeDigests([downloaded_digest_without_go_sum, request.go_sum_digest])
+        DownloadedExternalModule,
+        DownloadExternalModuleRequest(request.module_path, request.version, request.go_sum_digest),
     )
     json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=input_digest,
+            input_digest=downloaded_module.digest,
             command=("list", "-json", "./..."),
             description=(
-                f"Determine import paths in Go external module {module_path}@{module_version}"
+                "Determine import paths in Go external module "
+                f"{request.module_path}@{request.version}"
             ),
         ),
     )
-
     return ExternalModulePkgImportPaths(
         metadata["ImportPath"]
         for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
