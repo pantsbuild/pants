@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 deploy_jar(
-    name="example_lib_deploy_jar",
-    main="org.pantsbuild.example.ExampleLib",
-    root_address=":example",
+    name="example_app_deploy_jar",
+    main="org.pantsbuild.example.app.ExampleApp",
+    root_address=":app",
 )
 
 java_sources(
