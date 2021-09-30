@@ -37,6 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.core.util_rules.archive import ZipBinary
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +57,14 @@ class DeployJarFieldSet(PackageFieldSet):
 @rule
 async def package_deploy_jar(
     bash: BashBinary,
+    zip: ZipBinary,
     field_set: DeployJarFieldSet,
 ) -> BuiltPackage:
     """
     Constructs a deploy ("fat") JAR file (currently from Java sources only) by
     1. compiling all Java sources
     2. building a JAR containing all of those built class files
-    3. creating a fat jar with a broken ZIP index by concatenating all dependency JARs together,
+    3. creating a deploy jar with a broken ZIP index by concatenating all dependency JARs together,
        followed by the thin JAR we created
     4. using the unix `zip` utility's repair function to fix the broken fat jar
     """
@@ -137,7 +139,7 @@ async def package_deploy_jar(
         ProcessResult,
         Process(
             argv=[
-                "/usr/bin/zip",
+                zip.path,
                 "pants_thin_jar.jar",
                 *compiled_class_files_snapshot.files + ("META-INF/MANIFEST.MF",),
             ],
@@ -184,13 +186,14 @@ async def package_deploy_jar(
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
     
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    input_filenames = " ".join(materialized_classpath._reified_filenames())
+    input_filenames = " ".join(materialized_classpath.reified_filenames())
     cat_and_repair_script = FileContent(
         "_cat_and_repair_zip_files.sh",
+        # Using POSIX location/arg format for `cat`. If this gets more complicated; refactor.
         textwrap.dedent(
             f"""
             /bin/cat {input_filenames} pants_thin_jar.jar > pants_broken_deploy_jar.jar
-            /usr/bin/zip -FF pants_broken_deploy_jar.jar --out {output_filename.name}
+            {zip.path} -FF pants_broken_deploy_jar.jar --out {output_filename.name}
             """
         ).encode("utf-8"),
     )
