@@ -47,7 +47,7 @@ def packages():
             EMPTY_DIGEST,
             (
                 BuiltPackageArtifact("my-package-0.1.0.tar.gz"),
-                BuiltPackageArtifact("my-package-0.1.0.whl"),
+                BuiltPackageArtifact("my_package-0.1.0-py3-none-any.whl"),
             ),
         ),
     )
@@ -114,13 +114,13 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "--config-file=.pypirc",
                 "--repository=pypi",
                 "my-package-0.1.0.tar.gz",
-                "my-package-0.1.0.whl",
+                "my_package-0.1.0-py3-none-any.whl",
             ),
             env=FrozenDict({"TWINE_PASSWORD": "secret"}),
         ),
         expect_names=(
             "my-package-0.1.0.tar.gz",
-            "my-package-0.1.0.whl",
+            "my_package-0.1.0-py3-none-any.whl",
         ),
         expect_description="@pypi",
     )
@@ -134,13 +134,13 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "--config-file=.pypirc",
                 "--repository=private",
                 "my-package-0.1.0.tar.gz",
-                "my-package-0.1.0.whl",
+                "my_package-0.1.0-py3-none-any.whl",
             ),
             env=FrozenDict(),
         ),
         expect_names=(
             "my-package-0.1.0.tar.gz",
-            "my-package-0.1.0.whl",
+            "my_package-0.1.0-py3-none-any.whl",
         ),
         expect_description="@private",
     )
@@ -158,7 +158,7 @@ def test_skip_twine(rule_runner, packages) -> None:
         result.packages[0],
         expect_names=(
             "my-package-0.1.0.tar.gz",
-            "my-package-0.1.0.whl",
+            "my_package-0.1.0-py3-none-any.whl",
         ),
         expect_description="(by `skip_twine` on src:dist)",
     )

@@ -98,7 +98,10 @@ class PublishSubsystem(GoalSubsystem):
     name = "publish"
     help = "Publish deliverables (assets, distributions, images, etc)."
 
-    required_union_implementations = (PublishFieldSet,)
+    required_union_implementations = (
+        PackageFieldSet,
+        PublishFieldSet,
+    )
 
 
 class Publish(Goal):
@@ -106,7 +109,7 @@ class Publish(Goal):
 
 
 @goal_rule
-async def publish_asset(console: Console, interactive_runner: InteractiveRunner) -> Publish:
+async def run_publish(console: Console, interactive_runner: InteractiveRunner) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
             TargetRootsToFieldSets,
