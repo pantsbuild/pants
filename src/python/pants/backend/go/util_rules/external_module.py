@@ -259,12 +259,12 @@ async def resolve_external_go_package(
 class ExternalModulePkgImportPathsRequest:
     """Request the import paths for all packages belonging to an external Go module.
 
-    The `go_sum_digest` must have a `go.sum` file that includes the module.
+    The module must be included in the input `go.mod`/`go.sum`.
     """
 
     module_path: str
     version: str
-    go_sum_digest: Digest
+    go_mod_stripped_digest: Digest
 
 
 class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
@@ -277,18 +277,21 @@ class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
 async def compute_package_import_paths_from_external_module(
     request: ExternalModulePkgImportPathsRequest,
 ) -> ExternalModulePkgImportPaths:
-    downloaded_module = await Get(
-        DownloadedExternalModule,
-        DownloadExternalModuleRequest(request.module_path, request.version, request.go_sum_digest),
+    # TODO: Extract the module we care about, rather than using everything. We also don't need the
+    #  root `go.sum` and `go.mod`.
+    downloaded_modules = await Get(
+        DownloadedExternalModules, DownloadExternalModulesRequest(request.go_mod_stripped_digest)
     )
     json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=downloaded_module.digest,
+            input_digest=downloaded_modules.digest,
             # "-find" skips determining dependencies and imports for each package.
-            command=("list", "-find", "-json", "./..."),
+            command=("list", "-find", "-mod=readonly", "-json", "./..."),
+            working_dir=f"gopath/pkg/mod/{request.module_path}@{request.version}",
+            env={"GOPROXY": "off"},
             description=(
-                "Determine import paths in Go external module "
+                "Determine packages belonging to Go external module "
                 f"{request.module_path}@{request.version}"
             ),
         ),
