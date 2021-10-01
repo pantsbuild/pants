@@ -101,9 +101,11 @@ async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtR
         return FmtResult.skip(formatter_name="pyupgrade")
     setup = await Get(Setup, SetupRequest(request))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result,
-        original_digest=setup.original_digest,
+    return FmtResult(
+        input=setup.original_digest,
+        output=result.output_digest,
+        stdout=result.stdout,
+        stderr=result.stderr,
         formatter_name="pyupgrade",
     )
 
