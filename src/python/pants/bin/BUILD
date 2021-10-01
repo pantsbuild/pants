@@ -20,7 +20,6 @@ pex_binary(
   dependencies=[
     ':pants_loader',
   ],
-  execution_mode="unzip",
   strip_pex_env=False,
 )
 

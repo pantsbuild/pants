@@ -51,9 +51,7 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
-    # The repository's constraints are not relevant here, because this resolve is mixed
-    # into the Pants' process' path, and never into user code.
-    requirements = PexRequirements(sorted(global_options.options.plugins), apply_constraints=False)
+    requirements = PexRequirements(sorted(global_options.options.plugins))
     if not requirements:
         return ResolvedPluginDistributions()
 
@@ -74,6 +72,9 @@ async def resolve_plugins(
             python=python,
             requirements=requirements,
             interpreter_constraints=request.interpreter_constraints,
+            # The repository's constraints are not relevant here, because this resolve is mixed
+            # into the Pants' process' path, and never into user code.
+            apply_requirement_constraints=False,
             description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
         ),
     )
