@@ -14,7 +14,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Sources
 from pants.util.logging import LogLevel
 
-_SCRIPT = """\
+# NOTE: Must call .format(min_dots=X) on this string to use it.
+_SCRIPT_FORMAT = """\
 # -*- coding: utf-8 -*-
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
@@ -29,7 +30,7 @@ import sys
 
 # This regex is used to infer imports from strings, e.g.
 #  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){2,}[a-zA-Z_]\\w*$", re.UNICODE)
+STRING_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\\d]*\\.){{{min_dots},}}[a-zA-Z_]\\w*$", re.UNICODE)
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts):
@@ -55,7 +56,7 @@ class AstVisitor(ast.NodeVisitor):
         else:
             abs_module = node.module
         for alias in node.names:
-            self.imports.add("{}.{}".format(abs_module, alias.name))
+            self.imports.add("{{}}.{{}}".format(abs_module, alias.name))
 
     def visit_Call(self, node):
       # Handle __import__("string_literal").  This is commonly used in __init__.py files,
@@ -145,13 +146,15 @@ class ParsePythonImportsRequest:
     sources: Sources
     interpreter_constraints: InterpreterConstraints
     string_imports: bool
+    string_imports_min_dots: int
 
 
 @rule
 async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPythonImports:
+    script = _SCRIPT_FORMAT.format(min_dots=request.string_imports_min_dots).encode()
     python_interpreter, script_digest, stripped_sources = await MultiGet(
         Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(Digest, CreateDigest([FileContent("__parse_python_imports.py", _SCRIPT.encode())])),
+        Get(Digest, CreateDigest([FileContent("__parse_python_imports.py", script)])),
         Get(StrippedSourceFiles, SourceFilesRequest([request.sources])),
     )
     input_digest = await Get(

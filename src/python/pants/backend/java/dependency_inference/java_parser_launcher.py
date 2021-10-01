@@ -93,7 +93,7 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
                 *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
                 "com.sun.tools.javac.Main",
                 "-cp",
-                materialized_classpath.classpath_arg(),
+                ":".join(materialized_classpath.classpath_entries()),
                 "-d",
                 dest_dir,
                 _LAUNCHER_BASENAME,

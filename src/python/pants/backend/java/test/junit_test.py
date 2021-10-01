@@ -8,6 +8,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import classpath
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
@@ -43,6 +44,7 @@ def rule_runner() -> RuleRunner:
         preserve_tmpdirs=True,
         rules=[
             *config_files.rules(),
+            *classpath.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),

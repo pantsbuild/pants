@@ -46,6 +46,7 @@ def assert_imports_parsed(
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
+    string_imports_min_dots: int = 2,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     files = {"project/BUILD": "python_library(sources=['**/*.py'])"}
@@ -60,6 +61,7 @@ def assert_imports_parsed(
                 tgt[PythonSources],
                 InterpreterConstraints([constraints]),
                 string_imports=string_imports,
+                string_imports_min_dots=string_imports_min_dots,
             )
         ],
     )
@@ -139,11 +141,14 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
     )
 
 
-def test_imports_from_strings(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("min_dots", [1, 2, 3, 4])
+def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     content = dedent(
         """\
         modules = [
-            # Valid strings
+            # Potentially valid strings (depending on min_dots).
+            'a.b',
+            'a.Foo',
             'a.b.d',
             'a.b2.d',
             'a.b.c.Foo',
@@ -154,9 +159,8 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             'a.b2.c.D',
             'a.b.c_狗',
 
-            # Invalid strings
+            # Definitely invalid strings
             '..a.b.c.d',
-            'a.b',
             'a.B.d',
             'a.2b.d',
             'a..b..c',
@@ -170,21 +174,23 @@ def test_imports_from_strings(rule_runner: RuleRunner) -> None:
             importlib.import_module(module)
         """
     )
-    assert_imports_parsed(
-        rule_runner,
-        content,
-        expected=[
-            "a.b.d",
-            "a.b2.d",
-            "a.b.c.Foo",
-            "a.b.c.d.Foo",
-            "a.b.c.d.FooBar",
-            "a.b.c.d.e.f.g.Baz",
-            "a.b_c.d._bar",
-            "a.b2.c.D",
-            "a.b.c_狗",
-        ],
-    )
+
+    potentially_valid = [
+        "a.b",
+        "a.Foo",
+        "a.b.d",
+        "a.b2.d",
+        "a.b.c.Foo",
+        "a.b.c.d.Foo",
+        "a.b.c.d.FooBar",
+        "a.b.c.d.e.f.g.Baz",
+        "a.b_c.d._bar",
+        "a.b2.c.D",
+        "a.b.c_狗",
+    ]
+    expected = [sym for sym in potentially_valid if sym.count(".") >= min_dots]
+
+    assert_imports_parsed(rule_runner, content, expected=expected, string_imports_min_dots=min_dots)
     assert_imports_parsed(rule_runner, content, string_imports=False, expected=[])
 
 

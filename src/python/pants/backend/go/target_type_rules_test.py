@@ -21,7 +21,6 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
 from pants.build_graph.address import Address
-from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
@@ -40,17 +39,12 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *external_tool.rules(),
-            *source_files.rules(),
             *go_mod.rules(),
             *go_pkg.rules(),
             *external_module.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, [DependenciesRequest]),
-            QueryRule(Targets, [Addresses]),
-            QueryRule(InferredDependencies, [InferGoPackageDependenciesRequest]),
-            QueryRule(GeneratedTargets, [GenerateGoExternalPackageTargetsRequest]),
         ],
         target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
     )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
@@ -20,11 +21,14 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import archive, config_files, source_files
+from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
-from pants.engine.fs import DigestContents, FileDigest
+from pants.engine.fs import Digest, DigestContents, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
@@ -45,6 +49,9 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            render_classpath,
+            QueryRule(RenderedClasspath, (Digest,)),
+            *archive.rules(),
             *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
@@ -89,6 +96,43 @@ JAVA_LIB_MAIN_SOURCE = dedent(
     }
     """
 )
+
+
+@dataclass(frozen=True)
+class RenderedClasspath:
+    """The contents of a classpath, organized as a key per entry with its contained classfiles."""
+
+    content: dict[str, set[str]]
+
+
+@rule
+async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> RenderedClasspath:
+    dest_dir = "dest"
+    process_results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    unzip_binary.path,
+                    "-d",
+                    dest_dir,
+                    filename,
+                ],
+                input_digest=snapshot.digest,
+                output_directories=(dest_dir,),
+                description=f"Extract {filename}",
+            ),
+        )
+        for filename in snapshot.files
+    )
+
+    listing_snapshots = await MultiGet(
+        Get(Snapshot, RemovePrefix(pr.output_digest, dest_dir)) for pr in process_results
+    )
+
+    return RenderedClasspath(
+        {path: set(listing.files) for path, listing in zip(snapshot.files, listing_snapshots)}
+    )
 
 
 def expect_single_expanded_coarsened_target(
@@ -139,10 +183,10 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
         [CompileJavaSourceRequest(component=coarsened_target)],
     )
 
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/example/lib/ExampleLib.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+    }
 
     # Additionally validate that `check` works.
     check_results = rule_runner.request(
@@ -189,13 +233,12 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="lib")
         )
     )
-    rule_runner.set_options(["--javac-jdk=zulu:1.6"])
-    assert {
-        contents.path
-        for contents in rule_runner.request(
-            DigestContents, [rule_runner.request(CompiledClassfiles, [request]).digest]
-        )
-    } == {"org/pantsbuild/example/lib/ExampleLib.class"}
+    rule_runner.set_options(["--javac-jdk=zulu:1.8"])
+    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+    }
 
     rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
@@ -346,15 +389,15 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(component=coarsened_target)
 
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        [
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        "a.A.java.jar": {
             "org/pantsbuild/a/A.class",
             "org/pantsbuild/a/C.class",
             "org/pantsbuild/b/B.class",
             "org/pantsbuild/b/C.class",
-        ]
-    )
+        }
+    }
 
 
 @maybe_skip_jdk_test
@@ -444,10 +487,8 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/main/Main.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {".Main.java.main.jar": {"org/pantsbuild/main/Main.class"}}
 
 
 @pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
@@ -583,9 +624,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert len(classfile_digest_contents) == 1
-    assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
 
 
 @maybe_skip_jdk_test
@@ -691,9 +731,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
         )
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert len(classfile_digest_contents) == 1
-    assert classfile_digest_contents[0].path == "org/pantsbuild/example/Example.class"
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
 
 
 @maybe_skip_jdk_test
