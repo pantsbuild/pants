@@ -25,7 +25,7 @@ from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, FileDigest, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
@@ -246,7 +246,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         rule_runner.request(CompiledClassfiles, [request])
 
 
-@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
+@maybe_skip_jdk_test
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -303,10 +303,13 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(component=coarsened_target)
 
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/example/lib/ExampleLib.class", "org/pantsbuild/example/lib/OtherLib.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.jar": {
+            "org/pantsbuild/example/lib/ExampleLib.class",
+            "org/pantsbuild/example/lib/OtherLib.class",
+        }
+    }
 
 
 @maybe_skip_jdk_test
@@ -491,7 +494,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     assert classpath.content == {".Main.java.main.jar": {"org/pantsbuild/main/Main.class"}}
 
 
-@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
+@maybe_skip_jdk_test
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
     rather than explicitly."""
@@ -568,10 +571,10 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
             )
         ],
     )
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/main/Main.class", "org/pantsbuild/main/Other.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".Main.java.main.jar": {"org/pantsbuild/main/Main.class", "org/pantsbuild/main/Other.class"}
+    }
 
 
 @maybe_skip_jdk_test
