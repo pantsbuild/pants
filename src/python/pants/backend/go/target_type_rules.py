@@ -244,7 +244,7 @@ async def generate_go_external_package_targets(
             ExternalModulePkgImportPathsRequest(
                 module_path=module_descriptor.path,
                 version=module_descriptor.version,
-                go_sum_digest=go_mod_info.go_sum_stripped_digest,
+                go_mod_stripped_digest=go_mod_info.stripped_digest,
             ),
         )
         for module_descriptor in go_mod_info.modules

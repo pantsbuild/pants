@@ -286,8 +286,18 @@ def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
 
 
 def test_determine_external_module_package_import_paths(rule_runner: RuleRunner) -> None:
-    go_sum_digest = rule_runner.make_snapshot(
+    input_digest = rule_runner.make_snapshot(
         {
+            "go.mod": dedent(
+                """\
+                module example.com/external-module
+                go 1.17
+                require (
+                    github.com/google/go-cmp v0.5.6
+                    golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543  // indirect
+                )
+                """
+            ),
             "go.sum": dedent(
                 """\
                 github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
@@ -295,12 +305,12 @@ def test_determine_external_module_package_import_paths(rule_runner: RuleRunner)
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                 """
-            )
+            ),
         }
     ).digest
     result = rule_runner.request(
         ExternalModulePkgImportPaths,
-        [ExternalModulePkgImportPathsRequest("github.com/google/go-cmp", "v0.5.6", go_sum_digest)],
+        [ExternalModulePkgImportPathsRequest("github.com/google/go-cmp", "v0.5.6", input_digest)],
     )
     assert result == ExternalModulePkgImportPaths(
         [
