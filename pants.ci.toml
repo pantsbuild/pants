@@ -11,10 +11,10 @@ log = true
 
 [test]
 use_coverage = true
+xml_dir = "dist/test-results/"
 
 [pytest]
 args = ["--no-header", "-vv"]
-junit_xml_dir = "dist/test-results/"
 
 [coverage-py]
 report = ["raw", "xml"]
