@@ -41,6 +41,11 @@ class DownloadedExternalModules:
 
     digest: Digest
 
+    @staticmethod
+    def module_dir(module_path: str, version: str) -> str:
+        """The path to the module's directory."""
+        return f"gopath/pkg/mod/{module_path}@{version}"
+
 
 @dataclass(frozen=True)
 class DownloadExternalModulesRequest:
@@ -82,7 +87,6 @@ async def download_external_modules(
             f"{contents[1].content.decode()}\n\n"
         )
 
-    # TODO: strip `gopath` and other paths?
     # TODO: stop including irrelevant files like the `.zip` files.
 
     download_snapshot = await Get(Snapshot, Digest, download_result.output_digest)
@@ -91,13 +95,10 @@ async def download_external_modules(
     # To analyze each module via `go list`, we need a `go.mod` in each module's directory. If the
     # module does not natively use Go modules, then Go will generate a `go.mod` for us, but we
     # need to relocate the file to the correct location.
-    module_dirs_with_go_mod = []
     generated_go_mods_to_module_dirs = {}
     for module_metadata in ijson.items(download_result.stdout, "", multiple_values=True):
         download_dir = strip_v2_chroot_path(module_metadata["Dir"])
-        if f"{download_dir}/go.mod" in all_downloaded_files:
-            module_dirs_with_go_mod.append(download_dir)
-        else:
+        if f"{download_dir}/go.mod" not in all_downloaded_files:
             generated_go_mod = strip_v2_chroot_path(module_metadata["GoMod"])
             generated_go_mods_to_module_dirs[generated_go_mod] = download_dir
 
@@ -288,7 +289,7 @@ async def compute_package_import_paths_from_external_module(
             input_digest=downloaded_modules.digest,
             # "-find" skips determining dependencies and imports for each package.
             command=("list", "-find", "-mod=readonly", "-json", "./..."),
-            working_dir=f"gopath/pkg/mod/{request.module_path}@{request.version}",
+            working_dir=downloaded_modules.module_dir(request.module_path, request.version),
             env={"GOPROXY": "off"},
             description=(
                 "Determine packages belonging to Go external module "
