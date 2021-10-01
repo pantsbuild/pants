@@ -503,7 +503,10 @@ class MaterializedClasspathRequest:
 
 @dataclass(frozen=True)
 class MaterializedClasspath:
-    """A fully fetched and merged classpath, ready to hand to a JVM process invocation."""
+    """A fully fetched and merged classpath, ready to hand to a JVM process invocation.
+
+    TODO: Consider renaming to reflect the fact that this is always a 3rdparty classpath.
+    """
 
     content: Snapshot
 
@@ -511,23 +514,19 @@ class MaterializedClasspath:
     def digest(self) -> Digest:
         return self.content.digest
 
-    def classpath_args(self, root: Optional[str] = None) -> Iterator[str]:
-        def maybe_add_prefix(file_name: str) -> str:
-            if root is not None:
-                file_name = os.path.join(root, file_name)
-            return file_name
+    def classpath_entries(self, root: Optional[str] = None) -> Iterator[str]:
+        """Returns optionally prefixed classpath entry filenames.
 
-        return (maybe_add_prefix(file_name) for file_name in self.content.files)
-
-    def classpath_arg(self, root: Optional[str] = None) -> str:
-        """Construct the argument to be passed to `-classpath`.
-
-        :param root: if set, will be prepended to all entries.  This is useful
+        :param prefix: if set, will be prepended to all entries.  This is useful
             if the process working directory is not the same as the root
             directory for the process input `Digest`.
         """
+        if root is None:
+            yield from self.content.files
+            return
 
-        return ":".join(self.classpath_args(root))
+        for file_name in self.content.files:
+            yield os.path.join(root, file_name)
 
 
 @rule(level=LogLevel.DEBUG)

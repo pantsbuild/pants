@@ -36,8 +36,8 @@ class Classpath:
 
     content: Snapshot
 
-    def classpath_args(self, prefix: str | None = None) -> Iterator[str]:
-        """Construct the argument to be passed to `java -cp`.
+    def classpath_entries(self, prefix: str | None = None) -> Iterator[str]:
+        """Returns optionally prefixed classpath entry filenames.
 
         :param prefix: if set, will be prepended to all entries.  This is useful
             if the process working directory is not the same as the root
@@ -45,8 +45,8 @@ class Classpath:
         """
         return self._classpath(lambda _: True, prefix=prefix)
 
-    def user_classpath_args(self, prefix: str | None = None) -> Iterator[str]:
-        """Like `classpath_arg`, but returns only entries corresponding to first-party code."""
+    def user_classpath_entries(self, prefix: str | None = None) -> Iterator[str]:
+        """Like `classpath_entries`, but returns only entries corresponding to first-party code."""
         return self._classpath(lambda f: f.startswith(_USERCP_RELPATH), prefix=prefix)
 
     def _classpath(

@@ -225,7 +225,7 @@ async def compile_java_source(
     )
 
     classpath_arg = ":".join(
-        [*prefixed_direct_dependency_classpath.files, *materialized_classpath.classpath_args()]
+        [*prefixed_direct_dependency_classpath.files, *materialized_classpath.classpath_entries()]
     )
 
     merged_digest = await Get(

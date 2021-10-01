@@ -113,7 +113,7 @@ async def analyze_java_source_dependencies(
         FallibleProcessResult,
         Process(
             argv=[
-                *jdk_setup.args(bash, [tool_classpath.classpath_arg(), processorcp_relpath]),
+                *jdk_setup.args(bash, [*tool_classpath.classpath_entries(), processorcp_relpath]),
                 "org.pantsbuild.javaparser.PantsJavaParserLauncher",
                 analysis_output_path,
                 source_path,

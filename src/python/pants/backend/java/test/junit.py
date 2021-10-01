@@ -76,14 +76,14 @@ async def run_junit_test(
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
-    user_classpath_arg = ":".join(classpath.user_classpath_args())
+    user_classpath_arg = ":".join(classpath.user_classpath_entries())
 
     process_result = await Get(
         FallibleProcessResult,
         Process(
             argv=[
                 *jdk_setup.args(
-                    bash, [*classpath.classpath_args(), *junit_classpath.classpath_args()]
+                    bash, [*classpath.classpath_entries(), *junit_classpath.classpath_entries()]
                 ),
                 "org.junit.platform.console.ConsoleLauncher",
                 *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
