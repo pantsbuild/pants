@@ -23,6 +23,12 @@ from pants.backend.go.util_rules.external_module import (
     DownloadExternalModuleRequest,
     ResolveExternalGoPackageRequest,
 )
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.go_pkg import (
     ResolvedGoPackage,
     ResolveGoPackageRequest,
@@ -76,6 +82,8 @@ async def build_target(
         source_files_subpath = target.address.spec_path
     elif is_third_party_package_target(target):
         assert isinstance(target, GoExternalPackageTarget)
+        owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
+        go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
         module_path = target[GoExternalModulePathField].value
         module, resolved_package = await MultiGet(
             Get(
@@ -85,7 +93,10 @@ async def build_target(
                     version=target[GoExternalModuleVersionField].value,
                 ),
             ),
-            Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(target)),
+            Get(
+                ResolvedGoPackage,
+                ResolveExternalGoPackageRequest(target, go_mod_info.stripped_digest),
+            ),
         )
 
         source_files_digest = module.digest

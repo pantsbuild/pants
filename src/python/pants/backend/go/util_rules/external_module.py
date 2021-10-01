@@ -17,6 +17,7 @@ from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -216,14 +217,24 @@ async def download_external_module(
 
 
 @dataclass(frozen=True)
-class ResolveExternalGoPackageRequest:
+class ResolveExternalGoPackageRequest(EngineAwareParameter):
     tgt: GoExternalPackageTarget
+    go_mod_stripped_digest: Digest
+
+    def debug_hint(self) -> str:
+        return self.tgt[GoExternalPackageImportPathField].value
 
 
 @rule
-async def resolve_external_go_package(
+async def compute_external_go_package_info(
     request: ResolveExternalGoPackageRequest,
 ) -> ResolvedGoPackage:
+    # TODO: Extract the module we care about, rather than using everything. We also don't need the
+    #  root `go.sum` and `go.mod`.
+    downloaded_modules = await Get(
+        DownloadedExternalModules, DownloadExternalModulesRequest(request.go_mod_stripped_digest)
+    )
+
     module_path = request.tgt[GoExternalModulePathField].value
     module_version = request.tgt[GoExternalModuleVersionField].value
 
@@ -231,17 +242,14 @@ async def resolve_external_go_package(
     assert import_path.startswith(module_path)
     subpath = import_path[len(module_path) :]
 
-    downloaded_module = await Get(
-        DownloadedExternalModule,
-        DownloadExternalModuleRequest(module_path, module_version),
-    )
-
     json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=downloaded_module.digest,
-            command=("list", "-json", f"./{subpath}"),
-            description="Resolve _go_external_package metadata.",
+            command=("list", "-mod=readonly", "-json", f"./{subpath}"),
+            env={"GOPROXY": "off"},
+            input_digest=downloaded_modules.digest,
+            working_dir=downloaded_modules.module_dir(module_path, module_version),
+            description=f"Determine metadata for Go external package {import_path}",
         ),
     )
 

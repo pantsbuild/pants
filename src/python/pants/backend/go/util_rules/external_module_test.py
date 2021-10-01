@@ -19,7 +19,7 @@ from pants.backend.go.util_rules.external_module import (
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
@@ -229,10 +229,14 @@ def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
             "BUILD": "go_mod(name='mod')",
         }
     )
+    input_digest = rule_runner.request(Digest, [PathGlobs(["go.mod", "go.sum"])])
     pkg_addr = Address("", target_name="mod", generated_name="github.com/google/go-cmp/cmp/cmpopts")
     tgt = rule_runner.get_target(pkg_addr)
     assert isinstance(tgt, GoExternalPackageTarget)
-    pkg_info = rule_runner.request(ResolvedGoPackage, [ResolveExternalGoPackageRequest(tgt)])
+
+    pkg_info = rule_runner.request(
+        ResolvedGoPackage, [ResolveExternalGoPackageRequest(tgt, input_digest)]
+    )
     assert pkg_info.address == pkg_addr
     assert pkg_info.module_address is None
     assert pkg_info.import_path == "github.com/google/go-cmp/cmp/cmpopts"
