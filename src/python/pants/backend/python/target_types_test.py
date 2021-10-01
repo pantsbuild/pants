@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from textwrap import dedent
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Iterable
 
 import pytest
 from _pytest.logging import LogCaptureFixture
@@ -79,10 +79,10 @@ def test_pex_binary_validation() -> None:
 def test_timeout_calculation() -> None:
     def assert_timeout_calculated(
         *,
-        field_value: Optional[int],
-        expected: Optional[int],
-        global_default: Optional[int] = None,
-        global_max: Optional[int] = None,
+        field_value: int | None,
+        expected: int | None,
+        global_default: int | None = None,
+        global_max: int | None = None,
         timeouts_enabled: bool = True,
     ) -> None:
         field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
@@ -112,7 +112,7 @@ def test_timeout_calculation() -> None:
         ("lambda.py:func", ["project/dir/lambda.py"]),
     ),
 )
-def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
+def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> None:
     field = PexEntryPointField(entry_point, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
@@ -147,7 +147,7 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
 
     def assert_resolved(
-        *, entry_point: Optional[str], expected: Optional[EntryPoint], is_file: bool
+        *, entry_point: str | None, expected: EntryPoint | None, is_file: bool
     ) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
@@ -248,7 +248,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         }
     )
 
-    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+    def assert_injected(address: Address, *, expected: Address | None) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
@@ -478,7 +478,7 @@ def test_inject_python_distribution_dependencies() -> None:
         ),
     )
 
-    def assert_injected(address: Address, expected: List[Address]) -> None:
+    def assert_injected(address: Address, expected: list[Address]) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
@@ -525,7 +525,7 @@ def test_inject_python_distribution_dependencies() -> None:
     ),
 )
 def test_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
+    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
 ) -> None:
     actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
     assert actual_value == FrozenDict(expected)
@@ -540,7 +540,7 @@ def test_module_mapping_field(
     ),
 )
 def test_type_stub_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
+    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
 ) -> None:
     actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
     assert actual_value == FrozenDict(expected)

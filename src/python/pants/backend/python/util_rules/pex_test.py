@@ -10,7 +10,7 @@ import textwrap
 import zipfile
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Mapping, Tuple
+from typing import Any, Iterable, Iterator, Mapping
 from unittest.mock import MagicMock
 
 import pytest
@@ -102,7 +102,7 @@ class PexData:
     sandbox_path: PurePath
     local_path: PurePath
     info: Mapping[str, Any]
-    files: Tuple[str, ...]
+    files: tuple[str, ...]
 
 
 def create_pex_and_get_all_data(
@@ -115,8 +115,8 @@ def create_pex_and_get_all_data(
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
     additional_inputs: Digest | None = None,
-    additional_pants_args: Tuple[str, ...] = (),
-    additional_pex_args: Tuple[str, ...] = (),
+    additional_pants_args: tuple[str, ...] = (),
+    additional_pex_args: tuple[str, ...] = (),
     env: Mapping[str, str] | None = None,
     internal_only: bool = True,
 ) -> PexData:
@@ -206,8 +206,8 @@ def create_pex_and_get_pex_info(
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
-    additional_pants_args: Tuple[str, ...] = (),
-    additional_pex_args: Tuple[str, ...] = (),
+    additional_pants_args: tuple[str, ...] = (),
+    additional_pex_args: tuple[str, ...] = (),
     internal_only: bool = True,
 ) -> Mapping[str, Any]:
     return create_pex_and_get_all_data(
@@ -421,9 +421,9 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
     def assert_direct_requirements(pex_info):
-        assert set(Requirement.parse(r) for r in pex_info["requirements"]) == set(
+        assert {Requirement.parse(r) for r in pex_info["requirements"]} == {
             Requirement.parse(d) for d in direct_deps
-        )
+        }
 
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.

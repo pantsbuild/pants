@@ -105,7 +105,7 @@ async def build_local_dists(
 
     all_contents = await MultiGet(Get(DigestContents, Digest, dist.digest) for dist in dists)
     for dist, contents, tgt in zip(dists, all_contents, applicable_targets):
-        artifacts = set((a.relpath or "") for a in dist.artifacts)
+        artifacts = {(a.relpath or "") for a in dist.artifacts}
         # A given local dist might build a wheel and an sdist (and maybe other artifacts -
         # we don't know what setup command was run...)
         # As long as there is a wheel, we can ignore the other artifacts.

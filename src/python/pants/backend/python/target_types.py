@@ -10,19 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Dict,
-    Iterable,
-    Iterator,
-    Mapping,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Iterator, Mapping, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -88,7 +76,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "constraints are merged with the constraints of dependencies."
     )
 
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+    def value_or_global_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -276,7 +264,7 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     value: EntryPoint | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[EntryPoint]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> EntryPoint | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -331,7 +319,7 @@ class PexScriptField(Field):
     value: ConsoleScript | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[ConsoleScript]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> ConsoleScript | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -372,9 +360,7 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], address: Address
-    ) -> Optional[str]:
+    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | None:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
         return super().compute_value(raw_value, address)
@@ -479,7 +465,7 @@ class PexExecutionModeField(StringField):
     )
 
     @classmethod
-    def _check_deprecated(cls, raw_value: Optional[Any], address_: Address) -> None:
+    def _check_deprecated(cls, raw_value: Any | None, address_: Address) -> None:
         if PexExecutionMode.UNZIP.value == raw_value:
             warn_or_error(
                 removal_version="2.9.0.dev0",
@@ -568,7 +554,7 @@ class PythonTestsTimeout(IntField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+    def compute_value(cls, raw_value: int | None, address: Address) -> int | None:
         value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(
@@ -577,7 +563,7 @@ class PythonTestsTimeout(IntField):
             )
         return value
 
-    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
+    def calculate_from_global_options(self, pytest: PyTest) -> int | None:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
         if not pytest.timeouts_enabled:
             return None
@@ -693,8 +679,8 @@ class _RequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[Requirement, ...]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[Requirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -760,8 +746,8 @@ class ModuleMappingField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
+        cls, raw_value: dict[str, Iterable[str]], address: Address
+    ) -> FrozenDict[str, tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         return normalize_module_mapping(value_or_default)
 
@@ -783,8 +769,8 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
+        cls, raw_value: dict[str, Iterable[str]], address: Address
+    ) -> FrozenDict[str, tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         return normalize_module_mapping(value_or_default)
 
@@ -868,7 +854,7 @@ class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+    def compute_value(cls, raw_value: PythonArtifact | None, address: Address) -> PythonArtifact:
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
@@ -916,7 +902,7 @@ class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
     entry_point: EntryPoint
-    pex_binary_address: Optional[Address]
+    pex_binary_address: Address | None
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
@@ -964,8 +950,8 @@ class ResolvePythonDistributionEntryPointsRequest:
     logic for resolving pex_binary addresses etc.
     """
 
-    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
-    provides_field: Optional[PythonProvidesField] = None
+    entry_points_field: PythonDistributionEntryPointsField | None = None
+    provides_field: PythonProvidesField | None = None
 
     def __post_init__(self):
         # Must provide at least one of these fields.
