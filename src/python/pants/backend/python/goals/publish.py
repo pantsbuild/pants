@@ -20,7 +20,7 @@ from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import StringSequenceField
+from pants.engine.target import BoolField, StringSequenceField
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,12 @@ class PyPiRepositories(StringSequenceField):
     # explicit in the BUILD file when a package is meant for public distribution.
 
 
+class SkipTwineUploadField(BoolField):
+    alias = "skip_twine"
+    default = False
+    help = "If true, don't publish this target's packages using Twine."
+
+
 class PublishToPyPiRequest(PublishPackagesRequest):
     pass
 
@@ -43,6 +49,7 @@ class PublishToPyPiFieldSet(PublishFieldSet):
     required_fields = (PyPiRepositories,)
 
     repositories: PyPiRepositories
+    skip_twine: SkipTwineUploadField
 
     # I'd rather opt out early here, so we don't build unnecessarily, however the error feedback is
     # misleading and not very helpful in that case.
@@ -114,14 +121,21 @@ async def twine_upload(
     if twine_subsystem.skip or not dists:
         return PublishPackagesProcesses(())
 
-    if not request.field_set.repositories.value:
+    # Too verbose to provide feedback as to why some packages were skipped?
+    skip = None
+    if request.field_set.skip_twine.value:
+        skip = f"(by `{request.field_set.skip_twine.alias}` on {request.field_set.address})"
+    elif not request.field_set.repositories.value:
         # I'd rather have used the opt_out mechanism on the field set, but that gives no hint as to
         # why the target was not applicable..
+        skip = f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})"
+
+    if skip:
         return PublishPackagesProcesses(
             (
                 PublishPackageProcesses(
                     names=dists,
-                    description=f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})",
+                    description=skip,
                 ),
             )
         )
@@ -178,6 +192,7 @@ async def twine_upload(
 def rules():
     return (
         *collect_rules(),
-        PythonDistribution.register_plugin_field(PyPiRepositories),
         *PublishToPyPiFieldSet.rules(),
+        PythonDistribution.register_plugin_field(PyPiRepositories),
+        PythonDistribution.register_plugin_field(SkipTwineUploadField),
     )

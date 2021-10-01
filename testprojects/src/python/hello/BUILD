@@ -9,5 +9,7 @@ python_distribution(
         name="hello",
         version="1.0.0",
     ),
+
     pypi_repositories=["@foo-bar"],
+    skip_twine=True,
 )
