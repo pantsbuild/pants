@@ -13,7 +13,7 @@ from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
@@ -44,7 +44,7 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def from_process_result(
         cls,
-        process_result: ProcessResult,
+        process_result: ProcessResult | FallibleProcessResult,
         *,
         original_digest: Digest,
         formatter_name: str,
