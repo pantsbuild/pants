@@ -10,7 +10,9 @@ from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget
 from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.external_module import (
     DownloadedExternalModule,
+    DownloadedExternalModules,
     DownloadExternalModuleRequest,
+    DownloadExternalModulesRequest,
     ExternalModulePkgImportPaths,
     ExternalModulePkgImportPathsRequest,
     ResolveExternalGoPackageRequest,
@@ -18,6 +20,7 @@ from pants.backend.go.util_rules.external_module import (
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -31,6 +34,7 @@ def rule_runner() -> RuleRunner:
             *go_pkg.rules(),
             *external_module.rules(),
             *target_type_rules.rules(),
+            QueryRule(DownloadedExternalModules, [DownloadExternalModulesRequest]),
             QueryRule(DownloadedExternalModule, [DownloadExternalModuleRequest]),
             QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
             QueryRule(ResolvedGoPackage, [ResolveExternalGoPackageRequest]),
@@ -39,6 +43,99 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def test_download_external_modules(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/external-module
+                require (
+                    // Has a `go.mod` already.
+                    github.com/google/uuid v1.3.0
+                    // Does not have a `go.mod`, should be generated.
+                    cloud.google.com/go v0.26.0
+                )
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                cloud.google.com/go v0.26.0 h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=
+                cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
+                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                """
+            ),
+        }
+    ).digest
+    downloaded_modules = rule_runner.request(
+        DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
+    )
+    snapshot = rule_runner.request(Snapshot, [downloaded_modules.digest])
+    all_files = snapshot.files
+
+    def assert_has_file(expected_fp: str) -> None:
+        assert any(
+            fp == expected_fp for fp in all_files
+        ), f"Could not find `{expected_fp}` in {sorted(all_files)}"
+
+    for fp in (
+        "go.mod",
+        "go.sum",
+        "gopath/pkg/mod/cloud.google.com/go@v0.26.0/go.mod",
+        "gopath/pkg/mod/cloud.google.com/go@v0.26.0/bigtable/filter.go",
+        "gopath/pkg/mod/github.com/google/uuid@v1.3.0/go.mod",
+        "gopath/pkg/mod/github.com/google/uuid@v1.3.0/uuid.go",
+    ):
+        assert_has_file(fp)
+
+
+def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/external-module
+                require github.com/google/uuid v1.3.0
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                github.com/google/uuid v1.3.0 h1:00000gmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:00000e4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                """
+            ),
+        }
+    ).digest
+    with pytest.raises(ExecutionError):
+        rule_runner.request(
+            DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
+        )
+
+
+def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/external-module
+                require github.com/google/uuid v1.3.0
+                """
+            ),
+            # `go.sum` is for a different module.
+            "go.sum": dedent(
+                """\
+                cloud.google.com/go v0.26.0 h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=
+                cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
+                """
+            ),
+        }
+    ).digest
+    with pytest.raises(ExecutionError):
+        rule_runner.request(
+            DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
+        )
 
 
 def test_download_external_module_with_gomod(rule_runner: RuleRunner) -> None:
@@ -97,52 +194,6 @@ def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None
 
     for fp in ("bigtable/filter.go", "go.mod"):
         assert_has_file(fp)
-
-
-@pytest.mark.xfail
-def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> None:
-    invalid_go_sum_digest = rule_runner.make_snapshot(
-        {
-            "go.sum": dedent(
-                """\
-                github.com/google/uuid v1.3.0 h1:00000000XMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
-                github.com/google/uuid v1.3.0/go.mod h1:000000000qvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-                """
-            )
-        }
-    ).digest
-    with pytest.raises(Exception):
-        rule_runner.request(
-            DownloadedExternalModule,
-            [
-                DownloadExternalModuleRequest(
-                    "github.com/google/uuid", "v1.3.0", invalid_go_sum_digest
-                )
-            ],
-        )
-
-
-@pytest.mark.xfail
-def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> None:
-    irrelevant_go_sum_digest = rule_runner.make_snapshot(
-        {
-            "go.sum": dedent(
-                """\
-                cloud.google.com/go v0.26.0 h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=
-                cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-                """
-            )
-        }
-    ).digest
-    with pytest.raises(Exception):
-        rule_runner.request(
-            DownloadedExternalModule,
-            [
-                DownloadExternalModuleRequest(
-                    "github.com/google/uuid", "v1.3.0", irrelevant_go_sum_digest
-                )
-            ],
-        )
 
 
 def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
