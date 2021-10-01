@@ -21,6 +21,7 @@ from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -98,6 +99,7 @@ def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> Non
             "go.mod": dedent(
                 """\
                 module example.com/external-module
+                go 1.17
                 require github.com/google/uuid v1.3.0
                 """
             ),
@@ -109,10 +111,13 @@ def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> Non
             ),
         }
     ).digest
-    with pytest.raises(ExecutionError):
+    with pytest.raises(ExecutionError) as exc:
         rule_runner.request(
             DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
         )
+    underlying_exception = exc.value.wrapped_exceptions[0]
+    assert isinstance(underlying_exception, ProcessExecutionFailure)
+    assert "SECURITY ERROR" in str(underlying_exception)
 
 
 def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> None:
@@ -121,6 +126,7 @@ def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> Non
             "go.mod": dedent(
                 """\
                 module example.com/external-module
+                go 1.17
                 require github.com/google/uuid v1.3.0
                 """
             ),
@@ -133,10 +139,12 @@ def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> Non
             ),
         }
     ).digest
-    with pytest.raises(ExecutionError):
+    with pytest.raises(ExecutionError) as exc:
         rule_runner.request(
             DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
         )
+    underlying_exception = exc.value.wrapped_exceptions[0]
+    assert "`go.mod` and/or `go.sum` changed!" in str(underlying_exception)
 
 
 def test_download_external_module_with_gomod(rule_runner: RuleRunner) -> None:
