@@ -3,31 +3,32 @@
 
 from __future__ import annotations
 
-from pants.engine.unions import UnionRule
-from typing_extensions import final
-from typing import TypeVar, ClassVar, Generic, Type
 import logging
 from abc import ABCMeta
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from itertools import chain
+from typing import ClassVar, Generic, Type, TypeVar, Iterable
+
+from typing_extensions import final
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, Rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionRule, union
 
 logger = logging.getLogger(__name__)
 
 
 _F = TypeVar("_F", bound=FieldSet)
+
 
 @union
 @dataclass(frozen=True)
@@ -38,15 +39,16 @@ class PublishPackagesRequest(Generic[_F]):
 
 _T = TypeVar("_T", bound=PublishPackagesRequest)
 
+
 @union
 @dataclass(frozen=True)
-class PublishFieldSet(FieldSet, metaclass=ABCMeta):
+class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """The fields necessary to publish an asset from a target.
 
     Implementing rules should subclass this class ... and return a PublishPackageArtifactRequest as
     output.
-
     """
+
     publish_request_type: ClassVar[Type[_T]]
 
     @final
@@ -55,7 +57,7 @@ class PublishFieldSet(FieldSet, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def rules(cls) -> tuple[Rule, ...]:
+    def rules(cls) -> tuple[UnionRule, ...]:
         return (
             UnionRule(PublishFieldSet, cls),
             UnionRule(PublishPackagesRequest, cls.publish_request_type),
@@ -66,18 +68,23 @@ class PublishFieldSet(FieldSet, metaclass=ABCMeta):
 class PublishPackageProcesses:
     """Process to run in order to publish named artifact.
 
-    This is returned from implementing rules in response to processing a PublishFieldSet.
-
     There are multiple names to support processes working on several packages for each process.
-    There are multiple processes to support publishing to several upstream services for each package.
+    There are multiple processes to support publishing to several upstream services for each
+    package.
     """
 
     names: tuple[str, ...]
-    processes: tuple[InteractiveProcess, ...]
+    processes: tuple[InteractiveProcess, ...] = ()
+    description: str | None = None
 
 
 @dataclass(frozen=True)
 class PublishPackagesProcesses:
+    """Collection of what processes to run for all built artifacts.
+
+    This is returned from implementing rules in response to a PublishPackagesRequest.
+    """
+
     packages: tuple[PublishPackageProcesses, ...]
 
 
@@ -85,7 +92,6 @@ class PublishPackagesProcesses:
 class PublishPackagesProcessesRequest:
     package_field_sets: tuple[PackageFieldSet, ...]
     publish_field_sets: tuple[PublishFieldSet, ...]
-
 
 
 class PublishSubsystem(GoalSubsystem):
@@ -134,27 +140,52 @@ async def publish_asset(console: Console, interactive_runner: InteractiveRunner)
     )
 
     # Run all processes interactively.
+    exit_code, results = run_publish_processes(
+        console, interactive_runner, chain.from_iterable(wrk.packages for wrk in work)
+    )
+
+    if not results:
+        sigil = console.sigil_skipped()
+        console.print_stderr(f"\n{sigil} Nothing published.")
+
+    # We collect all results to the end, so all output from the interactive processes are done,
+    # before printing the results.
+    for line in results:
+        console.print_stderr(line)
+
+    return Publish(exit_code)
+
+
+def run_publish_processes(console: Console, interactive_runner: InteractiveRunner, publish_processes: Iterable[PublishPackageProcesses]) -> tuple[int, list[str]]:
     exit_code = 0
-    for pkg in chain.from_iterable(wrk.packages for wrk in work):
-        if not pkg.processes:
+    output = []
+    for pub in publish_processes:
+        if not pub.processes:
             sigil = console.sigil_skipped()
-            for name in pkg.names:
-                console.print_stderr(f"{sigil} {name} skipped.")
+            status = "skipped"
+            if pub.description:
+                status += f" {pub.description}"
+            for name in pub.names:
+                output.append(f"{sigil} {name} {status}.")
             continue
 
-        for res in (interactive_runner.run(proc) for proc in pkg.processes):
+        for res in (interactive_runner.run(proc) for proc in pub.processes):
             if res.exit_code == 0:
                 sigil = console.sigil_succeeded()
                 status = "published"
+                prep = "to"
             else:
                 sigil = console.sigil_failed()
                 status = "failed"
+                prep = "for"
                 exit_code = res.exit_code
 
-            for name in pkg.names:
-                console.print_stderr(f"{sigil} {name} {status}.")
+            if pub.description:
+                status += f" {prep} {pub.description}"
 
-    return Publish(exit_code)
+            for name in pub.names:
+                output.append(f"{sigil} {name} {status}.")
+    return exit_code, output
 
 
 @rule
@@ -175,7 +206,8 @@ async def package_for_publish(request: PublishPackagesProcessesRequest) -> Publi
             PublishPackagesProcesses,
             PublishPackagesRequest,
             field_set.request(packages),
-        ) for field_set in request.publish_field_sets
+        )
+        for field_set in request.publish_field_sets
     )
 
     # Merge all PublishPackagesProcesses into one.
