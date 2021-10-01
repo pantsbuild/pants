@@ -51,6 +51,7 @@ def test_download_external_modules(rule_runner: RuleRunner) -> None:
             "go.mod": dedent(
                 """\
                 module example.com/external-module
+                go 1.17
                 require (
                     // Has a `go.mod` already.
                     github.com/google/uuid v1.3.0

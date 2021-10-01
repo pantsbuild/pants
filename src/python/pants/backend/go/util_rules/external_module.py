@@ -21,6 +21,7 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestContents,
     DigestEntries,
     DigestSubset,
     FileEntry,
@@ -73,7 +74,13 @@ async def download_external_modules(
     )
     if result_go_mod_digest != request.go_mod_stripped_digest:
         # TODO: make this a more informative error.
-        raise Exception("`go.mod` and/or `go.sum` changed! Please run `go mod tidy`.")
+        contents = await Get(DigestContents, Digest, result_go_mod_digest)
+
+        raise Exception(
+            "`go.mod` and/or `go.sum` changed! Please run `go mod tidy`.\n\n"
+            f"{contents[0].content.decode()}\n\n"
+            f"{contents[1].content.decode()}\n\n"
+        )
 
     # TODO: strip `gopath` and other paths?
     # TODO: stop including irrelevant files like the `.zip` files.
