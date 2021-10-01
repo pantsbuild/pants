@@ -90,16 +90,27 @@ JAVA_LIB_SOURCE = dedent(
     """
 )
 
-JAVA_LIB_MAIN_SOURCE = dedent(
+
+JAVA_MAIN_SOURCE = dedent(
     """
     package org.pantsbuild.example;
 
-    //import org.pantsbuild.example.lib.ExampleLib;
+    import org.pantsbuild.example.lib.ExampleLib;
 
     public class Example {
         public static void main(String[] args) {
-            // TODO: replace once dependencies work?
-            // System.out.println(ExampleLib.hello());
+            System.out.println(ExampleLib.hello());
+        }
+    }
+    """
+)
+
+JAVA_MAIN_SOURCE_NO_DEPS = dedent(
+    """
+    package org.pantsbuild.example;
+
+    public class Example {
+        public static void main(String[] args) {
             System.out.println("Hello, World!");
         }
     }
@@ -108,7 +119,7 @@ JAVA_LIB_MAIN_SOURCE = dedent(
 
 
 # @maybe_skip_jdk_test
-def test_compile_no_deps(rule_runner: RuleRunner) -> None:
+def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -143,11 +154,60 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
             .to_json()
             .decode("utf-8"),
-            "Example.java": JAVA_LIB_MAIN_SOURCE,
+            "Example.java": JAVA_MAIN_SOURCE,
+            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
 
-    tgt = rule_runner.get_target(Address("", target_name="example_app_deploy_jar"))
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+
+
+# @maybe_skip_jdk_test
+def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                    # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+                    # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        root_address=":example",
+                        output_path="dave.jar",
+                    )
+
+                    java_sources(
+                        name="example",
+                        dependencies=[
+                        ":lockfile",
+                        "
+                        ],
+                    )
+
+                    coursier_lockfile(
+                        name = "lockfile",
+                        requirements = [],
+                        sources = [
+                            "coursier_resolve.lockfile",
+                        ],
+                    )
+
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
+        }
+    )
+
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+
+
+def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
+    tgt = rule_runner.get_target(Address("", target_name=target_name))
     fat_jar = rule_runner.request(
         BuiltPackage,
         [DeployJarFieldSet.create(tgt)],
