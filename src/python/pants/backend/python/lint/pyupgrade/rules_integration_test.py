@@ -134,15 +134,19 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": PY_38_BAD_FILE, "BUILD": "python_library(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    rule_runner.write_files(
+        {"some_file_name.py": PY_38_BAD_FILE, "BUILD": "python_library(name='t')"}
+    )
+    tgt = rule_runner.get_target(
+        Address("", target_name="t", relative_file_path="some_file_name.py")
+    )
     lint_results, fmt_result = run_pyupgrade(
         rule_runner, [tgt], extra_args=["--pyupgrade-args=--py38-plus"]
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "Rewriting bad.py" in lint_results[0].stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": PY_38_FIXED_BAD_FILE})
+    assert "Rewriting some_file_name.py" in lint_results[0].stderr
+    assert fmt_result.output == get_digest(rule_runner, {"some_file_name.py": PY_38_FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 

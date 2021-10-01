@@ -14,7 +14,7 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -100,7 +100,7 @@ async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtR
     if pyupgrade.skip:
         return FmtResult.skip(formatter_name="pyupgrade")
     setup = await Get(Setup, SetupRequest(request))
-    result = await Get(ProcessResult, Process, setup.process)
+    result = await Get(FallibleProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
