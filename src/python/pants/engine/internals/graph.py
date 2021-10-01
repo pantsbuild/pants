@@ -382,7 +382,9 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
         if not any(component_address in addresses_set for component_address in component):
             continue
         component_set = set(component)
-        members = tuple(addresses_to_targets[a] for a in component)
+        members = tuple(
+            sorted((addresses_to_targets[a] for a in component), key=lambda t: t.address)
+        )
         dependencies = FrozenOrderedSet(
             [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
         )

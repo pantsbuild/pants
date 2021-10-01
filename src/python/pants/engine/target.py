@@ -621,11 +621,16 @@ class CoarsenedTarget(EngineAwareParameter):
     def metadata(self) -> Dict[str, Any]:
         return {"addresses": [t.address.spec for t in self.members]}
 
+    @property
+    def representative(self) -> Target:
+        """A stable "representative" target in the cycle."""
+        return self.members[0]
+
     def __str__(self) -> str:
         if len(self.members) > 1:
             others = len(self.members) - 1
             return f"{self.members[0].address.spec} (and {others} more)"
-        return self.members[0].address.spec
+        return self.representative.address.spec
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):

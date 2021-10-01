@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java import tailor
+from pants.backend.java import classpath, tailor
 from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import (
@@ -40,6 +40,7 @@ def rules():
     return [
         *javac.rules(),
         *junit.rules(),
+        *classpath.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
