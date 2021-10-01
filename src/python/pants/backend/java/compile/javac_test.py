@@ -189,7 +189,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="lib")
         )
     )
-    rule_runner.set_options(["--javac-jdk=zulu:1.6"])
+    rule_runner.set_options(["--javac-jdk=zulu:1.8"])
     assert {
         contents.path
         for contents in rule_runner.request(
