@@ -104,8 +104,8 @@ async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtR
     return FmtResult(
         input=setup.original_digest,
         output=result.output_digest,
-        stdout=result.stdout,
-        stderr=result.stderr,
+        stdout=FmtResult.prep_output(result.stdout),
+        stderr=FmtResult.prep_output(result.stderr),
         formatter_name="pyupgrade",
     )
 
