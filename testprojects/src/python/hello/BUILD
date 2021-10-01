@@ -8,5 +8,6 @@ python_distribution(
     provides=python_artifact(
         name="hello",
         version="1.0.0",
-    )
+    ),
+    pypi_repositories=["@foo-bar"],
 )

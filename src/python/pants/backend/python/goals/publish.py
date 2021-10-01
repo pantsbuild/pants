@@ -16,10 +16,11 @@ from pants.core.goals.publish import (
     PublishPackagesRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import StringSequenceField, Target
+from pants.engine.target import StringSequenceField
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 class PyPiRepositories(StringSequenceField):
     alias = "pypi_repositories"
     help = "List of PyPi repositories to publish the target package to."
+
+    # Twine uploads to 'pypi' by default, but we don't set default to ["@pypi"] here to make it
+    # explicit in the BUILD file when a package is meant for public distribution.
 
 
 class PublishToPyPiRequest(PublishPackagesRequest):
@@ -68,6 +72,34 @@ def twine_upload_args(
     return tuple(args)
 
 
+def twine_env_suffix(repo: str) -> str:
+    return f"_{repo[1:]}".replace("-", "_").upper() if repo.startswith("@") else ""
+
+
+def twine_env_request(repo: str) -> EnvironmentRequest:
+    suffix = twine_env_suffix(repo)
+    req = EnvironmentRequest(
+        [
+            f"{var}{suffix}"
+            for var in [
+                "TWINE_USERNAME",
+                "TWINE_PASSWORD",
+                "TWINE_REPOSITORY_URL",
+                # "TWINE_CERT",  # Does the --cert arg to pex take care of this for us?
+            ]
+        ]
+    )
+    return req
+
+
+def twine_env(env: Environment, repo: str) -> Environment:
+    suffix = twine_env_suffix(repo)
+    if not suffix:
+        return env
+
+    return Environment({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
+
+
 @rule
 async def twine_upload(
     request: PublishToPyPiRequest, twine_subsystem: TwineSubsystem
@@ -85,12 +117,14 @@ async def twine_upload(
     if not request.field_set.repositories.value:
         # I'd rather have used the opt_out mechanism on the field set, but that gives no hint as to
         # why the target was not applicable..
-        return PublishPackagesProcesses((
-            PublishPackageProcesses(
-                names=dists,
-                description=f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})"
-            ),
-        ))
+        return PublishPackagesProcesses(
+            (
+                PublishPackageProcesses(
+                    names=dists,
+                    description=f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})",
+                ),
+            )
+        )
 
     twine_pex, packages_digest, config_files = await MultiGet(
         Get(
@@ -109,14 +143,18 @@ async def twine_upload(
 
     input_digest = await Get(Digest, MergeDigests((packages_digest, config_files.snapshot.digest)))
     pex_proc_requests = []
+    twine_envs = await MultiGet(
+        Get(Environment, EnvironmentRequest, twine_env_request(repo))
+        for repo in request.field_set.repositories.value
+    )
 
-    for repo in request.field_set.repositories.value:
+    for repo, env in zip(request.field_set.repositories.value, twine_envs):
         pex_proc_requests.append(
             VenvPexProcess(
                 twine_pex,
                 argv=twine_upload_args(twine_subsystem, config_files, repo, dists),
                 input_digest=input_digest,
-                # extra_env=call_args.env,
+                extra_env=twine_env(env, repo),
                 description=repo,
             )
         )

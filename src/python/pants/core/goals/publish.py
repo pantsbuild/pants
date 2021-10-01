@@ -7,7 +7,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar, Iterable
+from typing import ClassVar, Generic, Iterable, Type, TypeVar
 
 from typing_extensions import final
 
@@ -144,9 +144,10 @@ async def publish_asset(console: Console, interactive_runner: InteractiveRunner)
         console, interactive_runner, chain.from_iterable(wrk.packages for wrk in work)
     )
 
+    console.print_stderr("")
     if not results:
         sigil = console.sigil_skipped()
-        console.print_stderr(f"\n{sigil} Nothing published.")
+        console.print_stderr(f"{sigil} Nothing published.")
 
     # We collect all results to the end, so all output from the interactive processes are done,
     # before printing the results.
@@ -156,7 +157,11 @@ async def publish_asset(console: Console, interactive_runner: InteractiveRunner)
     return Publish(exit_code)
 
 
-def run_publish_processes(console: Console, interactive_runner: InteractiveRunner, publish_processes: Iterable[PublishPackageProcesses]) -> tuple[int, list[str]]:
+def run_publish_processes(
+    console: Console,
+    interactive_runner: InteractiveRunner,
+    publish_processes: Iterable[PublishPackageProcesses],
+) -> tuple[int, list[str]]:
     exit_code = 0
     output = []
     for pub in publish_processes:
