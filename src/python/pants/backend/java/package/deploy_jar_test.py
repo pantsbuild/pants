@@ -154,8 +154,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
             .to_json()
             .decode("utf-8"),
-            "Example.java": JAVA_MAIN_SOURCE,
-            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
+            "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
         }
     )
 
@@ -163,6 +162,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
 
 
 # @maybe_skip_jdk_test
+@pytest.mark.skip("dependency inference needs to work first")
 def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -180,9 +180,9 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
+                        sources=["**/*.java", ],
                         dependencies=[
                         ":lockfile",
-                        "
                         ],
                     )
 
@@ -199,7 +199,8 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
             .to_json()
             .decode("utf-8"),
-            "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
+            "Example.java": JAVA_MAIN_SOURCE,
+            "lib/ExampleLib.java" : JAVA_LIB_SOURCE,
         }
     )
 
@@ -234,4 +235,4 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         ],
     )
 
-    raise Exception(process_result.stdout.decode("utf-8"))
+    assert process_result.stdout.decode("utf-8").strip() == "Hello, World!"

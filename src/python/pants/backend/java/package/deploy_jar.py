@@ -95,7 +95,7 @@ async def package_deploy_jar(
             tgt.address for tgt in transitive_targets.closure if tgt.has_field(JavaSourceField)
         ),
     )
-
+    
     javac_request_gets = [
         Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(tgt)) for tgt in sources_to_compile
     ]
