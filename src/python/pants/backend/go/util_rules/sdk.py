@@ -6,6 +6,7 @@ from __future__ import annotations
 import shlex
 import textwrap
 from dataclasses import dataclass
+from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
@@ -13,17 +14,40 @@ from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, Mer
 from pants.engine.internals.selectors import Get
 from pants.engine.process import BashBinary, Process
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class GoSdkProcess:
     command: tuple[str, ...]
     description: str
+    env: FrozenDict[str, str]
     input_digest: Digest = EMPTY_DIGEST
     working_dir: str | None = None
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+
+    def __init__(
+        self,
+        command: Iterable[str],
+        *,
+        description: str,
+        env: Mapping[str, str] | None = None,
+        input_digest: Digest = EMPTY_DIGEST,
+        working_dir: str | None = None,
+        output_files: Iterable[str] = (),
+        output_directories: Iterable[str] = (),
+    ) -> None:
+        self.command = tuple(command)
+        self.description = description
+        self.env = FrozenDict(env or {})
+        self.input_digest = input_digest
+        self.working_dir = working_dir
+        self.output_files = tuple(output_files)
+        self.output_directories = tuple(output_directories)
 
 
 @rule
