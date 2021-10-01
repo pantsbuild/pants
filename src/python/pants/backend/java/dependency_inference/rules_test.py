@@ -245,7 +245,7 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
-@maybe_skip_jdk_test
+@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
 def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -326,7 +326,7 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@maybe_skip_jdk_test
+@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
 def test_package_private_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
