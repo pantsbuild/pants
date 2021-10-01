@@ -7,7 +7,7 @@ import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Tuple
+from typing import Iterable
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -58,9 +58,9 @@ class PexFromTargetsRequest:
     internal_only: bool
     main: MainSpecification | None
     platforms: PexPlatforms
-    additional_args: Tuple[str, ...]
-    additional_lockfile_args: Tuple[str, ...]
-    additional_requirements: Tuple[str, ...]
+    additional_args: tuple[str, ...]
+    additional_lockfile_args: tuple[str, ...]
+    additional_requirements: tuple[str, ...]
     include_source_files: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None

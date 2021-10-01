@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import itertools
 from collections import defaultdict
-from typing import FrozenSet, Iterable, Iterator, List, Sequence, Set, Tuple, TypeVar
+from typing import Iterable, Iterator, Sequence, TypeVar
 
 from pkg_resources import Requirement
 from typing_extensions import Protocol
@@ -70,7 +70,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         return parsed_requirement
 
     @classmethod
-    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> List[Requirement]:
+    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> list[Requirement]:
         """Given a collection of constraints sets, merge by ORing within each individual constraint
         set and ANDing across each distinct constraint set.
 
@@ -81,7 +81,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # identical top-level parsed constraint sets.
         if not constraint_sets:
             return []
-        parsed_constraint_sets: Set[FrozenSet[Requirement]] = set()
+        parsed_constraint_sets: set[frozenset[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
             parsed_constraint_set = frozenset(
@@ -90,7 +90,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             parsed_constraint_sets.add(parsed_constraint_set)
 
         def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
-            merged_specs: Set[Tuple[str, str]] = set()
+            merged_specs: set[tuple[str, str]] = set()
             expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
                 if parsed_constraint.project_name == expected_interpreter:
@@ -159,7 +159,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     @classmethod
     def group_field_sets_by_constraints(
         cls, field_sets: Iterable[_FS], python_setup: PythonSetup
-    ) -> FrozenDict[InterpreterConstraints, Tuple[_FS, ...]]:
+    ) -> FrozenDict[InterpreterConstraints, tuple[_FS, ...]]:
         results = defaultdict(set)
         for fs in field_sets:
             constraints = cls.create_from_compatibility_fields(
