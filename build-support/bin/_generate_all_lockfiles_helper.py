@@ -21,6 +21,7 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
+from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
@@ -101,6 +102,12 @@ def main() -> None:
             f"--yapf-extra-requirements={repr(Yapf.default_extra_requirements)}",
             f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
             f"--yapf-lockfile={Yapf.default_lockfile_path}",
+            # PyUpgrade.
+            "--backend-packages=+['pants.backend.python.lint.pyupgrade']",
+            f"--pyupgrade-version={PyUpgrade.default_version}",
+            f"--pyupgrade-extra-requirements={repr(PyUpgrade.default_extra_requirements)}",
+            f"--pyupgrade-interpreter-constraints={repr(PyUpgrade.default_interpreter_constraints)}",
+            f"--pyupgrade-lockfile={PyUpgrade.default_lockfile_path}",
             # IPython.
             f"--ipython-version={IPython.default_version}",
             f"--ipython-extra-requirements={repr(IPython.default_extra_requirements)}",
