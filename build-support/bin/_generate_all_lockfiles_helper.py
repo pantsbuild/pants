@@ -12,6 +12,7 @@ import logging
 import subprocess
 
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.docker.dockerfile_parser import DockerfileParser
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
@@ -141,6 +142,12 @@ def main() -> None:
             f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
             f"--terraform-hcl2-parser-interpreter-constraints={repr(TerraformHcl2Parser.default_interpreter_constraints)}",
             f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
+            # Dockerfile parser for Docker dependency inference
+            "--backend-packages=+['pants.backend.experimental.docker']",
+            f"--dockerfile-parser-version={DockerfileParser.default_version}",
+            f"--dockerfile-parser-extra-requirements={repr(DockerfileParser.default_extra_requirements)}",
+            f"--dockerfile-parser-interpreter-constraints={repr(DockerfileParser.default_interpreter_constraints)}",
+            f"--dockerfile-parser-lockfile={DockerfileParser.default_lockfile_path}",
             # Run the goal.
             "generate-lockfiles",
         ],

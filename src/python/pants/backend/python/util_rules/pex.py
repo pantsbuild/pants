@@ -11,7 +11,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, Iterator, List, Mapping, Tuple
+from typing import Iterable, Iterator, Mapping
 
 import packaging.specifiers
 import packaging.version
@@ -147,7 +147,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
     def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
         return cls(field.value or ())
 
-    def generate_pex_arg_list(self) -> List[str]:
+    def generate_pex_arg_list(self) -> list[str]:
         args = []
         for platform in self:
             args.extend(["--platform", platform])
@@ -166,8 +166,8 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
-    additional_args: Tuple[str, ...]
-    pex_path: Tuple[Pex, ...]
+    additional_args: tuple[str, ...]
+    pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
 
     def __init__(
@@ -818,7 +818,7 @@ class VenvPex:
 @dataclass(unsafe_hash=True)
 class VenvPexRequest:
     pex_request: PexRequest
-    bin_names: Tuple[str, ...] = ()
+    bin_names: tuple[str, ...] = ()
 
     def __init__(self, pex_request: PexRequest, bin_names: Iterable[str] = ()) -> None:
         """A request for a PEX that runs in a venv and optionally exposes select vanv `bin` scripts.
@@ -911,7 +911,7 @@ async def create_venv_pex(
 @dataclass(unsafe_hash=True)
 class PexProcess:
     pex: Pex
-    argv: Tuple[str, ...]
+    argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None
@@ -987,7 +987,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
 @dataclass(unsafe_hash=True)
 class VenvPexProcess:
     venv_pex: VenvPex
-    argv: Tuple[str, ...]
+    argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest | None

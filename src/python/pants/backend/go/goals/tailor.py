@@ -50,8 +50,8 @@ class PutativeGoModuleTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-@rule(level=LogLevel.DEBUG, desc="Determine candidate Go `go_module` targets to create")
-async def find_putative_go_module_targets(
+@rule(level=LogLevel.DEBUG, desc="Determine candidate `go_mod` targets to create")
+async def find_putative_go_mod_targets(
     request: PutativeGoModuleTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
     all_go_mod_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("go.mod"))

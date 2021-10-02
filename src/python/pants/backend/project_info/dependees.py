@@ -106,7 +106,7 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
             "--transitive",
             default=False,
             type=bool,
-            help="List all transitive dependees, instead of only direct dependees.",
+            help="List all transitive dependees. If unspecified, list direct dependees only.",
         )
         register(
             "--closed",
@@ -118,6 +118,8 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
             "--output-format",
             type=DependeesOutputFormat,
             default=DependeesOutputFormat.text,
+            removal_version="2.9.0.dev0",
+            removal_hint="Use the `peek` goal for structured output, including dependencies.",
             help=(
                 "Use `text` for a flattened list of target addresses; use `json` for each key to be "
                 "the address of one of the specified targets, with its value being "
@@ -146,6 +148,7 @@ class DependeesGoal(Goal):
 async def dependees_goal(
     specified_addresses: Addresses, dependees_subsystem: DependeesSubsystem, console: Console
 ) -> DependeesGoal:
+    # TODO: Delte this entire conditional in 2.9.0.dev0.
     if dependees_subsystem.output_format == DependeesOutputFormat.json:
         dependees_per_target = await MultiGet(
             Get(

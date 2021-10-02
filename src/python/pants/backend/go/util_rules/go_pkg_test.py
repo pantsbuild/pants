@@ -8,7 +8,6 @@ from pants.backend.go.target_types import GoModTarget, GoPackage
 from pants.backend.go.util_rules import go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.build_graph.address import Address
-from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -17,7 +16,6 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *source_files.rules(),
             *go_mod.rules(),
             *go_pkg.rules(),
             *sdk.rules(),
@@ -29,24 +27,24 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_resolve_go_module(rule_runner: RuleRunner) -> None:
+def test_resolve_go_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_module()\n",
+            "foo/BUILD": "go_mod()\n",
             "foo/go.mod": textwrap.dedent(
                 """\
                 module go.example.com/foo
                 go 1.17
                 """
             ),
-            "foo/go.sum": "",
             "foo/pkg/BUILD": "go_package()\n",
             "foo/pkg/foo.go": textwrap.dedent(
                 """\
                 package pkg
                 func Grok() string {
                     return "Hello World"
-                }"""
+                }
+                """
             ),
             "foo/cmd/BUILD": "go_package()\n",
             "foo/cmd/main.go": textwrap.dedent(
@@ -58,14 +56,15 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
                 )
                 func main() {
                     fmt.Printf("%s\n", pkg.Grok())
-                }"""
+                }
+                """
             ),
             "foo/cmd/bar_test.go": textwrap.dedent(
                 """\
-            package main
-            import "testing"
-            func TestBar(t *testing.T) {}
-            """
+                package main
+                import "testing"
+                func TestBar(t *testing.T) {}
+                """
             ),
         }
     )
@@ -73,9 +72,8 @@ def test_resolve_go_module(rule_runner: RuleRunner) -> None:
         ResolvedGoPackage, [ResolveGoPackageRequest(Address("foo/cmd"))]
     )
 
-    # To avoid having to match on transitive dependencies in the `dependency_import_paths` metadata (some of
-    # which are internal to the Go standard library, match field-by-field instead of comparing to a full
-    # `ResolvedGoPackage` instance.
+    # Compare field-by-field rather than with a `ResolvedGoPackage` instance because
+    # `dependency_import_paths` is so verbose.
     assert resolved_go_package.address == Address("foo/cmd")
     assert resolved_go_package.import_path == "go.example.com/foo/cmd"
     assert resolved_go_package.module_address == Address("foo")

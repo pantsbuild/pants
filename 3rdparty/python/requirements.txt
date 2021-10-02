@@ -1,5 +1,4 @@
 ansicolors==1.1.8
-dockerfile==3.2.0
 fasteners==0.16
 freezegun==1.1.0
 

@@ -8,6 +8,7 @@ import pytest
 from pants.backend.docker.docker_build import DockerFieldSet
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImage
+from pants.backend.python.util_rules import pex
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -20,6 +21,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *docker_rules(),
+            *pex.rules(),
             *source_files_rules(),
             QueryRule(BuiltPackage, [DockerFieldSet]),
         ],
@@ -33,7 +35,10 @@ def run_docker(
     *,
     extra_args: list[str] | None = None,
 ) -> BuiltPackage:
-    rule_runner.set_options(extra_args or ())
+    rule_runner.set_options(
+        extra_args or (),
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     result = rule_runner.request(
         BuiltPackage,
         [DockerFieldSet.create(target)],
@@ -52,4 +57,4 @@ def test_docker_build(rule_runner) -> None:
     target = rule_runner.get_target(Address("src", target_name="test-image"))
     result = run_docker(rule_runner, target)
     assert len(result.artifacts) == 1
-    assert "Built docker image: test-image:1.0" in result.artifacts[0].extra_log_lines
+    assert "Built docker image: src/test-image:1.0" in result.artifacts[0].extra_log_lines

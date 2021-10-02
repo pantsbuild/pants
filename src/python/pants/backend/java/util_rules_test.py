@@ -50,6 +50,7 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
                     "-version",
                 ],
                 input_digest=jdk_setup.digest,
+                append_only_caches=jdk_setup.append_only_caches,
                 description="",
             )
         ],

@@ -6,9 +6,10 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.dependencies import InjectDockerDependencies, inject_docker_dependencies
-from pants.backend.docker.parser import parse_dockerfile
+from pants.backend.docker.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerDependencies, DockerImage
 from pants.backend.python.target_types import PexBinary
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -16,14 +17,20 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
+            *parser_rules(),
+            *pex_rules(),
             inject_docker_dependencies,
-            parse_dockerfile,
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
         ],
         target_types=[DockerImage, PexBinary],
     )
+    rule_runner.set_options(
+        [],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    return rule_runner
 
 
 def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:

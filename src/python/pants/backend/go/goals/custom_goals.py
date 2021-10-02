@@ -7,15 +7,11 @@ import logging
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.external_module import ResolveExternalGoPackageRequest
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.go_pkg import (
-    ResolvedGoPackage,
-    ResolveGoPackageRequest,
     is_first_party_package_target,
     is_third_party_package_target,
 )
-from pants.engine.console import Console
 from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -69,36 +65,6 @@ async def run_go_build(targets: UnexpandedTargets) -> GoBuildGoal:
         if is_first_party_package_target(tgt) or is_third_party_package_target(tgt)
     )
     return GoBuildGoal(exit_code=0)
-
-
-class GoPkgDebugSubsystem(GoalSubsystem):
-    name = "go-pkg-debug"
-    help = "Resolve a Go package and display its metadata"
-
-
-class GoPkgDebugGoal(Goal):
-    subsystem_cls = GoPkgDebugSubsystem
-
-
-@goal_rule
-async def run_go_pkg_debug(targets: UnexpandedTargets, console: Console) -> GoPkgDebugGoal:
-    first_party_package_targets = [tgt for tgt in targets if is_first_party_package_target(tgt)]
-    first_party_requests = [
-        Get(ResolvedGoPackage, ResolveGoPackageRequest(address=tgt.address))
-        for tgt in first_party_package_targets
-    ]
-
-    third_party_package_targets = [tgt for tgt in targets if is_third_party_package_target(tgt)]
-    third_party_requests = [
-        Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(address=tgt.address))
-        for tgt in third_party_package_targets
-    ]
-
-    resolved_packages = await MultiGet([*first_party_requests, *third_party_requests])  # type: ignore
-    for package in resolved_packages:
-        console.write_stdout(str(package) + "\n")
-
-    return GoPkgDebugGoal(exit_code=0)
 
 
 def rules():

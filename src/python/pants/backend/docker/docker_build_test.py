@@ -37,6 +37,7 @@ def assert_build(
 
     opts = options or {}
     opts.setdefault("registries", {})
+    opts.setdefault("default_image_name_template", "{repository}/{name}")
 
     docker_options = create_subsystem(
         DockerOptions,
@@ -85,29 +86,81 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
         {
             "docker/test/BUILD": dedent(
                 """\
-                docker_image(version="1.2.3")
+                docker_image(
+                  name="test1",
+                  version="1.2.3",
+                  image_name_template="{name}",
+                )
+                docker_image(
+                  name="test2",
+                  version="1.2.3"
+                )
+                docker_image(
+                  name="test3",
+                  version="1.2.3",
+                  image_name_template="{sub_repository}/{name}",
+                )
+                docker_image(
+                  name="test4",
+                  version="1.2.3",
+                  image_name="test-four",
+                  image_name_template="{sub_repository}/{name}",
+                  repository="four",
+                )
+                docker_image(
+                  name="test5",
+                  image_tags=["alpha-1.0", "alpha-1"],
+                )
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
         }
     )
 
-    assert_build(rule_runner, Address("docker/test"), "Built docker image: test:1.2.3")
+    assert_build(
+        rule_runner, Address("docker/test", target_name="test1"), "Built docker image: test1:1.2.3"
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test2"),
+        "Built docker image: test/test2:1.2.3",
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test3"),
+        "Built docker image: docker/test/test3:1.2.3",
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test4"),
+        "Built docker image: test/four/test-four:1.2.3",
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test5"),
+        (
+            "Built docker images: \n"
+            "  * test/test5:latest\n"
+            "  * test/test5:alpha-1.0\n"
+            "  * test/test5:alpha-1"
+        ),
+    )
 
 
-def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
+def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
                 """\
-                docker_image(name="addr1", version="1.2.3", registry="myregistry1domain:port")
-                docker_image(name="addr2", version="1.2.3", registry="myregistry2domain:port")
-                docker_image(name="addr3", version="1.2.3", registry="myregistry3domain:port")
-                docker_image(name="alias1", version="1.2.3", registry="@reg1")
-                docker_image(name="alias2", version="1.2.3", registry="@reg2")
-                docker_image(name="alias3", version="1.2.3", registry="reg3")
-                docker_image(name="unreg", version="1.2.3", registry="")
+                docker_image(name="addr1", version="1.2.3", registries=["myregistry1domain:port"])
+                docker_image(name="addr2", version="1.2.3", registries=["myregistry2domain:port"])
+                docker_image(name="addr3", version="1.2.3", registries=["myregistry3domain:port"])
+                docker_image(name="alias1", version="1.2.3", registries=["@reg1"])
+                docker_image(name="alias2", version="1.2.3", registries=["@reg2"])
+                docker_image(name="alias3", version="1.2.3", registries=["reg3"])
+                docker_image(name="unreg", version="1.2.3", registries=[])
                 docker_image(name="def", version="1.2.3")
+                docker_image(name="multi", version="1.2.3", registries=["@reg2", "@reg1"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -115,6 +168,7 @@ def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
     )
 
     options = {
+        "default_image_name_template": "{name}",
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
@@ -167,5 +221,15 @@ def test_build_image_with_registry(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="def"),
         "Built docker image: myregistry2domain:port/def:1.2.3",
+        options=options,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="multi"),
+        (
+            "Built docker images: \n"
+            "  * myregistry2domain:port/multi:1.2.3\n"
+            "  * myregistry1domain:port/multi:1.2.3"
+        ),
         options=options,
     )

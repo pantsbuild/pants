@@ -20,13 +20,14 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
 from pants.backend.go.util_rules.external_module import (
-    ResolveExternalGoModuleToPackagesRequest,
-    ResolveExternalGoModuleToPackagesResult,
+    ExternalModulePkgImportPaths,
+    ExternalModulePkgImportPathsRequest,
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
+    ModuleDescriptor,
     OwningGoMod,
     OwningGoModRequest,
 )
@@ -49,6 +50,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     Targets,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -57,7 +59,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-# Inject a dependency between a go_package and its owning go_module.
+# Inject a dependency between a go_package and its owning go_mod.
 class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
     inject_for = GoPackageDependencies
 
@@ -66,14 +68,8 @@ class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
 async def inject_go_package_dependencies(
     request: InjectGoPackageDependenciesRequest,
 ) -> InjectedDependencies:
-    owning_go_mod = await Get(
-        OwningGoMod, OwningGoModRequest(request.dependencies_field.address.spec_path)
-    )
-    return (
-        InjectedDependencies([owning_go_mod.address])
-        if owning_go_mod.address
-        else InjectedDependencies()
-    )
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.dependencies_field.address))
+    return InjectedDependencies([owning_go_mod.address])
 
 
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
@@ -120,7 +116,7 @@ async def infer_go_dependencies(
         ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
     )
 
-    # Obtain all go_package targets under this package's go_module.
+    # Obtain all go_package targets under this package's go_mod.
     assert this_go_package.module_address is not None
     spec_path = this_go_package.module_address.spec_path
     address_specs = [
@@ -141,7 +137,7 @@ async def infer_go_dependencies(
     )
     for first_party_go_package in first_party_go_packages:
         # Skip packages that are not part of this package's module.
-        # TODO: This requires that all first-party code in the monorepo be part of the same go_module. Will need
+        # TODO: This requires that all first-party code in the monorepo be part of the same go_mod. Will need
         # figure out how multiple modules in a monorepo can interact.
         if first_party_go_package.module_address != this_go_package.module_address:
             continue
@@ -159,7 +155,7 @@ async def infer_go_dependencies(
         if import_path in std_lib_imports:
             continue
 
-        # Infer first-party dependencies to other packages in same go_module.
+        # Infer first-party dependencies to other packages in same go_mod.
         if import_path in first_party_import_path_to_address:
             inferred_dependencies.append(first_party_import_path_to_address[import_path])
             continue
@@ -196,8 +192,15 @@ async def inject_go_external_package_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: GoImportPathToPackageMapping,
 ) -> InjectedDependencies:
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    tgt = wrapped_target.target
+    assert isinstance(tgt, GoExternalPackageTarget)
+
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(tgt.address))
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
+
     this_go_package = await Get(
-        ResolvedGoPackage, ResolveExternalGoPackageRequest(request.dependencies_field.address)
+        ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt, go_mod_info.stripped_digest)
     )
 
     # Loop through all of the imports of this package and add dependencies on other packages and
@@ -241,39 +244,43 @@ async def generate_go_external_package_targets(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
-    all_resolved_packages = await MultiGet(
+    all_pkg_import_paths = await MultiGet(
         Get(
-            ResolveExternalGoModuleToPackagesResult,
-            ResolveExternalGoModuleToPackagesRequest(
-                path=module_descriptor.path,
+            ExternalModulePkgImportPaths,
+            ExternalModulePkgImportPathsRequest(
+                module_path=module_descriptor.path,
                 version=module_descriptor.version,
-                go_sum_digest=go_mod_info.go_sum_stripped_digest,
+                go_mod_stripped_digest=go_mod_info.stripped_digest,
             ),
         )
         for module_descriptor in go_mod_info.modules
     )
 
-    def create_tgt(pkg: ResolvedGoPackage) -> GoExternalPackageTarget:
+    def create_tgt(
+        module_descriptor: ModuleDescriptor, pkg_import_path: str
+    ) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(
             {
-                GoExternalModulePathField.alias: pkg.module_path,
-                GoExternalModuleVersionField.alias: pkg.module_version,
-                GoExternalPackageImportPathField.alias: pkg.import_path,
+                GoExternalModulePathField.alias: module_descriptor.path,
+                GoExternalModuleVersionField.alias: module_descriptor.version,
+                GoExternalPackageImportPathField.alias: pkg_import_path,
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             Address(
                 generator_addr.spec_path,
                 target_name=generator_addr.target_name,
-                generated_name=pkg.import_path,
+                generated_name=pkg_import_path,
             ),
         )
 
     return GeneratedTargets(
         request.generator,
         (
-            create_tgt(pkg)
-            for resolved_pkgs in all_resolved_packages
-            for pkg in resolved_pkgs.packages
+            create_tgt(module_descriptor, pkg_import_path)
+            for module_descriptor, pkg_import_paths in zip(
+                go_mod_info.modules, all_pkg_import_paths
+            )
+            for pkg_import_path in pkg_import_paths
         ),
     )
 

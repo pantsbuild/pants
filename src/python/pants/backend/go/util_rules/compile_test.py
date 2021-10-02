@@ -16,11 +16,11 @@ SOURCE = FileContent(
     path="foo.go",
     content=textwrap.dedent(
         """\
-    package foo
-    func add(a, b int) int {
-        return a + b
-    }
-    """
+        package foo
+        func add(a, b int) int {
+            return a + b
+        }
+        """
     ).encode("utf-8"),
 )
 

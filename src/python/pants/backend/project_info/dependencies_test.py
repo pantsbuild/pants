@@ -60,10 +60,13 @@ def assert_dependencies(
     expected: List[str],
     transitive: bool = False,
     dependency_type: DependencyType = DependencyType.SOURCE,
+    closed: bool = False,
 ) -> None:
     args = [f"--type={dependency_type.value}"]
     if transitive:
         args.append("--transitive")
+    if closed:
+        args.append("--closed")
     result = rule_runner.run_goal_rule(Dependencies, args=[*args, *specs])
     assert result.stdout.splitlines() == expected
 
@@ -77,6 +80,10 @@ def test_no_dependencies(rule_runner: RuleRunner) -> None:
     create_python_library(rule_runner, path="some/target")
     assert_dependencies(rule_runner, specs=["some/target"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target"], expected=[], transitive=True)
+    assert_dependencies(rule_runner, specs=["some/target"], expected=["some/target"], closed=True)
+    assert_dependencies(
+        rule_runner, specs=["some/target"], expected=["some/target"], transitive=True, closed=True
+    )
 
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
@@ -119,6 +126,25 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         dependency_type=DependencyType.SOURCE,
         expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
     )
+    assert_deps(
+        specs=["some/other/target"],
+        dependency_type=DependencyType.SOURCE,
+        expected=["3rdparty/python:req2", "some/other/target", "some/target"],
+        closed=True,
+    )
+    assert_deps(
+        specs=["some/other/target"],
+        transitive=True,
+        dependency_type=DependencyType.SOURCE,
+        expected=[
+            "3rdparty/python:req1",
+            "3rdparty/python:req2",
+            "dep/target",
+            "some/other/target",
+            "some/target",
+        ],
+        closed=True,
+    )
 
     # `--type=3rdparty`
     assert_deps(
@@ -154,8 +180,8 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    # Glob the whole repo. `some/other/target` should not be included because nothing depends
-    # on it.
+    # Glob the whole repo. `some/other/target` should not be included if --closed is not set,
+    # because nothing depends on it.
     assert_deps(
         specs=["::"],
         expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
@@ -164,4 +190,27 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         specs=["::"],
         transitive=True,
         expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
+    )
+    assert_deps(
+        specs=["::"],
+        expected=[
+            "3rdparty/python:req1",
+            "3rdparty/python:req2",
+            "dep/target",
+            "some/other/target",
+            "some/target",
+        ],
+        closed=True,
+    )
+    assert_deps(
+        specs=["::"],
+        transitive=True,
+        expected=[
+            "3rdparty/python:req1",
+            "3rdparty/python:req2",
+            "dep/target",
+            "some/other/target",
+            "some/target",
+        ],
+        closed=True,
     )

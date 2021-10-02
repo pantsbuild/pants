@@ -1,12 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
-use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
 use store::Store;
@@ -17,7 +15,6 @@ use workunit_store::RunningWorkunit;
 use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessCacheScope,
 };
 
 #[cfg(test)]
@@ -43,8 +40,7 @@ static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
-  platform_constraint: Option<Platform>,
-  nailgun_digest: Digest,
+  client_request: Process,
 ) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -52,20 +48,15 @@ fn construct_nailgun_server_request(
 
   Process {
     argv: full_args,
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: nailgun_digest,
+    input_files: client_request.use_nailgun,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Some(Duration::new(1000, 0)),
+    timeout: None,
     description: format!("nailgun server for {}", nailgun_name),
     level: log::Level::Info,
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    platform_constraint,
     use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
-    cache_scope: ProcessCacheScope::Always,
+    ..client_request
   }
 }
 
@@ -104,9 +95,16 @@ impl CommandRunner {
     executor: Executor,
     nailgun_pool_size: usize,
   ) -> Self {
+    let named_caches = runner.named_caches().clone();
     CommandRunner {
       inner: runner,
-      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, store, executor.clone()),
+      nailgun_pool: NailgunPool::new(
+        workdir_base,
+        nailgun_pool_size,
+        store,
+        executor.clone(),
+        named_caches,
+      ),
       executor,
     }
   }
@@ -140,18 +138,14 @@ impl super::CommandRunner for CommandRunner {
     } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
 
-    let nailgun_req = construct_nailgun_server_request(
-      &nailgun_name,
-      nailgun_args,
-      original_request.platform_constraint,
-      original_request.use_nailgun,
-    );
+    let nailgun_req =
+      construct_nailgun_server_request(&nailgun_name, nailgun_args, original_request.clone());
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
     let mut nailgun_process = self
       .nailgun_pool
-      .acquire(nailgun_req)
+      .acquire(nailgun_req, context.clone())
       .await
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
 

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os.path
+import subprocess
 from textwrap import dedent
 
 import pytest
@@ -22,9 +24,9 @@ from pants.backend.go.util_rules import (
     link,
     sdk,
 )
-from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import source_files
+from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -56,7 +58,9 @@ def rule_runner() -> RuleRunner:
 
 def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:
     field_set = GoBinaryFieldSet.create(binary_target)
-    return rule_runner.request(BuiltPackage, [field_set])
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    return result
 
 
 def test_package_simple(rule_runner: RuleRunner) -> None:
@@ -78,7 +82,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """
@@ -90,8 +94,13 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     assert len(built_package.artifacts) == 1
     assert built_package.artifacts[0].relpath == "bin"
 
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"Hello world!\n"
 
-def test_package_with_dependency(rule_runner: RuleRunner) -> None:
+
+@pytest.mark.xfail
+def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "lib/lib.go": dedent(
@@ -100,10 +109,15 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
 
                 import (
                     "fmt"
+                    "rsc.io/quote"
                 )
 
                 func Quote(s string) string {
                     return fmt.Sprintf(">> %s <<", s)
+                }
+
+                func GoProverb() string {
+                    return quote.Go()
                 }
                 """
             ),
@@ -119,13 +133,33 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
 
                 func main() {
                     fmt.Println(lib.Quote("Hello world!"))
+                    fmt.Println(lib.GoProverb())
                 }
                 """
             ),
-            "go.mod": "module foo.example.com\n",
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                require (
+                    golang.org/x/text // indirect
+                    rsc.io/quote v1.5.2
+                    rsc.io/sampler // indirect
+                )
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+                rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+                rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+                rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+                rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+                """
+            ),
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """
@@ -136,3 +170,10 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
     assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == (
+        b">> Hello world! <<\n"
+        b"Don't communicate by sharing memory, share memory by communicating.\n"
+    )

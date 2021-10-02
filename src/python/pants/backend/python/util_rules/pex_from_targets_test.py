@@ -105,7 +105,7 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     return find_links
 
 
-def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
+def info(rule_runner: RuleRunner, pex: Pex) -> dict[str, Any]:
     rule_runner.scheduler.write_digest(pex.digest)
     completed_process = subprocess.run(
         args=[
@@ -122,7 +122,7 @@ def info(rule_runner: RuleRunner, pex: Pex) -> Dict[str, Any]:
     return cast(Dict[str, Any], json.loads(completed_process.stdout))
 
 
-def requirements(rule_runner: RuleRunner, pex: Pex) -> List[str]:
+def requirements(rule_runner: RuleRunner, pex: Pex) -> list[str]:
     return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
