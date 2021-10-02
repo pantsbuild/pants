@@ -29,6 +29,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class BuiltDockerImage(BuiltPackageArtifact):
+    tags: tuple[str, ...] = ()
+
+    @classmethod
+    def create(cls, tags: tuple[str, ...]) -> BuiltDockerImage:
+        tags_string = tags[0] if len(tags) == 1 else (f"\n{bullet_list(tags)}")
+        return cls(
+            tags=tags,
+            relpath=None,
+            extra_log_lines=(
+                f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
+                "To try out the image interactively:",
+                f"    docker run -it --rm {tags[0]} [entrypoint args...]",
+                "To push your image:",
+                f"    docker push {tags[0]}",
+                "",
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet):
     required_fields = (DockerImageSources,)
 
@@ -114,23 +135,9 @@ async def build_docker_image(
         f"{result.stderr.decode()}"
     )
 
-    tags_string = tags[0] if len(tags) == 1 else (f"\n{bullet_list(tags)}")
-
     return BuiltPackage(
         result.output_digest,
-        (
-            BuiltPackageArtifact(
-                relpath=None,
-                extra_log_lines=(
-                    f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-                    "To try out the image interactively:",
-                    f"    docker run -it --rm {tags[0]} [entrypoint args...]",
-                    "To push your image:",
-                    f"    docker push {tags[0]}",
-                    "",
-                ),
-            ),
-        ),
+        (BuiltDockerImage.create(tags),),
     )
 
 

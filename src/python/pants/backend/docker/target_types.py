@@ -6,6 +6,7 @@ from textwrap import dedent
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Dependencies,
     Sources,
     StringField,
@@ -103,6 +104,12 @@ class DockerRepository(StringField):
     )
 
 
+class DockerSkipPushField(BoolField):
+    alias = "skip_push"
+    default = False
+    help = "If set to true, do not push this image to registries when running `./pants publish`."
+
+
 class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
@@ -115,5 +122,6 @@ class DockerImage(Target):
         DockerImageVersion,
         DockerRegistriesField,
         DockerRepository,
+        DockerSkipPushField,
     )
     help = "A Docker image."
