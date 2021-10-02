@@ -202,10 +202,10 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_paths=xerrors_import_paths,
     )
 
-    quoter_import_paths = ["example.com/greeter/quoter", *xerrors_import_paths]
-    assert_built(rule_runner, Address("greeter/quoter"), expected_import_paths=quoter_import_paths)
+    quoter_import_path = "example.com/greeter/quoter"
+    assert_built(rule_runner, Address("greeter/quoter"), expected_import_paths=[quoter_import_path])
 
-    greeter_import_paths = ["example.com/greeter", *quoter_import_paths]
+    greeter_import_paths = ["example.com/greeter", quoter_import_path, *xerrors_import_paths]
     assert_built(rule_runner, Address("greeter"), expected_import_paths=greeter_import_paths)
 
     assert_built(
