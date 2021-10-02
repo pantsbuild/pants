@@ -14,16 +14,15 @@ from pants.backend.python.target_types import PythonDistribution, PythonLibrary
 from pants.core.goals.publish import (
     Publish,
     PublishFieldSet,
-    PublishPackageProcesses,
-    PublishPackagesProcesses,
-    PublishPackagesRequest,
+    PublishPackages,
+    PublishProcesses,
+    PublishRequest,
     rules,
 )
 from pants.core.register import rules as core_rules
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import rule
 from pants.engine.target import StringSequenceField
-from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -32,36 +31,35 @@ class MockRepositoriesField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class MockPublish(PublishPackagesRequest):
+class MockPublishRequest(PublishRequest):
     pass
 
 
 @dataclass(frozen=True)
 class PublishTestFieldSet(PublishFieldSet):
+    publish_request_type = MockPublishRequest
     required_fields = (MockRepositoriesField,)
-    publish_request_type = MockPublish
 
     repositories: MockRepositoriesField
 
 
 @rule
-async def mock_publish(request: MockPublish) -> PublishPackagesProcesses:
+async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
     if not request.field_set.repositories.value:
-        return PublishPackagesProcesses(())
+        return PublishProcesses()
 
-    return PublishPackagesProcesses(
-        tuple(
-            PublishPackageProcesses(
-                names=tuple(
-                    artifact.relpath
-                    for pkg in request.packages
-                    for artifact in pkg.artifacts
-                    if artifact.relpath
-                ),
-                processes=() if repo == "skip" else (InteractiveProcess(["echo", repo]),),
-            )
-            for repo in request.field_set.repositories.value
+    return PublishProcesses(
+        PublishPackages(
+            names=tuple(
+                artifact.relpath
+                for pkg in request.packages
+                for artifact in pkg.artifacts
+                if artifact.relpath
+            ),
+            process=None if repo == "skip" else InteractiveProcess(["echo", repo]),
+            description="(requested)" if repo == "skip" else repo,
         )
+        for repo in request.field_set.repositories.value
     )
 
 
@@ -74,8 +72,7 @@ def rule_runner() -> RuleRunner:
             *rules(),
             mock_publish,
             PythonDistribution.register_plugin_field(MockRepositoriesField),
-            UnionRule(PublishFieldSet, PublishTestFieldSet),
-            UnionRule(PublishPackagesRequest, MockPublish),
+            *PublishTestFieldSet.rules(),
         ],
         target_types=[PythonLibrary, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
@@ -136,8 +133,8 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
     )
 
     assert result.exit_code == 0
-    assert "my-package-0.1.0.tar.gz skipped." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl skipped." in result.stderr
+    assert "my-package-0.1.0.tar.gz skipped (requested)." in result.stderr
+    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
 
 
 @pytest.mark.skip("Can not run interactive process from test..?")

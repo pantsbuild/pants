@@ -12,7 +12,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import PythonDistribution, PythonLibrary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
-from pants.core.goals.publish import PublishPackageProcesses, PublishPackagesProcesses
+from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *config_files_rules(),
             *pex_from_targets.rules(),
             *rules(),
-            QueryRule(PublishPackagesProcesses, [PublishToPyPiRequest]),
+            QueryRule(PublishProcesses, [PublishToPyPiRequest]),
         ],
         target_types=[PythonLibrary, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
@@ -74,18 +74,18 @@ def project_files(skip_twine: bool) -> dict[str, str]:
     }
 
 
-def assert_package_processes(
-    package: PublishPackageProcesses,
-    *expect_processes,
+def assert_package(
+    package: PublishPackages,
     expect_names: tuple[str, ...],
     expect_description: str,
+    expect_process,
 ) -> None:
     assert package.names == expect_names
     assert package.description == expect_description
-    assert len(package.processes) == len(expect_processes)
-    processes = iter(package.processes)
-    for assert_process in expect_processes:
-        assert_process(next(processes))
+    if expect_process:
+        expect_process(package.process)
+    else:
+        assert package.process is None
 
 
 def process_assertion(**assertions):
@@ -101,12 +101,17 @@ def test_twine_upload(rule_runner, packages) -> None:
 
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
     fs = PublishToPyPiFieldSet.create(tgt)
-    result = rule_runner.request(PublishPackagesProcesses, [fs.request(packages)])
+    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
 
-    assert len(result.packages) == 2
-    assert_package_processes(
-        result.packages[0],
-        process_assertion(
+    assert len(result) == 2
+    assert_package(
+        result[0],
+        expect_names=(
+            "my-package-0.1.0.tar.gz",
+            "my_package-0.1.0-py3-none-any.whl",
+        ),
+        expect_description="@pypi",
+        expect_process=process_assertion(
             argv=(
                 "./twine.pex_pex_shim.sh",
                 "upload",
@@ -118,15 +123,15 @@ def test_twine_upload(rule_runner, packages) -> None:
             ),
             env=FrozenDict({"TWINE_PASSWORD": "secret"}),
         ),
+    )
+    assert_package(
+        result[1],
         expect_names=(
             "my-package-0.1.0.tar.gz",
             "my_package-0.1.0-py3-none-any.whl",
         ),
-        expect_description="@pypi",
-    )
-    assert_package_processes(
-        result.packages[1],
-        process_assertion(
+        expect_description="@private",
+        expect_process=process_assertion(
             argv=(
                 "./twine.pex_pex_shim.sh",
                 "upload",
@@ -138,11 +143,6 @@ def test_twine_upload(rule_runner, packages) -> None:
             ),
             env=FrozenDict(),
         ),
-        expect_names=(
-            "my-package-0.1.0.tar.gz",
-            "my_package-0.1.0-py3-none-any.whl",
-        ),
-        expect_description="@private",
     )
 
 
@@ -151,19 +151,20 @@ def test_skip_twine(rule_runner, packages) -> None:
 
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
     fs = PublishToPyPiFieldSet.create(tgt)
-    result = rule_runner.request(PublishPackagesProcesses, [fs.request(packages)])
+    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
 
-    assert len(result.packages) == 1
-    assert_package_processes(
-        result.packages[0],
+    assert len(result) == 1
+    assert_package(
+        result[0],
         expect_names=(
             "my-package-0.1.0.tar.gz",
             "my_package-0.1.0-py3-none-any.whl",
         ),
         expect_description="(by `skip_twine` on src:dist)",
+        expect_process=None,
     )
 
     # Skip twine globally from config option.
     rule_runner.set_options(["--twine-skip"])
-    result = rule_runner.request(PublishPackagesProcesses, [fs.request(packages)])
-    assert len(result.packages) == 0
+    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
+    assert len(result) == 0

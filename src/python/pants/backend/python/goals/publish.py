@@ -11,9 +11,9 @@ from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.publish import (
     PublishFieldSet,
-    PublishPackageProcesses,
-    PublishPackagesProcesses,
-    PublishPackagesRequest,
+    PublishPackages,
+    PublishProcesses,
+    PublishRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
@@ -39,7 +39,7 @@ class SkipTwineUploadField(BoolField):
     help = "If true, don't publish this target's packages using Twine."
 
 
-class PublishToPyPiRequest(PublishPackagesRequest):
+class PublishToPyPiRequest(PublishRequest):
     pass
 
 
@@ -110,7 +110,7 @@ def twine_env(env: Environment, repo: str) -> Environment:
 @rule
 async def twine_upload(
     request: PublishToPyPiRequest, twine_subsystem: TwineSubsystem
-) -> PublishPackagesProcesses:
+) -> PublishProcesses:
     dists = tuple(
         artifact.relpath
         for pkg in request.packages
@@ -119,7 +119,7 @@ async def twine_upload(
     )
 
     if twine_subsystem.skip or not dists:
-        return PublishPackagesProcesses(())
+        return PublishProcesses()
 
     # Too verbose to provide feedback as to why some packages were skipped?
     skip = None
@@ -131,13 +131,13 @@ async def twine_upload(
         skip = f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})"
 
     if skip:
-        return PublishPackagesProcesses(
-            (
-                PublishPackageProcesses(
+        return PublishProcesses(
+            [
+                PublishPackages(
                     names=dists,
                     description=skip,
                 ),
-            )
+            ]
         )
 
     twine_pex, packages_digest, config_files = await MultiGet(
@@ -177,15 +177,13 @@ async def twine_upload(
         Get(Process, VenvPexProcess, request) for request in pex_proc_requests
     )
 
-    return PublishPackagesProcesses(
-        tuple(
-            PublishPackageProcesses(
-                names=dists,
-                processes=(InteractiveProcess.from_process(process),),
-                description=process.description,
-            )
-            for process in processes
+    return PublishProcesses(
+        PublishPackages(
+            names=dists,
+            process=InteractiveProcess.from_process(process),
+            description=process.description,
         )
+        for process in processes
     )
 
 
