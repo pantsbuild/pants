@@ -219,11 +219,9 @@ class ExceptionSink:
             intermediate_filename_component = ""
         else:
             assert isinstance(for_pid, Pid)
-            intermediate_filename_component = ".{}".format(for_pid)
+            intermediate_filename_component = f".{for_pid}"
         in_dir = in_dir or cls._log_dir
-        return os.path.join(
-            in_dir, ".pids", "exceptions{}.log".format(intermediate_filename_component)
-        )
+        return os.path.join(in_dir, ".pids", f"exceptions{intermediate_filename_component}.log")
 
     @classmethod
     def _log_exception(cls, msg):
@@ -347,7 +345,7 @@ pid: {pid}
         if should_print_backtrace:
             traceback_string = "\n{}".format("".join(traceback_lines))
         else:
-            traceback_string = " {}".format(cls._traceback_omitted_default_text)
+            traceback_string = f" {cls._traceback_omitted_default_text}"
         return traceback_string
 
     _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
@@ -358,7 +356,7 @@ Exception message: {exception_message}{maybe_newline}
     @classmethod
     def _format_unhandled_exception_log(cls, exc, tb, add_newline, should_print_backtrace):
         exc_type = type(exc)
-        exception_full_name = "{}.{}".format(exc_type.__module__, exc_type.__name__)
+        exception_full_name = f"{exc_type.__module__}.{exc_type.__name__}"
         exception_message = str(exc) if exc else "(no message)"
         maybe_newline = "\n" if add_newline else ""
         return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
@@ -391,7 +389,7 @@ Exception message: {exception_message}{maybe_newline}
             )
             cls._log_exception(exception_log_entry)
         except Exception as e:
-            extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
+            extra_err_msg = f"Additional error logging unhandled exception {exc}: {e}"
             logger.error(extra_err_msg)
 
         # The rust logger implementation will have its own stacktrace, but at import time, we want

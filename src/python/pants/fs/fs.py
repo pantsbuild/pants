@@ -29,7 +29,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     max_length: the maximum desired file name length
     """
     if os.path.basename(name) != name:
-        raise ValueError("Name must be a filename, handed a path: {}".format(name))
+        raise ValueError(f"Name must be a filename, handed a path: {name}")
 
     ext = extension or ""
     filename = name + ext
@@ -46,7 +46,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
         prefix = name[:ps_len]
         suffix = name[-ps_len:] if ps_len > 0 else ""
 
-        safe_name = "{}{}{}{}{}{}".format(prefix, sep, hexdigest, sep, suffix, ext)
+        safe_name = f"{prefix}{sep}{hexdigest}{sep}{suffix}{ext}"
         if len(safe_name) > max_length:
             raise ValueError(
                 "Digest {} failed to produce a filename <= {} "

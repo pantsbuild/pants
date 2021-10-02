@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple, cast
+from typing import Any, Iterable, cast
 
 from pants.base.deprecated import deprecated_conditional
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
@@ -58,7 +58,7 @@ class CheckResult:
             report=report,
         )
 
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         return {"partition": self.partition_description}
 
 
@@ -72,7 +72,7 @@ class CheckResults(EngineAwareReturnType):
     multiple results.
     """
 
-    results: Tuple[CheckResult, ...]
+    results: tuple[CheckResult, ...]
     checker_name: str
 
     def __init__(
@@ -105,12 +105,12 @@ class CheckResults(EngineAwareReturnType):
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel | None:
         if self.skipped:
             return LogLevel.DEBUG
         return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         if self.skipped:
             return f"{self.checker_name} skipped."
         message = self.checker_name

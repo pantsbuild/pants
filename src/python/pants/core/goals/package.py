@@ -7,7 +7,6 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
@@ -38,14 +37,14 @@ class BuiltPackageArtifact:
     Used for logging information about the artifacts that are dumped to the distdir.
     """
 
-    relpath: Optional[str]
-    extra_log_lines: Tuple[str, ...] = tuple()
+    relpath: str | None
+    extra_log_lines: tuple[str, ...] = tuple()
 
 
 @dataclass(frozen=True)
 class BuiltPackage:
     digest: Digest
-    artifacts: Tuple[BuiltPackageArtifact, ...]
+    artifacts: tuple[BuiltPackageArtifact, ...]
 
 
 class OutputPathField(StringField, AsyncFieldMixin):
