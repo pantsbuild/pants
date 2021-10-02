@@ -391,14 +391,12 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
         # For each member of the component, include the CoarsenedTarget for each of its external
         # dependencies.
         coarsened_target = CoarsenedTarget(
-            tuple(addresses_to_targets[a] for a in component),
-            tuple(
-                OrderedSet(
-                    coarsened_targets[d]
-                    for a in component
-                    for d in dependency_mapping.mapping[a]
-                    if d not in component_set
-                )
+            (addresses_to_targets[a] for a in component),
+            (
+                coarsened_targets[d]
+                for a in component
+                for d in dependency_mapping.mapping[a]
+                if d not in component_set
             ),
         )
 
