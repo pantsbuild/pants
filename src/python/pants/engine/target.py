@@ -8,6 +8,7 @@ import itertools
 import logging
 import os.path
 from abc import ABC, ABCMeta, abstractmethod
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -605,15 +606,17 @@ class UnexpandedTargets(Collection[Target]):
 
 @dataclass(frozen=True)
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisible."""
+    """A set of Targets which cyclicly reach one another, and are thus indivisible.
+
+    This class is a structure-shared DAG.
+    TODO: Memoize identity and hash for the dependencies.
+    """
 
     # The members of the cycle.
     members: Tuple[Target, ...]
     # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
     # between members of the cycle are excluded.
-    #
-    # To expand these dependencies, request `CoarsenedTargets` for them.
-    dependencies: FrozenOrderedSet[Address]
+    dependencies: Tuple[CoarsenedTarget, ...]
 
     def debug_hint(self) -> str:
         return str(self)
@@ -634,7 +637,23 @@ class CoarsenedTarget(EngineAwareParameter):
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):
-    """A set of direct (not transitive) disjoint CoarsenedTarget instances."""
+    """The CoarsenedTarget roots of a transitive graph walk for some addresses.
+
+    To collect all reachable CoarsenedTarget members, use `def closure`.
+    """
+
+    def closure(self) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+
+        visited = set()
+        queue = deque(self)
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
 
 
 @dataclass(frozen=True)

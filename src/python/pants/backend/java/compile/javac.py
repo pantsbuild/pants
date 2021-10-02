@@ -137,6 +137,23 @@ async def compile_java_source(
     zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
 ) -> FallibleCompiledClassfiles:
+    # Request the component's direct dependency classpath.
+    direct_dependency_classfiles_fallible = await MultiGet(
+        Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=coarsened_dep))
+        for coarsened_dep in request.component.dependencies
+    )
+    direct_dependency_classfiles = [
+        fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
+    ]
+    if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
+        return FallibleCompiledClassfiles(
+            description=str(request.component),
+            result=CompileResult.DEPENDENCY_FAILED,
+            output=None,
+            exit_code=1,
+        )
+
+    # Then collect the component's sources.
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(Sources)
     )
@@ -154,51 +171,28 @@ async def compile_java_source(
             for t in component_members_with_sources
         ),
     )
-
     component_members_and_java_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
         if sources.snapshot.digest != EMPTY_DIGEST
     ]
-
     if not component_members_and_java_source_files:
+        # If the component has no sources, it is acting as an alias for its dependencies: return
+        # their merged classpaths.
+        dependencies_digest = await Get(
+            Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)
+        )
         return FallibleCompiledClassfiles(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=CompiledClassfiles(digest=EMPTY_DIGEST),
+            output=CompiledClassfiles(digest=dependencies_digest),
             exit_code=0,
         )
-
-    # Target coarsening currently doesn't perform dep expansion, which matters for targets
-    # with multiple sources that expand to individual source subtargets.
-    # We expand the dependencies explicitly here before coarsening, but ideally this could
-    # be done somehow during coarsening.
-    # TODO: Should component dependencies be filtered out here if they were only brought in by component members which were
-    #   filtered out above (due to having no JavaSources to contribute)?  If so, that will likely required extending
-    #   the CoarsenedTargets API to include more complete dependency information, or to support such filtering directly.
-    expanded_direct_deps = await Get(Targets, Addresses(request.component.dependencies))
-    coarsened_direct_deps = await Get(
-        CoarsenedTargets, Addresses(t.address for t in expanded_direct_deps)
-    )
 
     lockfile = await Get(
         CoursierResolvedLockfile,
         CoursierLockfileForTargetRequest(Targets(request.component.members)),
     )
-    direct_dependency_classfiles_fallible = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=coarsened_dep))
-        for coarsened_dep in coarsened_direct_deps
-    )
-    direct_dependency_classfiles = [
-        fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
-    ]
-    if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
-        return FallibleCompiledClassfiles(
-            description=str(request.component),
-            result=CompileResult.DEPENDENCY_FAILED,
-            output=None,
-            exit_code=1,
-        )
 
     dest_dir = "classfiles"
     (
