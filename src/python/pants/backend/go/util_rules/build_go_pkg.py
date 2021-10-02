@@ -42,7 +42,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Targets, WrappedTarget
+from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import path_safe
 
@@ -110,7 +110,9 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
 
     import_path = "main" if request.is_main else resolved_package.import_path
 
-    _all_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
+    # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
+    #  of its generated targets...Figure this out.
+    _all_dependencies = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
     _buildable_dependencies = [
         dep
         for dep in _all_dependencies
