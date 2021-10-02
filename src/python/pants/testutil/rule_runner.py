@@ -129,7 +129,7 @@ class RuleRunner:
         exec_slot = os.environ.get("EXECUTION_SLOT")
         if home and exec_slot:
             bootstrap_args.append(
-                "--named-caches-dir=" f"{home}/.cache/pants/named_caches/tests/{exec_slot}"
+                f"--named-caches-dir={home}/.cache/pants/named_caches/tests/{exec_slot}"
             )
 
         root_dir: Path | None = None
