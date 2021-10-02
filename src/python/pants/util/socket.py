@@ -39,7 +39,7 @@ class RecvBufferedSocket:
         try:
             # Disable Nagle's algorithm to improve latency.
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        except (OSError, IOError):
+        except OSError:
             # This can fail in tests where `socket.socketpair()` is used, or potentially
             # in odd environments - but we shouldn't ever crash over it.
             return

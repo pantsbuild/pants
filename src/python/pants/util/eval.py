@@ -4,14 +4,14 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Any, Type
+from typing import Any
 
 
 def parse_expression(
     val: str,
     acceptable_types: type | tuple[type, ...],
     name: str | None = None,
-    raise_type: Type[BaseException] = ValueError,
+    raise_type: type[BaseException] = ValueError,
 ) -> Any:
     """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
 
@@ -63,8 +63,7 @@ def parse_expression(
                 yield types
             elif isinstance(types, tuple):
                 for item in types:
-                    for typ in iter_types(item):
-                        yield typ
+                    yield from iter_types(item)
             else:
                 raise ValueError(
                     f"The given acceptable_types is not a valid type (tuple): {acceptable_types}"

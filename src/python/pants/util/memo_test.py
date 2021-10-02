@@ -158,7 +158,7 @@ class MemoizeTest(unittest.TestCase):
 
         self.assertEqual([2, 3, 2, 3], calculations)
 
-    class _Called(object):
+    class _Called:
         def __init__(self, increment):
             self._calls = 0
             self._increment = increment
