@@ -104,7 +104,6 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"Hello world!\n"
 
 
-@pytest.mark.xfail
 def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
