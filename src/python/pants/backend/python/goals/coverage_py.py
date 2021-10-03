@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from pathlib import PurePath
-from typing import List, Optional, Tuple, cast
+from typing import cast
 
 import toml
 
@@ -81,7 +81,7 @@ class CoverageReportType(Enum):
 
     _report_name: str
 
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> CoverageReportType:
+    def __new__(cls, value: str, report_name: str | None = None) -> CoverageReportType:
         member: CoverageReportType = object.__new__(cls)
         member._value_ = value
         member._report_name = report_name if report_name is not None else value
@@ -195,11 +195,11 @@ class CoverageSubsystem(PythonToolBase):
         )
 
     @property
-    def filter(self) -> Tuple[str, ...]:
+    def filter(self) -> tuple[str, ...]:
         return tuple(self.options.filter)
 
     @property
-    def reports(self) -> Tuple[CoverageReportType, ...]:
+    def reports(self) -> tuple[CoverageReportType, ...]:
         return tuple(self.options.report)
 
     @property
@@ -262,7 +262,7 @@ class CoverageConfig:
 
 
 def _validate_and_update_config(
-    coverage_config: configparser.ConfigParser, config_path: Optional[str]
+    coverage_config: configparser.ConfigParser, config_path: str | None
 ) -> None:
     if not coverage_config.has_section("run"):
         coverage_config.add_section("run")
@@ -506,7 +506,7 @@ async def generate_coverage_reports(
     pex_processes = []
     report_types = []
     result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
-    coverage_reports: List[CoverageReport] = []
+    coverage_reports: list[CoverageReport] = []
     for report_type in coverage_subsystem.reports:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
@@ -584,7 +584,7 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
-    report_file: Optional[PurePath]
+    report_file: PurePath | None
     if report_type == CoverageReportType.HTML:
         report_file = output_dir / "htmlcov" / "index.html"
     elif report_type == CoverageReportType.XML:

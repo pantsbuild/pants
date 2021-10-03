@@ -6,6 +6,7 @@ from pathlib import PurePath
 
 from pants.backend.go.target_types import GoBinaryMainAddress
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
@@ -39,9 +40,11 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     built_package = await Get(
         BuiltGoPackage, BuildGoPackageRequest(main_go_package_address, is_main=True)
     )
-    input_digest = await Get(
-        Digest, MergeDigests([built_package.object_digest, built_package.imports_digest])
+    main_pkg_path = built_package.import_paths_to_pkg_a_files["main"]
+    import_config = await Get(
+        ImportConfig, ImportConfigRequest(built_package.import_paths_to_pkg_a_files)
     )
+    input_digest = await Get(Digest, MergeDigests([built_package.digest, import_config.digest]))
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
 
@@ -49,8 +52,8 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         LinkedGoBinary,
         LinkGoBinaryRequest(
             input_digest=input_digest,
-            archives=("./__pkg__.a",),
-            import_config_path="./importcfg",
+            archives=(main_pkg_path,),
+            import_config_path=import_config.CONFIG_PATH,
             output_filename=f"./{output_filename.name}",
             description=f"Link Go binary for {field_set.address}",
         ),

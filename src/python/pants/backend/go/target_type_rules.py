@@ -195,7 +195,13 @@ async def inject_go_external_package_dependencies(
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     tgt = wrapped_target.target
     assert isinstance(tgt, GoExternalPackageTarget)
-    this_go_package = await Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt))
+
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(tgt.address))
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
+
+    this_go_package = await Get(
+        ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt, go_mod_info.stripped_digest)
+    )
 
     # Loop through all of the imports of this package and add dependencies on other packages and
     # external modules.

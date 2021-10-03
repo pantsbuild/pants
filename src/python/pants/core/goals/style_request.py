@@ -7,7 +7,7 @@ import logging
 import os.path
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Generic, Iterable, Optional, Sequence, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Sequence, TypeVar
 
 from typing_extensions import Protocol
 
@@ -33,16 +33,16 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     linting.
     """
 
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[type[_FS]]
 
     field_sets: Collection[_FS]
-    prior_formatter_result: Optional[Snapshot] = None
+    prior_formatter_result: Snapshot | None = None
 
     def __init__(
         self,
         field_sets: Iterable[_FS],
         *,
-        prior_formatter_result: Optional[Snapshot] = None,
+        prior_formatter_result: Snapshot | None = None,
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
         self.prior_formatter_result = prior_formatter_result

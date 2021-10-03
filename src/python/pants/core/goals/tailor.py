@@ -9,7 +9,7 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Set, Tuple, Type, cast
+from typing import Iterable, Mapping, cast
 
 from pants.base.specs import (
     AddressSpecs,
@@ -63,7 +63,7 @@ class PutativeTargetsSearchPaths:
 
 
 @memoized
-def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
+def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     for field in tgt_type.core_fields:
         if issubclass(field, Sources):
             return field.default or tuple()
@@ -88,7 +88,7 @@ class PutativeTarget:
     # The putative target will own these sources, but may also glob over other sources.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.
-    triggering_sources: Tuple[str, ...]
+    triggering_sources: tuple[str, ...]
 
     # The globs of sources owned by this target.
     # If kwargs contains an explicit sources key, it should be identical to this value.
@@ -98,7 +98,7 @@ class PutativeTarget:
     # TODO: If target_type is a regular target (and not a macro) we can derive the default
     #  source globs for that type from BuildConfiguration.  However that is fiddly and not
     #  a high priority.
-    owned_sources: Tuple[str, ...]
+    owned_sources: tuple[str, ...]
 
     # Whether the pututative target has an address (or, e.g., is a macro with no address).
     addressable: bool
@@ -107,20 +107,20 @@ class PutativeTarget:
     # type_alias), not from the fields above, which are broken out for other uses.
     # This allows the creator of instances of this class to control whether the generated
     # target should assume default kwarg values or provide them explicitly.
-    kwargs: FrozenDict[str, str | int | bool | Tuple[str, ...]]
+    kwargs: FrozenDict[str, str | int | bool | tuple[str, ...]]
 
     # Any comment lines to add above the BUILD file stanza we generate for this putative target.
     # Should include the `#` prefix, which will not be added.
-    comments: Tuple[str, ...]
+    comments: tuple[str, ...]
 
     @classmethod
     def for_target_type(
         cls,
-        target_type: Type[Target],
+        target_type: type[Target],
         path: str,
         name: str,
         triggering_sources: Iterable[str],
-        kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
+        kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ):
         explicit_sources = (kwargs or {}).get("sources")
@@ -157,7 +157,7 @@ class PutativeTarget:
         owned_sources: Iterable[str],
         *,
         addressable: bool = True,
-        kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
+        kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> None:
         self.path = path
@@ -232,7 +232,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
     @classmethod
     def merge(cls, tgts_iters: Iterable[PutativeTargets]) -> PutativeTargets:
-        all_tgts: List[PutativeTarget] = []
+        all_tgts: list[PutativeTarget] = []
         for tgts in tgts_iters:
             all_tgts.extend(tgts)
         return cls(all_tgts)
@@ -313,7 +313,7 @@ def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
 
 def group_by_build_file(
     build_file_name: str, ptgts: Iterable[PutativeTarget]
-) -> Dict[str, List[PutativeTarget]]:
+) -> dict[str, list[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
         ret[os.path.join(ptgt.path, build_file_name)].append(ptgt)
@@ -348,8 +348,8 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     all_existing_tgts = await Get(
         UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")])
     )
-    existing_addrs: Set[str] = {tgt.address.spec for tgt in all_existing_tgts}
-    uniquely_named_putative_targets: List[PutativeTarget] = []
+    existing_addrs: set[str] = {tgt.address.spec for tgt in all_existing_tgts}
+    uniquely_named_putative_targets: list[PutativeTarget] = []
     for ptgt in ptgts:
         if not ptgt.addressable:
             # Non-addressable PutativeTargets never have collision issues.
@@ -421,8 +421,8 @@ class EditBuildFilesRequest:
 @dataclass(frozen=True)
 class EditedBuildFiles:
     digest: Digest
-    created_paths: Tuple[str, ...]
-    updated_paths: Tuple[str, ...]
+    created_paths: tuple[str, ...]
+    updated_paths: tuple[str, ...]
 
 
 def make_content_str(

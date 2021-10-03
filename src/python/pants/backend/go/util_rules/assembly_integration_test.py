@@ -1,12 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import os.path
+import subprocess
 from textwrap import dedent
 
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget, GoPackage
+from pants.backend.go.goals import package_binary
+from pants.backend.go.goals.package_binary import GoBinaryFieldSet
+from pants.backend.go.target_types import GoBinary, GoModTarget, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -15,35 +21,46 @@ from pants.backend.go.util_rules import (
     go_mod,
     go_pkg,
     import_analysis,
+    link,
     sdk,
 )
-from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
+from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-@pytest.fixture
+@pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *source_files.rules(),
-            *sdk.rules(),
             *assembly.rules(),
-            *build_go_pkg.rules(),
             *compile.rules(),
+            *source_files.rules(),
             *import_analysis.rules(),
-            *go_mod.rules(),
+            *package_binary.rules(),
+            *build_go_pkg.rules(),
             *go_pkg.rules(),
-            *external_module.rules(),
+            *go_mod.rules(),
+            *link.rules(),
             *target_type_rules.rules(),
-            QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
+            *external_module.rules(),
+            *sdk.rules(),
+            QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
-        target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
+        target_types=[GoBinary, GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:
+    field_set = GoBinaryFieldSet.create(binary_target)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    return result
 
 
 def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
@@ -96,14 +113,18 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="main")
+                go_package(name="pkg")
+                go_binary(name="bin", main=":pkg")
                 """
             ),
         }
     )
 
-    built_package = rule_runner.request(
-        BuiltGoPackage,
-        [BuildGoPackageRequest(Address("", target_name="main"))],
-    )
-    assert built_package.import_path == "example.com/assembly/"
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"3\n"

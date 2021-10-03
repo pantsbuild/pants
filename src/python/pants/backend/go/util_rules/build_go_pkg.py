@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os.path
 from dataclasses import dataclass
 from typing import Optional
 
@@ -23,26 +24,33 @@ from pants.backend.go.util_rules.external_module import (
     DownloadExternalModuleRequest,
     ResolveExternalGoPackageRequest,
 )
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.go_pkg import (
     ResolvedGoPackage,
     ResolveGoPackageRequest,
     is_first_party_package_target,
     is_third_party_package_target,
 )
-from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
+from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
-from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.frozendict import FrozenDict
+from pants.util.strutil import path_safe
 
 
 @dataclass(frozen=True)
 class BuildGoPackageRequest(EngineAwareParameter):
+    """Build a package and its dependencies as `__pkg__.a` files."""
+
     address: Address
     is_main: bool = False
 
@@ -52,15 +60,17 @@ class BuildGoPackageRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class BuiltGoPackage:
-    import_path: str
-    object_digest: Digest
-    imports_digest: Digest
+    """A package and its dependencies compiled as `__pkg__.a` files.
+
+    The packages are arranged into `__pkgs__/{path_safe(import_path)}/__pkg__.a`.
+    """
+
+    digest: Digest
+    import_paths_to_pkg_a_files: FrozenDict[str, str]
 
 
 @rule
-async def build_target(
-    request: BuildGoPackageRequest,
-) -> BuiltGoPackage:
+async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
@@ -76,6 +86,8 @@ async def build_target(
         source_files_subpath = target.address.spec_path
     elif is_third_party_package_target(target):
         assert isinstance(target, GoExternalPackageTarget)
+        owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
+        go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
         module_path = target[GoExternalModulePathField].value
         module, resolved_package = await MultiGet(
             Get(
@@ -85,36 +97,44 @@ async def build_target(
                     version=target[GoExternalModuleVersionField].value,
                 ),
             ),
-            Get(ResolvedGoPackage, ResolveExternalGoPackageRequest(target)),
+            Get(
+                ResolvedGoPackage,
+                ResolveExternalGoPackageRequest(target, go_mod_info.stripped_digest),
+            ),
         )
 
         source_files_digest = module.digest
         source_files_subpath = resolved_package.import_path[len(module_path) :]
     else:
-        raise ValueError(f"Unknown how to build Go target at address {request.address}.")
+        raise AssertionError(f"Unknown how to build target at address {request.address} with Go.")
 
-    dependencies = await Get(Addresses, DependenciesRequest(field=target[Dependencies]))
-    dependencies_targets = await Get(UnexpandedTargets, Addresses(dependencies))
-    buildable_dependencies_targets = [
-        dep_tgt
-        for dep_tgt in dependencies_targets
-        if is_first_party_package_target(dep_tgt) or is_third_party_package_target(dep_tgt)
+    import_path = "main" if request.is_main else resolved_package.import_path
+
+    # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
+    #  of its generated targets...Figure this out.
+    _all_dependencies = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
+    _buildable_dependencies = [
+        dep
+        for dep in _all_dependencies
+        if is_first_party_package_target(dep) or is_third_party_package_target(dep)
     ]
-    built_go_deps = await MultiGet(
-        Get(BuiltGoPackage, BuildGoPackageRequest(tgt.address))
-        for tgt in buildable_dependencies_targets
+    built_deps = await MultiGet(
+        Get(BuiltGoPackage, BuildGoPackageRequest(tgt.address)) for tgt in _buildable_dependencies
     )
 
-    gathered_imports = await Get(
-        GatheredImports,
-        GatherImportsRequest(packages=FrozenOrderedSet(built_go_deps), include_stdlib=True),
+    import_paths_to_pkg_a_files: dict[str, str] = {}
+    dep_digests = []
+    for dep in built_deps:
+        import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
+        dep_digests.append(dep.digest)
+
+    merged_deps_digest, import_config = await MultiGet(
+        Get(Digest, MergeDigests(dep_digests)),
+        Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
     )
-
-    import_path = resolved_package.import_path
-    if request.is_main:
-        import_path = "main"
-
-    input_digest = await Get(Digest, MergeDigests([gathered_imports.digest, source_files_digest]))
+    input_digest = await Get(
+        Digest, MergeDigests([merged_deps_digest, import_config.digest, source_files_digest])
+    )
 
     assembly_digests = None
     symabis_path = None
@@ -135,27 +155,30 @@ async def build_target(
             digest=input_digest,
             sources=tuple(f"./{source_files_subpath}/{name}" for name in resolved_package.go_files),
             import_path=import_path,
-            description=f"Compile Go package with {pluralize(len(resolved_package.go_files), 'file')}.",
-            import_config_path="./importcfg",
+            description=f"Compile Go package: {import_path}",
+            import_config_path=import_config.CONFIG_PATH,
             symabis_path=symabis_path,
         ),
     )
-    output_digest = result.output_digest
-
+    compilation_digest = result.output_digest
     if assembly_digests:
         assembly_result = await Get(
             AssemblyPostCompilation,
             AssemblyPostCompilationRequest(
-                output_digest, assembly_digests, resolved_package.s_files, source_files_subpath
+                compilation_digest,
+                assembly_digests,
+                resolved_package.s_files,
+                source_files_subpath,
             ),
         )
-        output_digest = assembly_result.merged_output_digest
+        compilation_digest = assembly_result.merged_output_digest
 
-    return BuiltGoPackage(
-        import_path=import_path,
-        object_digest=output_digest,
-        imports_digest=gathered_imports.digest,
-    )
+    _path_prefix = os.path.join("__pkgs__", path_safe(import_path))
+    import_paths_to_pkg_a_files[import_path] = os.path.join(_path_prefix, "__pkg__.a")
+    _output_digest = await Get(Digest, AddPrefix(compilation_digest, _path_prefix))
+    merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, _output_digest]))
+
+    return BuiltGoPackage(merged_result_digest, FrozenDict(import_paths_to_pkg_a_files))
 
 
 def rules():

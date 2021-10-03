@@ -97,9 +97,9 @@ sys.argv: ([^\n]+)
 pid: {pid}
 XXX
 """
-        with open(cur_process_error_log_path, "r") as cur_pid_file:
+        with open(cur_process_error_log_path) as cur_pid_file:
             assert bool(re.search(err_rx, cur_pid_file.read()))
-        with open(shared_error_log_path, "r") as shared_log_file:
+        with open(shared_error_log_path) as shared_log_file:
             assert bool(re.search(err_rx, shared_log_file.read()))
 
 
