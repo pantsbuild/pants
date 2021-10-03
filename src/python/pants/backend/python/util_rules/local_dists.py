@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
@@ -30,6 +29,7 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.meta import frozen_after_init
 
@@ -150,10 +150,8 @@ async def build_local_dists(
     for source in request.sources.source_files.files:
         if source not in unrooted_files_set:
             for source_root in source_roots:
-                if (
-                    source.startswith(source_root)
-                    and os.path.relpath(source, source_root) in provided_files
-                ):
+                source_relpath = fast_relpath_optional(source, source_root)
+                if source_relpath is not None and source_relpath in provided_files:
                     remaining_sources.remove(source)
     remaining_sources_snapshot = await Get(
         Snapshot,
