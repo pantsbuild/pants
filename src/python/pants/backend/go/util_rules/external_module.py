@@ -322,10 +322,14 @@ async def compute_package_import_paths_from_external_module(
             ),
         ),
     )
-    return ExternalModulePkgImportPaths(
-        metadata["ImportPath"]
-        for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
-    )
+
+    if json_result.stdout:
+        return ExternalModulePkgImportPaths(
+            metadata["ImportPath"]
+            for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
+        )
+    else:
+        return ExternalModulePkgImportPaths()
 
 
 def rules():
