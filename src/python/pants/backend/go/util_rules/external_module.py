@@ -15,11 +15,9 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
-    EMPTY_DIGEST,
     CreateDigest,
     Digest,
     DigestContents,
@@ -28,7 +26,6 @@ from pants.engine.fs import (
     FileEntry,
     MergeDigests,
     PathGlobs,
-    RemovePrefix,
     Snapshot,
 )
 from pants.engine.process import ProcessResult
@@ -132,105 +129,6 @@ async def download_external_modules(
         Digest, MergeDigests([download_result.output_digest, generated_digest])
     )
     return DownloadedExternalModules(result_digest)
-
-
-@dataclass(frozen=True)
-class DownloadExternalModuleRequest:
-    path: str
-    version: str
-    go_sum_digest: Digest = EMPTY_DIGEST
-
-
-@dataclass(frozen=True)
-class DownloadedExternalModule:
-    path: str
-    version: str
-    digest: Digest
-
-
-@rule
-async def download_external_module(
-    request: DownloadExternalModuleRequest,
-) -> DownloadedExternalModule:
-    download_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=EMPTY_DIGEST,
-            command=("mod", "download", "-json", f"{request.path}@{request.version}"),
-            description=f"Download external Go module at {request.path}@{request.version}.",
-            output_directories=("gopath",),
-        ),
-    )
-
-    metadata = json.loads(download_result.stdout)
-
-    _download_path = strip_v2_chroot_path(metadata["Dir"])
-    _download_digest_unstripped = await Get(
-        Digest,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{_download_path}/**"],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=(
-                    f"the DownloadExternalModuleRequest for {request.path}@{request.version}"
-                ),
-            ),
-        ),
-    )
-    download_snapshot = await Get(
-        Snapshot, RemovePrefix(_download_digest_unstripped, _download_path)
-    )
-
-    if "go.mod" in download_snapshot.files:
-        return DownloadedExternalModule(
-            path=request.path,
-            version=request.version,
-            digest=download_snapshot.digest,
-        )
-
-    # Else, there was no go.mod in the downloaded source. Use the generated go.mod from the Go
-    # tooling.
-    if "GoMod" not in metadata:
-        raise AssertionError(
-            "No go.mod was provided in download of Go external module "
-            f"{request.path}@{request.version}, and the module metadata did not identify a "
-            "generated go.mod file to use instead.\n\n"
-            "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with the "
-            "above information."
-        )
-
-    _go_mod_path = strip_v2_chroot_path(metadata["GoMod"])
-    _go_mod_digest_unstripped = await Get(
-        Digest,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{_go_mod_path}"],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=(
-                    f"the DownloadExternalModuleRequest for {request.path}@{request.version}"
-                ),
-            ),
-        ),
-    )
-    original_go_mod_digest = await Get(
-        Digest, RemovePrefix(_go_mod_digest_unstripped, os.path.dirname(_go_mod_path))
-    )
-
-    # Rename the `.mod` file to the standard `go.mod` name.
-    entries = await Get(DigestEntries, Digest, original_go_mod_digest)
-    assert len(entries) == 1
-    file_entry = entries[0]
-    assert isinstance(file_entry, FileEntry)
-    go_mod_digest = await Get(Digest, CreateDigest([FileEntry("go.mod", file_entry.file_digest)]))
-
-    result_digest = await Get(Digest, MergeDigests([go_mod_digest, download_snapshot.digest]))
-    return DownloadedExternalModule(
-        path=request.path,
-        version=request.version,
-        digest=result_digest,
-    )
 
 
 @dataclass(frozen=True)

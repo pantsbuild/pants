@@ -20,8 +20,8 @@ from pants.backend.go.util_rules.assembly import (
 )
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.external_module import (
-    DownloadedExternalModule,
-    DownloadExternalModuleRequest,
+    DownloadedExternalModules,
+    DownloadExternalModulesRequest,
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
@@ -40,7 +40,7 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.frozendict import FrozenDict
@@ -89,21 +89,24 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
         go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
         module_path = target[GoExternalModulePathField].value
-        module, resolved_package = await MultiGet(
+        _downloaded_modules, resolved_package = await MultiGet(
             Get(
-                DownloadedExternalModule,
-                DownloadExternalModuleRequest(
-                    path=module_path,
-                    version=target[GoExternalModuleVersionField].value,
-                ),
+                DownloadedExternalModules,
+                DownloadExternalModulesRequest(go_mod_info.stripped_digest),
             ),
             Get(
                 ResolvedGoPackage,
                 ResolveExternalGoPackageRequest(target, go_mod_info.stripped_digest),
             ),
         )
-
-        source_files_digest = module.digest
+        # TODO: generalize this code.
+        _module_dir = _downloaded_modules.module_dir(
+            module_path, target[GoExternalModuleVersionField].value
+        )
+        _downloaded_module = await Get(
+            Digest, DigestSubset(_downloaded_modules.digest, PathGlobs([f"{_module_dir}/**"]))
+        )
+        source_files_digest = await Get(Digest, RemovePrefix(_downloaded_module, _module_dir))
         source_files_subpath = resolved_package.import_path[len(module_path) :]
     else:
         raise AssertionError(f"Unknown how to build target at address {request.address} with Go.")
