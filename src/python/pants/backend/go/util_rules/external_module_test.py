@@ -12,9 +12,7 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget
 from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.external_module import (
-    DownloadedExternalModule,
     DownloadedExternalModules,
-    DownloadExternalModuleRequest,
     DownloadExternalModulesRequest,
     ExternalModulePkgImportPaths,
     ExternalModulePkgImportPathsRequest,
@@ -39,7 +37,6 @@ def rule_runner() -> RuleRunner:
             *external_module.rules(),
             *target_type_rules.rules(),
             QueryRule(DownloadedExternalModules, [DownloadExternalModulesRequest]),
-            QueryRule(DownloadedExternalModule, [DownloadExternalModuleRequest]),
             QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
             QueryRule(ResolvedGoPackage, [ResolveExternalGoPackageRequest]),
         ],
@@ -183,64 +180,6 @@ def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> Non
         )
     underlying_exception = exc.value.wrapped_exceptions[0]
     assert "`go.mod` and/or `go.sum` changed!" in str(underlying_exception)
-
-
-def test_download_external_module_with_gomod(rule_runner: RuleRunner) -> None:
-    go_sum_digest = rule_runner.make_snapshot(
-        {
-            "go.sum": dedent(
-                """\
-                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
-                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-                """
-            )
-        }
-    ).digest
-    downloaded_module = rule_runner.request(
-        DownloadedExternalModule,
-        [DownloadExternalModuleRequest("github.com/google/uuid", "v1.3.0", go_sum_digest)],
-    )
-    assert downloaded_module.path == "github.com/google/uuid"
-    assert downloaded_module.version == "v1.3.0"
-
-    snapshot = rule_runner.request(Snapshot, [downloaded_module.digest])
-
-    def assert_has_file(expected_fp: str) -> None:
-        assert any(
-            fp == expected_fp for fp in snapshot.files
-        ), f"Could not find `{expected_fp}` in {snapshot.files}"
-
-    for fp in ("uuid.go", "go.mod"):
-        assert_has_file(fp)
-
-
-def test_download_external_module_with_no_gomod(rule_runner: RuleRunner) -> None:
-    go_sum_digest = rule_runner.make_snapshot(
-        {
-            "go.sum": dedent(
-                """\
-                cloud.google.com/go v0.26.0 h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=
-                cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-                """
-            )
-        }
-    ).digest
-    downloaded_module = rule_runner.request(
-        DownloadedExternalModule,
-        [DownloadExternalModuleRequest("cloud.google.com/go", "v0.26.0", go_sum_digest)],
-    )
-    assert downloaded_module.path == "cloud.google.com/go"
-    assert downloaded_module.version == "v0.26.0"
-
-    snapshot = rule_runner.request(Snapshot, [downloaded_module.digest])
-
-    def assert_has_file(expected_fp: str) -> None:
-        assert any(
-            fp == expected_fp for fp in snapshot.files
-        ), f"Could not find `{expected_fp}` in {snapshot.files}"
-
-    for fp in ("bigtable/filter.go", "go.mod"):
-        assert_has_file(fp)
 
 
 def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
