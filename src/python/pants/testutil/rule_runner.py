@@ -27,7 +27,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
@@ -73,6 +73,53 @@ def logging(func):
             return func(*args, **kwargs)
 
     return wrapper
+
+
+class EngineErrorTrap:
+    """A context manager to catch `ExecutionError`s in tests and get the underlying exception.
+
+    Use like this:
+
+        with EngineErrorTrap() as trap:
+            rule_runner.request(OutputType, [input])
+        assert isinstance(trap.e, ValueError)
+
+    Will raise AssertionError if no ExecutionError occurred. Will re-raise all other exception
+    types.
+    """
+
+    _e: Exception | None = None
+
+    def __enter__(self) -> EngineErrorTrap:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            raise AssertionError("Did not raise an exception! ExecutionError expected.")
+        if not issubclass(exc_type, ExecutionError):
+            # This is equivalent to re-raising the exception.
+            return None
+
+        if not len(exc_val.wrapped_exceptions) == 1:
+            formatted_errors = "\n\n".join(repr(e) for e in exc_val.wrapped_exceptions)
+            raise ValueError(
+                "Multiple underlying exceptions, but this helper function expected only one. "
+                "Use `with pytest.raises(ExecutionError)` directly and inspect "
+                "`exc.value.wrapped_exceptions`.\n\n"
+                f"Errors: {formatted_errors}"
+            )
+        self._e = exc_val.wrapped_exceptions[0]
+        return True
+
+    @property
+    def e(self) -> Exception:
+        if self._e is None:
+            raise AssertionError(
+                "`EngineErrorTrap.e` is not set. This happens when you try accessing the field "
+                "inside the context manager (i.e. the `with` block) and an ExecutionError has not "
+                "happened yet."
+            )
+        return self._e
 
 
 # -----------------------------------------------------------------------------------------------
