@@ -8,13 +8,14 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java import util_rules as java_util_rules
+from pants.backend.java.classpath import Classpath
+from pants.backend.java.classpath import rules as classpath_rules
 from pants.backend.java.compile.javac import (
     CompiledClassfiles,
     CompileJavaSourceRequest,
     FallibleCompiledClassfiles,
     JavacCheckRequest,
 )
-from pants.backend.java.classpath import rules as classpath_rules, Classpath
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.package.deploy_jar import DeployJarFieldSet
 from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
@@ -34,9 +35,9 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.jvm.testutil import maybe_skip_jdk_test
 
 
 @pytest.fixture
