@@ -187,7 +187,7 @@ async def extract_module_from_downloaded_modules(
     if digest is None:
         raise AssertionError(
             f"The module {request.module_path}@{request.version} was not downloaded. Unless "
-            "you explicitly created an `_external_package_target`, this should not happen."
+            "you explicitly created an `_go_external_package`, this should not happen."
             "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose with "
             "this error message."
         )
