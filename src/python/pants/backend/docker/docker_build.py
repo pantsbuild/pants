@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from os import path
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue
+from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue, DockerVersionContextError
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystem import DockerOptions
 from pants.backend.docker.target_types import (
@@ -27,6 +27,14 @@ from pants.util.strutil import bullet_list, pluralize
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
+
+
+class DockerBuildError(Exception):
+    pass
+
+
+class DockerNameTemplateError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -59,17 +67,38 @@ class DockerFieldSet(PackageFieldSet):
         default_repo = path.basename(self.address.spec_path)
         repo = self.repository.value or default_repo
         name_template = self.name_template.value or default_name_template
-        image_name = name_template.format(
-            name=self.name.value or self.address.target_name,
-            repository=repo,
-            sub_repository="/".join(
-                [default_repo if self.repository.value else default_parent, repo]
-            ),
-        )
-        image_names = tuple(
-            ":".join(s for s in [image_name, tag] if s)
-            for tag in [self.version.value.format(**version_context), *(self.tags.value or [])]
-        )
+        try:
+            image_name = name_template.format(
+                name=self.name.value or self.address.target_name,
+                repository=repo,
+                sub_repository="/".join(
+                    [default_repo if self.repository.value else default_parent, repo]
+                ),
+            )
+        except KeyError as e:
+            raise DockerNameTemplateError(
+                f"Invalid image name template: {name_template!r}. Unknown key: {e}.\n\n"
+                f"Use any of 'name', 'repository' or 'sub_repository' in the template string."
+            ) from e
+
+        try:
+            image_names = tuple(
+                ":".join(s for s in [image_name, tag] if s)
+                for tag in [self.version.value.format(**version_context), *(self.tags.value or [])]
+            )
+        except (KeyError, ValueError) as e:
+            msg = (
+                "Invalid format string for the `docker_image(version)` field: "
+                f"{self.version.value!r}.\n\n"
+            )
+            if isinstance(e, KeyError):
+                msg += (
+                    f"The key {e} is unknown. Try with one of: "
+                    f'{", ".join(version_context.keys())}.'
+                )
+            else:
+                msg += str(e)
+            raise DockerVersionContextError(msg) from e
 
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
@@ -98,11 +127,16 @@ async def build_docker_image(
         ),
     )
 
-    tags = field_set.image_names(
-        default_name_template=options.default_image_name_template,
-        registries=options.registries(),
-        version_context=context.version_context,
-    )
+    try:
+        tags = field_set.image_names(
+            default_name_template=options.default_image_name_template,
+            registries=options.registries(),
+            version_context=context.version_context,
+        )
+    except ValueError as e:
+        raise DockerBuildError(
+            f"Error in {field_set.address}: {e}"
+        ) from e
 
     result = await Get(
         ProcessResult,

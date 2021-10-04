@@ -28,12 +28,21 @@ from pants.util.frozendict import FrozenDict
 logger = logging.getLogger(__name__)
 
 
+class DockerVersionContextError(ValueError):
+    pass
+
+
 class DockerVersionContextValue(FrozenDict[str, str]):
     """Dict class suitable for use as a format string context object, as it allows to use attribute
     access rather than item access.
 
     """
     def __getattr__(self, attribute: str) -> str:
+        if not attribute in self:
+            raise DockerVersionContextError(
+                f"The key {attribute!r} is unknown. Try with one of: "
+                f'{", ".join(self.keys())}.'
+            )
         return self[attribute]
 
 
