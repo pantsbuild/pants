@@ -969,8 +969,17 @@ pub fn make_execute_request(
     .output_directories
     .iter()
     .map(|p| {
+      // Note: An empty string which denotes capturing the working directory is converted to "."
+      // since Buildfarm intentionally does not handle this case. Moreover, the REAPI
+      // expressly discourages supporting empty strings for output_directories:
+      //
+      //   The special value of empty string is allowed,
+      //   although not recommended, and can be used to capture the entire working
+      //   directory tree, including inputs.
+      // https://github.com/bazelbuild/remote-apis/blob/3e816456ee28f01ab2e0abf72306c1f340c7b229/build/bazel/remote/execution/v2/remote_execution.proto#L592-L594
       p.to_str()
         .map(str::to_owned)
+        .map(|s| if s.is_empty() { ".".to_owned() } else { s })
         .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
     })
     .collect::<Result<Vec<String>, String>>()?;

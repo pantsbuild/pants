@@ -1,11 +1,14 @@
-use std::collections::{BTreeMap, HashSet};
+use std::any::type_name;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
+use fs::RelativePath;
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -19,6 +22,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
+use tonic::{Code, Status};
 use workunit_store::WorkunitStore;
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
@@ -26,9 +30,6 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
-use std::any::type_name;
-use std::io::Cursor;
-use tonic::{Code, Status};
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 const RETRY_INTERVAL: Duration = Duration::from_micros(0);
@@ -537,6 +538,64 @@ async fn make_execute_request_with_timeout() {
         )
         .unwrap(),
         144,
+      ))
+        .into(),
+    ),
+    ..Default::default()
+  };
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
+async fn make_execute_request_with_empty_output_directory() {
+  let input_directory = TestDirectory::containing_roland();
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
+  req.output_directories = {
+    let mut s = BTreeSet::new();
+    s.insert(RelativePath::new("").unwrap());
+    s
+  };
+  req.input_files = input_directory.digest();
+
+  let want_command = remexec::Command {
+    arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
+    environment_variables: vec![remexec::command::EnvironmentVariable {
+      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+      value: "none".to_owned(),
+    }],
+    platform: Some(remexec::Platform::default()),
+    // The empty output directory in Process will be converted ".":
+    output_directories: vec![".".to_owned()],
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "3669124c6ae36eede1c93432bcb5ca4b8c1861f23e89701ecb37428f7a8af47f",
+        )
+        .unwrap(),
+        61,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some((&input_directory.digest()).into()),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "a796f65341098fbd38acff3146f062109f14b3adff91a3dc59aae9771f0f90b2",
+        )
+        .unwrap(),
+        140,
       ))
         .into(),
     ),
