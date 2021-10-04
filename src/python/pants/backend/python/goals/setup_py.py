@@ -61,10 +61,11 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Sources,
+    SourcesPaths,
     Target,
     Targets,
     TransitiveTargets,
-    TransitiveTargetsRequest, SourcesPaths,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
@@ -414,7 +415,7 @@ async def package_python_dist(
             "Creating a raw dump of the generated setup.py and its chroot",
             "This exposed an internal implementation detail, and is no longer supported.",
         )
-        dirname = f"{field_set.address.path_safe_spec}"
+        dirname = field_set.address.path_safe_spec
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
         return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
 
@@ -538,20 +539,28 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     snapshot = await Get(Snapshot, Digest, sources.digest)
     stripped = await Get(
         StrippedSourceFileNames,
-        SourcesPaths(files=(request.exported_target.target.address.spec_path,), dirs=()),
+        SourcesPaths(
+            files=(os.path.join(request.exported_target.target.address.spec_path, "setup.py"),),
+            dirs=(),
+        ),
     )
-    working_directory = stripped[0]
+    existing_setup_py = stripped[0]
 
     # TODO: Add a generate_setup field to the python_distribution target type, so that
     #  we're not guessing user intent (and not relying on the build being specifically
     #  setup.py-based, it could be setup.cfg).
-    if os.path.join(working_directory, "setup.py") in snapshot.files:
+    if existing_setup_py in snapshot.files:
+        working_directory = os.path.dirname(existing_setup_py)
         chroot_digest = sources.digest
     else:
         logger.info("No setup.py found, generating one...")
         generated_setup_py = await Get(
             GeneratedSetupPy, GenerateSetupPyRequest(request.exported_target, sources)
         )
+        # We currently generate a setup.py that expects to be in the source root.
+        # TODO: It might make sense to generate one in the target's directory, for
+        #  consistency with existing setup.py.
+        working_directory = ""
         chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
     return SetupPyChroot(chroot_digest, working_directory)
 

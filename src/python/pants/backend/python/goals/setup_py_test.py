@@ -592,12 +592,12 @@ def test_get_sources() -> None:
             "src/python/foo/BUILD",
             textwrap.dedent(
                 f"""
-        python_distribution(
-          name="dist",
-          dependencies=["{'","'.join(addr.spec for addr in addrs)}"],
-          provides=setup_py(name="foo", version="3.2.1"),
-        )
-        """
+                python_distribution(
+                  name="dist",
+                  dependencies=["{'","'.join(addr.spec for addr in addrs)}"],
+                  provides=setup_py(name="foo", version="3.2.1"),
+                )
+            """
             ),
         )
         owner_tgt = rule_runner.get_target(Address("src/python/foo", target_name="dist"))
