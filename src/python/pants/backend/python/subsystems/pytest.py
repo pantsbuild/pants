@@ -69,7 +69,11 @@ class PyTest(PythonToolBase):
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement_library` to override the version.
     default_version = "pytest>=6.2.4,<6.3"
-    default_extra_requirements = ["pytest-cov>=2.12.1,<2.13"]
+    # N.B.: We avoid 2.12.1 since it switched from a `coverage[toml]` dependency introduced in
+    # 2.12.0 to a direct dependency on `toml`. This is broken for newer versions of `coverage` where
+    # the `toml` extra is mapped to `tomli`. This direct `toml` dependency was reverted in favor of
+    # `coverage[toml]` in 3.0.0.
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
 
