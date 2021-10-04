@@ -21,7 +21,6 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoPackage, GoModTarget],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.go"])
     return rule_runner
 
 
