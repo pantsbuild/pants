@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 import logging
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from packaging.version import InvalidVersion, Version
 
@@ -165,7 +165,7 @@ def deprecated_conditional(
     entity: str,
     hint: str | None,
     *,
-    start_version: Optional[str] = None,
+    start_version: str | None = None,
 ) -> None:
     """Mark something as deprecated if the predicate is true."""
     validate_deprecation_semver(removal_version, "removal version")

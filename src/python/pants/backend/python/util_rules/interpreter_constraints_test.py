@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable
 
 import pytest
 from pkg_resources import Requirement
@@ -37,7 +37,7 @@ class MockFieldSet(FieldSet):
 
 
 def test_merge_interpreter_constraints() -> None:
-    def assert_merged(*, inp: List[List[str]], expected: List[str]) -> None:
+    def assert_merged(*, inp: list[list[str]], expected: list[str]) -> None:
         result = sorted(str(req) for req in InterpreterConstraints.merge_constraint_sets(inp))
         # Requirement.parse() sorts specs differently than we'd like, so we convert each str to a
         # Requirement.
@@ -183,7 +183,7 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
     ],
 )
 def test_interpreter_constraints_minimum_python_version(
-    constraints: List[str], expected: str
+    constraints: list[str], expected: str
 ) -> None:
     universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
     ics = InterpreterConstraints(constraints)

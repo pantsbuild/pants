@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, DefaultDict, Dict, List, Mapping, Set, Tuple, cast
+from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
@@ -184,9 +184,9 @@ class SetupPySources:
     """
 
     digest: Digest
-    packages: Tuple[str, ...]
-    namespace_packages: Tuple[str, ...]
-    package_data: Tuple["PackageDatum", ...]
+    packages: tuple[str, ...]
+    namespace_packages: tuple[str, ...]
+    package_data: tuple[PackageDatum, ...]
 
 
 @dataclass(frozen=True)
@@ -239,7 +239,7 @@ class SetupKwargs:
         self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4)
 
     @memoized_property
-    def kwargs(self) -> Dict[str, Any]:
+    def kwargs(self) -> dict[str, Any]:
         return cast(Dict[str, Any], pickle.loads(self._pickled_bytes))
 
     @property
@@ -273,7 +273,7 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> Dict[str, Any]:
+    def explicit_kwargs(self) -> dict[str, Any]:
         return self.target[PythonProvidesField].value.kwargs
 
 
@@ -356,7 +356,7 @@ class SetupPyGeneration(Subsystem):
         return f"{specifier}{version}"
 
 
-def validate_commands(commands: Tuple[str, ...]):
+def validate_commands(commands: tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
     if "--dist-dir" in commands or "-d" in commands:
         raise InvalidSetupPyArgs(
@@ -624,7 +624,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     def _format_entry_points(
         resolved: ResolvedPythonDistributionEntryPoints,
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> dict[str, dict[str, str]]:
         return {
             category: {ep_name: ep_val.entry_point.spec for ep_name, ep_val in entry_points.items()}
             for category, entry_points in resolved.val.items()
@@ -655,7 +655,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     ).encode()
     files_to_create = [
         FileContent("setup.py", setup_py_content),
-        FileContent("MANIFEST.in", "include *.py".encode()),
+        FileContent("MANIFEST.in", b"include *.py"),
     ]
     extra_files_digest = await Get(Digest, CreateDigest(files_to_create))
     chroot_digest = await Get(Digest, MergeDigests((sources.digest, extra_files_digest)))
@@ -716,8 +716,8 @@ async def get_requirements(
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
     ]
     owners = await MultiGet(Get(ExportedTarget, OwnedDependency(tgt)) for tgt in ownable_tgts)
-    owned_by_us: Set[Target] = set()
-    owned_by_others: Set[Target] = set()
+    owned_by_us: set[Target] = set()
+    owned_by_others: set[Target] = set()
     for tgt, owner in zip(ownable_tgts, owners):
         (owned_by_us if owner == dep_owner.exported_target else owned_by_others).add(tgt)
 
@@ -809,7 +809,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
     exported_ancestor_tgts = sorted(
-        [t for t in ancestor_tgts if t.has_field(PythonProvidesField)],
+        (t for t in ancestor_tgts if t.has_field(PythonProvidesField)),
         key=lambda t: t.address,
         reverse=True,
     )
@@ -867,19 +867,19 @@ PackageDatum = Tuple[str, Tuple[str, ...]]
 
 def find_packages(
     *,
-    python_files: Set[str],
-    resource_files: Set[str],
+    python_files: set[str],
+    resource_files: set[str],
     init_py_digest_contents: DigestContents,
     py2: bool,
-) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[PackageDatum, ...]]:
     """Analyze the package structure for the given sources.
 
     Returns a tuple (packages, namespace_packages, package_data), suitable for use as setup()
     kwargs.
     """
     # Find all packages implied by the sources.
-    packages: Set[str] = set()
-    package_data: DefaultDict[str, List[str]] = defaultdict(list)
+    packages: set[str] = set()
+    package_data: DefaultDict[str, list[str]] = defaultdict(list)
     for python_file in python_files:
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
@@ -902,8 +902,8 @@ def find_packages(
     # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
     # should *not* be listed in the setup namespace_packages kwarg. That's for pkg_resources-style
     # namespace packages only. See https://github.com/pypa/sample-namespace-packages/.
-    namespace_packages: Set[str] = set()
-    init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_digest_contents}
+    namespace_packages: set[str] = set()
+    init_py_by_path: dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_digest_contents}
     for pkg in packages:
         path = os.path.join(pkg.replace(".", os.path.sep), "__init__.py")
         if path in init_py_by_path and declares_pkg_resources_namespace_package(
@@ -940,7 +940,7 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
             func, func_name
         )
 
-    def has_args(call_node: ast.Call, required_arg_ids: Tuple[str, ...]) -> bool:
+    def has_args(call_node: ast.Call, required_arg_ids: tuple[str, ...]) -> bool:
         args = call_node.args
         if len(args) != len(required_arg_ids):
             return False
@@ -968,8 +968,8 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 
 def merge_entry_points(
-    *all_entry_points_with_descriptions_of_source: Tuple[str, Dict[str, Dict[str, str]]]
-) -> Dict[str, Dict[str, str]]:
+    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]]
+) -> dict[str, dict[str, str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
@@ -983,8 +983,8 @@ def merge_entry_points(
                 merged[category][ep_name].append((description_of_source, entry_point))
 
     def _check_entry_point_single_source(
-        category: str, name: str, entry_points_with_source: List[Tuple[str, str]]
-    ) -> Tuple[str, str]:
+        category: str, name: str, entry_points_with_source: list[tuple[str, str]]
+    ) -> tuple[str, str]:
         if len(entry_points_with_source) > 1:
             raise ValueError(
                 f"Multiple entry_points registered for {category} {name} in: "

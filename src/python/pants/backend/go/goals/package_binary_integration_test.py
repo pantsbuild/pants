@@ -35,7 +35,6 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoBinary, GoPackage, GoModTarget],
         rules=[
             *assembly.rules(),
             *compile.rules(),
@@ -51,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
+        target_types=[GoBinary, GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -66,7 +66,12 @@ def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackag
 def test_package_simple(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "go.mod": "module foo.example.com\n",
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                go 1.17
+                """
+            ),
             "main.go": dedent(
                 """\
                 package main
@@ -82,7 +87,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """
@@ -99,7 +104,7 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"Hello world!\n"
 
 
-def test_package_with_dependency(rule_runner: RuleRunner) -> None:
+def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "lib/lib.go": dedent(
@@ -108,10 +113,15 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
 
                 import (
                     "fmt"
+                    "rsc.io/quote"
                 )
 
                 func Quote(s string) string {
                     return fmt.Sprintf(">> %s <<", s)
+                }
+
+                func GoProverb() string {
+                    return quote.Go()
                 }
                 """
             ),
@@ -127,13 +137,34 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
 
                 func main() {
                     fmt.Println(lib.Quote("Hello world!"))
+                    fmt.Println(lib.GoProverb())
                 }
                 """
             ),
-            "go.mod": "module foo.example.com\n",
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                go 1.17
+                require (
+                    golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c // indirect
+                    rsc.io/quote v1.5.2
+                    rsc.io/sampler v1.3.0 // indirect
+                )
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+                rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+                rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+                rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+                rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+                """
+            ),
             "BUILD": dedent(
                 """\
-                go_module(name='go_mod')
+                go_mod(name='mod')
                 go_package(name='main')
                 go_binary(name='bin', main=':main')
                 """
@@ -147,4 +178,7 @@ def test_package_with_dependency(rule_runner: RuleRunner) -> None:
 
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
     assert result.returncode == 0
-    assert result.stdout == b">> Hello world! <<\n"
+    assert result.stdout == (
+        b">> Hello world! <<\n"
+        b"Don't communicate by sharing memory, share memory by communicating.\n"
+    )

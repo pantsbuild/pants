@@ -4,35 +4,19 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.classpath import Classpath
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestSourceField
 from pants.backend.java.util_rules import JdkSetup
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    DigestSubset,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
-    CoursierLockfileForTargetRequest,
-    CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
@@ -56,20 +40,11 @@ async def run_junit_test(
     test_subsystem: TestSubsystem,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(t.address for t in transitive_targets.closure)
-    )
-
-    lockfile = await Get(
-        CoursierResolvedLockfile,
-        CoursierLockfileForTargetRequest(Targets(transitive_targets.closure)),
-    )
-    materialized_classpath = await Get(
+    classpath = await Get(Classpath, Addresses([field_set.address]))
+    junit_classpath = await Get(
         MaterializedClasspath,
         MaterializedClasspathRequest(
             prefix="__thirdpartycp",
-            lockfiles=(lockfile,),
             artifact_requirements=(
                 ArtifactRequirements(
                     [
@@ -93,47 +68,33 @@ async def run_junit_test(
             ),
         ),
     )
-
-    transitive_user_classfiles = await MultiGet(
-        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t)) for t in coarsened_targets
-    )
-    merged_transitive_user_classfiles_digest = await Get(
-        Digest, MergeDigests(classfiles.digest for classfiles in transitive_user_classfiles)
-    )
-    usercp_relpath = "__usercp"
-    prefixed_transitive_user_classfiles_digest = await Get(
-        Digest, AddPrefix(merged_transitive_user_classfiles_digest, usercp_relpath)
-    )
     merged_digest = await Get(
         Digest,
-        MergeDigests(
-            (
-                prefixed_transitive_user_classfiles_digest,
-                materialized_classpath.digest,
-                jdk_setup.digest,
-            )
-        ),
+        MergeDigests((classpath.content.digest, jdk_setup.digest, junit_classpath.digest)),
     )
 
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
+    user_classpath_arg = ":".join(classpath.user_classpath_entries())
+
     process_result = await Get(
         FallibleProcessResult,
         Process(
             argv=[
-                *jdk_setup.args(bash, [materialized_classpath.classpath_arg()]),
+                *jdk_setup.args(
+                    bash, [*classpath.classpath_entries(), *junit_classpath.classpath_entries()]
+                ),
                 "org.junit.platform.console.ConsoleLauncher",
-                "--classpath",
-                usercp_relpath,
-                "--scan-class-path",
-                usercp_relpath,
+                *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
+                *(("--scan-class-path", user_classpath_arg) if user_classpath_arg else ()),
                 "--reports-dir",
                 reports_dir,
                 *junit.options.args,
             ],
             input_digest=merged_digest,
             output_directories=(reports_dir,),
+            append_only_caches=jdk_setup.append_only_caches,
             description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
             level=LogLevel.DEBUG,
         ),

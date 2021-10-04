@@ -65,18 +65,18 @@ def test_go_mod_info(rule_runner: RuleRunner) -> None:
             "foo/main.go": "package main\nfunc main() { }\n",
             "foo/BUILD": dedent(
                 """\
-                go_module(name='mod')
+                go_mod(name='mod')
                 go_package(name='pkg')
                 """
             ),
         }
     )
-    resolved_go_module = rule_runner.request(
+    go_mod_info = rule_runner.request(
         GoModInfo, [GoModInfoRequest(Address("foo", target_name="mod"))]
     )
-    assert resolved_go_module.import_path == "go.example.com/foo"
-    assert resolved_go_module.modules
+    assert go_mod_info.import_path == "go.example.com/foo"
+    assert go_mod_info.modules
     assert any(
         module_descriptor.path == "github.com/golang/protobuf"
-        for module_descriptor in resolved_go_module.modules
+        for module_descriptor in go_mod_info.modules
     )

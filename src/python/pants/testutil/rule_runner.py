@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import os
 import sys
 from contextlib import contextmanager
@@ -35,7 +36,7 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import initialize_stdio, stdio_destination
+from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
     DynamicRemoteOptions,
     ExecutionOptions,
@@ -54,7 +55,25 @@ from pants.util.dirutil import (
     safe_mkdtemp,
     safe_open,
 )
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+
+
+def logging(func):
+    """A decorator that enables logging (optionally at the given level)."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
+        with temporary_dir() as tempdir, initialize_stdio_raw(
+            LogLevel.INFO, False, False, {}, True, [], tempdir
+        ), stdin_context() as stdin, stdio_destination(
+            stdin.fileno(), stdout_fileno, stderr_fileno
+        ):
+            return func(*args, **kwargs)
+
+    return wrapper
+
 
 # -----------------------------------------------------------------------------------------------
 # `RuleRunner`
@@ -103,6 +122,15 @@ class RuleRunner:
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
+
+        # TODO: Until https://github.com/coursier/coursier/pull/2197 is resolved, we avoid concurrent
+        # use of the named caches via `[pytest] execution_slot_var`.
+        home = os.environ.get("HOME")
+        exec_slot = os.environ.get("EXECUTION_SLOT")
+        if home and exec_slot:
+            bootstrap_args.append(
+                f"--named-caches-dir={home}/.cache/pants/named_caches/tests/{exec_slot}"
+            )
 
         root_dir: Path | None = None
         if preserve_tmpdirs:
@@ -522,6 +550,17 @@ def run_rule_with_mocks(
 
 
 @contextmanager
+def stdin_context(content: bytes | str | None = None):
+    if content is None:
+        yield open("/dev/null", "r")
+    else:
+        with temporary_file(binary_mode=isinstance(content, bytes)) as stdin_file:
+            stdin_file.write(content)
+            stdin_file.close()
+            yield open(stdin_file.name, "r")
+
+
+@contextmanager
 def mock_console(
     options_bootstrapper: OptionsBootstrapper,
     *,
@@ -536,19 +575,11 @@ def mock_console(
         .colors
     )
 
-    @contextmanager
-    def stdin_context():
-        if stdin_content is None:
-            yield open("/dev/null", "r")
-        else:
-            with temporary_file(binary_mode=isinstance(stdin_content, bytes)) as stdin_file:
-                stdin_file.write(stdin_content)
-                stdin_file.close()
-                yield open(stdin_file.name, "r")
-
-    with initialize_stdio(global_bootstrap_options), stdin_context() as stdin, temporary_file(
+    with initialize_stdio(global_bootstrap_options), stdin_context(
+        stdin_content
+    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
         binary_mode=False
-    ) as stdout, temporary_file(binary_mode=False) as stderr, stdio_destination(
+    ) as stderr, stdio_destination(
         stdin_fileno=stdin.fileno(),
         stdout_fileno=stdout.fileno(),
         stderr_fileno=stderr.fileno(),

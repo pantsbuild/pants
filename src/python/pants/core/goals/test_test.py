@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional, Tuple, Type
 
 import pytest
 
@@ -125,7 +124,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
-def make_target(address: Optional[Address] = None) -> Target:
+def make_target(address: Address | None = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
     return MockTarget({}, address)
@@ -134,15 +133,15 @@ def make_target(address: Optional[Address] = None) -> Target:
 def run_test_rule(
     rule_runner: RuleRunner,
     *,
-    field_set: Type[TestFieldSet],
-    targets: List[Target],
+    field_set: type[TestFieldSet],
+    targets: list[Target],
     debug: bool = False,
     use_coverage: bool = False,
     xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
     include_sources: bool = True,
     valid_targets: bool = True,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,

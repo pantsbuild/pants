@@ -53,10 +53,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourceTarget],
-        # TODO(#12293): use a fixed JDK version.
-        bootstrap_args=[
-            "--javac-jdk=system",
-        ],
     )
 
 

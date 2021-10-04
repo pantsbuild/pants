@@ -7,7 +7,7 @@ import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
-from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
+from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -71,14 +71,12 @@ async def setup_analyzer() -> AnalyzerSetup:
         source_entry_content,
     )
 
-    source_digest, imports = await MultiGet(
+    source_digest, import_config = await MultiGet(
         Get(Digest, CreateDigest([source_entry])),
-        Get(
-            GatheredImports, GatherImportsRequest(packages=FrozenOrderedSet(), include_stdlib=True)
-        ),
+        Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
     )
 
-    input_digest = await Get(Digest, MergeDigests([source_digest, imports.digest]))
+    input_digest = await Get(Digest, MergeDigests([source_digest, import_config.digest]))
 
     compiled_analyzer = await Get(
         CompiledGoSources,
@@ -87,12 +85,12 @@ async def setup_analyzer() -> AnalyzerSetup:
             sources=(source_entry.path,),
             import_path="main",
             description="Compile Go test sources analyzer",
-            import_config_path="./importcfg",
+            import_config_path=import_config.CONFIG_PATH,
         ),
     )
 
     link_input_digest = await Get(
-        Digest, MergeDigests([compiled_analyzer.output_digest, imports.digest])
+        Digest, MergeDigests([compiled_analyzer.output_digest, import_config.digest])
     )
 
     analyzer = await Get(
@@ -100,7 +98,7 @@ async def setup_analyzer() -> AnalyzerSetup:
         LinkGoBinaryRequest(
             input_digest=link_input_digest,
             archives=("__pkg__.a",),
-            import_config_path="./importcfg",
+            import_config_path=import_config.CONFIG_PATH,
             output_filename="./analyzer",
             description="Link Go test sources analyzer",
         ),

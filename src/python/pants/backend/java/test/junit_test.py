@@ -8,6 +8,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java import classpath
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
@@ -43,6 +44,7 @@ def rule_runner() -> RuleRunner:
         preserve_tmpdirs=True,
         rules=[
             *config_files.rules(),
+            *classpath.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
@@ -62,7 +64,6 @@ def rule_runner() -> RuleRunner:
             JunitTestsGeneratorTarget,
         ],
         bootstrap_args=[
-            "--javac-jdk=system",  # TODO(#12293): use a fixed JDK version.
             # Makes JUnit output predictable and parseable across versions (#12933):
             "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
         ],
@@ -582,87 +583,6 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
-
-
-@maybe_skip_jdk_test
-def test_vintage_and_jupiter_simple_success(rule_runner: RuleRunner) -> None:
-    combined_lockfile = CoursierResolvedLockfile(
-        entries=(*JUNIT4_RESOLVED_LOCKFILE.entries, *JUNIT5_RESOLVED_LOCKFILE.entries)
-    )
-    rule_runner.write_files(
-        {
-            "coursier_resolve.lockfile": combined_lockfile.to_json().decode("utf-8"),
-            "BUILD": dedent(
-                """\
-                jvm_artifact(
-                  name='junit_junit',
-                  group='junit',
-                  artifact='junit',
-                  version='4.13.2',
-                )
-                jvm_artifact(
-                  name='org.junit.jupiter_junit-jupiter-api',
-                  group='org.junit.jupiter',
-                  artifact='junit-jupiter-api',
-                  version='5.7.2',
-                )
-                coursier_lockfile(
-                    name = 'lockfile',
-                    requirements = [
-                        ':junit_junit',
-                        ':org.junit.jupiter_junit-jupiter-api',
-                    ],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
-                )
-
-                junit_tests(
-                    name='example-test',
-                    dependencies= [':lockfile'],
-                )
-                """
-            ),
-            "JupiterTest.java": dedent(
-                """
-                package org.pantsbuild.example;
-
-                import static org.junit.jupiter.api.Assertions.assertEquals;
-                import org.junit.jupiter.api.Test;
-
-                class JupiterTest {
-                    @Test
-                    void testHello(){
-                      assertEquals("Hello!", "Hello!");
-                   }
-                }
-                """
-            ),
-            "VintageTest.java": dedent(
-                """
-                package org.pantsbuild.example;
-
-                import junit.framework.TestCase;
-
-                public class VintageTest extends TestCase {
-                   public void testGoodbye(){
-                      assertTrue("Hello!" == "Hello!");
-                   }
-                }
-                """
-            ),
-        }
-    )
-
-    test_result = run_junit_test(rule_runner, "example-test", "JupiterTest.java")
-
-    assert test_result.exit_code == 0
-    # TODO: Once support for parsing junit.xml is implemented, use that to determine status so we can remove the
-    #  hack to use ASCII test output in the `run_junit_test` rule.
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"Finished:\s+testGoodbye", test_result.stdout) is not None
-    assert re.search(r"2 tests successful", test_result.stdout) is not None
-    assert re.search(r"2 tests found", test_result.stdout) is not None
 
 
 def run_junit_test(

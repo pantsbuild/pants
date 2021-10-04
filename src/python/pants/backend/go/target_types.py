@@ -44,7 +44,7 @@ class GoPackage(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_module` target
+# `go_mod` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -83,13 +83,13 @@ class GoModSourcesField(Sources):
 
 
 class GoModTarget(Target):
-    alias = "go_module"
+    alias = "go_mod"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         GoModSourcesField,
     )
-    help = "First-party Go module."
+    help = "A first-party Go module corresponding to a `go.mod` file."
 
 
 # -----------------------------------------------------------------------------------------------

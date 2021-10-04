@@ -234,4 +234,5 @@ Created by running `./build-support/bin/contributors.sh`.
 + Yujie Chen
 + billybecker
 + hephex
++ riisi
 + Ólafur Páll Geirsson

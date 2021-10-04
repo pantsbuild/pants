@@ -113,7 +113,7 @@ async def analyze_java_source_dependencies(
         FallibleProcessResult,
         Process(
             argv=[
-                *jdk_setup.args(bash, [tool_classpath.classpath_arg(), processorcp_relpath]),
+                *jdk_setup.args(bash, [*tool_classpath.classpath_entries(), processorcp_relpath]),
                 "org.pantsbuild.javaparser.PantsJavaParserLauncher",
                 analysis_output_path,
                 source_path,
@@ -121,6 +121,7 @@ async def analyze_java_source_dependencies(
             input_digest=merged_digest,
             output_files=(analysis_output_path,),
             use_nailgun=tool_digest,
+            append_only_caches=jdk_setup.append_only_caches,
             description="Run Spoon analysis against Java source",
             level=LogLevel.DEBUG,
         ),

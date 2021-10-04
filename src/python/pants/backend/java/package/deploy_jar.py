@@ -95,7 +95,7 @@ async def package_deploy_jar(
             tgt.address for tgt in transitive_targets.closure if tgt.has_field(JavaSourceField)
         ),
     )
-    
+
     javac_request_gets = [
         Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(tgt)) for tgt in sources_to_compile
     ]
@@ -186,7 +186,7 @@ async def package_deploy_jar(
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    input_filenames = " ".join(materialized_classpath.reified_filenames())
+    input_filenames = " ".join(materialized_classpath.classpath_entries())
     cat_and_repair_script = FileContent(
         "_cat_and_repair_zip_files.sh",
         # Using POSIX location/arg format for `cat`. If this gets more complicated; refactor.

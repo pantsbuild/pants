@@ -42,6 +42,12 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             ),
         )
         register(
+            "--closed",
+            type=bool,
+            default=False,
+            help="Include the input targets in the output, along with the dependencies.",
+        )
+        register(
             "--type",
             type=DependencyType,
             default=DependencyType.SOURCE,
@@ -61,6 +67,10 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     @property
     def transitive(self) -> bool:
         return cast(bool, self.options.transitive)
+
+    @property
+    def closed(self) -> bool:
+        return cast(bool, self.options.closed)
 
     @property
     def type(self) -> DependencyType:
@@ -100,7 +110,7 @@ async def dependencies(
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
 
-    address_strings = set()
+    address_strings = {addr.spec for addr in addresses} if dependencies_subsystem.closed else set()
     third_party_requirements: Set[str] = set()
     for tgt in targets:
         if include_source:

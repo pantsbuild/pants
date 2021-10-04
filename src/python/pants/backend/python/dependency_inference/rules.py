@@ -64,6 +64,16 @@ class PythonInferSubsystem(Subsystem):
             ),
         )
         register(
+            "--string-imports-min-dots",
+            default=2,
+            type=int,
+            help=(
+                "If --string-imports is True, treat valid-looking strings with at least this many "
+                "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
+                "treated as a potential dependency if this option is set to 2 but not if set to 3."
+            ),
+        )
+        register(
             "--inits",
             default=False,
             type=bool,
@@ -106,6 +116,10 @@ class PythonInferSubsystem(Subsystem):
         return cast(bool, self.options.string_imports)
 
     @property
+    def string_imports_min_dots(self) -> int:
+        return cast(bool, self.options.string_imports_min_dots)
+
+    @property
     def inits(self) -> bool:
         return cast(bool, self.options.inits)
 
@@ -140,6 +154,7 @@ async def infer_python_dependencies_via_imports(
                 request.sources_field,
                 InterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
+                string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             ),
         ),
     )

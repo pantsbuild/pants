@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
 from pathlib import PurePath
-from typing import Dict, Iterator, cast
+from typing import Dict, Iterator
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
@@ -157,22 +157,38 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     * PantsDaemon, immediately on startup. The process will then default to sending stdio to the log
       until client connections arrive, at which point `stdio_destination` is used per-connection.
     """
-    global_level = global_bootstrap_options.level
-    log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
-    show_target = global_bootstrap_options.show_log_target
-    log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
-    print_stacktrace = global_bootstrap_options.print_stacktrace
+    with initialize_stdio_raw(
+        global_bootstrap_options.level,
+        global_bootstrap_options.log_show_rust_3rdparty,
+        global_bootstrap_options.show_log_target,
+        _get_log_levels_by_target(global_bootstrap_options),
+        global_bootstrap_options.print_stacktrace,
+        global_bootstrap_options.ignore_warnings,
+        global_bootstrap_options.pants_workdir,
+    ):
+        yield
 
+
+@contextmanager
+def initialize_stdio_raw(
+    global_level: LogLevel,
+    log_show_rust_3rdparty: bool,
+    show_target: bool,
+    log_levels_by_target: dict[str, LogLevel],
+    print_stacktrace: bool,
+    ignore_warnings: list[str],
+    pants_workdir: str,
+) -> Iterator[None]:
     literal_filters = []
     regex_filters = []
-    for filt in cast("list[str]", global_bootstrap_options.ignore_warnings):
+    for filt in ignore_warnings:
         if filt.startswith("$regex$"):
             regex_filters.append(strip_prefix(filt, "$regex$"))
         else:
             literal_filters.append(filt)
 
     # Set the pants log destination.
-    log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
+    log_path = str(pants_log_path(PurePath(pants_workdir)))
     safe_mkdir_for(log_path)
 
     # Initialize thread-local stdio, and replace sys.std* with proxies.

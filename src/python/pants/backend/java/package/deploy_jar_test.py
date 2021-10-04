@@ -200,7 +200,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
             .to_json()
             .decode("utf-8"),
             "Example.java": JAVA_MAIN_SOURCE,
-            "lib/ExampleLib.java" : JAVA_LIB_SOURCE,
+            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
 

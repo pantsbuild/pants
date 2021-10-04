@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Sequence, cast
 
 import toml
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -21,22 +21,18 @@ from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
 
-PyprojectAttr = TypedDict(
-    "PyprojectAttr",
-    {
-        "extras": List[str],
-        "git": str,
-        "rev": str,
-        "branch": str,
-        "python": str,
-        "markers": str,
-        "tag": str,
-        "version": str,
-        "url": str,
-        "path": str,
-    },
-    total=False,
-)
+
+class PyprojectAttr(TypedDict, total=False):
+    extras: List[str]
+    git: str
+    rev: str
+    branch: str
+    python: str
+    markers: str
+    tag: str
+    version: str
+    url: str
+    path: str
 
 
 def get_max_caret(parsed_version: Version) -> str:
@@ -329,7 +325,7 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     dependencies.pop("python", None)
 
     groups = poetry_vals.get("group", {})
-    group_deps: Dict[str, PyprojectAttr] = {}
+    group_deps: dict[str, PyprojectAttr] = {}
 
     for group in groups.values():
         group_deps.update(group.get("dependencies", {}))
@@ -391,8 +387,8 @@ class PoetryRequirements:
         self,
         pyproject_toml_relpath: str = "pyproject.toml",
         *,
-        module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
+        module_mapping: Mapping[str, Iterable[str]] | None = None,
+        type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
     ) -> None:
         """
         :param pyproject_toml_relpath: The relpath from this BUILD file to the requirements file.

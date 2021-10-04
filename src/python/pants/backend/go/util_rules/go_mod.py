@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 
 import ijson
@@ -12,7 +13,8 @@ from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix
+from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.fs import Digest, RemovePrefix
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -43,13 +45,16 @@ class GoModInfo:
     # Digest containing the full paths to `go.mod` and `go.sum`.
     digest: Digest
 
-    # Digest containing only the `go.sum` with no leading directory prefix.
-    go_sum_stripped_digest: Digest
+    # Digest containing `go.mod` and `go.sum` with no path prefixes.
+    stripped_digest: Digest
 
 
 @dataclass(frozen=True)
-class GoModInfoRequest:
+class GoModInfoRequest(EngineAwareParameter):
     address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
@@ -71,38 +76,40 @@ def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
 
 
 @rule
-async def resolve_go_module(
+async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     sources_field = wrapped_target.target[GoModSourcesField]
+    go_mod_path = sources_field.go_mod_path
+    go_mod_dir = os.path.dirname(go_mod_path)
 
     # Get the `go.mod` (and `go.sum`) and strip so the file has no directory prefix.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources_field))
-    sources_without_prefix = await Get(
-        Digest, RemovePrefix(hydrated_sources.snapshot.digest, request.address.spec_path)
-    )
-    go_sum_digest_get = Get(Digest, DigestSubset(sources_without_prefix, PathGlobs(["go.sum"])))
+    sources_digest = hydrated_sources.snapshot.digest
 
     mod_json_get = Get(
         ProcessResult,
         GoSdkProcess(
             command=("mod", "edit", "-json"),
-            input_digest=sources_without_prefix,
-            description=f"Parse {sources_field.go_mod_path}",
+            input_digest=sources_digest,
+            working_dir=go_mod_dir,
+            description=f"Parse {go_mod_path}",
         ),
     )
     list_modules_get = Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=sources_without_prefix,
             command=("list", "-m", "-json", "all"),
-            description=f"List modules in {sources_field.go_mod_path}",
+            input_digest=sources_digest,
+            working_dir=go_mod_dir,
+            description=f"List modules in {go_mod_path}",
         ),
     )
 
-    mod_json, list_modules, go_sum_digest = await MultiGet(
-        mod_json_get, list_modules_get, go_sum_digest_get
+    stripped_source_get = Get(Digest, RemovePrefix(sources_digest, go_mod_dir))
+    mod_json, list_modules, stripped_sources = await MultiGet(
+        mod_json_get, list_modules_get, stripped_source_get
     )
 
     module_metadata = json.loads(mod_json.stdout)
@@ -110,8 +117,8 @@ async def resolve_go_module(
     return GoModInfo(
         import_path=module_metadata["Module"]["Path"],
         modules=FrozenOrderedSet(modules),
-        digest=hydrated_sources.snapshot.digest,
-        go_sum_stripped_digest=go_sum_digest,
+        digest=sources_digest,
+        stripped_digest=stripped_sources,
     )
 
 
@@ -122,29 +129,32 @@ class OwningGoModRequest:
 
 
 @dataclass(frozen=True)
-class OwningGoMod:
+class OwningGoMod(EngineAwareParameter):
     address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @rule
-async def find_nearest_go_module(request: OwningGoModRequest) -> OwningGoMod:
+async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     candidate_targets = await Get(
         UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
     )
-    # Sort by address.spec_path in descending order so the nearest go_module target is sorted first.
-    go_module_targets = sorted(
+    # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
+    go_mod_targets = sorted(
         (tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
-    if not go_module_targets:
+    if not go_mod_targets:
         raise Exception(
-            f"The target {request.address} does not have any `go_module` target in any ancestor "
+            f"The target {request.address} does not have any `go_mod` target in any ancestor "
             "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
-            "`go_module` target (you can run `./pants tailor` to do this)."
+            "`go_mod` target (you can run `./pants tailor` to do this)."
         )
-    nearest_go_module_target = go_module_targets[0]
-    return OwningGoMod(nearest_go_module_target.address)
+    nearest_go_mod_target = go_mod_targets[0]
+    return OwningGoMod(nearest_go_mod_target.address)
 
 
 def rules():
