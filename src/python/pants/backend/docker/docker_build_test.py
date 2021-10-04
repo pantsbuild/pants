@@ -9,14 +9,16 @@ import pytest
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
 from pants.backend.docker.docker_build import DockerFieldSet, build_docker_image
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
+from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue
 from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.target_types import DockerImage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -33,7 +35,7 @@ def assert_build(
     tgt = rule_runner.get_target(address)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
-        return DockerBuildContext(digest=EMPTY_DIGEST)
+        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=FrozenDict())
 
     opts = options or {}
     opts.setdefault("registries", {})
@@ -233,3 +235,37 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         ),
         options=options,
     )
+
+
+def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
+    version_context = FrozenDict({
+        "baseimage": DockerVersionContextValue({"tag": "3.8"}),
+        "stage0": DockerVersionContextValue({"tag":"3.8"}),
+        "interim": DockerVersionContextValue({"tag":"latest"}),
+        "stage2": DockerVersionContextValue({"tag":"latest"}),
+        "output": DockerVersionContextValue({"tag":"1-1"}),
+    })
+
+    def assert_tags(name: str, *expect_tags: str) -> None:
+        tgt = rule_runner.get_target(Address("docker/test", target_name=name))
+        fs = DockerFieldSet.create(tgt)
+        tags = fs.image_names(
+            "image",
+            DockerRegistries.from_dict({}),
+            version_context,
+        )
+        assert expect_tags == tags
+
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(name="ver_1")
+                docker_image(name="ver_2", version="{baseimage.tag}", image_tags=["beta"])
+                """
+            ),
+        }
+    )
+
+    assert_tags("ver_1", "image:latest")
+    assert_tags("ver_2", "image:3.8", "image:beta")

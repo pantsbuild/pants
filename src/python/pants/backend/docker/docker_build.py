@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from os import path
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
+from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystem import DockerOptions
 from pants.backend.docker.target_types import (
@@ -24,6 +24,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.strutil import bullet_list, pluralize
+from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class DockerFieldSet(PackageFieldSet):
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
     def image_names(
-        self, default_name_template: str, registries: DockerRegistries
+            self, default_name_template: str, registries: DockerRegistries, version_context: FrozenDict[str, DockerVersionContextValue]
     ) -> tuple[str, ...]:
         """This method will always return a non-empty tuple."""
         default_parent = path.basename(path.dirname(self.address.spec_path))
@@ -67,7 +68,7 @@ class DockerFieldSet(PackageFieldSet):
         )
         image_names = tuple(
             ":".join(s for s in [image_name, tag] if s)
-            for tag in [self.version.value, *(self.tags.value or [])]
+            for tag in [self.version.value.format(**version_context), *(self.tags.value or [])]
         )
 
         registries_options = tuple(registries.get(*(self.registries.value or [])))
@@ -97,7 +98,12 @@ async def build_docker_image(
         ),
     )
 
-    tags = field_set.image_names(options.default_image_name_template, options.registries())
+    tags = field_set.image_names(
+        default_name_template=options.default_image_name_template,
+        registries=options.registries(),
+        version_context=context.version_context,
+    )
+
     result = await Get(
         ProcessResult,
         Process,

@@ -37,7 +37,7 @@ def translate_to_address(value: str) -> str | None:
     return None
 
 
-def main(args):
+def main(cmd: str, args: tuple[str, ...]) -> None:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string
 
@@ -74,10 +74,56 @@ def main(args):
             addresses.extend(self.copy_source_addresses())
             return tuple(addresses)
 
+        def from_baseimages(self) -> Generator[tuple[str, tuple[str, ...]], None, None]:
+            for idx, cmd in enumerate(self.get_all("FROM")):
+                name_parts = cmd.value[0].split("/")
+                if len(cmd.value) == 3 and cmd.value[1].upper() == "AS":
+                    stage = cmd.value[2]
+                else:
+                    stage = f"stage{idx}"
+                yield stage, name_parts
+
+        def baseimage_tags(self) -> tuple[str, ...]:
+            """Return all base image tags, prefix with the stage alias or index.
+
+            Example:
+
+                FROM base:1.0 AS build
+                ...
+                FROM interim
+                ...
+                FROM final as out
+            
+            Gives:
+
+                build 1.0
+                stage1 latest
+                out latest
+            """
+            return tuple(
+                " ".join([
+                    stage,
+                    name_parts[-1].rsplit(":", maxsplit=1)[-1]
+                    if ":" in name_parts[-1] else "latest"
+                ])
+                for stage, name_parts in self.from_baseimages()
+            )
+
     for parsed in map(ParsedDockerfile.from_file, args):
-        for addr in parsed.putative_target_addresses():
-            print(addr)
+        if cmd == "putative-targets":
+            for addr in parsed.putative_target_addresses():
+                print(addr)
+        elif cmd == "version-tags":
+            for tag in parsed.baseimage_tags():
+                print(tag)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    if len(sys.argv) > 2:
+        for idx, cmd in enumerate(sys.argv[1].split(",")):
+            if idx:
+                print("---")
+            main(cmd, sys.argv[2:])
+    else:
+        print(f"Not enough arguments.\nUsage: {sys.argv[0]} [COMMAND,COMMAND,...] [DOCKERFILE ...]")
+        sys.exit(1)
