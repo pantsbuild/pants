@@ -471,7 +471,6 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     chroot_prefix = "chroot"
 
     prefixed_chroot = await Get(Digest, AddPrefix(req.chroot.digest, chroot_prefix))
-    working_directory = os.path.join(chroot_prefix, req.exported_target.target.address.spec_path)
 
     result = await Get(
         DistBuildResult,
@@ -482,7 +481,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             build_wheel=req.wheel,
             build_sdist=req.sdist,
             input=prefixed_chroot,
-            working_directory=working_directory,
+            working_directory=chroot_prefix,
             target_address_spec=req.exported_target.target.address.spec,
             wheel_config_settings=req.wheel_config_settings,
             sdist_config_settings=req.sdist_config_settings,
@@ -554,7 +553,7 @@ async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy
     finalized_setup_kwargs = await Get(FinalizedSetupKwargs, GenerateSetupPyRequest, request)
     setup_py_content = SETUP_BOILERPLATE.format(
         target_address_spec=request.exported_target.target.address.spec,
-        setup_kwargs_str=distutils_repr(finalized_setup_kwargs),
+        setup_kwargs_str=distutils_repr(finalized_setup_kwargs.kwargs),
     ).encode()
     files_to_create = [
         FileContent("setup.py", setup_py_content),
