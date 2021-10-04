@@ -71,7 +71,7 @@ type TestSourcesMetadata struct {
 // isTestFunc tells whether fn has the type of a testing function. arg
 // specifies the parameter type we look for: B, M or T.
 func isTestFunc(fn *ast.FuncDecl, arg string) bool {
-	if fn.Type.Results != nil && len(fn.Type.Results.List) > 0 ||
+	if (fn.Type.Results != nil && len(fn.Type.Results.List) > 0) ||
 		fn.Type.Params.List == nil ||
 		len(fn.Type.Params.List) != 1 ||
 		len(fn.Type.Params.List[0].Names) > 1 {
@@ -95,7 +95,8 @@ func isTestFunc(fn *ast.FuncDecl, arg string) bool {
 }
 
 // isTest tells whether name looks like a test (or benchmark, according to prefix).
-// It is a Test (say) if there is a character after Test that is not a lower-case letter.
+// It is a test if there is a character after Test that is not a lower-case letter.
+// This avoids, for example, Testify matching.
 func isTest(name, prefix string) bool {
 	if !strings.HasPrefix(name, prefix) {
 		return false
