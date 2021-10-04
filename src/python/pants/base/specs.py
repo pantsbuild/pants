@@ -7,7 +7,7 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.exceptions import ResolveError
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -62,13 +62,13 @@ class AddressLiteralSpec(AddressSpec):
 
 class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
     @abstractmethod
-    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
         """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
 
     @abstractmethod
     def matching_address_families(
-        self, address_families_dict: Mapping[str, "AddressFamily"]
-    ) -> Tuple["AddressFamily", ...]:
+        self, address_families_dict: Mapping[str, AddressFamily]
+    ) -> tuple[AddressFamily, ...]:
         """Given a dict of (namespace path) -> AddressFamily, return the values matching this
         address spec.
 
@@ -77,8 +77,8 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
         """
 
     def matching_addresses(
-        self, address_families: Sequence["AddressFamily"]
-    ) -> Sequence[Tuple[Address, TargetAdaptor]]:
+        self, address_families: Sequence[AddressFamily]
+    ) -> Sequence[tuple[Address, TargetAdaptor]]:
         """Given a list of AddressFamily, return (Address, TargetAdaptor) pairs matching this
         address spec.
 
@@ -104,12 +104,12 @@ class MaybeEmptySiblingAddresses(AddressGlobSpec):
     def __str__(self) -> str:
         return f"{self.directory}:"
 
-    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
         return tuple(os.path.join(self.directory, pat) for pat in build_patterns)
 
     def matching_address_families(
-        self, address_families_dict: Mapping[str, "AddressFamily"]
-    ) -> Tuple["AddressFamily", ...]:
+        self, address_families_dict: Mapping[str, AddressFamily]
+    ) -> tuple[AddressFamily, ...]:
         maybe_af = address_families_dict.get(self.directory)
         return (maybe_af,) if maybe_af is not None else ()
 
@@ -122,8 +122,8 @@ class SiblingAddresses(MaybeEmptySiblingAddresses):
     """
 
     def matching_address_families(
-        self, address_families_dict: Mapping[str, "AddressFamily"]
-    ) -> Tuple["AddressFamily", ...]:
+        self, address_families_dict: Mapping[str, AddressFamily]
+    ) -> tuple[AddressFamily, ...]:
         address_families_tuple = super().matching_address_families(address_families_dict)
         if not address_families_tuple:
             raise ResolveError(
@@ -133,8 +133,8 @@ class SiblingAddresses(MaybeEmptySiblingAddresses):
         return address_families_tuple
 
     def matching_addresses(
-        self, address_families: Sequence["AddressFamily"]
-    ) -> Sequence[Tuple[Address, TargetAdaptor]]:
+        self, address_families: Sequence[AddressFamily]
+    ) -> Sequence[tuple[Address, TargetAdaptor]]:
         matching = super().matching_addresses(address_families)
         if len(matching) == 0:
             raise ResolveError(f"Address spec '{self}' does not match any targets.")
@@ -153,12 +153,12 @@ class MaybeEmptyDescendantAddresses(AddressGlobSpec):
     def __str__(self) -> str:
         return f"{self.directory}::"
 
-    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
         return tuple(os.path.join(self.directory, "**", pat) for pat in build_patterns)
 
     def matching_address_families(
-        self, address_families_dict: Mapping[str, "AddressFamily"]
-    ) -> Tuple["AddressFamily", ...]:
+        self, address_families_dict: Mapping[str, AddressFamily]
+    ) -> tuple[AddressFamily, ...]:
         return tuple(
             af
             for ns, af in address_families_dict.items()
@@ -173,8 +173,8 @@ class DescendantAddresses(MaybeEmptyDescendantAddresses):
     """
 
     def matching_addresses(
-        self, address_families: Sequence["AddressFamily"]
-    ) -> Sequence[Tuple[Address, TargetAdaptor]]:
+        self, address_families: Sequence[AddressFamily]
+    ) -> Sequence[tuple[Address, TargetAdaptor]]:
         matching = super().matching_addresses(address_families)
         if len(matching) == 0:
             raise ResolveError(f"Address spec '{self}' does not match any targets.")
@@ -211,8 +211,8 @@ class AscendantAddresses(AddressGlobSpec):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class AddressSpecs:
-    literals: Tuple[AddressLiteralSpec, ...]
-    globs: Tuple[AddressGlobSpec, ...]
+    literals: tuple[AddressLiteralSpec, ...]
+    globs: tuple[AddressGlobSpec, ...]
     filter_by_global_options: bool
 
     def __init__(
@@ -238,7 +238,7 @@ class AddressSpecs:
         self.filter_by_global_options = filter_by_global_options
 
     @property
-    def specs(self) -> Tuple[AddressSpec, ...]:
+    def specs(self) -> tuple[AddressSpec, ...]:
         return (*self.literals, *self.globs)
 
     def to_path_globs(
@@ -312,7 +312,7 @@ class FilesystemSpecs:
         self.ignores = tuple(ignores)
 
     @property
-    def specs(self) -> Tuple[FilesystemSpec, ...]:
+    def specs(self) -> tuple[FilesystemSpec, ...]:
         return (*self.includes, *self.ignores)
 
     @staticmethod

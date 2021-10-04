@@ -35,7 +35,6 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoBinary, GoPackage, GoModTarget],
         rules=[
             *assembly.rules(),
             *compile.rules(),
@@ -51,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
+        target_types=[GoBinary, GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -66,7 +66,12 @@ def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackag
 def test_package_simple(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "go.mod": "module foo.example.com\n",
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                go 1.17
+                """
+            ),
             "main.go": dedent(
                 """\
                 package main
@@ -99,7 +104,6 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"Hello world!\n"
 
 
-@pytest.mark.xfail
 def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -140,10 +144,11 @@ def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
             "go.mod": dedent(
                 """\
                 module foo.example.com
+                go 1.17
                 require (
-                    golang.org/x/text // indirect
+                    golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c // indirect
                     rsc.io/quote v1.5.2
-                    rsc.io/sampler // indirect
+                    rsc.io/sampler v1.3.0 // indirect
                 )
                 """
             ),

@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Optional, Tuple, Type, TypeVar, cast
+from typing import ClassVar, TypeVar, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
@@ -32,7 +32,7 @@ class FmtResult(EngineAwareReturnType):
     formatter_name: str
 
     @classmethod
-    def skip(cls: Type[_F], *, formatter_name: str) -> _F:
+    def skip(cls: type[_F], *, formatter_name: str) -> _F:
         return cls(
             input=EMPTY_DIGEST,
             output=EMPTY_DIGEST,
@@ -74,12 +74,12 @@ class FmtResult(EngineAwareReturnType):
     def did_change(self) -> bool:
         return self.output != self.input
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel | None:
         if self.skipped:
             return LogLevel.DEBUG
         return LogLevel.WARN if self.did_change else LogLevel.INFO
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         if self.skipped:
             return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
@@ -107,7 +107,7 @@ class LanguageFmtTargets:
     across languages, it is safe to run in parallel.
     """
 
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
+    required_fields: ClassVar[tuple[type[Field], ...]]
 
     targets: Targets
 
@@ -126,7 +126,7 @@ class LanguageFmtResults:
     target(s), including any which were not re-formatted.
     """
 
-    results: Tuple[FmtResult, ...]
+    results: tuple[FmtResult, ...]
     input: Digest
     output: Digest
 

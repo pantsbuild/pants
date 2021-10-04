@@ -173,7 +173,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     paths = {}
     for line in output_lines:
         for dist_type in ["wheel", "sdist"]:
-            if line.startswith("{}: ".format(dist_type)):
+            if line.startswith(f"{dist_type}: "):
                 paths[dist_type] = line[len(dist_type) + 2 :].strip()
     # Note that output_digest paths are relative to the working_directory.
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))

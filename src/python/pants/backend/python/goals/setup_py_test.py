@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Iterable, Type
+from typing import Iterable
 
 import pytest
 
@@ -136,7 +136,7 @@ def assert_chroot(
         assert expected_setup_kwargs == setup_kwargs.kwargs
 
 
-def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: Type[Exception]) -> None:
+def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Exception]) -> None:
     tgt = rule_runner.get_target(addr)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
@@ -963,7 +963,7 @@ def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: Address):
     )
 
 
-def assert_owner_error(rule_runner, owned: Address, exc_cls: Type[Exception]):
+def assert_owner_error(rule_runner, owned: Address, exc_cls: type[Exception]):
     tgt = rule_runner.get_target(owned)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(

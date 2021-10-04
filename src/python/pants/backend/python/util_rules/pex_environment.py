@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Mapping, Optional, Tuple, cast
+from typing import Mapping, cast
 
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -71,21 +71,20 @@ class PexRuntimeEnvironment(Subsystem):
         )
 
     @memoized_method
-    def path(self, env: Environment) -> Tuple[str, ...]:
+    def path(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self.options.executable_search_paths:
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
-                        for path_entry in path.split(os.pathsep):
-                            yield path_entry
+                        yield from path.split(os.pathsep)
                 else:
                     yield entry
 
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
-    def bootstrap_interpreter_names(self) -> Tuple[str, ...]:
+    def bootstrap_interpreter_names(self) -> tuple[str, ...]:
         return tuple(self.options.bootstrap_interpreter_names)
 
     @property
@@ -105,11 +104,11 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
 
 @dataclass(frozen=True)
 class PexEnvironment(EngineAwareReturnType):
-    path: Tuple[str, ...]
-    interpreter_search_paths: Tuple[str, ...]
+    path: tuple[str, ...]
+    interpreter_search_paths: tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
     named_caches_dir: PurePath
-    bootstrap_python: Optional[PythonExecutable] = None
+    bootstrap_python: PythonExecutable | None = None
 
     _PEX_ROOT_DIRNAME = "pex_root"
 
@@ -125,7 +124,7 @@ class PexEnvironment(EngineAwareReturnType):
             )
         return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
-    def in_sandbox(self, *, working_directory: Optional[str]) -> CompletePexEnvironment:
+    def in_sandbox(self, *, working_directory: str | None) -> CompletePexEnvironment:
         pex_root = PurePath(".cache") / self._PEX_ROOT_DIRNAME
         return CompletePexEnvironment(
             _pex_environment=self,
@@ -209,7 +208,7 @@ async def find_pex_python(
         for binary_name in pex_runtime_env.bootstrap_interpreter_names
     )
 
-    def first_python_binary() -> Optional[PythonExecutable]:
+    def first_python_binary() -> PythonExecutable | None:
         for binary_paths in all_python_binary_paths:
             if binary_paths.first_path:
                 return PythonExecutable(
@@ -235,18 +234,18 @@ async def find_pex_python(
 class CompletePexEnvironment:
     _pex_environment: PexEnvironment
     pex_root: PurePath
-    _working_directory: Optional[PurePath]
+    _working_directory: PurePath | None
     append_only_caches: FrozenDict[str, str]
 
     _PEX_ROOT_DIRNAME = "pex_root"
 
     @property
-    def interpreter_search_paths(self) -> Tuple[str, ...]:
+    def interpreter_search_paths(self) -> tuple[str, ...]:
         return self._pex_environment.interpreter_search_paths
 
     def create_argv(
-        self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
-    ) -> Tuple[str, ...]:
+        self, pex_filepath: str, *args: str, python: PythonExecutable | None = None
+    ) -> tuple[str, ...]:
         pex_relpath = (
             os.path.relpath(pex_filepath, self._working_directory)
             if self._working_directory
