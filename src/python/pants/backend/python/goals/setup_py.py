@@ -42,6 +42,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -63,7 +64,7 @@ from pants.engine.target import (
     Target,
     Targets,
     TransitiveTargets,
-    TransitiveTargetsRequest,
+    TransitiveTargetsRequest, SourcesPaths,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
@@ -282,6 +283,7 @@ class SetupPyChroot:
     """A chroot containing a setup.py and the sources it operates on."""
 
     digest: Digest
+    working_directory: str  # Path to dir within digest.
 
 
 @dataclass(frozen=True)
@@ -469,6 +471,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     # changes setup made within it (e.g., when running 'develop') without also capturing other
     # artifacts of the pex process invocation.
     chroot_prefix = "chroot"
+    working_directory = os.path.join(chroot_prefix, req.chroot.working_directory)
 
     prefixed_chroot = await Get(Digest, AddPrefix(req.chroot.digest, chroot_prefix))
 
@@ -481,7 +484,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             build_wheel=req.wheel,
             build_sdist=req.sdist,
             input=prefixed_chroot,
-            working_directory=chroot_prefix,
+            working_directory=working_directory,
             target_address_spec=req.exported_target.target.address.spec,
             wheel_config_settings=req.wheel_config_settings,
             sdist_config_settings=req.sdist_config_settings,
@@ -533,10 +536,16 @@ class GeneratedSetupPy:
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     sources = await Get(SetupPySources, SetupPyChrootRequest, request)
     snapshot = await Get(Snapshot, Digest, sources.digest)
+    stripped = await Get(
+        StrippedSourceFileNames,
+        SourcesPaths(files=(request.exported_target.target.address.spec_path,), dirs=()),
+    )
+    working_directory = stripped[0]
+
     # TODO: Add a generate_setup field to the python_distribution target type, so that
     #  we're not guessing user intent (and not relying on the build being specifically
     #  setup.py-based, it could be setup.cfg).
-    if "setup.py" in snapshot.files:
+    if os.path.join(working_directory, "setup.py") in snapshot.files:
         chroot_digest = sources.digest
     else:
         logger.info("No setup.py found, generating one...")
@@ -544,7 +553,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             GeneratedSetupPy, GenerateSetupPyRequest(request.exported_target, sources)
         )
         chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
-    return SetupPyChroot(chroot_digest)
+    return SetupPyChroot(chroot_digest, working_directory)
 
 
 @rule
