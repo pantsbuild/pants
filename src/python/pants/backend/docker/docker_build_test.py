@@ -8,7 +8,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
-from pants.backend.docker.docker_build import DockerBuildError, DockerFieldSet, build_docker_image
+from pants.backend.docker.docker_build import (
+    DockerFieldSet,
+    DockerNameTemplateError,
+    build_docker_image,
+)
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -159,11 +163,11 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     )
 
     err1 = (
-        r"Error in docker/test:err1: Invalid image name template: '{bad_template}'\. "
-        r"Unknown key: 'bad_template'\.\n\n"
+        r"Invalid image name template from the `image_name_template` field of the docker_image "
+        r"target at docker/test:err1: '{bad_template}'\. Unknown key: 'bad_template'\.\n\n"
         r"Use any of 'name', 'repository' or 'sub_repository' in the template string\."
     )
-    with pytest.raises(DockerBuildError, match=err1):
+    with pytest.raises(DockerNameTemplateError, match=err1):
         assert_build(
             rule_runner,
             Address("docker/test", target_name="err1"),
@@ -300,7 +304,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     assert_tags("ver_2", "image:3.8-latest", "image:beta")
 
     err_1 = (
-        r"Invalid format string for the `docker_image\(version\)` field: "
+        r"Invalid format string for the `version` field of the docker_image target at docker/test:err_1: "
         r"'{unknown_stage}'\.\n\n"
         r"The key 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, interim, "
         r"stage2, output\."
@@ -309,7 +313,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
         assert_tags("err_1")
 
     err_2 = (
-        r"Invalid format string for the `docker_image\(version\)` field: "
+        r"Invalid format string for the `version` field of the docker_image target at docker/test:err_2: "
         r"'{stage0.unknown_value}'\.\n\n"
         r"The key 'unknown_value' is unknown\. Try with one of: tag\."
     )

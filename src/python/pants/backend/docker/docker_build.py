@@ -35,10 +35,6 @@ from pants.util.strutil import bullet_list, pluralize
 logger = logging.getLogger(__name__)
 
 
-class DockerBuildError(Exception):
-    pass
-
-
 class DockerNameTemplateError(ValueError):
     pass
 
@@ -85,8 +81,16 @@ class DockerFieldSet(PackageFieldSet):
                 ),
             )
         except KeyError as e:
+            if self.name_template.value:
+                source = (
+                    "from the `image_name_template` field of the docker_image target "
+                    f"at {self.address}"
+                )
+            else:
+                source = "from the [docker].default_image_name_template configuration option"
+
             raise DockerNameTemplateError(
-                f"Invalid image name template: {name_template!r}. Unknown key: {e}.\n\n"
+                f"Invalid image name template {source}: {name_template!r}. Unknown key: {e}.\n\n"
                 f"Use any of 'name', 'repository' or 'sub_repository' in the template string."
             ) from e
 
@@ -100,8 +104,8 @@ class DockerFieldSet(PackageFieldSet):
             )
         except (KeyError, ValueError) as e:
             msg = (
-                "Invalid format string for the `docker_image(version)` field: "
-                f"{self.version.value!r}.\n\n"
+                "Invalid format string for the `version` field of the docker_image target at "
+                f"{self.address}: {self.version.value!r}.\n\n"
             )
             if isinstance(e, KeyError):
                 msg += (
@@ -139,14 +143,11 @@ async def build_docker_image(
         ),
     )
 
-    try:
-        tags = field_set.image_names(
-            default_name_template=options.default_image_name_template,
-            registries=options.registries(),
-            version_context=context.version_context,
-        )
-    except ValueError as e:
-        raise DockerBuildError(f"Error in {field_set.address}: {e}") from e
+    tags = field_set.image_names(
+        default_name_template=options.default_image_name_template,
+        registries=options.registries(),
+        version_context=context.version_context,
+    )
 
     result = await Get(
         ProcessResult,
