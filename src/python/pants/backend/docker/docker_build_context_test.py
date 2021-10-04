@@ -7,11 +7,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue
+from pants.backend.docker.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextRequest,
+    DockerVersionContextValue,
+)
 from pants.backend.docker.docker_build_context import rules as context_rules
 from pants.backend.docker.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerImage
-from pants.util.frozendict import FrozenDict
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -23,7 +26,7 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -49,7 +52,7 @@ def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
     expected_files: list[str],
-    expected_version_context: dict[str, Any] | None = None,
+    expected_version_context: FrozenDict[str, DockerVersionContextValue] | None = None,
 ) -> None:
     context = rule_runner.request(
         DockerBuildContext,
@@ -203,11 +206,13 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context=FrozenDict({
-            "baseimage": DockerVersionContextValue({"tag": "3.8"}),
-            "stage0": DockerVersionContextValue({"tag":"3.8"}),
-            "interim": DockerVersionContextValue({"tag":"latest"}),
-            "stage2": DockerVersionContextValue({"tag":"latest"}),
-            "output": DockerVersionContextValue({"tag":"1-1"}),
-        }),
+        expected_version_context=FrozenDict(
+            {
+                "baseimage": DockerVersionContextValue({"tag": "3.8"}),
+                "stage0": DockerVersionContextValue({"tag": "3.8"}),
+                "interim": DockerVersionContextValue({"tag": "latest"}),
+                "stage2": DockerVersionContextValue({"tag": "latest"}),
+                "output": DockerVersionContextValue({"tag": "1-1"}),
+            }
+        ),
     )

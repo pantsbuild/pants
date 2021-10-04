@@ -34,14 +34,12 @@ class DockerVersionContextError(ValueError):
 
 class DockerVersionContextValue(FrozenDict[str, str]):
     """Dict class suitable for use as a format string context object, as it allows to use attribute
-    access rather than item access.
+    access rather than item access."""
 
-    """
     def __getattr__(self, attribute: str) -> str:
-        if not attribute in self:
+        if attribute not in self:
             raise DockerVersionContextError(
-                f"The key {attribute!r} is unknown. Try with one of: "
-                f'{", ".join(self.keys())}.'
+                f"The key {attribute!r} is unknown. Try with one of: " f'{", ".join(self.keys())}.'
             )
         return self[attribute]
 
@@ -120,7 +118,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         MergeDigests(d for d in all_digests if d),
     )
 
-    version_context = {}
+    version_context: dict[str, DockerVersionContextValue] = {}
     for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
         value = DockerVersionContextValue({"tag": tag})
         if not version_context:

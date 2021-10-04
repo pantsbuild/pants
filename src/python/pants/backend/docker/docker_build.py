@@ -5,9 +5,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from os import path
+from typing import cast
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue, DockerVersionContextError
+from pants.backend.docker.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextRequest,
+    DockerVersionContextError,
+    DockerVersionContextValue,
+)
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystem import DockerOptions
 from pants.backend.docker.target_types import (
@@ -23,8 +29,8 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.strutil import bullet_list, pluralize
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,10 @@ class DockerFieldSet(PackageFieldSet):
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
     def image_names(
-            self, default_name_template: str, registries: DockerRegistries, version_context: FrozenDict[str, DockerVersionContextValue]
+        self,
+        default_name_template: str,
+        registries: DockerRegistries,
+        version_context: FrozenDict[str, DockerVersionContextValue],
     ) -> tuple[str, ...]:
         """This method will always return a non-empty tuple."""
         default_parent = path.basename(path.dirname(self.address.spec_path))
@@ -84,7 +93,10 @@ class DockerFieldSet(PackageFieldSet):
         try:
             image_names = tuple(
                 ":".join(s for s in [image_name, tag] if s)
-                for tag in [self.version.value.format(**version_context), *(self.tags.value or [])]
+                for tag in [
+                    cast(str, self.version.value).format(**version_context),
+                    *(self.tags.value or []),
+                ]
             )
         except (KeyError, ValueError) as e:
             msg = (
@@ -134,9 +146,7 @@ async def build_docker_image(
             version_context=context.version_context,
         )
     except ValueError as e:
-        raise DockerBuildError(
-            f"Error in {field_set.address}: {e}"
-        ) from e
+        raise DockerBuildError(f"Error in {field_set.address}: {e}") from e
 
     result = await Get(
         ProcessResult,

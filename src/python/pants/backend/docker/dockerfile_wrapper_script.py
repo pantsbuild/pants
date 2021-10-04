@@ -37,7 +37,7 @@ def translate_to_address(value: str) -> str | None:
     return None
 
 
-def main(cmd: str, args: tuple[str, ...]) -> None:
+def main(cmd: str, args: list[str]) -> None:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string
 
@@ -93,7 +93,7 @@ def main(cmd: str, args: tuple[str, ...]) -> None:
                 FROM interim
                 ...
                 FROM final as out
-            
+
             Gives:
 
                 build 1.0
@@ -101,11 +101,14 @@ def main(cmd: str, args: tuple[str, ...]) -> None:
                 out latest
             """
             return tuple(
-                " ".join([
-                    stage,
-                    name_parts[-1].rsplit(":", maxsplit=1)[-1]
-                    if ":" in name_parts[-1] else "latest"
-                ])
+                " ".join(
+                    [
+                        stage,
+                        name_parts[-1].rsplit(":", maxsplit=1)[-1]
+                        if ":" in name_parts[-1]
+                        else "latest",
+                    ]
+                )
                 for stage, name_parts in self.from_baseimages()
             )
 

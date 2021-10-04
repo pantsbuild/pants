@@ -6,6 +6,7 @@ from __future__ import annotations
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Generator
 
 from pants.backend.docker.target_types import DockerImageSources
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
@@ -112,11 +113,13 @@ class DockerfileInfo:
     version_tags: tuple[str, ...] = ()
 
 
-def split_iterable(sep: str, obj: list[str]|tuple[str, ...]) -> Generator[tuple[str, ...], None, None]:
+def split_iterable(
+    sep: str, obj: list[str] | tuple[str, ...]
+) -> Generator[tuple[str, ...], None, None]:
     while sep in obj:
         idx = obj.index(sep)
         yield tuple(obj[:idx])
-        obj = obj[idx+1:]
+        obj = obj[idx + 1 :]
     yield tuple(obj)
 
 
@@ -125,7 +128,10 @@ async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources))
     result = await Get(
         ProcessResult,
-        DockerfileParseRequest(hydrated_sources.snapshot.digest, ("version-tags,putative-targets", *hydrated_sources.snapshot.files)),
+        DockerfileParseRequest(
+            hydrated_sources.snapshot.digest,
+            ("version-tags,putative-targets", *hydrated_sources.snapshot.files),
+        ),
     )
 
     output = result.stdout.decode("utf-8").strip().split("\n")

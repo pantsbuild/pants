@@ -8,10 +8,15 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
-from pants.backend.docker.docker_build import DockerFieldSet, build_docker_image, DockerBuildError
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest, DockerVersionContextValue, DockerVersionContextError
-from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.docker_build import DockerBuildError, DockerFieldSet, build_docker_image
+from pants.backend.docker.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextRequest,
+    DockerVersionContextError,
+    DockerVersionContextValue,
+)
 from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.subsystem import DockerOptions
 from pants.backend.docker.target_types import DockerImage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
@@ -254,13 +259,15 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    version_context = FrozenDict({
-        "baseimage": DockerVersionContextValue({"tag": "3.8"}),
-        "stage0": DockerVersionContextValue({"tag":"3.8"}),
-        "interim": DockerVersionContextValue({"tag":"latest"}),
-        "stage2": DockerVersionContextValue({"tag":"latest"}),
-        "output": DockerVersionContextValue({"tag":"1-1"}),
-    })
+    version_context = FrozenDict(
+        {
+            "baseimage": DockerVersionContextValue({"tag": "3.8"}),
+            "stage0": DockerVersionContextValue({"tag": "3.8"}),
+            "interim": DockerVersionContextValue({"tag": "latest"}),
+            "stage2": DockerVersionContextValue({"tag": "latest"}),
+            "output": DockerVersionContextValue({"tag": "1-1"}),
+        }
+    )
 
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
