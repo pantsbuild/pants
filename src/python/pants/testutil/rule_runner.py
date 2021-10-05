@@ -87,32 +87,31 @@ def engine_error(
         with engine_error(ValueError, contains="foo"):
             rule_runner.request(OutputType, [input])
 
-    Will raise AssertionError if no ExecutionError occurred. Will not catch any other exception
-    types.
+    Will raise AssertionError if no ExecutionError occurred.
     """
     try:
         yield
-    except ExecutionError as e:
-        if not len(e.wrapped_exceptions) == 1:
-            formatted_errors = "\n\n".join(repr(e) for e in e.wrapped_exceptions)
+    except ExecutionError as exec_error:
+        if not len(exec_error.wrapped_exceptions) == 1:
+            formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
             raise ValueError(
                 "Multiple underlying exceptions, but this helper function expected only one. "
                 "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
                 "`exc.value.wrapped_exceptions`.\n\n"
                 f"Errors: {formatted_errors}"
             )
-        underlying = e.wrapped_exceptions[0]
+        underlying = exec_error.wrapped_exceptions[0]
         if not isinstance(underlying, expected_underlying_exception):
             raise AssertionError(
                 "ExecutionError occurred as expected, but the underlying exception had type "
                 f"{type(underlying)} rather than the expected type "
                 f"{expected_underlying_exception}."
             )
-        if contains is not None and contains not in str(e):
+        if contains is not None and contains not in str(underlying):
             raise AssertionError(
                 "Expected value not found in exception.\n"
                 f"expected: {contains}\n\n"
-                f"exception: {e}"
+                f"exception: {underlying}"
             )
 
 
