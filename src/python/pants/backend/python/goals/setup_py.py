@@ -17,6 +17,7 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
 from pants.backend.python.target_types import (
+    GenerateSetupField,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
@@ -535,33 +536,45 @@ class GeneratedSetupPy:
 
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
-    sources = await Get(SetupPySources, SetupPyChrootRequest, request)
-    snapshot = await Get(Snapshot, Digest, sources.digest)
-    stripped = await Get(
-        StrippedSourceFileNames,
-        SourcesPaths(
-            files=(os.path.join(request.exported_target.target.address.spec_path, "setup.py"),),
-            dirs=(),
-        ),
-    )
-    existing_setup_py = stripped[0]
+    generate_setup = request.exported_target.target.get(GenerateSetupField).value
 
-    # TODO: Add a generate_setup field to the python_distribution target type, so that
-    #  we're not guessing user intent (and not relying on the build being specifically
-    #  setup.py-based, it could be setup.cfg).
-    if existing_setup_py in snapshot.files:
-        working_directory = os.path.dirname(existing_setup_py)
-        chroot_digest = sources.digest
-    else:
-        logger.info("No setup.py found, generating one...")
+    # TODO: In 2.9.0.dev0 delete from here...
+    resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, request.exported_target)
+    setup_script = resolved_setup_kwargs.kwargs.get("setup_script")
+    if setup_script:
+        generate_setup = False
+        warn_or_error(
+            "2.9.0.dev0",
+            "explicitly specifying a setup_script",
+            f"This kwarg is ignored. Instead set generate_setup=False on the python_distribution "
+            f"target at {request.exported_target.target.address.spec}, and setup will run on "
+            f"whatever relevant files it finds in the dependency closure (e.g., setup.py, "
+            f"setup.cfg, pyproject.toml",
+        )
+    # ... to here.
+
+    sources = await Get(SetupPySources, SetupPyChrootRequest, request)
+
+    if generate_setup:
         generated_setup_py = await Get(
             GeneratedSetupPy, GenerateSetupPyRequest(request.exported_target, sources)
         )
         # We currently generate a setup.py that expects to be in the source root.
         # TODO: It might make sense to generate one in the target's directory, for
-        #  consistency with existing setup.py.
+        #  consistency with the existing setup.py case.
         working_directory = ""
         chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
+    else:
+        # To get the stripped target directory we need a dummy path under it.
+        stripped = await Get(
+            StrippedSourceFileNames,
+            SourcesPaths(
+                files=(os.path.join(request.exported_target.target.address.spec_path, "dummy.py"),),
+                dirs=(),
+            ),
+        )
+        working_directory = os.path.dirname(stripped[0])
+        chroot_digest = sources.digest
     return SetupPyChroot(chroot_digest, working_directory)
 
 
@@ -593,16 +606,8 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
-
-    setup_script = setup_kwargs.pop("setup_script", None)
-    if setup_script:
-        warn_or_error(
-            "2.9.0.dev0",
-            "explicitly specifying a setup_script",
-            "This param is ignored. If the dependency closure contains a setup.py in the same "
-            "directory as the python_distribution target it will be used, otherwise one will be "
-            "generated.",
-        )
+    # TODO: Delete this line in 2.9.0.dev0.
+    setup_kwargs.pop("setup_script", None)
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
     # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have

@@ -1037,6 +1037,19 @@ class SetupPyCommandsField(StringSequenceField):
     )
 
 
+class GenerateSetupField(BoolField):
+    alias = "generate_setup"
+    # Generating setup is the more aggressive thing to do, so we'd prefer that the default be False.
+    # However that would break widespread existing usage, so we'll make that change in a future
+    # deprecation cycle.
+    default = True
+    help = (
+        "Whether to generate setup information for this distribution, based on analyzing "
+        "sources and dependencies. Set to False to use existing setup information, such as "
+        "existing setup.py, setup.cfg, pyproject.toml files or similar."
+    )
+
+
 class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
@@ -1044,6 +1057,7 @@ class PythonDistribution(Target):
         PythonDistributionDependencies,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
+        GenerateSetupField,
         WheelField,
         SDistField,
         WheelConfigSettingsField,
