@@ -246,7 +246,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     java_sources(
                         name="example",
                         dependencies=[
-                        ":lockfile",
+                            ":lockfile",
                         ],
                     )
 
@@ -289,7 +289,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                         name="example",
                         sources=["**/*.java", ],
                         dependencies=[
-                        ":lockfile",
+                            ":lockfile",
                         ],
                     )
 
@@ -333,8 +333,8 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                         name="example",
                         sources=["**/*.java", ],
                         dependencies=[
-                        ":lockfile",
-                        ":com.fasterxml.jackson.core_jackson-databind",
+                            ":lockfile",
+                            ":com.fasterxml.jackson.core_jackson-databind",
                         ],
                     )
 

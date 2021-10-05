@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import shlex
 import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -96,7 +97,7 @@ async def package_deploy_jar(
                 _PANTS_MANIFEST_PARTIAL_JAR_FILENAME,
                 _JAVA_MANIFEST_FILENAME,
             ],
-            description="Build thin JAR file.",
+            description="Build partial JAR containing manifest file",
             input_digest=manifest_jar_input_digest,
             output_files=[_PANTS_MANIFEST_PARTIAL_JAR_FILENAME],
         ),
@@ -120,7 +121,7 @@ async def package_deploy_jar(
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    input_filenames = " ".join(classpath.classpath_entries())
+    input_filenames = " ".join(shlex.quote(i) for i in classpath.classpath_entries())
     _PANTS_BROKEN_DEPLOY_JAR = "pants_broken_deploy_jar.notajar"
     cat_and_repair_script = FileContent(
         _PANTS_CAT_AND_REPAIR_ZIP_FILENAME,
