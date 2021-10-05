@@ -23,6 +23,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -61,6 +62,7 @@ def build(tgt: DockerImage, options: DockerOptions):
                     fs.image_names(
                         options.default_image_name_template,
                         options.registries(),
+                        FrozenDict(),
                     ),
                 ),
             ),

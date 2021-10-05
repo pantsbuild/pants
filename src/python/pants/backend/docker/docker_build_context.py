@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from itertools import chain
 
+from pants.backend.docker.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageSources
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FilesSources
@@ -22,13 +23,31 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
+
+
+class DockerVersionContextError(ValueError):
+    pass
+
+
+class DockerVersionContextValue(FrozenDict[str, str]):
+    """Dict class suitable for use as a format string context object, as it allows to use attribute
+    access rather than item access."""
+
+    def __getattr__(self, attribute: str) -> str:
+        if attribute not in self:
+            raise DockerVersionContextError(
+                f"The key {attribute!r} is unknown. Try with one of: " f'{", ".join(self.keys())}.'
+            )
+        return self[attribute]
 
 
 @dataclass(frozen=True)
 class DockerBuildContext:
     digest: Digest
+    version_context: FrozenDict[str, DockerVersionContextValue]
 
 
 @dataclass(frozen=True)
@@ -71,10 +90,11 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    dockerfiles, sources, embedded_pkgs_per_target = await MultiGet(
+    dockerfiles, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
         dockerfiles_request,
         sources_request,
         embedded_pkgs_per_target_request,
+        Get(DockerfileInfo, DockerImageSources, transitive_targets.roots[0][DockerImageSources]),
     )
 
     # Package binary dependencies for build context.
@@ -98,7 +118,18 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         MergeDigests(d for d in all_digests if d),
     )
 
-    return DockerBuildContext(context)
+    version_context: dict[str, DockerVersionContextValue] = {}
+    for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
+        value = DockerVersionContextValue({"tag": tag})
+        if not version_context:
+            # Refer to the first FROM directive as the "baseimage".
+            version_context["baseimage"] = value
+        version_context[stage] = value
+
+    return DockerBuildContext(
+        digest=context,
+        version_context=FrozenDict(version_context),
+    )
 
 
 def rules():
