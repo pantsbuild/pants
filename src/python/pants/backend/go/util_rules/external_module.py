@@ -16,7 +16,6 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
@@ -241,7 +240,7 @@ async def compute_external_go_package_info(
 
 
 @dataclass(frozen=True)
-class ExternalModulePkgImportPathsRequest:
+class ExternalModulePackagesRequest:
     """Request the import paths for all packages belonging to an external Go module.
 
     The module must be included in the input `go.mod`/`go.sum`.
@@ -252,16 +251,15 @@ class ExternalModulePkgImportPathsRequest:
     go_mod_stripped_digest: Digest
 
 
-class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
-    """The import paths for all packages belonging to an external Go module."""
-
-    sort_input = True
+class ExternalModulePackages(FrozenDict[str, Tuple[str, ...]]):
+    """The import paths for all packages belonging to an external Go module mapped to their
+    dependencies (as import paths)."""
 
 
 @rule
-async def compute_package_import_paths_from_external_module(
-    request: ExternalModulePkgImportPathsRequest,
-) -> ExternalModulePkgImportPaths:
+async def compute_packages_belonging_to_external_module(
+    request: ExternalModulePackagesRequest,
+) -> ExternalModulePackages:
     downloaded_module = await Get(
         DownloadedModule,
         DownloadedModuleRequest(
@@ -272,8 +270,7 @@ async def compute_package_import_paths_from_external_module(
         ProcessResult,
         GoSdkProcess(
             input_digest=downloaded_module.digest,
-            # "-find" skips determining dependencies and imports for each package.
-            command=("list", "-find", "-mod=readonly", "-json", "./..."),
+            command=("list", "-mod=readonly", "-json", "./..."),
             env={"GOPROXY": "off"},
             description=(
                 "Determine packages belonging to Go external module "
@@ -281,8 +278,8 @@ async def compute_package_import_paths_from_external_module(
             ),
         ),
     )
-    return ExternalModulePkgImportPaths(
-        metadata["ImportPath"]
+    return ExternalModulePackages(
+        (metadata["ImportPath"], tuple(metadata.get("Imports", ())))
         for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
     )
 

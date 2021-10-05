@@ -22,6 +22,7 @@ from pants.backend.go.target_types import (
     GoExternalModuleVersionField,
     GoExternalPackageImportPathField,
     GoExternalPackageTarget,
+    GoImportPathsDependenciesField,
     GoModSourcesField,
     GoModTarget,
     GoPackage,
@@ -199,12 +200,15 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
         GeneratedTargets, [GenerateGoExternalPackageTargetsRequest(generator)]
     )
 
-    def gen_tgt(mod_path: str, version: str, import_path: str) -> GoExternalPackageTarget:
+    def gen_tgt(
+        mod_path: str, version: str, import_path: str, import_path_deps: list[str]
+    ) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(
             {
                 GoExternalModulePathField.alias: mod_path,
                 GoExternalModuleVersionField.alias: version,
                 GoExternalPackageImportPathField.alias: import_path,
+                GoImportPathsDependenciesField.alias: import_path_deps,
             },
             Address("src/go", generated_name=import_path),
         )
@@ -212,40 +216,127 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     expected = GeneratedTargets(
         generator,
         {
-            gen_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"),
             gen_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/diff"
+                "github.com/google/uuid",
+                "v1.2.0",
+                "github.com/google/uuid",
+                [
+                    "bytes",
+                    "crypto/md5",
+                    "crypto/rand",
+                    "crypto/sha1",
+                    "database/sql/driver",
+                    "encoding/binary",
+                    "encoding/hex",
+                    "errors",
+                    "fmt",
+                    "hash",
+                    "io",
+                    "net",
+                    "os",
+                    "strings",
+                    "sync",
+                    "time",
+                ],
             ),
             gen_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/flags"
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp",
+                [
+                    "bytes",
+                    "fmt",
+                    "github.com/google/go-cmp/cmp/internal/diff",
+                    "github.com/google/go-cmp/cmp/internal/flags",
+                    "github.com/google/go-cmp/cmp/internal/function",
+                    "github.com/google/go-cmp/cmp/internal/value",
+                    "math/rand",
+                    "reflect",
+                    "regexp",
+                    "strconv",
+                    "strings",
+                    "time",
+                    "unicode",
+                    "unicode/utf8",
+                    "unsafe",
+                ],
+            ),
+            gen_tgt(
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp/cmpopts",
+                [
+                    "fmt",
+                    "github.com/google/go-cmp/cmp",
+                    "github.com/google/go-cmp/cmp/internal/function",
+                    "golang.org/x/xerrors",
+                    "math",
+                    "reflect",
+                    "sort",
+                    "strings",
+                    "time",
+                    "unicode",
+                    "unicode/utf8",
+                ],
+            ),
+            gen_tgt(
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp/internal/diff",
+                [],
+            ),
+            gen_tgt(
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp/internal/flags",
+                [],
             ),
             gen_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/function",
+                ["reflect", "regexp", "runtime", "strings"],
             ),
             gen_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/testprotos",
+                [],
             ),
             gen_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/teststructs",
+                ["github.com/google/go-cmp/cmp/internal/testprotos", "sync", "time"],
             ),
             gen_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/value"
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp/internal/value",
+                ["fmt", "math", "reflect", "sort", "unsafe"],
             ),
             gen_tgt(
-                "golang.org/x/xerrors", "v0.0.0-20191204190536-9bdfabe68543", "golang.org/x/xerrors"
+                "golang.org/x/xerrors",
+                "v0.0.0-20191204190536-9bdfabe68543",
+                "golang.org/x/xerrors",
+                [
+                    "bytes",
+                    "fmt",
+                    "golang.org/x/xerrors/internal",
+                    "io",
+                    "reflect",
+                    "runtime",
+                    "strconv",
+                    "strings",
+                    "unicode",
+                    "unicode/utf8",
+                ],
             ),
             gen_tgt(
                 "golang.org/x/xerrors",
                 "v0.0.0-20191204190536-9bdfabe68543",
                 "golang.org/x/xerrors/internal",
+                [],
             ),
         },
     )

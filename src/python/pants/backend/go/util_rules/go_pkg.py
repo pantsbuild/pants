@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoExternalPackageDependencies,
+    GoExternalPackageDependenciesField,
     GoImportPath,
     GoPackageSources,
 )
@@ -183,7 +183,7 @@ def is_first_party_package_target(tgt: Target) -> bool:
 
 
 def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoExternalPackageDependencies)
+    return tgt.has_field(GoExternalPackageDependenciesField)
 
 
 @rule

@@ -14,19 +14,19 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageRequest,
     GoExternalModulePathField,
     GoExternalModuleVersionField,
-    GoExternalPackageDependencies,
+    GoExternalPackageDependenciesField,
     GoExternalPackageImportPathField,
     GoExternalPackageTarget,
     GoImportPath,
+    GoImportPathsDependenciesField,
     GoModTarget,
     GoPackageDependencies,
     GoPackageSources,
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
 from pants.backend.go.util_rules.external_module import (
-    ExternalModulePkgImportPaths,
-    ExternalModulePkgImportPathsRequest,
-    ResolveExternalGoPackageRequest,
+    ExternalModulePackages,
+    ExternalModulePackagesRequest,
 )
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -186,12 +186,9 @@ async def infer_go_dependencies(
 
 
 class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoExternalPackageDependencies
+    inject_for = GoExternalPackageDependenciesField
 
 
-# TODO(#12761): This duplicates first-party dependency inference but that other rule cannot operate
-#  on _go_external_package targets since there is no sources field in a _go_external_package.
-#  Consider how to merge the inference/injection rules into one. Maybe use a private Sources field?
 @rule
 async def inject_go_external_package_dependencies(
     request: InjectGoExternalPackageDependenciesRequest,
@@ -199,20 +196,10 @@ async def inject_go_external_package_dependencies(
     package_mapping: GoImportPathToPackageMapping,
 ) -> InjectedDependencies:
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    tgt = wrapped_target.target
-    assert isinstance(tgt, GoExternalPackageTarget)
+    import_paths_deps = wrapped_target.target[GoImportPathsDependenciesField].value or ()
 
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(tgt.address))
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
-
-    this_go_package = await Get(
-        ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt, go_mod_info.stripped_digest)
-    )
-
-    # Loop through all of the imports of this package and add dependencies on other packages and
-    # external modules.
     inferred_dependencies = []
-    for import_path in this_go_package.imports + this_go_package.test_imports:
+    for import_path in import_paths_deps:
         if import_path in std_lib_imports:
             continue
 
@@ -229,7 +216,7 @@ async def inject_go_external_package_dependencies(
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in go_external_package at address '{this_go_package.address}'."
+                f"in _go_external_package at address '{request.dependencies_field.address}'."
             )
 
     return InjectedDependencies(inferred_dependencies)
@@ -250,10 +237,10 @@ async def generate_go_external_package_targets(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
-    all_pkg_import_paths = await MultiGet(
+    all_packages = await MultiGet(
         Get(
-            ExternalModulePkgImportPaths,
-            ExternalModulePkgImportPathsRequest(
+            ExternalModulePackages,
+            ExternalModulePackagesRequest(
                 module_path=module_descriptor.path,
                 version=module_descriptor.version,
                 go_mod_stripped_digest=go_mod_info.stripped_digest,
@@ -263,13 +250,14 @@ async def generate_go_external_package_targets(
     )
 
     def create_tgt(
-        module_descriptor: ModuleDescriptor, pkg_import_path: str
+        module_descriptor: ModuleDescriptor, pkg_import_path: str, import_path_deps: tuple[str, ...]
     ) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(
             {
                 GoExternalModulePathField.alias: module_descriptor.path,
                 GoExternalModuleVersionField.alias: module_descriptor.version,
                 GoExternalPackageImportPathField.alias: pkg_import_path,
+                GoImportPathsDependenciesField.alias: import_path_deps,
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             Address(
@@ -282,11 +270,9 @@ async def generate_go_external_package_targets(
     return GeneratedTargets(
         request.generator,
         (
-            create_tgt(module_descriptor, pkg_import_path)
-            for module_descriptor, pkg_import_paths in zip(
-                go_mod_info.modules, all_pkg_import_paths
-            )
-            for pkg_import_path in pkg_import_paths
+            create_tgt(module_descriptor, pkg_import_path, import_path_deps)
+            for module_descriptor, packages in zip(go_mod_info.modules, all_packages)
+            for pkg_import_path, import_path_deps in packages.items()
         ),
     )
 

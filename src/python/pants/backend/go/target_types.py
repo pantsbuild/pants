@@ -17,6 +17,7 @@ from pants.engine.target import (
     InvalidFieldException,
     Sources,
     StringField,
+    StringSequenceField,
     Target,
 )
 
@@ -103,7 +104,15 @@ class GoModTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExternalPackageDependencies(Dependencies):
+class GoImportPathsDependenciesField(StringSequenceField):
+    alias = "import_path_dependencies"
+    help = (
+        "The import paths of the package's dependencies.\n\n"
+        "(This is stored explicitly as a field to improve the performance of dependency inference.)"
+    )
+
+
+class GoExternalPackageDependenciesField(Dependencies):
     pass
 
 
@@ -133,7 +142,8 @@ class GoExternalPackageTarget(Target):
     alias = "_go_external_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoExternalPackageDependencies,
+        GoImportPathsDependenciesField,
+        GoExternalPackageDependenciesField,
         GoExternalModulePathField,
         GoExternalModuleVersionField,
         GoExternalPackageImportPathField,

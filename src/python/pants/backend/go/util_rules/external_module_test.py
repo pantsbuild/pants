@@ -15,8 +15,8 @@ from pants.backend.go.util_rules.external_module import (
     AllDownloadedModulesRequest,
     DownloadedModule,
     DownloadedModuleRequest,
-    ExternalModulePkgImportPaths,
-    ExternalModulePkgImportPathsRequest,
+    ExternalModulePackages,
+    ExternalModulePackagesRequest,
     ResolveExternalGoPackageRequest,
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             QueryRule(AllDownloadedModules, [AllDownloadedModulesRequest]),
             QueryRule(DownloadedModule, [DownloadedModuleRequest]),
-            QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
+            QueryRule(ExternalModulePackages, [ExternalModulePackagesRequest]),
             QueryRule(ResolvedGoPackage, [ResolveExternalGoPackageRequest]),
         ],
         target_types=[GoModTarget],
@@ -257,20 +257,28 @@ def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
         get_pkg_info(pkg)
 
 
-def test_determine_external_module_package_import_paths(rule_runner: RuleRunner) -> None:
+def test_determine_external_module_packages(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
 
     def assert_packages(
-        module_path: str, version: str, expected: list[str], *, check_subset: bool = False
+        module_path: str,
+        version: str,
+        expected: list[str] | dict[str, list[str]],
+        *,
+        check_subset: bool = False
     ) -> None:
         result = rule_runner.request(
-            ExternalModulePkgImportPaths,
-            [ExternalModulePkgImportPathsRequest(module_path, version, input_digest)],
+            ExternalModulePackages,
+            [ExternalModulePackagesRequest(module_path, version, input_digest)],
         )
         if check_subset:
-            assert set(expected).issubset(result)
+            assert isinstance(expected, list)
+            assert set(expected).issubset(result.keys())
         else:
-            assert list(result) == expected
+            if isinstance(expected, dict):
+                assert dict(result) == {k: tuple(v) for k, v in expected.items()}
+            else:
+                assert list(result.keys()) == expected
 
     assert_packages(
         "cloud.google.com/go",
@@ -278,7 +286,31 @@ def test_determine_external_module_package_import_paths(rule_runner: RuleRunner)
         ["cloud.google.com/go/bigquery", "cloud.google.com/go/firestore"],
         check_subset=True,
     )
-    assert_packages("github.com/google/uuid", "v1.3.0", ["github.com/google/uuid"])
+    assert_packages(
+        "github.com/google/uuid",
+        "v1.3.0",
+        {
+            "github.com/google/uuid": [
+                "bytes",
+                "crypto/md5",
+                "crypto/rand",
+                "crypto/sha1",
+                "database/sql/driver",
+                "encoding/binary",
+                "encoding/hex",
+                "encoding/json",
+                "errors",
+                "fmt",
+                "hash",
+                "io",
+                "net",
+                "os",
+                "strings",
+                "sync",
+                "time",
+            ]
+        },
+    )
 
     assert_packages(
         "github.com/google/go-cmp",
@@ -305,7 +337,21 @@ def test_determine_external_module_package_import_paths(rule_runner: RuleRunner)
     assert_packages(
         "golang.org/x/xerrors",
         "v0.0.0-20191204190536-9bdfabe68543",
-        ["golang.org/x/xerrors", "golang.org/x/xerrors/internal"],
+        {
+            "golang.org/x/xerrors": [
+                "bytes",
+                "fmt",
+                "golang.org/x/xerrors/internal",
+                "io",
+                "reflect",
+                "runtime",
+                "strconv",
+                "strings",
+                "unicode",
+                "unicode/utf8",
+            ],
+            "golang.org/x/xerrors/internal": [],
+        },
     )
 
     assert_packages("rsc.io/quote", "v1.5.2", ["rsc.io/quote", "rsc.io/quote/buggy"])
