@@ -172,7 +172,6 @@ class DeployJar(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassName,
-        JvmRootClassAddress,
     )
     help = (
         "A `jar` file that contains the compiled source code along with its dependency class "

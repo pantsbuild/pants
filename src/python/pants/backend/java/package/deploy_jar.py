@@ -7,8 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.java.classpath import Classpath
-from pants.backend.java.target_types import JvmMainClassName, JvmRootClassAddress
-from pants.build_graph.address import Address, AddressInput
+from pants.backend.java.target_types import JvmMainClassName
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -20,6 +19,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
@@ -34,12 +34,12 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 class DeployJarFieldSet(PackageFieldSet):
     required_fields = (
         JvmMainClassName,
-        JvmRootClassAddress,
+        Dependencies,
     )
 
     main_class: JvmMainClassName
-    root_address: JvmRootClassAddress
     output_path: OutputPathField
+    dependencies: Dependencies
 
 
 @rule
@@ -57,23 +57,15 @@ async def package_deploy_jar(
     4. Using the unix `zip` utility's repair function to fix the broken fat jar
     """
 
-    if field_set.root_address.value is None:
-        raise Exception("Needs a `root_address` argument")
-
     if field_set.main_class.value is None:
         raise Exception("Needs a `main` argument")
 
-    root_class_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(field_set.root_address.value, relative_to=field_set.address.spec_path),
-    )
-
     #
-    # 1. Produce a thin JAR containing our first-party sources
+    # 1. Produce a thin JAR containing our first-party sources and other runtime dependencies
     #
 
-    classpath = await Get(Classpath, Addresses([root_class_address]))
+    dependencies = await Get(Addresses, DependenciesRequest(field_set.dependencies))
+    classpath = await Get(Classpath, Addresses, dependencies)
 
     #
     # 2. Produce JAR manifest, and output to a ZIP file that can be included with the JARs

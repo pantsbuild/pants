@@ -244,8 +244,10 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
-                        root_address=":example",
                         output_path="dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
                     )
 
                     java_sources(
@@ -287,8 +289,10 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
-                        root_address=":example",
                         output_path="dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
                     )
 
                     java_sources(
@@ -332,8 +336,10 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
-                        root_address=":example",
                         output_path="dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
                     )
 
                     java_sources(

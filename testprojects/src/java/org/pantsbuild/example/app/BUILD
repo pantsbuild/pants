@@ -4,7 +4,9 @@
 deploy_jar(
     name="example_app_deploy_jar",
     main="org.pantsbuild.example.app.ExampleApp",
-    root_address=":app",
+    dependencies=[
+        ":app",
+    ],
 )
 
 java_sources(
