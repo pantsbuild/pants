@@ -150,7 +150,7 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
     help = (
         "Address of the `go_package` with the `main` for this binary.\n\n"
-        "If left off, will default to the `go_package` in the same directory as this target's "
+        "If not specified, will default to the `go_package` in the same directory as this target's "
         "BUILD file."
     )
     value: str
