@@ -90,13 +90,11 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
     assert_resolved("path.to.lambda:func", expected="path.to.lambda:func", is_file=False)
     assert_resolved("lambda.py:func", expected="project.lambda:func", is_file=True)
 
-    with EngineErrorTrap() as trap:
+    with EngineErrorTrap(contains="Unmatched glob"):
         assert_resolved("doesnt_exist.py:func", expected="doesnt matter", is_file=True)
-    assert "Unmatched glob" in str(trap.e)
     # Resolving >1 file is an error.
-    with EngineErrorTrap() as trap:
+    with EngineErrorTrap(InvalidFieldException):
         assert_resolved("*.py:func", expected="doesnt matter", is_file=True)
-    assert isinstance(trap.e, InvalidFieldException)
 
 
 def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:

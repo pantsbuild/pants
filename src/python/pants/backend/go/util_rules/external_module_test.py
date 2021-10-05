@@ -126,13 +126,13 @@ def test_download_modules(rule_runner: RuleRunner) -> None:
 
 def test_download_modules_missing_module(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
-    with EngineErrorTrap() as trap:
+    with EngineErrorTrap(
+        AssertionError, contains="The module some_project.org/project@v1.1 was not downloaded"
+    ):
         rule_runner.request(
             DownloadedModule,
             [DownloadedModuleRequest("some_project.org/project", "v1.1", input_digest)],
         )
-    assert isinstance(trap.e, AssertionError)
-    assert "The module some_project.org/project@v1.1 was not downloaded" in str(trap.e)
 
 
 def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
@@ -153,10 +153,8 @@ def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with EngineErrorTrap() as trap:
+    with EngineErrorTrap(ProcessExecutionFailure, contains="SECURITY ERROR"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
-    assert isinstance(trap.e, ProcessExecutionFailure)
-    assert "SECURITY ERROR" in str(trap.e)
 
 
 def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
@@ -178,9 +176,8 @@ def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with EngineErrorTrap() as trap:
+    with EngineErrorTrap(contains="`go.mod` and/or `go.sum` changed!"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
-    assert "`go.mod` and/or `go.sum` changed!" in str(trap.e)
 
 
 def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
