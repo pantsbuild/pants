@@ -199,6 +199,7 @@ async def resolve_go_package(
     go_mod_spec_path = owning_go_mod.address.spec_path
     assert request.address.spec_path.startswith(go_mod_spec_path)
     spec_subpath = request.address.spec_path[len(go_mod_spec_path) :]
+    print(request.address.spec_path, go_mod_spec_path, spec_subpath)
 
     go_mod_info, pkg_sources = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
@@ -217,11 +218,9 @@ async def resolve_go_package(
         # Otherwise infer the import path from the owning `go_mod` target. The inferred import
         # path will be the module's import path plus any subdirectories in the spec_path
         # between the go_mod and go_package target.
-        import_path = f"{go_mod_info.import_path}/"
-        if spec_subpath.startswith("/"):
-            import_path += spec_subpath[1:]
-        else:
-            import_path += spec_subpath
+        import_path = f"{go_mod_info.import_path}"
+        if spec_subpath:
+            import_path += spec_subpath if spec_subpath.startswith("/") else f"/{spec_subpath}"
 
     result = await Get(
         ProcessResult,
