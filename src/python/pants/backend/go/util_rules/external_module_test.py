@@ -24,7 +24,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import EngineErrorTrap, RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def test_download_modules(rule_runner: RuleRunner) -> None:
 
 def test_download_modules_missing_module(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
-    with EngineErrorTrap(
+    with engine_error(
         AssertionError, contains="The module some_project.org/project@v1.1 was not downloaded"
     ):
         rule_runner.request(
@@ -153,7 +153,7 @@ def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with EngineErrorTrap(ProcessExecutionFailure, contains="SECURITY ERROR"):
+    with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
 
 
@@ -176,7 +176,7 @@ def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with EngineErrorTrap(contains="`go.mod` and/or `go.sum` changed!"):
+    with engine_error(contains="`go.mod` and/or `go.sum` changed!"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
 
 

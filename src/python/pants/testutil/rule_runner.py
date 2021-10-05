@@ -14,7 +14,7 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -75,80 +75,45 @@ def logging(func):
     return wrapper
 
 
-_Exc = TypeVar("_Exc", bound=Exception)
-
-
-class EngineErrorTrap(Generic[_Exc]):
-    """A context manager to catch `ExecutionError`s in tests and get the underlying exception.
+@contextmanager
+def engine_error(
+    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+) -> Iterator[None]:
+    """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
+    is expected.
 
     Use like this:
 
-        with EngineErrorTrap(ValueError, contains="foo") as trap:
+        with engine_error(ValueError, contains="foo"):
             rule_runner.request(OutputType, [input])
 
-    Which is equivalent to this:
-
-        with EngineErrorTrap() as trap:
-            rule_runner.request(OutputType, [input])
-        assert isinstance(trap.e, ValueError)
-        assert "foo" in trap.e
-
-    Will raise AssertionError if no ExecutionError occurred. Will re-raise all other exception
+    Will raise AssertionError if no ExecutionError occurred. Will not catch any other exception
     types.
     """
-
-    def __init__(
-        self,
-        expected_exception: type[_Exc] = Exception,  # type: ignore[assignment]
-        *,
-        contains: str | None = None,
-    ) -> None:
-        self._e: _Exc | None = None
-        self.expected_exception: type[_Exc] = expected_exception
-        self.contains: str | None = contains
-
-    def __enter__(self) -> EngineErrorTrap:
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
-            raise AssertionError("Did not raise an exception! ExecutionError expected.")
-        if not issubclass(exc_type, ExecutionError):
-            # This is equivalent to re-raising the exception.
-            return None
-
-        if not len(exc_val.wrapped_exceptions) == 1:
-            formatted_errors = "\n\n".join(repr(e) for e in exc_val.wrapped_exceptions)
+    try:
+        yield
+    except ExecutionError as e:
+        if not len(e.wrapped_exceptions) == 1:
+            formatted_errors = "\n\n".join(repr(e) for e in e.wrapped_exceptions)
             raise ValueError(
                 "Multiple underlying exceptions, but this helper function expected only one. "
-                "Use `with pytest.raises(ExecutionError)` directly and inspect "
+                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
                 "`exc.value.wrapped_exceptions`.\n\n"
                 f"Errors: {formatted_errors}"
             )
-        underlying = exc_val.wrapped_exceptions[0]
-        if not isinstance(underlying, self.expected_exception):
+        underlying = e.wrapped_exceptions[0]
+        if not isinstance(underlying, expected_underlying_exception):
             raise AssertionError(
                 "ExecutionError occurred as expected, but the underlying exception had type "
-                f"{type(underlying)} rather than the expected type `{self.expected_exception}."
+                f"{type(underlying)} rather than the expected type "
+                f"{expected_underlying_exception}."
             )
-        if self.contains is not None and self.contains not in str(exc_val):
+        if contains is not None and contains not in str(e):
             raise AssertionError(
                 "Expected value not found in exception.\n"
-                f"expected: {self.contains}\n\n"
-                f"exception: {exc_val}"
+                f"expected: {contains}\n\n"
+                f"exception: {e}"
             )
-        self._e = underlying
-        return True
-
-    @property
-    def e(self) -> _Exc:
-        if self._e is None:
-            raise AssertionError(
-                "`EngineErrorTrap.e` is not set. This happens when you try accessing the field "
-                "inside the context manager (i.e. the `with` block) and an ExecutionError has not "
-                "happened yet. Instead, access outside of the context manager."
-            )
-        return self._e
 
 
 # -----------------------------------------------------------------------------------------------
