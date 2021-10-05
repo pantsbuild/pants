@@ -74,10 +74,6 @@ def rule_runner() -> RuleRunner:
             JvmArtifact,
             DeployJar,
         ],
-        # TODO(#12293): use a fixed JDK version.
-        bootstrap_args=[
-            "--javac-jdk=system",
-        ],
     )
 
 
