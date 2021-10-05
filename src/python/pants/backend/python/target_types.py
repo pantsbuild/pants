@@ -1037,12 +1037,13 @@ class SetupPyCommandsField(StringSequenceField):
     )
 
 
-class GenerateSetupField(BoolField):
+class GenerateSetupField(TriBoolField):
     alias = "generate_setup"
-    # Generating setup is the more aggressive thing to do, so we'd prefer that the default be False.
-    # However that would break widespread existing usage, so we'll make that change in a future
-    # deprecation cycle.
-    default = True
+    required = False
+    # The default behavior if this field is unspecified is controlled by the
+    # --generate-setup-default option in the setup-py-generation scope.
+    default = None
+
     help = (
         "Whether to generate setup information for this distribution, based on analyzing "
         "sources and dependencies. Set to False to use existing setup information, such as "

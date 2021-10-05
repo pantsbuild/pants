@@ -322,6 +322,21 @@ class SetupPyGeneration(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        # Generating setup is the more aggressive thing to do, so we'd prefer that the default
+        # be False. However that would break widespread existing usage, so we'll make that
+        # change in a future deprecation cycle.
+        register(
+            "--generate-setup-default",
+            type=bool,
+            default=True,
+            help=(
+                "The default value for the `generate_setup` field on `python_distribution` targets."
+                "Can be overridden per-target by setting that field explicitly. Set this to False "
+                "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
+                "Leave as True if you mostly rely on Pants generating setup files for you."
+            ),
+        )
+
         register(
             "--first-party-dependency-version-scheme",
             type=FirstPartyDependencyVersionScheme,
@@ -333,6 +348,10 @@ class SetupPyGeneration(Subsystem):
                 "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
             ),
         )
+
+    @property
+    def generate_setup_default(self) -> bool:
+        return cast(bool, self.options.generate_setup_default)
 
     def first_party_dependency_version(self, version: str) -> str:
         """Return the version string (e.g. '~=4.0') for a first-party dependency.
@@ -535,8 +554,12 @@ class GeneratedSetupPy:
 
 
 @rule
-async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
+async def generate_chroot(
+    request: SetupPyChrootRequest, subsys: SetupPyGeneration
+) -> SetupPyChroot:
     generate_setup = request.exported_target.target.get(GenerateSetupField).value
+    if generate_setup is None:
+        generate_setup = subsys.generate_setup_default
 
     # TODO: In 2.9.0.dev0 delete from here...
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, request.exported_target)
@@ -565,7 +588,11 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         working_directory = ""
         chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
     else:
-        # To get the stripped target directory we need a dummy path under it.
+        # To get the stripped target directory we need a dummy path under it. Note that this
+        # is just a dummy string, required because our source root stripping mechanism assumes
+        # that paths are files and starts searching from the parent dir. It doesn't correspond
+        # to an actual file on disk, so there are no collision issues.
+        # TODO: Add source root stripping functionality for directories.
         stripped = await Get(
             StrippedSourceFileNames,
             SourcesPaths(
