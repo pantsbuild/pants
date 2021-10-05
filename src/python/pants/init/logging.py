@@ -60,8 +60,8 @@ class _ExceptionFormatter(Formatter):
         )
 
         return (
-            f"{stacktrace}\n\n({debug_instructions}See {doc_url('troubleshooting')} for common issues. "
-            f"Consider reaching out for help: {doc_url('getting-help')}.)"
+            f"{stacktrace}\n\n{debug_instructions}\nSee {doc_url('troubleshooting')} for common "
+            f"issues.\nConsider reaching out for help: {doc_url('getting-help')}\n"
         )
 
 
