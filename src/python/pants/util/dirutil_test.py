@@ -9,7 +9,7 @@ import unittest
 import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Tuple
+from typing import Iterator
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -128,7 +128,7 @@ class DirutilTest(unittest.TestCase):
                 self.assertTrue(all(isinstance(dirname, str) for dirname in dirs))
 
     @contextmanager
-    def tree(self) -> Iterator[Tuple[str, str]]:
+    def tree(self) -> Iterator[tuple[str, str]]:
         # root/
         #   a/
         #     b/
@@ -160,7 +160,7 @@ class DirutilTest(unittest.TestCase):
 
         @classmethod
         def read(cls, root: str, relpath: str) -> DirutilTest.File:
-            with open(os.path.join(root, relpath), "r") as fp:
+            with open(os.path.join(root, relpath)) as fp:
                 return cls(relpath, fp.read())
 
     @dataclass(frozen=True)
@@ -388,7 +388,7 @@ class AbsoluteSymlinkTest(unittest.TestCase):
         self._create_and_check_link(self.source, self.link)
 
         # The link should have been deleted (over-written), not the file it pointed to.
-        with open(self.source, "r") as fp:
+        with open(self.source) as fp:
             self.assertEqual("evidence", fp.read())
 
     def test_overwrite_link_dir(self) -> None:

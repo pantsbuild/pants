@@ -14,7 +14,7 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -225,7 +225,7 @@ class RuleRunner:
         return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
-    def target_types(self) -> Tuple[Type[Target], ...]:
+    def target_types(self) -> tuple[type[Target], ...]:
         return self.build_config.target_types
 
     @property
@@ -237,7 +237,7 @@ class RuleRunner:
         """Mutates this RuleRunner to begin a new Session with the same Scheduler."""
         self.scheduler = self.scheduler.scheduler.new_session(build_id)
 
-    def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
+    def request(self, output_type: type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
             self.scheduler.product_request(output_type, [Params(*inputs)])
         )
@@ -245,7 +245,7 @@ class RuleRunner:
 
     def run_goal_rule(
         self,
-        goal: Type[Goal],
+        goal: type[Goal],
         *,
         global_args: Iterable[str] | None = None,
         args: Iterable[str] | None = None,
@@ -439,8 +439,8 @@ class RuleRunner:
 #  `Callable[[InputType], OutputType]`.
 @dataclass(frozen=True)
 class MockGet:
-    output_type: Type
-    input_type: Type
+    output_type: type
+    input_type: type
     mock: Callable[[Any], Any]
 
 
@@ -552,12 +552,12 @@ def run_rule_with_mocks(
 @contextmanager
 def stdin_context(content: bytes | str | None = None):
     if content is None:
-        yield open("/dev/null", "r")
+        yield open("/dev/null")
     else:
         with temporary_file(binary_mode=isinstance(content, bytes)) as stdin_file:
             stdin_file.write(content)
             stdin_file.close()
-            yield open(stdin_file.name, "r")
+            yield open(stdin_file.name)
 
 
 @contextmanager
@@ -565,7 +565,7 @@ def mock_console(
     options_bootstrapper: OptionsBootstrapper,
     *,
     stdin_content: bytes | str | None = None,
-) -> Iterator[Tuple[Console, StdioReader]]:
+) -> Iterator[tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     colors = (
         options_bootstrapper.full_options_for_scopes(

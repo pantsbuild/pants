@@ -8,7 +8,7 @@ import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
+from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
@@ -30,9 +30,9 @@ class OptionsBootstrapper:
     """Holds the result of the first stage of options parsing, and assists with parsing full
     options."""
 
-    env_tuples: Tuple[Tuple[str, str], ...]
-    bootstrap_args: Tuple[str, ...]
-    args: Tuple[str, ...]
+    env_tuples: tuple[tuple[str, str], ...]
+    bootstrap_args: tuple[str, ...]
+    args: tuple[str, ...]
     config: Config
 
     def __repr__(self) -> str:
@@ -43,7 +43,7 @@ class OptionsBootstrapper:
         return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
 
     @staticmethod
-    def get_config_file_paths(env, args) -> List[str]:
+    def get_config_file_paths(env, args) -> list[str]:
         """Get the location of the config files.
 
         The locations are specified by the --pants-config-files option.  However we need to load the
@@ -190,7 +190,7 @@ class OptionsBootstrapper:
             )
 
     @memoized_property
-    def env(self) -> Dict[str, str]:
+    def env(self) -> dict[str, str]:
         return dict(self.env_tuples)
 
     @memoized_property
@@ -223,7 +223,7 @@ class OptionsBootstrapper:
             allow_unknown_options=allow_unknown_options,
         )
 
-        distinct_subsystem_classes: Set[Type[Subsystem]] = set()
+        distinct_subsystem_classes: set[type[Subsystem]] = set()
         for ksi in known_scope_infos:
             if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue

@@ -104,7 +104,7 @@ class ArgSplitter:
 
         # We check for prefixes in reverse order, so we match the longest prefix first.
         sorted_scope_infos = sorted(
-            [si for si in self._known_scope_infos if si.scope],
+            (si for si in self._known_scope_infos if si.scope),
             key=lambda si: si.scope,
             reverse=True,
         )

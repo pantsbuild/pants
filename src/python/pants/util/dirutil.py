@@ -13,7 +13,7 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import Any, Callable, DefaultDict, Iterator, Sequence, Set, overload
+from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
 
 from typing_extensions import Literal
 
@@ -138,7 +138,7 @@ def maybe_read_file(filename: str, binary_mode: bool = False) -> bytes | str | N
     """
     try:
         return read_file(filename, binary_mode=binary_mode)
-    except IOError:
+    except OSError:
         return None
 
 
@@ -194,7 +194,7 @@ def safe_walk(path: bytes | str, **kwargs: Any) -> Iterator[tuple[str, list[str]
 
 _MkdtempCleanerType = Callable[[], None]
 _MKDTEMP_CLEANER: _MkdtempCleanerType | None = None
-_MKDTEMP_DIRS: DefaultDict[int, Set[str]] = defaultdict(set)
+_MKDTEMP_DIRS: DefaultDict[int, set[str]] = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()
 
 
@@ -284,7 +284,7 @@ def safe_concurrent_rename(src: str, dst: str) -> None:
         safe_delete(dst)
     try:
         shutil.move(src, dst)
-    except IOError as e:
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
