@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, ClassVar, List, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
@@ -55,10 +55,10 @@ class TestResult(EngineAwareReturnType):
     address: Address
     output_setting: ShowOutput
 
-    coverage_data: Optional[CoverageData] = None
-    xml_results: Optional[Snapshot] = None
+    coverage_data: CoverageData | None = None
+    xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
-    extra_output: Optional[Snapshot] = None
+    extra_output: Snapshot | None = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -70,9 +70,9 @@ class TestResult(EngineAwareReturnType):
         address: Address,
         output_setting: ShowOutput,
         *,
-        coverage_data: Optional[CoverageData] = None,
-        xml_results: Optional[Snapshot] = None,
-        extra_output: Optional[Snapshot] = None,
+        coverage_data: CoverageData | None = None,
+        xml_results: Snapshot | None = None,
+        extra_output: Snapshot | None = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
@@ -96,8 +96,8 @@ class TestResult(EngineAwareReturnType):
             return self.address.spec < other.address.spec
         return abs(self.exit_code) < abs(other.exit_code)
 
-    def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
-        output: Dict[str, Union[FileDigest, Snapshot]] = {
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
+        output: dict[str, FileDigest | Snapshot] = {
             "stdout": self.stdout_digest,
             "stderr": self.stderr_digest,
         }
@@ -124,7 +124,7 @@ class TestResult(EngineAwareReturnType):
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
 
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         return {"address": self.address.spec}
 
     def cacheable(self) -> bool:
@@ -182,7 +182,7 @@ class CoverageReport(ABC):
     # was sufficient or not. The test goal will fail the build if coverage was deemed insufficient.
     coverage_insufficient: bool
 
-    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+    def materialize(self, console: Console, workspace: Workspace) -> PurePath | None:
         """Materialize this code coverage report to the terminal or disk.
 
         :param console: A handle to the terminal.
@@ -192,7 +192,7 @@ class CoverageReport(ABC):
         """
         ...
 
-    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
+    def get_artifact(self) -> tuple[str, Snapshot] | None:
         return None
 
 
@@ -213,10 +213,10 @@ class FilesystemCoverageReport(CoverageReport):
 
     result_snapshot: Snapshot
     directory_to_materialize_to: PurePath
-    report_file: Optional[PurePath]
+    report_file: PurePath | None
     report_type: str
 
-    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+    def materialize(self, console: Console, workspace: Workspace) -> PurePath | None:
         workspace.write_digest(
             self.result_snapshot.digest, path_prefix=str(self.directory_to_materialize_to)
         )
@@ -225,20 +225,20 @@ class FilesystemCoverageReport(CoverageReport):
         )
         return self.report_file
 
-    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
+    def get_artifact(self) -> tuple[str, Snapshot] | None:
         return f"coverage_{self.report_type}", self.result_snapshot
 
 
 @dataclass(frozen=True)
 class CoverageReports(EngineAwareReturnType):
-    reports: Tuple[CoverageReport, ...]
+    reports: tuple[CoverageReport, ...]
 
     @property
     def coverage_insufficient(self) -> bool:
         """Whether to fail the build due to insufficient coverage."""
         return any(report.coverage_insufficient for report in self.reports)
 
-    def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
+    def materialize(self, console: Console, workspace: Workspace) -> tuple[PurePath, ...]:
         report_paths = []
         for report in self.reports:
             report_path = report.materialize(console, workspace)
@@ -246,8 +246,8 @@ class CoverageReports(EngineAwareReturnType):
                 report_paths.append(report_path)
         return tuple(report_paths)
 
-    def artifacts(self) -> Optional[Dict[str, Union[Snapshot, FileDigest]]]:
-        artifacts: Dict[str, Union[Snapshot, FileDigest]] = {}
+    def artifacts(self) -> dict[str, Snapshot | FileDigest] | None:
+        artifacts: dict[str, Snapshot | FileDigest] = {}
         for report in self.reports:
             artifact = report.get_artifact()
             if not artifact:
@@ -328,7 +328,7 @@ class TestSubsystem(GoalSubsystem):
         )
 
     @property
-    def extra_env_vars(self) -> List[str]:
+    def extra_env_vars(self) -> list[str]:
         return cast(List[str], self.options.extra_env_vars)
 
     @property

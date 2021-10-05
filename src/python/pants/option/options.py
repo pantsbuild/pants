@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -79,7 +79,7 @@ class Options:
         Also validates that scopes do not collide.
         """
         ret: OrderedSet[ScopeInfo] = OrderedSet()
-        original_scopes: Dict[str, ScopeInfo] = {}
+        original_scopes: dict[str, ScopeInfo] = {}
         for si in sorted(scope_infos, key=lambda _si: _si.scope):
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
@@ -100,7 +100,7 @@ class Options:
         config: Config,
         known_scope_infos: Iterable[ScopeInfo],
         args: Sequence[str],
-        bootstrap_option_values: Optional[OptionValueContainer] = None,
+        bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
     ) -> Options:
         """Create an Options instance.
@@ -131,7 +131,7 @@ class Options:
             spec_files = bootstrap_option_values.spec_files
             if spec_files:
                 for spec_file in spec_files:
-                    with open(spec_file, "r") as f:
+                    with open(spec_file) as f:
                         split_args.specs.extend(
                             [line for line in [line.strip() for line in f] if line]
                         )
@@ -154,14 +154,14 @@ class Options:
 
     def __init__(
         self,
-        goals: List[str],
-        scope_to_flags: Dict[str, List[str]],
-        specs: List[str],
-        passthru: List[str],
-        help_request: Optional[HelpRequest],
-        parser_by_scope: Dict[str, Parser],
-        bootstrap_option_values: Optional[OptionValueContainer],
-        known_scope_to_info: Dict[str, ScopeInfo],
+        goals: list[str],
+        scope_to_flags: dict[str, list[str]],
+        specs: list[str],
+        passthru: list[str],
+        help_request: HelpRequest | None,
+        parser_by_scope: dict[str, Parser],
+        bootstrap_option_values: OptionValueContainer | None,
+        known_scope_to_info: dict[str, ScopeInfo],
         allow_unknown_options: bool = False,
     ) -> None:
         """The low-level constructor for an Options instance.
@@ -179,14 +179,14 @@ class Options:
         self._allow_unknown_options = allow_unknown_options
 
     @property
-    def help_request(self) -> Optional[HelpRequest]:
+    def help_request(self) -> HelpRequest | None:
         """
         :API: public
         """
         return self._help_request
 
     @property
-    def specs(self) -> List[str]:
+    def specs(self) -> list[str]:
         """The specifications to operate on, e.g. the target addresses and the file names.
 
         :API: public
@@ -194,7 +194,7 @@ class Options:
         return self._specs
 
     @property
-    def goals(self) -> List[str]:
+    def goals(self) -> list[str]:
         """The requested goals, in the order specified on the cmd line.
 
         :API: public
@@ -202,11 +202,11 @@ class Options:
         return self._goals
 
     @property
-    def known_scope_to_info(self) -> Dict[str, ScopeInfo]:
+    def known_scope_to_info(self) -> dict[str, ScopeInfo]:
         return self._known_scope_to_info
 
     @property
-    def scope_to_flags(self) -> Dict[str, List[str]]:
+    def scope_to_flags(self) -> dict[str, list[str]]:
         return self._scope_to_flags
 
     def verify_configs(self, global_config: Config) -> None:
@@ -396,7 +396,7 @@ class Options:
         # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
         return self.for_scope(scope)
 
-    def bootstrap_option_values(self) -> Optional[OptionValueContainer]:
+    def bootstrap_option_values(self) -> OptionValueContainer | None:
         """Return the option values for bootstrap options.
 
         General code can also access these values in the global scope.  But option registration code

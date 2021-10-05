@@ -7,7 +7,7 @@ import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
-from pants.backend.go.util_rules.import_analysis import GatheredImports, GatherImportsRequest
+from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -33,22 +33,47 @@ class GoTestCase:
 
 
 @dataclass(frozen=True)
+class Example:
+    name: str
+    package: str
+    output: str
+    unordered: bool
+
+    @classmethod
+    def from_json_dict(cls, data: dict) -> Example:
+        return cls(
+            name=data["name"],
+            package=data["package"],
+            output=data["output"],
+            unordered=data["unordered"],
+        )
+
+
+@dataclass(frozen=True)
 class AnalyzedTestSources:
     tests: FrozenOrderedSet[GoTestCase]
     benchmarks: FrozenOrderedSet[GoTestCase]
-    # TODO: Account for TestMain in internal and/or external test packages.
-    has_test_main: bool
+    examples: FrozenOrderedSet[Example]
+    test_main: GoTestCase | None
 
     @classmethod
     def from_json_dict(cls, data: dict) -> AnalyzedTestSources:
         # Note: The Go `json` package is producing `null` values so the keys may be present but set to `null` so
         # this code uses `data.get("foo") or []` instead of `data.get("foo", []) to handle that case.
+
+        test_main = None
+        if "test_main" in data:
+            test_main = GoTestCase.from_json_dict(data["test_main"])
+
         return cls(
             tests=FrozenOrderedSet([GoTestCase.from_json_dict(d) for d in data.get("tests") or []]),
             benchmarks=FrozenOrderedSet(
                 [GoTestCase.from_json_dict(d) for d in data.get("benchmarks") or []]
             ),
-            has_test_main=data["has_test_main"],
+            examples=FrozenOrderedSet(
+                [Example.from_json_dict(d) for d in data.get("examples") or []]
+            ),
+            test_main=test_main,
         )
 
 
@@ -71,14 +96,12 @@ async def setup_analyzer() -> AnalyzerSetup:
         source_entry_content,
     )
 
-    source_digest, imports = await MultiGet(
+    source_digest, import_config = await MultiGet(
         Get(Digest, CreateDigest([source_entry])),
-        Get(
-            GatheredImports, GatherImportsRequest(packages=FrozenOrderedSet(), include_stdlib=True)
-        ),
+        Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
     )
 
-    input_digest = await Get(Digest, MergeDigests([source_digest, imports.digest]))
+    input_digest = await Get(Digest, MergeDigests([source_digest, import_config.digest]))
 
     compiled_analyzer = await Get(
         CompiledGoSources,
@@ -87,12 +110,12 @@ async def setup_analyzer() -> AnalyzerSetup:
             sources=(source_entry.path,),
             import_path="main",
             description="Compile Go test sources analyzer",
-            import_config_path="./importcfg",
+            import_config_path=import_config.CONFIG_PATH,
         ),
     )
 
     link_input_digest = await Get(
-        Digest, MergeDigests([compiled_analyzer.output_digest, imports.digest])
+        Digest, MergeDigests([compiled_analyzer.output_digest, import_config.digest])
     )
 
     analyzer = await Get(
@@ -100,7 +123,7 @@ async def setup_analyzer() -> AnalyzerSetup:
         LinkGoBinaryRequest(
             input_digest=link_input_digest,
             archives=("__pkg__.a",),
-            import_config_path="./importcfg",
+            import_config_path=import_config.CONFIG_PATH,
             output_filename="./analyzer",
             description="Link Go test sources analyzer",
         ),

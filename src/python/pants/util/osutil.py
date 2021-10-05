@@ -9,7 +9,6 @@ import os
 import platform
 import posix
 from functools import reduce
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ ARCH_ALIASES = {
 Pid = int
 
 
-def get_arch_name(uname_result: Optional[posix.uname_result] = None) -> str:
+def get_arch_name(uname_result: posix.uname_result | None = None) -> str:
     """
     :API: public
     """
@@ -52,7 +51,7 @@ def get_arch_name(uname_result: Optional[posix.uname_result] = None) -> str:
     return uname_result.machine.lower()
 
 
-def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
+def get_os_name(uname_result: posix.uname_result | None = None) -> str:
     """
     :API: public
     """
@@ -119,7 +118,7 @@ def safe_kill(pid: Pid, signum: int) -> None:
     assert isinstance(signum, int)
     try:
         os.kill(pid, signum)
-    except (IOError, OSError) as e:
+    except OSError as e:
         if e.errno in [errno.ESRCH, errno.EPERM]:
             pass
         elif e.errno == errno.EINVAL:

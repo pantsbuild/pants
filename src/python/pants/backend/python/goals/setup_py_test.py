@@ -14,7 +14,9 @@ from pants.backend.python.goals.setup_py import (
     DependencyOwner,
     ExportedTarget,
     ExportedTargetRequirements,
+    FinalizedSetupKwargs,
     FirstPartyDependencyVersionScheme,
+    GenerateSetupPyRequest,
     InvalidEntryPoint,
     InvalidSetupPyArgs,
     NoOwnerError,
@@ -26,10 +28,11 @@ from pants.backend.python.goals.setup_py import (
     SetupPyChrootRequest,
     SetupPyGeneration,
     SetupPySources,
-    SetupPySourcesRequest,
     declares_pkg_resources_namespace_package,
     determine_setup_kwargs,
     generate_chroot,
+    generate_setup_py,
+    generate_setup_py_kwargs,
     get_exporting_owner,
     get_owned_dependencies,
     get_requirements,
@@ -50,7 +53,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
-from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -96,6 +98,8 @@ def chroot_rule_runner() -> RuleRunner:
         rules=[
             determine_setup_kwargs,
             generate_chroot,
+            generate_setup_py,
+            generate_setup_py_kwargs,
             get_sources,
             get_requirements,
             get_owned_dependencies,
@@ -106,6 +110,8 @@ def chroot_rule_runner() -> RuleRunner:
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
+            QueryRule(SetupPySources, (SetupPyChrootRequest,)),
+            QueryRule(FinalizedSetupKwargs, (GenerateSetupPyRequest,)),
         ]
     )
 
@@ -113,19 +119,21 @@ def chroot_rule_runner() -> RuleRunner:
 def assert_chroot(
     rule_runner: RuleRunner,
     expected_files: list[str],
-    expected_setup_script: str,
     expected_setup_kwargs,
     addr: Address,
 ) -> None:
     tgt = rule_runner.get_target(addr)
-    chroot = rule_runner.request(
-        SetupPyChroot,
-        [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
-    )
+    req = SetupPyChrootRequest(ExportedTarget(tgt), py2=False)
+    chroot = rule_runner.request(SetupPyChroot, [req])
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
-    assert chroot.setup_script == expected_setup_script
-    assert expected_setup_kwargs == chroot.setup_kwargs.kwargs
+
+    if expected_setup_kwargs is not None:
+        sources = rule_runner.request(SetupPySources, [req])
+        setup_kwargs = rule_runner.request(
+            FinalizedSetupKwargs, [GenerateSetupPyRequest(ExportedTarget(tgt), sources)]
+        )
+        assert expected_setup_kwargs == setup_kwargs.kwargs
 
 
 def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Exception]) -> None:
@@ -153,34 +161,25 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
     chroot_rule_runner.add_to_build_file("files", 'files(sources=["README.txt"])')
     chroot_rule_runner.create_file("files/README.txt")
     chroot_rule_runner.add_to_build_file(
-        "src/python/foo",
+        "src/python/",
         textwrap.dedent(
             """
             python_distribution(
                 name='foo-dist',
                 dependencies=[
-                    ':foo',
+                    ':setup',
                 ],
                 provides=setup_py(
-                    setup_script='setup.py',
                     name='foo', version='1.2.3'
                 )
             )
 
-            python_library(
-                dependencies=[
-                    'src/python/foo/bar',
-                    'src/python/foo/resources',
-                    'files',
-                ]
-            )
+            python_library(name="setup", dependencies=["src/python/foo"])
             """
         ),
     )
-    chroot_rule_runner.create_file("src/python/foo/__init__.py", _namespace_decl)
-    chroot_rule_runner.create_file("src/python/foo/foo.py")
     chroot_rule_runner.create_file(
-        "src/python/foo/setup.py",
+        "src/python/setup.py",
         textwrap.dedent(
             """
         from setuptools import setup
@@ -193,9 +192,26 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
     """
         ),
     )
+    chroot_rule_runner.add_to_build_file(
+        "src/python/foo",
+        textwrap.dedent(
+            """
+            python_library(
+                dependencies=[
+                    'src/python/foo/bar',
+                    'src/python/foo/resources',
+                    'files',
+                ]
+            )
+            """
+        ),
+    )
+    chroot_rule_runner.create_file("src/python/foo/__init__.py", _namespace_decl)
+    chroot_rule_runner.create_file("src/python/foo/foo.py")
     assert_chroot(
         chroot_rule_runner,
         [
+            "setup.py",
             "files/README.txt",
             "foo/bar/__init__.py",
             "foo/bar/bar.py",
@@ -203,14 +219,9 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
             "foo/resources/js/code.js",
             "foo/__init__.py",
             "foo/foo.py",
-            "foo/setup.py",
         ],
-        "foo/setup.py",
-        {
-            "name": "foo",
-            "version": "1.2.3",
-        },
-        Address("src/python/foo", target_name="foo-dist"),
+        None,
+        Address("src/python", target_name="foo-dist"),
     )
 
 
@@ -335,7 +346,6 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "setup.py",
             "MANIFEST.in",
         ],
-        "setup.py",
         {
             "name": "foo",
             "version": "1.2.3",
@@ -409,7 +419,6 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "setup.py",
             "MANIFEST.in",
         ],
-        "setup.py",
         {
             "name": "foo",
             "version": "1.2.3",
@@ -526,7 +535,6 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
     assert_chroot(
         chroot_rule_runner,
         ["project/app.py", "setup.py", "MANIFEST.in"],
-        "setup.py",
         {
             "name": "bin",
             "version": "1.1.1",
@@ -545,8 +553,11 @@ def test_get_sources() -> None:
     rule_runner = create_setup_py_rule_runner(
         rules=[
             get_sources,
+            get_owned_dependencies,
+            get_exporting_owner,
             *python_sources.rules(),
-            QueryRule(SetupPySources, (SetupPySourcesRequest,)),
+            QueryRule(OwnedDependencies, (DependencyOwner,)),
+            QueryRule(SetupPySources, (SetupPyChrootRequest,)),
         ]
     )
 
@@ -576,10 +587,23 @@ def test_get_sources() -> None:
         expected_package_data,
         addrs,
     ):
-        targets = Targets(rule_runner.get_target(addr) for addr in addrs)
+        # We synthesize an owner for the addrs, so we have something to put in SetupPyChrootRequest.
+        rule_runner.create_file(
+            "src/python/foo/BUILD",
+            textwrap.dedent(
+                f"""
+                python_distribution(
+                  name="dist",
+                  dependencies=["{'","'.join(addr.spec for addr in addrs)}"],
+                  provides=setup_py(name="foo", version="3.2.1"),
+                )
+            """
+            ),
+        )
+        owner_tgt = rule_runner.get_target(Address("src/python/foo", target_name="dist"))
         srcs = rule_runner.request(
             SetupPySources,
-            [SetupPySourcesRequest(targets, py2=False)],
+            [SetupPyChrootRequest(ExportedTarget(owner_tgt), py2=False)],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 

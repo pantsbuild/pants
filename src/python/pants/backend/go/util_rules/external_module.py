@@ -4,6 +4,7 @@
 import json
 import os
 from dataclasses import dataclass
+from typing import Tuple
 
 import ijson
 
@@ -15,41 +16,38 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
-    EMPTY_DIGEST,
     CreateDigest,
     Digest,
     DigestContents,
     DigestEntries,
     DigestSubset,
     FileEntry,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
     Snapshot,
 )
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_v2_chroot_path
 
 
-@dataclass(frozen=True)
-class DownloadedExternalModules:
-    """All downloaded modules, along with the input `go.mod` and `go.sum`."""
+class AllDownloadedModules(FrozenDict[Tuple[str, str], Digest]):
+    """A mapping of each downloaded (module, version) to its digest.
 
-    digest: Digest
-
-    @staticmethod
-    def module_dir(module_path: str, version: str) -> str:
-        """The path to the module's directory."""
-        return f"gopath/pkg/mod/{module_path}@{version}"
+    Each digest is stripped of the `gopath` prefix and also guaranteed to have a `go.mod` and
+    `go.sum` for the particular module. This means that you can operate on the module (e.g. `go
+    list`) directly, without needing to set the working_dir etc.
+    """
 
 
 @dataclass(frozen=True)
-class DownloadExternalModulesRequest:
+class AllDownloadedModulesRequest:
     """Download all modules from the `go.mod`.
 
     The `go.mod` and `go.sum` must already be up-to-date.
@@ -60,8 +58,17 @@ class DownloadExternalModulesRequest:
 
 @rule
 async def download_external_modules(
-    request: DownloadExternalModulesRequest,
-) -> DownloadedExternalModules:
+    request: AllDownloadedModulesRequest,
+) -> AllDownloadedModules:
+    # TODO: Clean this up.
+    input_digest_entries = await Get(DigestEntries, Digest, request.go_mod_stripped_digest)
+    assert len(input_digest_entries) == 2
+    go_sum_file_digest = next(
+        file_entry.file_digest
+        for file_entry in input_digest_entries
+        if isinstance(file_entry, FileEntry) and file_entry.path == "go.sum"
+    )
+
     download_result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -88,18 +95,28 @@ async def download_external_modules(
             f"{contents[1].content.decode()}\n\n"
         )
 
-    # TODO: stop including irrelevant files like the `.zip` files.
-
     download_snapshot = await Get(Snapshot, Digest, download_result.output_digest)
     all_downloaded_files = set(download_snapshot.files)
 
-    # To analyze each module via `go list`, we need a `go.mod` in each module's directory. If the
-    # module does not natively use Go modules, then Go will generate a `go.mod` for us, but we
-    # need to relocate the file to the correct location.
+    # To analyze each module via `go list`, we need its own `go.mod`, along with a `go.sum` that
+    # includes it and its deps:
+    #
+    #  * If the module does not already have `go.mod`, Go will have generated it.
+    #  * Our `go.sum` should be a superset of each module, so we can simply use that. Note that we
+    #    eagerly error if the `go.sum` changed during the download, so we can be confident
+    #    that the on-disk `go.sum` is comprehensive. TODO(#13093): subset this somehow?
+    module_paths_and_versions_to_dirs = {}
+    missing_go_sums = []
     generated_go_mods_to_module_dirs = {}
     for module_metadata in ijson.items(download_result.stdout, "", multiple_values=True):
         download_dir = strip_v2_chroot_path(module_metadata["Dir"])
-        if f"{download_dir}/go.mod" not in all_downloaded_files:
+        module_paths_and_versions_to_dirs[
+            (module_metadata["Path"], module_metadata["Version"])
+        ] = download_dir
+        _go_sum = os.path.join(download_dir, "go.sum")
+        if _go_sum not in all_downloaded_files:
+            missing_go_sums.append(FileEntry(_go_sum, go_sum_file_digest))
+        if os.path.join(download_dir, "go.mod") not in all_downloaded_files:
             generated_go_mod = strip_v2_chroot_path(module_metadata["GoMod"])
             generated_go_mods_to_module_dirs[generated_go_mod] = download_dir
 
@@ -109,111 +126,72 @@ async def download_external_modules(
         if isinstance(entry, FileEntry) and entry.path in generated_go_mods_to_module_dirs:
             module_dir = generated_go_mods_to_module_dirs[entry.path]
             go_mod_requests.append(FileEntry(os.path.join(module_dir, "go.mod"), entry.file_digest))
-    generated_go_mod_digest = await Get(Digest, CreateDigest(go_mod_requests))
 
-    result_digest = await Get(
-        Digest, MergeDigests([download_result.output_digest, generated_go_mod_digest])
+    generated_digest = await Get(Digest, CreateDigest([*missing_go_sums, *go_mod_requests]))
+    full_digest = await Get(Digest, MergeDigests([download_result.output_digest, generated_digest]))
+
+    subsets = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                full_digest,
+                PathGlobs(
+                    [f"{module_dir}/**"],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=f"downloading {module}@{version}",
+                ),
+            ),
+        )
+        for (module, version), module_dir in module_paths_and_versions_to_dirs.items()
     )
-    return DownloadedExternalModules(result_digest)
+    stripped_subsets = await MultiGet(
+        Get(Digest, RemovePrefix(digest, module_dir))
+        for digest, module_dir in zip(subsets, module_paths_and_versions_to_dirs.values())
+    )
+    module_paths_and_versions_to_digests = {
+        mod_and_version: digest
+        for mod_and_version, digest in zip(
+            module_paths_and_versions_to_dirs.keys(), stripped_subsets
+        )
+    }
+    return AllDownloadedModules(module_paths_and_versions_to_digests)
 
 
 @dataclass(frozen=True)
-class DownloadExternalModuleRequest:
-    path: str
-    version: str
-    go_sum_digest: Digest = EMPTY_DIGEST
+class DownloadedModule:
+    """A downloaded module's directory.
 
+    The digest is stripped of the `gopath` prefix and also guaranteed to have a `go.mod` and
+    `go.sum` for the particular module. This means that you can operate on the module (e.g. `go
+    list`) directly, without needing to set the working_dir etc.
+    """
 
-@dataclass(frozen=True)
-class DownloadedExternalModule:
-    path: str
-    version: str
     digest: Digest
 
 
+@dataclass(frozen=True)
+class DownloadedModuleRequest:
+    module_path: str
+    version: str
+    go_mod_stripped_digest: Digest
+
+
 @rule
-async def download_external_module(
-    request: DownloadExternalModuleRequest,
-) -> DownloadedExternalModule:
-    download_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=EMPTY_DIGEST,
-            command=("mod", "download", "-json", f"{request.path}@{request.version}"),
-            description=f"Download external Go module at {request.path}@{request.version}.",
-            output_directories=("gopath",),
-        ),
+async def extract_module_from_downloaded_modules(
+    request: DownloadedModuleRequest,
+) -> DownloadedModule:
+    all_modules = await Get(
+        AllDownloadedModules, AllDownloadedModulesRequest(request.go_mod_stripped_digest)
     )
-
-    metadata = json.loads(download_result.stdout)
-
-    _download_path = strip_v2_chroot_path(metadata["Dir"])
-    _download_digest_unstripped = await Get(
-        Digest,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{_download_path}/**"],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=(
-                    f"the DownloadExternalModuleRequest for {request.path}@{request.version}"
-                ),
-            ),
-        ),
-    )
-    download_snapshot = await Get(
-        Snapshot, RemovePrefix(_download_digest_unstripped, _download_path)
-    )
-
-    if "go.mod" in download_snapshot.files:
-        return DownloadedExternalModule(
-            path=request.path,
-            version=request.version,
-            digest=download_snapshot.digest,
-        )
-
-    # Else, there was no go.mod in the downloaded source. Use the generated go.mod from the Go
-    # tooling.
-    if "GoMod" not in metadata:
+    digest = all_modules.get((request.module_path, request.version))
+    if digest is None:
         raise AssertionError(
-            "No go.mod was provided in download of Go external module "
-            f"{request.path}@{request.version}, and the module metadata did not identify a "
-            "generated go.mod file to use instead.\n\n"
-            "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with the "
-            "above information."
+            f"The module {request.module_path}@{request.version} was not downloaded. Unless "
+            "you explicitly created an `_go_external_package`, this should not happen."
+            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose with "
+            "this error message."
         )
-
-    _go_mod_path = strip_v2_chroot_path(metadata["GoMod"])
-    _go_mod_digest_unstripped = await Get(
-        Digest,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{_go_mod_path}"],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=(
-                    f"the DownloadExternalModuleRequest for {request.path}@{request.version}"
-                ),
-            ),
-        ),
-    )
-    original_go_mod_digest = await Get(
-        Digest, RemovePrefix(_go_mod_digest_unstripped, os.path.dirname(_go_mod_path))
-    )
-
-    # Rename the `.mod` file to the standard `go.mod` name.
-    entries = await Get(DigestEntries, Digest, original_go_mod_digest)
-    assert len(entries) == 1
-    file_entry = entries[0]
-    assert isinstance(file_entry, FileEntry)
-    go_mod_digest = await Get(Digest, CreateDigest([FileEntry("go.mod", file_entry.file_digest)]))
-
-    result_digest = await Get(Digest, MergeDigests([go_mod_digest, download_snapshot.digest]))
-    return DownloadedExternalModule(
-        path=request.path,
-        version=request.version,
-        digest=result_digest,
-    )
+    return DownloadedModule(digest)
 
 
 @dataclass(frozen=True)
@@ -229,14 +207,13 @@ class ResolveExternalGoPackageRequest(EngineAwareParameter):
 async def compute_external_go_package_info(
     request: ResolveExternalGoPackageRequest,
 ) -> ResolvedGoPackage:
-    # TODO: Extract the module we care about, rather than using everything. We also don't need the
-    #  root `go.sum` and `go.mod`.
-    downloaded_modules = await Get(
-        DownloadedExternalModules, DownloadExternalModulesRequest(request.go_mod_stripped_digest)
-    )
-
     module_path = request.tgt[GoExternalModulePathField].value
     module_version = request.tgt[GoExternalModuleVersionField].value
+
+    downloaded_module = await Get(
+        DownloadedModule,
+        DownloadedModuleRequest(module_path, module_version, request.go_mod_stripped_digest),
+    )
 
     import_path = request.tgt[GoExternalPackageImportPathField].value
     assert import_path.startswith(module_path)
@@ -247,8 +224,7 @@ async def compute_external_go_package_info(
         GoSdkProcess(
             command=("list", "-mod=readonly", "-json", f"./{subpath}"),
             env={"GOPROXY": "off"},
-            input_digest=downloaded_modules.digest,
-            working_dir=downloaded_modules.module_dir(module_path, module_version),
+            input_digest=downloaded_module.digest,
             description=f"Determine metadata for Go external package {import_path}",
         ),
     )
@@ -286,18 +262,18 @@ class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
 async def compute_package_import_paths_from_external_module(
     request: ExternalModulePkgImportPathsRequest,
 ) -> ExternalModulePkgImportPaths:
-    # TODO: Extract the module we care about, rather than using everything. We also don't need the
-    #  root `go.sum` and `go.mod`.
-    downloaded_modules = await Get(
-        DownloadedExternalModules, DownloadExternalModulesRequest(request.go_mod_stripped_digest)
+    downloaded_module = await Get(
+        DownloadedModule,
+        DownloadedModuleRequest(
+            request.module_path, request.version, request.go_mod_stripped_digest
+        ),
     )
     json_result = await Get(
         ProcessResult,
         GoSdkProcess(
-            input_digest=downloaded_modules.digest,
+            input_digest=downloaded_module.digest,
             # "-find" skips determining dependencies and imports for each package.
             command=("list", "-find", "-mod=readonly", "-json", "./..."),
-            working_dir=downloaded_modules.module_dir(request.module_path, request.version),
             env={"GOPROXY": "off"},
             description=(
                 "Determine packages belonging to Go external module "

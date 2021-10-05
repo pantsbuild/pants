@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import collections
 import collections.abc
-from typing import Any, Iterable, List, MutableMapping, TypeVar
+from typing import Any, Iterable, MutableMapping, TypeVar
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -54,7 +54,7 @@ def ensure_list(
         raise ValueError(
             f"The value {val} (type {type(val)}) was not an iterable of {expected_type}."
         )
-    result: List[_T] = []
+    result: list[_T] = []
     for i, x in enumerate(val):
         if not isinstance(x, expected_type):
             raise ValueError(

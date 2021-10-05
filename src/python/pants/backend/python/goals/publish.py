@@ -128,7 +128,7 @@ async def twine_upload(
     elif not request.field_set.repositories.value:
         # I'd rather have used the opt_out mechanism on the field set, but that gives no hint as to
         # why the target was not applicable..
-        skip = f"(no `{request.field_set.repositories.alias}` specifed for {request.field_set.address})"
+        skip = f"(no `{request.field_set.repositories.alias}` specified for {request.field_set.address})"
 
     if skip:
         return PublishProcesses(

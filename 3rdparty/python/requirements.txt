@@ -8,11 +8,11 @@ humbug==0.2.6
 
 ijson==3.1.4
 packaging==21.0
-pex==2.1.50
+pex==2.1.51
 psutil==5.8.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.
-pytest>=6.0.1,<6.3
+pytest>=6.2.4,<6.3
 PyYAML>=5.4,<5.5
 requests[security]>=2.25.1
 setproctitle==1.2.2

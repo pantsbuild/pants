@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -70,7 +71,7 @@ async def setup_assembly_pre_compilation(
                 "tool",
                 "asm",
                 "-I",
-                str(PurePath(goroot.path, "pkg", "include")),
+                os.path.join(goroot.path, "pkg", "include"),
                 "-gensymabis",
                 "-o",
                 "symabis",
