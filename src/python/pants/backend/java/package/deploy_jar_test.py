@@ -379,15 +379,10 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         ProcessResult,
         [
             Process(
-                argv=[
-                    bash.path,
-                    jdk_setup.jdk_preparation_script,
-                    f"{jdk_setup.java_home}/bin/java",
-                    "-jar",
-                    "dave.jar",
-                ],
+                argv=jdk_setup.args(bash, []) + ("-jar", "dave.jar"),
                 description="Run that test jar",
                 input_digest=input_digests,
+                append_only_caches=jdk_setup.append_only_caches,
             )
         ],
     )
