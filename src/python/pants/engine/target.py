@@ -8,6 +8,7 @@ import itertools
 import logging
 import os.path
 from abc import ABC, ABCMeta, abstractmethod
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -603,17 +604,25 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
-@dataclass(frozen=True)
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisible."""
+    """A set of Targets which cyclicly reach one another, and are thus indivisible.
+
+    Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
+    recursive portion.
+    """
 
     # The members of the cycle.
-    members: Tuple[Target, ...]
+    members: FrozenOrderedSet[Target]
     # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
     # between members of the cycle are excluded.
-    #
-    # To expand these dependencies, request `CoarsenedTargets` for them.
-    dependencies: FrozenOrderedSet[Address]
+    dependencies: FrozenOrderedSet[CoarsenedTarget]
+    # Pre-computed hashcode: see the class doc.
+    _hashcode: int
+
+    def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
+        self.members = FrozenOrderedSet(members)
+        self.dependencies = FrozenOrderedSet(dependencies)
+        self._hashcode = hash((self.members, self.dependencies))
 
     def debug_hint(self) -> str:
         return str(self)
@@ -624,17 +633,48 @@ class CoarsenedTarget(EngineAwareParameter):
     @property
     def representative(self) -> Target:
         """A stable "representative" target in the cycle."""
-        return self.members[0]
+        return next(iter(self.members))
+
+    def __hash__(self) -> int:
+        return self._hashcode
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, CoarsenedTarget):
+            return NotImplemented
+        return (
+            self._hashcode == other._hashcode
+            and self.members == other.members
+            and self.dependencies == other.dependencies
+        )
 
     def __str__(self) -> str:
         if len(self.members) > 1:
             others = len(self.members) - 1
-            return f"{self.members[0].address.spec} (and {others} more)"
+            return f"{self.representative.address.spec} (and {others} more)"
         return self.representative.address.spec
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({str(self)})"
 
 
 class CoarsenedTargets(Collection[CoarsenedTarget]):
-    """A set of direct (not transitive) disjoint CoarsenedTarget instances."""
+    """The CoarsenedTarget roots of a transitive graph walk for some addresses.
+
+    To collect all reachable CoarsenedTarget members, use `def closure`.
+    """
+
+    def closure(self) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+
+        visited = set()
+        queue = deque(self)
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
 
 
 @dataclass(frozen=True)

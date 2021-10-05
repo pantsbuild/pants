@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple, cast
+from typing import Any, Iterable, cast
 
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
@@ -48,7 +48,7 @@ class LintResult(EngineAwareReturnType):
         cls,
         process_result: FallibleProcessResult,
         *,
-        partition_description: Optional[str] = None,
+        partition_description: str | None = None,
         strip_chroot_path: bool = False,
         report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
@@ -63,7 +63,7 @@ class LintResult(EngineAwareReturnType):
             report=report,
         )
 
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         return {"partition": self.partition_description}
 
 
@@ -77,7 +77,7 @@ class LintResults(EngineAwareReturnType):
     results. For example, many Python linters will need to group by interpreter compatibility.
     """
 
-    results: Tuple[LintResult, ...]
+    results: tuple[LintResult, ...]
     linter_name: str
 
     def __init__(self, results: Iterable[LintResult], *, linter_name: str) -> None:
@@ -92,12 +92,12 @@ class LintResults(EngineAwareReturnType):
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel | None:
         if self.skipped:
             return LogLevel.DEBUG
         return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         if self.skipped:
             return f"{self.linter_name} skipped."
         message = self.linter_name

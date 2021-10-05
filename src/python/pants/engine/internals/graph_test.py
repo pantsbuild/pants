@@ -372,7 +372,11 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             [Addresses([a])],
         )
         assert list(sorted(t.address for t in coarsened_targets[0].members)) == expected_members
-        assert list(sorted(d for d in coarsened_targets[0].dependencies)) == expected_dependencies
+        # NB: Only the direct dependencies are compared.
+        assert (
+            list(sorted(d.address for ct in coarsened_targets[0].dependencies for d in ct.members))
+            == expected_dependencies
+        )
 
     # Non-file-level targets are already validated to not have cycles, so they coarsen to
     # themselves.

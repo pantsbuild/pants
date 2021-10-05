@@ -4,24 +4,18 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import ClassVar
 
 import ijson
 
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-if TYPE_CHECKING:
-    from pants.backend.go.util_rules.build_go_pkg import BuiltGoPackage
-
 
 logger = logging.getLogger(__name__)
 
@@ -55,47 +49,45 @@ async def determine_go_std_lib_imports() -> GoStdLibImports:
 
 
 @dataclass(frozen=True)
-class GatherImportsRequest:
-    packages: FrozenOrderedSet[BuiltGoPackage]
-    include_stdlib: bool
+class ImportConfig:
+    """An `importcfg` file associating import paths to their `__pkg__.a` files."""
+
+    digest: Digest
+
+    CONFIG_PATH: ClassVar[str] = "./importcfg"
 
 
 @dataclass(frozen=True)
-class GatheredImports:
-    digest: Digest
+class ImportConfigRequest:
+    """Create an `importcfg` file associating import paths to their `__pkg__.a` files."""
+
+    import_paths_to_pkg_a_files: FrozenDict[str, str]
+    include_stdlib: bool = True
+
+    @classmethod
+    def stdlib_only(cls) -> ImportConfigRequest:
+        return cls(FrozenDict(), include_stdlib=True)
 
 
 @rule
 async def generate_import_config(
-    request: GatherImportsRequest, stdlib_imports: GoStdLibImports
-) -> GatheredImports:
-    import_config_digests: dict[str, tuple[str, Digest]] = {}
-    for pkg in request.packages:
-        fp = pkg.object_digest.fingerprint
-        prefixed_digest = await Get(Digest, AddPrefix(pkg.object_digest, f"__pkgs__/{fp}"))
-        import_config_digests[pkg.import_path] = (fp, prefixed_digest)
-
-    pkg_digests: OrderedSet[Digest] = OrderedSet()
-
-    import_config = ["# import config"]
-    for import_path, (fp, digest) in import_config_digests.items():
-        pkg_digests.add(digest)
-        import_config.append(f"packagefile {import_path}=__pkgs__/{fp}/__pkg__.a")
-
+    request: ImportConfigRequest, stdlib_imports: GoStdLibImports
+) -> ImportConfig:
+    lines = [
+        "# import config",
+        *(
+            f"packagefile {import_path}={pkg_a_path}"
+            for import_path, pkg_a_path in request.import_paths_to_pkg_a_files.items()
+        ),
+    ]
     if request.include_stdlib:
-        import_config.extend(
-            f"packagefile {import_path}={os.path.normpath(static_file_path)}"
+        lines.extend(
+            f"packagefile {import_path}={static_file_path}"
             for import_path, static_file_path in stdlib_imports.items()
         )
-
-    import_config_content = "\n".join(import_config).encode("utf-8")
-    import_config_digest = await Get(
-        Digest, CreateDigest([FileContent("./importcfg", import_config_content)])
-    )
-    pkg_digests.add(import_config_digest)
-
-    digest = await Get(Digest, MergeDigests(pkg_digests))
-    return GatheredImports(digest=digest)
+    content = "\n".join(lines).encode("utf-8")
+    result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
+    return ImportConfig(result)
 
 
 def rules():
