@@ -7,10 +7,11 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
-from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
+from pants.jvm.compile import CompiledClassfiles
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,

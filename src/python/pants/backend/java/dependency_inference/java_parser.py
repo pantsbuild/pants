@@ -13,11 +13,11 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
     java_parser_artifact_requirements,
 )
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.backend.java.util_rules import JdkSetup
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel

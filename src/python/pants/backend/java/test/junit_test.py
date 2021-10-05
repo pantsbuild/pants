@@ -14,7 +14,6 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTes
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test.junit import JavaTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
-from pants.backend.java.util_rules import rules as java_util_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -22,6 +21,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
+from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
