@@ -169,8 +169,9 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
                 dependencies=[
                     ':setup',
                 ],
+                generate_setup=False,
                 provides=setup_py(
-                    name='foo', version='1.2.3'
+                    name='foo', version='1.2.3',
                 )
             )
 
