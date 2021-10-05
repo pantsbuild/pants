@@ -42,9 +42,6 @@ class BuiltDockerImage(BuiltPackageArtifact):
                 f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
                 "To try out the image interactively:",
                 f"    docker run -it --rm {tags[0]} [entrypoint args...]",
-                "To push your image:",
-                f"    docker push {tags[0]}",
-                "",
             ),
         )
 
