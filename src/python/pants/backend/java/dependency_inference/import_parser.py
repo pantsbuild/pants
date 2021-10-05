@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -15,6 +16,10 @@ class ParsedJavaImports(DeduplicatedCollection[str]):
 
     sort_input = True
 
+    @classmethod
+    def from_analysis(cls, analysis: JavaSourceDependencyAnalysis) -> ParsedJavaImports:
+        return cls(imp.name for imp in analysis.imports)
+
 
 @dataclass(frozen=True)
 class ParseJavaImportsRequest:
@@ -25,7 +30,7 @@ class ParseJavaImportsRequest:
 async def parse_java_imports(request: ParseJavaImportsRequest) -> ParsedJavaImports:
     source_files = await Get(SourceFiles, SourceFilesRequest([request.sources]))
     analysis = await Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)
-    return ParsedJavaImports(imp.name for imp in analysis.imports)
+    return ParsedJavaImports.from_analysis(analysis.imports)
 
 
 def rules():

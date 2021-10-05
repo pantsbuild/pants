@@ -6,12 +6,11 @@ import logging
 from typing import cast
 
 from pants.backend.java.dependency_inference import import_parser, package_mapper
-from pants.backend.java.dependency_inference.import_parser import (
-    ParsedJavaImports,
-    ParseJavaImportsRequest,
-)
+from pants.backend.java.dependency_inference.import_parser import ParsedJavaImports
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
+from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
@@ -63,23 +62,25 @@ async def infer_java_dependencies_via_imports(
         return InferredDependencies([])
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
-    explicitly_provided_deps, detected_imports = await MultiGet(
+    explicitly_provided_deps, source_files = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(
-            ParsedJavaImports,
-            ParseJavaImportsRequest(
-                request.sources_field,
-            ),
-        ),
+        Get(SourceFiles, SourceFilesRequest([request.sources_field])),
     )
+
+    source_analysis = await Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)
+    detected_imports = ParsedJavaImports.from_analysis(source_analysis)
     relevant_imports = detected_imports  # TODO: Remove stdlib
 
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
+    deps_from_imports = itertools.chain.from_iterable(
+        dep_map.addresses_for_symbol(imp) for imp in relevant_imports
+    )
+
+    deps_from_same_package = dep_map.addresses_for_symbol(source_analysis.declared_package)
+
     return InferredDependencies(
-        dependencies=itertools.chain.from_iterable(
-            dep_map.addresses_for_symbol(imp) for imp in relevant_imports
-        ),
+        dependencies=itertools.chain(deps_from_imports, deps_from_same_package),
     )
 
 
