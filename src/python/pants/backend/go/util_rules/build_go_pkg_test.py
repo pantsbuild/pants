@@ -87,12 +87,14 @@ def test_build_internal_pkg(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg", import_path='main')
+                go_package(name="pkg")
                 """
             ),
         }
     )
-    assert_built(rule_runner, Address("", target_name="pkg"), expected_import_paths=["main"])
+    assert_built(
+        rule_runner, Address("", target_name="pkg"), expected_import_paths=["example.com/greeter"]
+    )
 
 
 def test_build_external_pkg(rule_runner: RuleRunner) -> None:
@@ -144,7 +146,7 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
 
                 import (
                     "fmt"
-                    "example.com/greeter/quoter"
+                    "example.com/project/greeter/quoter"
                     "golang.org/x/xerrors"
                 )
 
@@ -159,7 +161,7 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
                 """\
                 package main
 
-                import "example.com/greeter"
+                import "example.com/project/greeter"
 
                 func main() {
                     greeter.QuotedHello()
@@ -168,7 +170,7 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
             ),
             "go.mod": dedent(
                 """\
-                module example.com
+                module example.com/project
                 go 1.17
                 require golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
                 """
@@ -182,7 +184,7 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name='mod')
-                go_package(name='pkg', import_path='main')
+                go_package(name='pkg')
                 """
             ),
         }
@@ -202,14 +204,18 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_paths=xerrors_import_paths,
     )
 
-    quoter_import_path = "example.com/greeter/quoter"
+    quoter_import_path = "example.com/project/greeter/quoter"
     assert_built(rule_runner, Address("greeter/quoter"), expected_import_paths=[quoter_import_path])
 
-    greeter_import_paths = ["example.com/greeter", quoter_import_path, *xerrors_import_paths]
+    greeter_import_paths = [
+        "example.com/project/greeter",
+        quoter_import_path,
+        *xerrors_import_paths,
+    ]
     assert_built(rule_runner, Address("greeter"), expected_import_paths=greeter_import_paths)
 
     assert_built(
         rule_runner,
         Address("", target_name="pkg"),
-        expected_import_paths=["main", *greeter_import_paths],
+        expected_import_paths=["example.com/project", *greeter_import_paths],
     )

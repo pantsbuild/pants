@@ -2,8 +2,4 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 go_package()
-
-go_binary(
-    name="bin",
-    main=":pants_test",
-)
+go_binary(name="bin", main=":pants_test")
