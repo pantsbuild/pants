@@ -128,6 +128,7 @@ async def package_deploy_jar(
         # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
         textwrap.dedent(
             f"""
+            set -e
             /bin/cat {input_filenames} {_PANTS_MANIFEST_PARTIAL_JAR_FILENAME} > {_PANTS_BROKEN_DEPLOY_JAR}
             {zip.path} -FF {_PANTS_BROKEN_DEPLOY_JAR} --out {output_filename.name}
             """
