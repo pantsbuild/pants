@@ -33,22 +33,47 @@ class GoTestCase:
 
 
 @dataclass(frozen=True)
+class Example:
+    name: str
+    package: str
+    output: str
+    unordered: bool
+
+    @classmethod
+    def from_json_dict(cls, data: dict) -> Example:
+        return cls(
+            name=data["name"],
+            package=data["package"],
+            output=data["output"],
+            unordered=data["unordered"],
+        )
+
+
+@dataclass(frozen=True)
 class AnalyzedTestSources:
     tests: FrozenOrderedSet[GoTestCase]
     benchmarks: FrozenOrderedSet[GoTestCase]
-    # TODO: Account for TestMain in internal and/or external test packages.
-    has_test_main: bool
+    examples: FrozenOrderedSet[Example]
+    test_main: GoTestCase | None
 
     @classmethod
     def from_json_dict(cls, data: dict) -> AnalyzedTestSources:
         # Note: The Go `json` package is producing `null` values so the keys may be present but set to `null` so
         # this code uses `data.get("foo") or []` instead of `data.get("foo", []) to handle that case.
+
+        test_main = None
+        if "test_main" in data:
+            test_main = GoTestCase.from_json_dict(data["test_main"])
+
         return cls(
             tests=FrozenOrderedSet([GoTestCase.from_json_dict(d) for d in data.get("tests") or []]),
             benchmarks=FrozenOrderedSet(
                 [GoTestCase.from_json_dict(d) for d in data.get("benchmarks") or []]
             ),
-            has_test_main=data["has_test_main"],
+            examples=FrozenOrderedSet(
+                [Example.from_json_dict(d) for d in data.get("examples") or []]
+            ),
+            test_main=test_main,
         )
 
 

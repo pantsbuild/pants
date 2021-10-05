@@ -7,7 +7,7 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import Any, ClassVar, Optional, Type, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
@@ -33,8 +33,8 @@ class Subsystem(metaclass=ABCMeta):
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
     # The deprecation warning becomes an error at the given Pants version (which must therefore be
     # a valid semver).
-    deprecated_options_scope: Optional[str] = None
-    deprecated_options_scope_removal_version: Optional[str] = None
+    deprecated_options_scope: str | None = None
+    deprecated_options_scope_removal_version: str | None = None
 
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
@@ -119,6 +119,6 @@ class Subsystem(metaclass=ABCMeta):
 _T = TypeVar("_T", bound=Subsystem)
 
 
-async def _construct_subsytem(subsystem_typ: Type[_T]) -> _T:
+async def _construct_subsytem(subsystem_typ: type[_T]) -> _T:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)

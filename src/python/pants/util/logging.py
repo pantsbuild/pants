@@ -20,7 +20,7 @@ class LogLevel(Enum):
     _level: int
 
     def __new__(cls, value: str, level: int) -> LogLevel:
-        member: "LogLevel" = object.__new__(cls)
+        member: LogLevel = object.__new__(cls)
         member._value_ = value
         member._level = level
         return member

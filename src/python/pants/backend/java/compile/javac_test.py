@@ -191,7 +191,11 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     # Additionally validate that `check` works.
     check_results = rule_runner.request(
         CheckResults,
-        [JavacCheckRequest([JavacCheckRequest.field_set_type.create(coarsened_target.members[0])])],
+        [
+            JavacCheckRequest(
+                [JavacCheckRequest.field_set_type.create(coarsened_target.representative)]
+            )
+        ],
     )
 
     assert len(check_results.results) == 1

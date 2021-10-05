@@ -149,7 +149,7 @@ class GoBinaryMainAddress(StringField):
 
 class GoBinary(Target):
     alias = "go_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, OutputPathField, GoBinaryMainAddress)
+    core_fields = (*COMMON_TARGET_FIELDS, OutputPathField, GoBinaryMainAddress)
     help = "A Go binary."
 
 
