@@ -7,21 +7,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.classpath import Classpath
 from pants.backend.java.classpath import rules as classpath_rules
-from pants.backend.java.compile.javac import (
-    CompiledClassfiles,
-    CompileJavaSourceRequest,
-    FallibleCompiledClassfiles,
-    JavacCheckRequest,
-)
+from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.package.deploy_jar import DeployJarFieldSet
 from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
 from pants.backend.java.target_types import DeployJar, JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
-from pants.backend.java.util_rules import JdkSetup
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.goals.package import BuiltPackage
@@ -30,7 +23,10 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.jvm import jdk_rules
+from pants.jvm.compile import CompiledClassfiles, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
+from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -46,25 +42,25 @@ def rule_runner() -> RuleRunner:
         rules=[
             # TODO: delete a few of these (they were copied from junit tests; not sure which
             # are needed)
+            *classpath_rules(),
             *config_files.rules(),
             *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
-            *source_files.rules(),
-            *classpath_rules(),
-            *deploy_jar_rules(),
-            *javac_rules(),
-            *util_rules(),
-            *target_types_rules(),
             *coursier_rules(),
-            *java_util_rules.rules(),
-            QueryRule(CheckResults, (JavacCheckRequest,)),
-            QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
-            QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
-            QueryRule(Classpath, (Addresses,)),
-            QueryRule(BuiltPackage, (DeployJarFieldSet,)),
-            QueryRule(JdkSetup, ()),
+            *coursier_setup_rules(),
+            *deploy_jar_rules(),
+            *external_tool_rules(),
+            *javac_rules(),
+            *jdk_rules.rules(),
+            *source_files.rules(),
+            *target_types_rules(),
+            *util_rules(),
             QueryRule(BashBinary, ()),
+            QueryRule(BuiltPackage, (DeployJarFieldSet,)),
+            QueryRule(CheckResults, (JavacCheckRequest,)),
+            QueryRule(Classpath, (Addresses,)),
+            QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
+            QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
+            QueryRule(JdkSetup, ()),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(Snapshot, (Digest,)),
         ],

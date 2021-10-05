@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.java_parser import (
     FallibleJavaSourceDependencyAnalysisResult,
@@ -25,6 +24,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Sources
+from pants.jvm import jdk_rules
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -47,7 +47,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *source_files.rules(),
             *util_rules(),
-            *java_util_rules.rules(),
+            *jdk_rules.rules(),
             QueryRule(FallibleJavaSourceDependencyAnalysisResult, (SourceFiles,)),
             QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

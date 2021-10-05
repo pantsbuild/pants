@@ -7,11 +7,11 @@ import logging
 
 import pkg_resources
 
-from pants.backend.java.compile.javac import CompiledClassfiles
-from pants.backend.java.util_rules import JdkSetup
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.jvm.compile import CompiledClassfiles
+from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
