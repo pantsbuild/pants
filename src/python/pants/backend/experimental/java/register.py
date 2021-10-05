@@ -11,7 +11,9 @@ from pants.backend.java.dependency_inference import (
     package_mapper,
 )
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
+from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
+    DeployJar,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
     JunitTestsGeneratorTarget,
@@ -27,6 +29,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 
 def target_types():
     return [
+        DeployJar,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
@@ -41,6 +44,7 @@ def rules():
         *javac.rules(),
         *junit.rules(),
         *classpath.rules(),
+        *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
