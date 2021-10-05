@@ -1,12 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
+from dataclasses import dataclass
 from typing import Sequence
 
 from pants.core.goals.package import OutputPathField
-from pants.engine.rules import collect_rules
+from pants.engine.addresses import Address
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     InvalidFieldException,
     Sources,
@@ -140,18 +146,41 @@ class GoExternalPackageTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoBinaryMainAddress(StringField):
+class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
-    required = True
-    help = "Address of the main Go package for this binary."
+    help = (
+        "Address of the `go_package` with the `main` for this binary.\n\n"
+        "If left off, will default to the `go_package` in the same directory as this target's "
+        "BUILD file."
+    )
     value: str
 
 
-class GoBinary(Target):
+@dataclass(frozen=True)
+class GoBinaryMainPackage:
+    address: Address
+
+
+@dataclass(frozen=True)
+class GoBinaryMainPackageRequest(EngineAwareParameter):
+    field: GoBinaryMainPackageField
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+class GoBinaryDependenciesField(Dependencies):
+    # This is only used to inject a dependency from the `GoBinaryMainPackageField`. Users should
+    # add any explicit dependencies to the `go_package`.
+    alias = "_dependencies"
+
+
+class GoBinaryTarget(Target):
     alias = "go_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, OutputPathField, GoBinaryMainAddress)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+        GoBinaryMainPackageField,
+        GoBinaryDependenciesField,
+    )
     help = "A Go binary."
-
-
-def rules():
-    return collect_rules()
