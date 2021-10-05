@@ -61,6 +61,7 @@ pub struct ExecutionRequest {
 ///
 /// Represents the state of an execution of a Graph.
 ///
+#[derive(Clone)]
 pub struct Scheduler {
   pub core: Arc<Core>,
 }
