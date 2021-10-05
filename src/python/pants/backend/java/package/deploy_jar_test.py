@@ -238,9 +238,6 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                    # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
-                    # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
@@ -283,9 +280,6 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                    # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
-                    # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
@@ -330,9 +324,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                    # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
-                    # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
@@ -373,8 +364,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
             "lib/ExampleLib.java": JAVA_JSON_MANGLING_LIB_SOURCE,
         }
     )
-
-    print(JAVA_JSON_MANGLING_LIB_SOURCE)
 
     _deploy_jar_test(rule_runner, "example_app_deploy_jar")
 
