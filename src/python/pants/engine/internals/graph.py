@@ -369,27 +369,45 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
             expanded_targets=False,
         ),
     )
+    addresses_to_targets = {
+        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
+    }
+
+    # Because this is Tarjan's SCC (TODO: update signature to guarantee), components are returned
+    # in reverse topological order. We can thus assume when building the structure shared
+    # `CoarsenedTarget` instances that each instance will already have had its dependencies
+    # constructed.
     components = native_engine.strongly_connected_components(
         list(dependency_mapping.mapping.items())
     )
 
-    addresses_set = set(addresses)
-    addresses_to_targets = {
-        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
-    }
-    targets = []
+    coarsened_targets: dict[Address, CoarsenedTarget] = {}
+    root_coarsened_targets = []
+    root_addresses_set = set(addresses)
     for component in components:
-        if not any(component_address in addresses_set for component_address in component):
-            continue
+        component = sorted(component)
         component_set = set(component)
-        members = tuple(
-            sorted((addresses_to_targets[a] for a in component), key=lambda t: t.address)
+
+        # For each member of the component, include the CoarsenedTarget for each of its external
+        # dependencies.
+        coarsened_target = CoarsenedTarget(
+            (addresses_to_targets[a] for a in component),
+            (
+                coarsened_targets[d]
+                for a in component
+                for d in dependency_mapping.mapping[a]
+                if d not in component_set
+            ),
         )
-        dependencies = FrozenOrderedSet(
-            [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
-        )
-        targets.append(CoarsenedTarget(members, dependencies))
-    return CoarsenedTargets(targets)
+
+        # Add to the coarsened_targets mapping under each of the component's Addresses.
+        for address in component:
+            coarsened_targets[address] = coarsened_target
+
+        # If any of the input Addresses was a member of this component, it is a root.
+        if component_set & root_addresses_set:
+            root_coarsened_targets.append(coarsened_target)
+    return CoarsenedTargets(tuple(root_coarsened_targets))
 
 
 # -----------------------------------------------------------------------------------------------

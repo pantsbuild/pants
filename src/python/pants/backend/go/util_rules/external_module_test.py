@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
 from textwrap import dedent
 
 import pytest
@@ -12,8 +11,10 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget
 from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.external_module import (
-    DownloadedExternalModules,
-    DownloadExternalModulesRequest,
+    AllDownloadedModules,
+    AllDownloadedModulesRequest,
+    DownloadedModule,
+    DownloadedModuleRequest,
     ExternalModulePkgImportPaths,
     ExternalModulePkgImportPathsRequest,
     ResolveExternalGoPackageRequest,
@@ -36,7 +37,8 @@ def rule_runner() -> RuleRunner:
             *go_pkg.rules(),
             *external_module.rules(),
             *target_type_rules.rules(),
-            QueryRule(DownloadedExternalModules, [DownloadExternalModulesRequest]),
+            QueryRule(AllDownloadedModules, [AllDownloadedModulesRequest]),
+            QueryRule(DownloadedModule, [DownloadedModuleRequest]),
             QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
             QueryRule(ResolvedGoPackage, [ResolveExternalGoPackageRequest]),
         ],
@@ -93,42 +95,51 @@ GO_SUM = dedent(
 )
 
 
-def test_download_external_modules(rule_runner: RuleRunner) -> None:
+def test_download_modules(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     downloaded_modules = rule_runner.request(
-        DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
+        AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)]
     )
-    snapshot = rule_runner.request(Snapshot, [downloaded_modules.digest])
-    all_files = snapshot.files
+    assert len(downloaded_modules) == 7
 
-    def assert_has_file(expected_fp: str) -> None:
-        assert any(
-            fp == expected_fp for fp in all_files
-        ), f"Could not find `{expected_fp}` in {sorted(all_files)}"
+    def assert_module(module: str, version: str, sample_file: str) -> None:
+        assert (module, version) in downloaded_modules
+        digest = downloaded_modules[(module, version)]
+        snapshot = rule_runner.request(Snapshot, [digest])
+        assert "go.mod" in snapshot.files
+        assert "go.sum" in snapshot.files
+        assert sample_file in snapshot.files
 
-    def module_files(module_dir: str, sample_file: str) -> list[str]:
-        module_dir = os.path.join("gopath/pkg/mod", module_dir)
-        return [
-            os.path.join(module_dir, "go.mod"),
-            os.path.join(module_dir, "go.sum"),
-            os.path.join(module_dir, sample_file),
-        ]
+        extracted_module = rule_runner.request(
+            DownloadedModule, [DownloadedModuleRequest(module, version, input_digest)]
+        )
+        extracted_snapshot = rule_runner.request(Snapshot, [extracted_module.digest])
+        assert extracted_snapshot == snapshot
 
-    for fp in (
-        "go.mod",
-        "go.sum",
-        *module_files("cloud.google.com/go@v0.26.0", "bigtable/filter.go"),
-        *module_files("github.com/google/uuid@v1.3.0", "uuid.go"),
-        *module_files("github.com/google/go-cmp@v0.5.6", "cmp/cmpopts/errors_go113.go"),
-        *module_files("golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c", "width/transform.go"),
-        *module_files("golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543", "wrap.go"),
-        *module_files("rsc.io/quote@v1.5.2", "quote.go"),
-        *module_files("rsc.io/sampler@v1.3.0", "sampler.go"),
-    ):
-        assert_has_file(fp)
+    assert_module("cloud.google.com/go", "v0.26.0", "bigtable/filter.go")
+    assert_module("github.com/google/uuid", "v1.3.0", "uuid.go")
+    assert_module("github.com/google/go-cmp", "v0.5.6", "cmp/cmpopts/errors_go113.go")
+    assert_module("golang.org/x/text", "v0.0.0-20170915032832-14c0d48ead0c", "width/transform.go")
+    assert_module("golang.org/x/xerrors", "v0.0.0-20191204190536-9bdfabe68543", "wrap.go")
+    assert_module("rsc.io/quote", "v1.5.2", "quote.go")
+    assert_module("rsc.io/sampler", "v1.3.0", "sampler.go")
 
 
-def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> None:
+def test_download_modules_missing_module(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(
+            DownloadedModule,
+            [DownloadedModuleRequest("some_project.org/project", "v1.1", input_digest)],
+        )
+    underlying_exception = exc.value.wrapped_exceptions[0]
+    assert isinstance(underlying_exception, AssertionError)
+    assert "The module some_project.org/project@v1.1 was not downloaded" in str(
+        underlying_exception
+    )
+
+
+def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot(
         {
             "go.mod": dedent(
@@ -147,15 +158,13 @@ def test_download_external_module_invalid_go_sum(rule_runner: RuleRunner) -> Non
         }
     ).digest
     with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(
-            DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
-        )
+        rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
     underlying_exception = exc.value.wrapped_exceptions[0]
     assert isinstance(underlying_exception, ProcessExecutionFailure)
     assert "SECURITY ERROR" in str(underlying_exception)
 
 
-def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> None:
+def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot(
         {
             "go.mod": dedent(
@@ -175,9 +184,7 @@ def test_download_external_module_missing_go_sum(rule_runner: RuleRunner) -> Non
         }
     ).digest
     with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(
-            DownloadedExternalModules, [DownloadExternalModulesRequest(input_digest)]
-        )
+        rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
     underlying_exception = exc.value.wrapped_exceptions[0]
     assert "`go.mod` and/or `go.sum` changed!" in str(underlying_exception)
 

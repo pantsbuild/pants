@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Iterable, List, Sequence
+from typing import Iterable, Sequence
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -27,7 +27,7 @@ def ensure_text(text_or_binary: bytes | str) -> str:
         raise TypeError(f"Argument is neither text nor binary type ({type(text_or_binary)})")
 
 
-def safe_shlex_split(text_or_binary: bytes | str) -> List[str]:
+def safe_shlex_split(text_or_binary: bytes | str) -> list[str]:
     """Split a string using shell-like syntax.
 
     Safe even on python versions whose shlex.split() method doesn't accept unicode.
@@ -74,7 +74,7 @@ def create_path_env_var(
 
     prev_path = env.get(env_var, None)
     if prev_path is None:
-        path_dirs: List[str] = []
+        path_dirs: list[str] = []
     else:
         path_dirs = list(prev_path.split(delimiter))
 

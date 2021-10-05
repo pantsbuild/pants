@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, cast
+from typing import Any, Callable, Dict, cast
 
 import pytest
 import toml
@@ -764,7 +764,7 @@ class OptionsTest(unittest.TestCase):
     def test_list_option(self) -> None:
         def check(
             *,
-            expected: List[int],
+            expected: list[int],
             flags: str = "",
             env_val: str | None = None,
             config_val: str | None = None,
@@ -862,7 +862,7 @@ class OptionsTest(unittest.TestCase):
     def test_dict_list_option(self) -> None:
         def check(
             *,
-            expected: List[Dict[str, int]],
+            expected: list[dict[str, int]],
             flags: str = "",
             env_val: str | None = None,
             config_val: str | None = None,
@@ -901,7 +901,7 @@ class OptionsTest(unittest.TestCase):
     def test_target_list_option(self) -> None:
         def check(
             *,
-            expected: List[str],
+            expected: list[str],
             flags: str = "",
             env_val: str | None = None,
             config_val: str | None = None,
@@ -932,7 +932,7 @@ class OptionsTest(unittest.TestCase):
     def test_shell_str_list(self) -> None:
         def check(
             *,
-            expected: List[str],
+            expected: list[str],
             flags: str = "",
             env_val: str | None = None,
             config_val: str | None = None,
@@ -965,7 +965,7 @@ class OptionsTest(unittest.TestCase):
     def test_dict_option(self) -> None:
         def check(
             *,
-            expected: Dict[str, str],
+            expected: dict[str, str],
             flags: str = "",
             config_val: str | None = None,
         ) -> None:

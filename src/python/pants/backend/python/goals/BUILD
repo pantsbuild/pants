@@ -57,3 +57,4 @@ python_tests(
 )
 
 python_tests(name="tailor_test", sources=["tailor_test.py"])
+python_tests(name="publish_test", sources=["publish_test.py"])

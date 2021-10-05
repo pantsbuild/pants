@@ -47,6 +47,14 @@ class DockerBinary(BinaryPath):
             ),
         )
 
+    def push_image(self, tags: tuple[str, ...]) -> Process | None:
+        if not tags:
+            return None
+
+        return Process(
+            argv=(self.path, "push", *tags), description="Pushing docker image {tags[0]}"
+        )
+
 
 @dataclass(frozen=True)
 class DockerBinaryRequest:
@@ -65,6 +73,11 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
     if not first_path:
         raise BinaryNotFoundError.from_request(request, rationale="interact with the docker daemon")
     return DockerBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+async def get_docker() -> DockerBinary:
+    return await Get(DockerBinary, DockerBinaryRequest())
 
 
 def rules():

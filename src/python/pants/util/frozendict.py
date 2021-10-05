@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Iterator, Mapping, Tuple, TypeVar, overload
+from typing import Any, Iterable, Iterator, Mapping, TypeVar, overload
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -18,7 +18,7 @@ class FrozenDict(Mapping[K, V]):
     """
 
     @overload
-    def __init__(self, __items: Iterable[Tuple[K, V]], **kwargs: V) -> None:
+    def __init__(self, __items: Iterable[tuple[K, V]], **kwargs: V) -> None:
         ...
 
     @overload
@@ -29,7 +29,7 @@ class FrozenDict(Mapping[K, V]):
     def __init__(self, **kwargs: V) -> None:
         ...
 
-    def __init__(self, *item: Mapping[K, V] | Iterable[Tuple[K, V]], **kwargs: V) -> None:
+    def __init__(self, *item: Mapping[K, V] | Iterable[tuple[K, V]], **kwargs: V) -> None:
         """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
         if len(item) > 1:
             raise ValueError(

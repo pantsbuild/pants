@@ -9,7 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator, List, Mapping, Optional, Union
+from typing import Any, Iterator, List, Mapping, Union
 
 import pytest
 
@@ -37,7 +37,7 @@ class PantsResult:
     workdir: str
     pid: Pid
 
-    def _format_unexpected_error_code_msg(self, msg: Optional[str]) -> str:
+    def _format_unexpected_error_code_msg(self, msg: str | None) -> str:
         details = [msg] if msg else []
         details.append(" ".join(self.command))
         details.append(f"exit_code: {self.exit_code}")
@@ -49,10 +49,10 @@ class PantsResult:
         details.append(f"stderr:\n\t{indent(self.stderr)}")
         return "\n".join(details)
 
-    def assert_success(self, msg: Optional[str] = None) -> None:
+    def assert_success(self, msg: str | None = None) -> None:
         assert self.exit_code == 0, self._format_unexpected_error_code_msg(msg)
 
-    def assert_failure(self, msg: Optional[str] = None) -> None:
+    def assert_failure(self, msg: str | None = None) -> None:
         assert self.exit_code != 0, self._format_unexpected_error_code_msg(msg)
 
 
@@ -307,11 +307,10 @@ def render_logs(workdir: str) -> None:
 def read_pants_log(workdir: str) -> Iterator[str]:
     """Yields all lines from the pants log under the given workdir."""
     # Surface the pants log for easy viewing via pytest's `-s` (don't capture stdio) option.
-    for line in _read_log(f"{workdir}/pants.log"):
-        yield line
+    yield from _read_log(f"{workdir}/pants.log")
 
 
 def _read_log(filename: str) -> Iterator[str]:
-    with open(filename, "r") as f:
+    with open(filename) as f:
         for line in f:
             yield line.rstrip()
