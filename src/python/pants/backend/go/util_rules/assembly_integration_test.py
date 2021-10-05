@@ -12,7 +12,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinary, GoModTarget, GoPackage
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackage
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
-        target_types=[GoBinary, GoPackage, GoModTarget],
+        target_types=[GoBinaryTarget, GoPackage, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -114,7 +114,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
                 """\
                 go_mod(name="mod")
                 go_package(name="pkg")
-                go_binary(name="bin", main=":pkg")
+                go_binary(name="bin")
                 """
             ),
         }

@@ -8,6 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
+    GoBinaryDependenciesField,
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoExternalPackageDependencies,
@@ -33,15 +37,16 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
+from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     DescendantAddresses,
     MaybeEmptyDescendantAddresses,
     MaybeEmptySiblingAddresses,
+    SiblingAddresses,
 )
-from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.addresses import Address, AddressInput
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -49,6 +54,7 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    InvalidFieldException,
     Targets,
     WrappedTarget,
 )
@@ -285,6 +291,69 @@ async def generate_go_external_package_targets(
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# The `main` field for `go_binary`
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def determine_main_pkg_for_go_binary(
+    request: GoBinaryMainPackageRequest,
+) -> GoBinaryMainPackage:
+    addr = request.field.address
+    if request.field.value:
+        wrapped_specified_tgt = await Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(request.field.value, relative_to=addr.spec_path),
+        )
+        if not wrapped_specified_tgt.target.has_field(GoPackageSources):
+            raise InvalidFieldException(
+                f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
+                "a `go_package` target, but was the address for a "
+                f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
+                "Hint: consider leaving off this field so that Pants will find the `go_package` "
+                "target for you."
+            )
+        return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
+
+    build_dir_targets = await Get(Targets, AddressSpecs([SiblingAddresses(addr.spec_path)]))
+    internal_pkg_targets = [tgt for tgt in build_dir_targets if tgt.has_field(GoPackageSources)]
+    if len(internal_pkg_targets) == 1:
+        return GoBinaryMainPackage(internal_pkg_targets[0].address)
+
+    wrapped_tgt = await Get(WrappedTarget, Address, addr)
+    alias = wrapped_tgt.target.alias
+    if not internal_pkg_targets:
+        raise ResolveError(
+            f"The `{alias}` target {addr} requires that there is a `go_package` "
+            "target in the same directory, but none were found."
+        )
+    raise ResolveError(
+        f"There are multiple `go_package` targets in the same directory of the `{alias}` "
+        f"target {addr}, so it is ambiguous what to use as the `main` package.\n\n"
+        f"To fix, please either set the `main` field for `{addr} or remove these "
+        "`go_package` targets so that only one remains: "
+        f"{sorted(tgt.address.spec for tgt in internal_pkg_targets)}"
+    )
+
+
+class InjectGoBinaryMainDependencyRequest(InjectDependenciesRequest):
+    inject_for = GoBinaryDependenciesField
+
+
+@rule
+async def inject_go_binary_main_dependency(
+    request: InjectGoBinaryMainDependencyRequest,
+) -> InjectedDependencies:
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    main_pkg = await Get(
+        GoBinaryMainPackage,
+        GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),
+    )
+    return InjectedDependencies([main_pkg.address])
+
+
 def rules():
     return (
         *collect_rules(),
@@ -293,5 +362,6 @@ def rules():
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InjectDependenciesRequest, InjectGoExternalPackageDependenciesRequest),
+        UnionRule(InjectDependenciesRequest, InjectGoBinaryMainDependencyRequest),
         UnionRule(GenerateTargetsRequest, GenerateGoExternalPackageTargetsRequest),
     )

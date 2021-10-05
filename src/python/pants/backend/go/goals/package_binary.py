@@ -4,11 +4,14 @@
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.target_types import GoBinaryMainAddress
+from pants.backend.go.target_types import (
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
+)
 from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
-from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -23,23 +26,16 @@ from pants.engine.unions import UnionRule
 
 @dataclass(frozen=True)
 class GoBinaryFieldSet(PackageFieldSet):
-    required_fields = (GoBinaryMainAddress,)
+    required_fields = (GoBinaryMainPackageField,)
 
-    main_address: GoBinaryMainAddress
+    main: GoBinaryMainPackageField
     output_path: OutputPathField
 
 
 @rule
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
-    main_go_package_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(field_set.main_address.value, relative_to=field_set.address.spec_path),
-    )
-
-    built_package = await Get(
-        BuiltGoPackage, BuildGoPackageRequest(main_go_package_address, is_main=True)
-    )
+    main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+    built_package = await Get(BuiltGoPackage, BuildGoPackageRequest(main_pkg.address, is_main=True))
     main_pkg_path = built_package.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_package.import_paths_to_pkg_a_files)

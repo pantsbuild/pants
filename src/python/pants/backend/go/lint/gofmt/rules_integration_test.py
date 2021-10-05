@@ -10,7 +10,7 @@ import pytest
 from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
-from pants.backend.go.target_types import GoBinary, GoPackage
+from pants.backend.go.target_types import GoBinaryTarget, GoPackage
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import source_files
@@ -24,7 +24,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[GoBinary, GoPackage],
+        target_types=[GoBinaryTarget, GoPackage],
         rules=[
             *fmt.rules(),
             *gofmt_rules(),
