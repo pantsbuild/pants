@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from os import path
 from typing import cast
 
-from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
+from pants.backend.docker.docker_binary import DockerBinary
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -26,8 +26,9 @@ from pants.backend.docker.target_types import (
     DockerRepository,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, pluralize
@@ -58,7 +59,7 @@ class BuiltDockerImage(BuiltPackageArtifact):
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet):
+class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
     name: DockerImageName
@@ -149,15 +150,13 @@ class DockerFieldSet(PackageFieldSet):
 async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
+    docker: DockerBinary,
 ) -> BuiltPackage:
-    docker, context = await MultiGet(
-        Get(DockerBinary, DockerBinaryRequest()),
-        Get(
-            DockerBuildContext,
-            DockerBuildContextRequest(
-                address=field_set.address,
-                build_upstream_images=True,
-            ),
+    context = await Get(
+        DockerBuildContext,
+        DockerBuildContextRequest(
+            address=field_set.address,
+            build_upstream_images=True,
         ),
     )
 
@@ -189,8 +188,24 @@ async def build_docker_image(
     )
 
 
+@rule
+async def docker_image_run_request(field_set: DockerFieldSet, docker: DockerBinary) -> RunRequest:
+    image = await Get(BuiltPackage, PackageFieldSet, field_set)
+    return RunRequest(
+        digest=image.digest,
+        args=(
+            docker.path,
+            "run",
+            "-it",
+            "--rm",
+            cast(BuiltDockerImage, image.artifacts[0]).tags[0],
+        ),
+    )
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(PackageFieldSet, DockerFieldSet),
+        UnionRule(RunFieldSet, DockerFieldSet),
     ]
