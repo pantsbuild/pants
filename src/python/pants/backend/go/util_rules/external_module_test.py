@@ -22,10 +22,9 @@ from pants.backend.go.util_rules.external_module import (
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, PathGlobs, Snapshot
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -127,16 +126,13 @@ def test_download_modules(rule_runner: RuleRunner) -> None:
 
 def test_download_modules_missing_module(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(
+        AssertionError, contains="The module some_project.org/project@v1.1 was not downloaded"
+    ):
         rule_runner.request(
             DownloadedModule,
             [DownloadedModuleRequest("some_project.org/project", "v1.1", input_digest)],
         )
-    underlying_exception = exc.value.wrapped_exceptions[0]
-    assert isinstance(underlying_exception, AssertionError)
-    assert "The module some_project.org/project@v1.1 was not downloaded" in str(
-        underlying_exception
-    )
 
 
 def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
@@ -157,11 +153,8 @@ def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
-    underlying_exception = exc.value.wrapped_exceptions[0]
-    assert isinstance(underlying_exception, ProcessExecutionFailure)
-    assert "SECURITY ERROR" in str(underlying_exception)
 
 
 def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
@@ -183,10 +176,8 @@ def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
             ),
         }
     ).digest
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="`go.mod` and/or `go.sum` changed!"):
         rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
-    underlying_exception = exc.value.wrapped_exceptions[0]
-    assert "`go.mod` and/or `go.sum` changed!" in str(underlying_exception)
 
 
 def test_determine_external_package_info(rule_runner: RuleRunner) -> None:

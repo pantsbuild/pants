@@ -27,7 +27,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
@@ -73,6 +73,46 @@ def logging(func):
             return func(*args, **kwargs)
 
     return wrapper
+
+
+@contextmanager
+def engine_error(
+    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+) -> Iterator[None]:
+    """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
+    is expected.
+
+    Use like this:
+
+        with engine_error(ValueError, contains="foo"):
+            rule_runner.request(OutputType, [input])
+
+    Will raise AssertionError if no ExecutionError occurred.
+    """
+    try:
+        yield
+    except ExecutionError as exec_error:
+        if not len(exec_error.wrapped_exceptions) == 1:
+            formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
+            raise ValueError(
+                "Multiple underlying exceptions, but this helper function expected only one. "
+                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
+                "`exc.value.wrapped_exceptions`.\n\n"
+                f"Errors: {formatted_errors}"
+            )
+        underlying = exec_error.wrapped_exceptions[0]
+        if not isinstance(underlying, expected_underlying_exception):
+            raise AssertionError(
+                "ExecutionError occurred as expected, but the underlying exception had type "
+                f"{type(underlying)} rather than the expected type "
+                f"{expected_underlying_exception}."
+            )
+        if contains is not None and contains not in str(underlying):
+            raise AssertionError(
+                "Expected value not found in exception.\n"
+                f"expected: {contains}\n\n"
+                f"exception: {underlying}"
+            )
 
 
 # -----------------------------------------------------------------------------------------------
