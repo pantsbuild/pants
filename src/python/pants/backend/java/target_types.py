@@ -159,12 +159,6 @@ class JvmMainClassName(StringField):
     )
 
 
-class JvmRootClassAddress(StringField):
-    alias = "root_address"
-    required = True
-    help = "Address that contains the Java source which contains the `main` class."
-
-
 class DeployJar(Target):
     alias = "deploy_jar"
     core_fields = (
