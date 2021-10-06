@@ -612,10 +612,10 @@ py_class!(class PySession |py| {
     ) -> CPyResult<Self> {
       // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
       // held.
-      let scheduler = scheduler.scheduler(py).clone();
+      let core = scheduler.scheduler(py).core.clone();
       let cancellation_latch = cancellation_latch.cancelled(py).clone();
       let session = py.allow_threads(|| Session::new(
-          &scheduler,
+          core,
           should_render_ui,
           build_id,
           session_values.into(),
