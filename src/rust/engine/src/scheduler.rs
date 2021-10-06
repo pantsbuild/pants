@@ -80,7 +80,7 @@ pub struct Session(Arc<InnerSession>);
 
 impl Session {
   pub fn new(
-    scheduler: &Scheduler,
+    core: Arc<Core>,
     should_record_zipkin_spans: bool,
     should_render_ui: bool,
     build_id: String,
@@ -94,7 +94,7 @@ impl Session {
     };
 
     let inner_session = InnerSession {
-      preceding_graph_size: scheduler.core.graph.len(),
+      preceding_graph_size: core.graph.len(),
       roots: Mutex::new(HashMap::new()),
       display,
       should_record_zipkin_spans,
