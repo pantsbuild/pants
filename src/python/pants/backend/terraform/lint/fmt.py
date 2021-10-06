@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.terraform.style import StyleRequest
-from pants.backend.terraform.target_types import TerraformSources
+from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
@@ -16,7 +16,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 
 @dataclass(frozen=True)
 class TerraformFmtTargets(LanguageFmtTargets):
-    required_fields = (TerraformSources,)
+    required_fields = (TerraformModuleSourcesField,)
 
 
 @union
@@ -30,7 +30,9 @@ async def format_terraform_targets(
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[TerraformSources] for target in terraform_fmt_targets.targets),
+        SourceFilesRequest(
+            target[TerraformModuleSourcesField] for target in terraform_fmt_targets.targets
+        ),
     )
     prior_formatter_result = original_sources.snapshot
 
