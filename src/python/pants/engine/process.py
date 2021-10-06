@@ -66,6 +66,7 @@ class Process:
     use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
+    reusable_input_digests: FrozenDict[str, Digest]
     platform: str | None
 
     def __init__(
@@ -85,6 +86,7 @@ class Process:
         use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        reusable_digests: Mapping[str, Digest] | None = None,
         platform: Platform | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
@@ -130,7 +132,35 @@ class Process:
         self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
+        self.reusable_input_digests = FrozenDict(reusable_digests or {})
         self.platform = platform.value if platform is not None else None
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class MultiPlatformProcess:
+    platform_constraints: tuple[str | None, ...]
+    processes: tuple[Process, ...]
+
+    def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
+        if len(request_dict) == 0:
+            raise ValueError("At least one platform-constrained Process must be passed.")
+        serialized_constraints = tuple(
+            constraint.value if constraint else None for constraint in request_dict
+        )
+        if len([req.description for req in request_dict.values()]) != 1:
+            raise ValueError(
+                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
+                f"be identical, but got: {list(request_dict.values())}."
+            )
+
+        self.platform_constraints = serialized_constraints
+        self.processes = tuple(request_dict.values())
+
+    @property
+    def product_description(self) -> ProductDescription:
+        return ProductDescription(self.processes[0].description)
+>>>>>>> 7ae7b6394e... reusable input digests API
 
 
 @dataclass(frozen=True)

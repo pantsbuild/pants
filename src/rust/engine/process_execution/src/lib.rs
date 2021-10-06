@@ -313,6 +313,21 @@ pub struct Process {
   pub platform_constraint: Option<Platform>,
 
   pub cache_scope: ProcessCacheScope,
+
+  /// "Reusable" digests to make available in the input root.
+  ///
+  /// These digests are intended for inputs that will be reused between multiple Process
+  /// invocations.This is useful, for example, for the files used by a tool to be
+  /// invoked in the `Process`.
+  ///
+  /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
+  /// The executor may choose how to make the digests available, including by just merging
+  /// the digest normally into the input root, creating a symlink to a persistent cache,
+  /// or bind mounting the directory read-only into a persistent cache.
+  ///
+  /// Assumes the build action does not modify the digest as made available. This may be
+  /// enforced by an executor, for example by bind mounting the directory read-only.
+  pub reusable_input_digests: BTreeMap<RelativePath, Digest>,
 }
 
 impl Process {
@@ -342,6 +357,7 @@ impl Process {
       platform_constraint: None,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
+      reusable_input_digests: BTreeMap::new(),
     }
   }
 
@@ -377,6 +393,14 @@ impl Process {
     append_only_caches: BTreeMap<CacheName, CacheDest>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
+    self
+  }
+
+  ///
+  /// Replaces the reusable digests for this process.
+  ///
+  pub fn reusable_digests(mut self, reusable_digests: BTreeMap<RelativePath, Digest>) -> Self {
+    self.reusable_input_digests = reusable_digests;
     self
   }
 }

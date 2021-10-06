@@ -357,6 +357,25 @@ impl ExecuteProcess {
         None
       };
 
+    let reusable_input_digests = {
+      let py_reusable_input_digests: PyObject =
+        externs::getattr(value, "reusable_input_digests").unwrap();
+      let pydict: PyDict = externs::getattr(&py_reusable_input_digests, "_data").unwrap();
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      let items = pydict
+        .items(py)
+        .into_iter()
+        .map(|(key, value)| {
+          lift_directory_digest(&value).map(|digest| (externs::val_to_str(&key), digest))
+        })
+        .collect::<Result<Vec<(_, _)>, String>>()?;
+      items
+        .into_iter()
+        .map(|(path, digest)| RelativePath::new(path).map(|p| (p, digest)))
+        .collect::<Result<BTreeMap<RelativePath, Digest>, String>>()?
+    };
+
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -372,6 +391,7 @@ impl ExecuteProcess {
       platform_constraint,
       execution_slot_variable,
       cache_scope,
+      reusable_input_digests,
     })
   }
 
