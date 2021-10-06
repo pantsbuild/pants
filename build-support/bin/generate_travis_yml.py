@@ -283,10 +283,11 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False
 ) -> List[str]:
     commands = [
-        "./build-support/bin/install_aws_cli_for_ci.sh",
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
         "pyenv global 2.7.15 3.6.7 3.7.1",
+        # Install AWS after enabling pyenv to ensure that we have a modern python available.
+        "./build-support/bin/install_aws_cli_for_ci.sh",
     ]
     if install_travis_wait:
         commands.extend(
