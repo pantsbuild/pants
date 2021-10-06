@@ -7,9 +7,10 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoExternalPackageDependencies,
-    GoImportPath,
-    GoPackageSources,
+    GoExternalPackageDependenciesField,
+    GoImportPathField,
+    GoInternalPackageSourcesField,
+    GoInternalPackageSubpathField,
 )
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -166,11 +167,11 @@ def error_to_string(d: dict) -> str:
 
 
 def is_first_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoPackageSources)
+    return tgt.has_field(GoInternalPackageSourcesField)
 
 
 def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoExternalPackageDependencies)
+    return tgt.has_field(GoExternalPackageDependenciesField)
 
 
 @rule
@@ -182,46 +183,30 @@ async def resolve_go_package(
         Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
     target = wrapped_target.target
-
-    go_mod_spec_path = owning_go_mod.address.spec_path
-    assert request.address.spec_path.startswith(go_mod_spec_path)
-    spec_subpath = request.address.spec_path[len(go_mod_spec_path) :]
+    subpath = target[GoInternalPackageSubpathField].value
 
     go_mod_info, pkg_sources = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
-        Get(HydratedSources, HydrateSourcesRequest(target[GoPackageSources])),
+        Get(HydratedSources, HydrateSourcesRequest(target[GoInternalPackageSourcesField])),
     )
     input_digest = await Get(
         Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])
     )
 
-    # Compute the import_path for this go_package.
-    import_path_field = target.get(GoImportPath)
-    if import_path_field and import_path_field.value:
-        # Use any explicit import path set on the `go_package` target.
-        import_path = import_path_field.value
-    else:
-        # Otherwise infer the import path from the owning `go_mod` target. The inferred import
-        # path will be the module's import path plus any subdirectories in the spec_path
-        # between the go_mod and go_package target.
-        import_path = f"{go_mod_info.import_path}"
-        if spec_subpath:
-            import_path += spec_subpath if spec_subpath.startswith("/") else f"/{spec_subpath}"
-
     result = await Get(
         ProcessResult,
         GoSdkProcess(
             input_digest=input_digest,
-            command=("list", "-json", f"./{spec_subpath}"),
+            command=("list", "-json", f"./{subpath}"),
             description="Resolve go_package metadata.",
-            working_dir=go_mod_spec_path,
+            working_dir=owning_go_mod.address.spec_path,
         ),
     )
 
     metadata = json.loads(result.stdout)
     return ResolvedGoPackage.from_metadata(
         metadata,
-        import_path=import_path,
+        import_path=target[GoImportPathField].value,
         address=request.address,
         module_address=owning_go_mod.address,
     )

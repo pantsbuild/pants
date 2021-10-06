@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.target_types import GoModTarget, GoPackage
+from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import go_mod, sdk
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.build_graph.address import Address
@@ -23,7 +23,7 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             QueryRule(GoModInfo, [GoModInfoRequest]),
         ],
-        target_types=[GoPackage, GoModTarget],
+        target_types=[GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -63,17 +63,10 @@ def test_go_mod_info(rule_runner: RuleRunner) -> None:
                 """
             ),
             "foo/main.go": "package main\nfunc main() { }\n",
-            "foo/BUILD": dedent(
-                """\
-                go_mod(name='mod')
-                go_package(name='pkg')
-                """
-            ),
+            "foo/BUILD": "go_mod()",
         }
     )
-    go_mod_info = rule_runner.request(
-        GoModInfo, [GoModInfoRequest(Address("foo", target_name="mod"))]
-    )
+    go_mod_info = rule_runner.request(GoModInfo, [GoModInfoRequest(Address("foo"))])
     assert go_mod_info.import_path == "go.example.com/foo"
     assert go_mod_info.modules
     assert any(

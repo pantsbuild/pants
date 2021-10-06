@@ -9,7 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget, GoPackage
+from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_go_pkg,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
         ],
-        target_types=[GoPackage, GoModTarget],
+        target_types=[GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -84,16 +84,13 @@ def test_build_internal_pkg(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "BUILD": dedent(
-                """\
-                go_mod(name="mod")
-                go_package(name="pkg")
-                """
-            ),
+            "BUILD": "go_mod(name='mod')",
         }
     )
     assert_built(
-        rule_runner, Address("", target_name="pkg"), expected_import_paths=["example.com/greeter"]
+        rule_runner,
+        Address("", target_name="mod", generated_name="./"),
+        expected_import_paths=["example.com/greeter"],
     )
 
 
@@ -139,7 +136,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "greeter/quoter/BUILD": "go_package()",
             "greeter/lib.go": dedent(
                 """\
                 package greeter
@@ -156,7 +152,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "greeter/BUILD": "go_package()",
             "main.go": dedent(
                 """\
                 package main
@@ -184,7 +179,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name='mod')
-                go_package(name='pkg')
                 """
             ),
         }
@@ -205,17 +199,25 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     quoter_import_path = "example.com/project/greeter/quoter"
-    assert_built(rule_runner, Address("greeter/quoter"), expected_import_paths=[quoter_import_path])
+    assert_built(
+        rule_runner,
+        Address("", target_name="mod", generated_name="./greeter/quoter"),
+        expected_import_paths=[quoter_import_path],
+    )
 
     greeter_import_paths = [
         "example.com/project/greeter",
         quoter_import_path,
         *xerrors_import_paths,
     ]
-    assert_built(rule_runner, Address("greeter"), expected_import_paths=greeter_import_paths)
+    assert_built(
+        rule_runner,
+        Address("", target_name="mod", generated_name="./greeter"),
+        expected_import_paths=greeter_import_paths,
+    )
 
     assert_built(
         rule_runner,
-        Address("", target_name="pkg"),
+        Address("", target_name="mod", generated_name="./"),
         expected_import_paths=["example.com/project", *greeter_import_paths],
     )

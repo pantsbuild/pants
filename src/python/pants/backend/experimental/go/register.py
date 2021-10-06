@@ -10,8 +10,8 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import (
     GoBinaryTarget,
     GoExternalPackageTarget,
+    GoInternalPackageTarget,
     GoModTarget,
-    GoPackage,
 )
 from pants.backend.go.util_rules import (
     assembly,
@@ -28,7 +28,7 @@ from pants.backend.go.util_rules import (
 
 
 def target_types():
-    return [GoModTarget, GoPackage, GoExternalPackageTarget, GoBinaryTarget]
+    return [GoInternalPackageTarget, GoModTarget, GoExternalPackageTarget, GoBinaryTarget]
 
 
 def rules():

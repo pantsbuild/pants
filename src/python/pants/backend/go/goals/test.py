@@ -1,14 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.go.target_types import GoPackageSources
+
+from __future__ import annotations
+
+from pants.backend.go.target_types import GoInternalPackageSourcesField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 
 
 class GoTestFieldSet(TestFieldSet):
-    required_fields = (GoPackageSources,)
-    sources: GoPackageSources
+    required_fields = (GoInternalPackageSourcesField,)
+
+    sources: GoInternalPackageSourcesField
 
 
 @rule
