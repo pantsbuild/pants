@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.java.util_rules import JdkSetup
-from pants.backend.java.util_rules import rules as java_util_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.process import rules as process_rules
+from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *external_tool_rules(),
             *util_rules(),
-            *java_util_rules(),
+            *jdk_rules(),
             *process_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(JdkSetup, ()),

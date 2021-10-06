@@ -9,7 +9,7 @@ from typing import Optional
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
-    GoExternalPackageTarget,
+    GoExternalPackageImportPathField,
     GoPackageSources,
 )
 from pants.backend.go.util_rules.assembly import (
@@ -19,11 +19,7 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilationRequest,
 )
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
-from pants.backend.go.util_rules.external_module import (
-    DownloadedModule,
-    DownloadedModuleRequest,
-    ResolveExternalGoPackageRequest,
-)
+from pants.backend.go.util_rules.external_pkg import ExternalPkgInfo, ExternalPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
@@ -75,40 +71,45 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
     target = wrapped_target.target
 
     if is_first_party_package_target(target):
-        source_files, resolved_package = await MultiGet(
+        _source_files, _resolved_package = await MultiGet(
             Get(
                 SourceFiles,
                 SourceFilesRequest((target[GoPackageSources],)),
             ),
             Get(ResolvedGoPackage, ResolveGoPackageRequest(address=target.address)),
         )
-        source_files_digest = source_files.snapshot.digest
+        source_files_digest = _source_files.snapshot.digest
         source_files_subpath = target.address.spec_path
+
+        original_import_path = _resolved_package.import_path
+        go_files = _resolved_package.go_files
+        s_files = _resolved_package.s_files
+
     elif is_third_party_package_target(target):
-        assert isinstance(target, GoExternalPackageTarget)
+        original_import_path = target[GoExternalPackageImportPathField].value
+        _module_path = target[GoExternalModulePathField].value
+        source_files_subpath = original_import_path[len(_module_path) :]
+
         _owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_owning_go_mod.address))
-        module_path = target[GoExternalModulePathField].value
-        _downloaded_module, resolved_package = await MultiGet(
-            Get(
-                DownloadedModule,
-                DownloadedModuleRequest(
-                    module_path,
-                    target[GoExternalModuleVersionField].value,
-                    _go_mod_info.stripped_digest,
-                ),
-            ),
-            Get(
-                ResolvedGoPackage,
-                ResolveExternalGoPackageRequest(target, _go_mod_info.stripped_digest),
+        _pkg_info = await Get(
+            ExternalPkgInfo,
+            ExternalPkgInfoRequest(
+                import_path=original_import_path,
+                module_path=_module_path,
+                version=target[GoExternalModuleVersionField].value,
+                go_mod_stripped_digest=_go_mod_info.stripped_digest,
             ),
         )
-        source_files_digest = _downloaded_module.digest
-        source_files_subpath = resolved_package.import_path[len(module_path) :]
+
+        source_files_digest = _pkg_info.digest
+        go_files = _pkg_info.go_files
+        s_files = _pkg_info.s_files
+
     else:
         raise AssertionError(f"Unknown how to build target at address {request.address} with Go.")
 
-    import_path = "main" if request.is_main else resolved_package.import_path
+    import_path = "main" if request.is_main else original_import_path
 
     # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
     #  of its generated targets...Figure this out.
@@ -138,12 +139,10 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
 
     assembly_digests = None
     symabis_path = None
-    if resolved_package.s_files:
+    if s_files:
         assembly_setup = await Get(
             AssemblyPreCompilation,
-            AssemblyPreCompilationRequest(
-                input_digest, resolved_package.s_files, source_files_subpath
-            ),
+            AssemblyPreCompilationRequest(input_digest, s_files, source_files_subpath),
         )
         input_digest = assembly_setup.merged_compilation_input_digest
         assembly_digests = assembly_setup.assembly_digests
@@ -153,7 +152,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         CompiledGoSources,
         CompileGoSourcesRequest(
             digest=input_digest,
-            sources=tuple(f"./{source_files_subpath}/{name}" for name in resolved_package.go_files),
+            sources=tuple(f"./{source_files_subpath}/{name}" for name in go_files),
             import_path=import_path,
             description=f"Compile Go package: {import_path}",
             import_config_path=import_config.CONFIG_PATH,
@@ -167,7 +166,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
             AssemblyPostCompilationRequest(
                 compilation_digest,
                 assembly_digests,
-                resolved_package.s_files,
+                s_files,
                 source_files_subpath,
             ),
         )

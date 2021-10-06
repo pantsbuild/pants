@@ -10,7 +10,7 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.backend.terraform.target_types import TerraformModuleSources
+from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
@@ -114,7 +114,7 @@ async def setup_process_for_parse_terraform_module_sources(
 
 
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
-    infer_from = TerraformModuleSources
+    infer_from = TerraformModuleSourcesField
 
 
 @rule
@@ -142,7 +142,7 @@ async def infer_terraform_module_dependencies(
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
     # per directory.
     terraform_module_addresses = [
-        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSources)
+        tgt.address for tgt in candidate_targets if tgt.has_field(TerraformModuleSourcesField)
     ]
     return InferredDependencies(terraform_module_addresses)
 

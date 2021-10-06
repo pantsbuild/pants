@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.java import classpath, tailor
-from pants.backend.java import util_rules as java_util_rules
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import (
     import_parser,
@@ -11,7 +10,9 @@ from pants.backend.java.dependency_inference import (
     package_mapper,
 )
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
+from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
+    DeployJar,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
     JunitTestsGeneratorTarget,
@@ -19,6 +20,7 @@ from pants.backend.java.target_types import (
 )
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.java.test import junit
+from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import coursier
 from pants.jvm.resolve import coursier_fetch, coursier_setup
@@ -27,6 +29,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 
 def target_types():
     return [
+        DeployJar,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
@@ -41,6 +44,7 @@ def rules():
         *javac.rules(),
         *junit.rules(),
         *classpath.rules(),
+        *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
@@ -51,6 +55,6 @@ def rules():
         *dependency_inference_rules.rules(),
         *tailor.rules(),
         *jvm_util_rules.rules(),
-        *java_util_rules.rules(),
+        *jdk_rules.rules(),
         *target_types_rules(),
     ]

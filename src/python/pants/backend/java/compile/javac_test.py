@@ -8,14 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java import util_rules as java_util_rules
-from pants.backend.java.compile.javac import (
-    CompiledClassfiles,
-    CompileJavaSourceRequest,
-    CompileResult,
-    FallibleCompiledClassfiles,
-    JavacCheckRequest,
-)
+from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
@@ -30,6 +23,8 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.jvm import jdk_rules
+from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
@@ -61,7 +56,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *target_types_rules(),
             *coursier_rules(),
-            *java_util_rules.rules(),
+            *jdk_rules.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),

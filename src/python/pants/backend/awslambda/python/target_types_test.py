@@ -19,9 +19,8 @@ from pants.backend.awslambda.python.target_types import rules as target_type_rul
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -91,10 +90,10 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
     assert_resolved("path.to.lambda:func", expected="path.to.lambda:func", is_file=False)
     assert_resolved("lambda.py:func", expected="project.lambda:func", is_file=True)
 
-    with pytest.raises(ExecutionError):
+    with engine_error(contains="Unmatched glob"):
         assert_resolved("doesnt_exist.py:func", expected="doesnt matter", is_file=True)
     # Resolving >1 file is an error.
-    with pytest.raises(ExecutionError):
+    with engine_error(InvalidFieldException):
         assert_resolved("*.py:func", expected="doesnt matter", is_file=True)
 
 

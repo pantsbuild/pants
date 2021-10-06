@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
+
+from __future__ import annotations
+
+from textwrap import dedent
 
 import pytest
 
@@ -8,8 +11,13 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import (
     GenerateGoExternalPackageTargetsRequest,
     InferGoPackageDependenciesRequest,
+    InjectGoBinaryMainDependencyRequest,
 )
 from pants.backend.go.target_types import (
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
+    GoBinaryTarget,
     GoExternalModulePathField,
     GoExternalModuleVersionField,
     GoExternalPackageImportPathField,
@@ -19,8 +27,10 @@ from pants.backend.go.target_types import (
     GoPackage,
     GoPackageSources,
 )
-from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
+from pants.backend.go.util_rules import external_pkg, go_mod, go_pkg, sdk
+from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
@@ -28,10 +38,12 @@ from pants.engine.target import (
     DependenciesRequest,
     GeneratedTargets,
     InferredDependencies,
+    InjectedDependencies,
+    InvalidFieldException,
     Target,
     Targets,
 )
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -41,12 +53,20 @@ def rule_runner() -> RuleRunner:
         rules=[
             *go_mod.rules(),
             *go_pkg.rules(),
-            *external_module.rules(),
+            *external_pkg.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, [DependenciesRequest]),
+            QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
+            QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
         ],
-        target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
+        target_types=[
+            GoPackage,
+            GoModTarget,
+            GoExternalPackageTarget,
+            GoBinaryTarget,
+            GenericTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -86,7 +106,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         (
             {
                 "foo/BUILD": "go_mod()",
-                "foo/go.mod": textwrap.dedent(
+                "foo/go.mod": dedent(
                     """\
                     module go.example.com/foo
                     go 1.17
@@ -94,7 +114,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     require github.com/google/go-cmp v0.4.0
                     """
                 ),
-                "foo/go.sum": textwrap.dedent(
+                "foo/go.sum": dedent(
                     """\
                     github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
                     github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
@@ -103,7 +123,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     """
                 ),
                 "foo/pkg/BUILD": "go_package()\n",
-                "foo/pkg/foo.go": textwrap.dedent(
+                "foo/pkg/foo.go": dedent(
                     """\
                     package pkg
                     import "github.com/google/go-cmp/cmp"
@@ -113,7 +133,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     """
                 ),
                 "foo/cmd/BUILD": "go_package()\n",
-                "foo/cmd/main.go": textwrap.dedent(
+                "foo/cmd/main.go": dedent(
                     """\
                     package main
                     import (
@@ -151,7 +171,7 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/go/BUILD": "go_mod()\n",
-            "src/go/go.mod": textwrap.dedent(
+            "src/go/go.mod": dedent(
                 """\
                 module example.com/src/go
                 go 1.17
@@ -162,7 +182,7 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/go/go.sum": textwrap.dedent(
+            "src/go/go.sum": dedent(
                 """\
                 github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
                 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
@@ -231,3 +251,62 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     )
     assert list(generated.keys()) == list(expected.keys())
     assert generated == expected
+
+
+# -----------------------------------------------------------------------------------------------
+# The `main` field for `go_binary`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "explicit/BUILD": dedent(
+                """\
+                go_package(name='pkg', sources=[])
+                go_binary(main=':pkg')
+                """
+            ),
+            "inferred/BUILD": dedent(
+                """\
+                go_package(name='pkg', sources=[])
+                go_binary()
+                """
+            ),
+            "ambiguous/BUILD": dedent(
+                """\
+                go_package(name='pkg1', sources=[])
+                go_package(name='pkg2', sources=[])
+                go_binary()
+                """
+            ),
+            "missing/BUILD": "go_binary()",
+            "explicit_wrong_type/BUILD": dedent(
+                """\
+                target(name='dep')
+                go_binary(main=':dep')
+                """
+            ),
+        }
+    )
+
+    def get_main(addr: Address) -> Address:
+        tgt = rule_runner.get_target(addr)
+        main_addr = rule_runner.request(
+            GoBinaryMainPackage, [GoBinaryMainPackageRequest(tgt[GoBinaryMainPackageField])]
+        ).address
+        injected_addresses = rule_runner.request(
+            InjectedDependencies, [InjectGoBinaryMainDependencyRequest(tgt[Dependencies])]
+        )
+        assert [main_addr] == list(injected_addresses)
+        return main_addr
+
+    assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")
+    assert get_main(Address("inferred")) == Address("inferred", target_name="pkg")
+
+    with engine_error(ResolveError, contains="none were found"):
+        get_main(Address("missing"))
+    with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
+        get_main(Address("ambiguous"))
+    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
+        get_main(Address("explicit_wrong_type"))

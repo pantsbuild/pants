@@ -11,10 +11,10 @@ resources(name="impl", sources=["*.c"])
 python_distribution(
     name = "dist",
     dependencies = [":impl", ":lib"],
+    generate_setup = False,
     provides = python_artifact(
         name = "native",
         version = "2.3.4",
-        setup_script='setup.py',
     ),
     sdist = False,
     wheel_config_settings = {"--global-option": ["--python-tag", "py36.py37"]}

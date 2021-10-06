@@ -117,7 +117,7 @@ class PythonInferSubsystem(Subsystem):
 
     @property
     def string_imports_min_dots(self) -> int:
-        return cast(bool, self.options.string_imports_min_dots)
+        return cast(int, self.options.string_imports_min_dots)
 
     @property
     def inits(self) -> bool:
