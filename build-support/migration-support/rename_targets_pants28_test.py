@@ -12,7 +12,7 @@ from rename_targets_pants28 import maybe_rewrite_build
 from pants.util.contextutil import temporary_dir
 
 
-def maybe_rewrite(content: str) -> str | None:
+def maybe_rewrite(content: str) -> list[str] | None:
     with temporary_dir() as tmpdir:
         build = Path(tmpdir, "BUILD")
         build.write_text(content)
