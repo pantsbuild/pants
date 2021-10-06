@@ -101,11 +101,9 @@ class PackageRootedDependencyMap:
         }
 
     def __repr__(self) -> str:
-        type_map = ", ".join([f"{ty}:{addr}" for ty, addr in self._type_map.items()])
+        type_map = ", ".join(f"{ty}:{addr}" for ty, addr in self._type_map.items())
         package_map = ", ".join(
-            [
-                f"{pkg}:{', '.join([str(addr) for addr in addrs])}"
-                for pkg, addrs in self._package_map.items()
-            ]
+            f"{pkg}:{', '.join(str(addr) for addr in addrs)}"
+            for pkg, addrs in self._package_map.items()
         )
         return f"PackageRootedDependencyMap(type_map={type_map}, package_map={package_map})"
