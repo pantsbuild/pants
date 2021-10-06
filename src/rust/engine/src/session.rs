@@ -9,7 +9,6 @@ use std::time::{Duration, Instant};
 use crate::context::Core;
 use crate::core::{Failure, Value};
 use crate::nodes::{NodeKey, Select};
-use crate::scheduler::Scheduler;
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable};
@@ -142,7 +141,7 @@ pub struct Session {
 
 impl Session {
   pub fn new(
-    scheduler: &Scheduler,
+    core: Arc<Core>,
     should_render_ui: bool,
     build_id: String,
     session_values: Value,
@@ -151,7 +150,7 @@ impl Session {
     let workunit_store = WorkunitStore::new(!should_render_ui);
     let display = Mutex::new(SessionDisplay::new(
       &workunit_store,
-      scheduler.core.local_parallelism,
+      core.local_parallelism,
       should_render_ui,
     ));
 
@@ -161,12 +160,13 @@ impl Session {
       isolated: false,
       display,
     });
-    scheduler.core.sessions.add(&handle)?;
+    core.sessions.add(&handle)?;
+    let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
       state: Arc::new(SessionState {
-        core: scheduler.core.clone(),
-        preceding_graph_size: scheduler.core.graph.len(),
+        core,
+        preceding_graph_size,
         roots: Mutex::new(HashMap::new()),
         workunit_store,
         session_values: Mutex::new(session_values),
