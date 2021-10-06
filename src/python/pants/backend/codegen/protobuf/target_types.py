@@ -20,41 +20,75 @@ from pants.util.docutil import doc_url
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# Protobuf targets.
-class ProtobufDependencies(Dependencies):
+# `protobuf_source` targets.
+class ProtobufDependenciesField(Dependencies):
     pass
 
 
-class ProtobufSources(Sources):
-    default = ("*.proto",)
-    expected_file_extensions = (".proto",)
-
-
-class ProtobufGrpcToggle(BoolField):
+class ProtobufGrpcToggleField(BoolField):
     alias = "grpc"
     default = False
     help = "Whether to generate gRPC code or not."
 
 
-class ProtobufLibrary(Target):
-    alias = "protobuf_library"
-    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrpcToggle)
+# -----------------------------------------------------------------------------------------------
+# `protobuf_source` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ProtobufSourcesField(Sources):
+    expected_file_extensions = (".proto",)
+    expected_num_files = 1
+    required = True
+
+
+class ProtobufSourceTarget(Target):
+    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ProtobufDependenciesField,
+        ProtobufSourcesField,
+        ProtobufGrpcToggleField,
+    )
+    help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."
+
+
+# -----------------------------------------------------------------------------------------------
+# `protobuf_sources` target generator
+# -----------------------------------------------------------------------------------------------
+
+
+class ProtobufSourcesGeneratingSourcesField(Sources):
+    default = ("*.proto",)
+    expected_file_extensions = (".proto",)
+
+
+class ProtobufSourcesGeneratorTarget(Target):
+    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_sources` when ready. Update `help` too.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ProtobufDependenciesField,
+        ProtobufSourcesGeneratingSourcesField,
+        ProtobufGrpcToggleField,
+    )
     help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."
 
 
-class GenerateTargetsFromProtobufLibrary(GenerateTargetsRequest):
-    generate_from = ProtobufLibrary
+class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
+    generate_from = ProtobufSourcesGeneratorTarget
 
 
 @rule
 async def generate_targets_from_protobuf_library(
-    request: GenerateTargetsFromProtobufLibrary,
+    request: GenerateTargetsFromProtobufSources,
     protoc: Protoc,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSourcesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
-        ProtobufLibrary,
+        ProtobufSourceTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -65,5 +99,5 @@ async def generate_targets_from_protobuf_library(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromProtobufLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromProtobufSources),
     )

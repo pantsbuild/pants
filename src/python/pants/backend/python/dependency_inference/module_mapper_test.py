@@ -10,7 +10,7 @@ import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_type_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
@@ -174,7 +174,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ThirdPartyPythonModuleMapping, []),
             QueryRule(PythonModuleOwners, [PythonModule]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary, ProtobufLibrary],
+        target_types=[PythonLibrary, PythonRequirementLibrary, ProtobufSourceTarget],
     )
 
 

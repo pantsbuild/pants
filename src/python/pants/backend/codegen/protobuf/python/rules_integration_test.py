@@ -15,14 +15,17 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourcesField,
+    ProtobufSourcesGeneratorTarget,
+)
+from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 GRPC_PROTO_STANZA = """
 syntax = "proto3";
@@ -55,36 +58,31 @@ def rule_runner() -> RuleRunner:
             *protobuf_subsystem_rules(),
             *additional_fields.rules(),
             *stripped_source_files.rules(),
+            *target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromProtobufRequest]),
         ],
-        target_types=[ProtobufLibrary],
+        target_types=[ProtobufSourcesGeneratorTarget],
     )
 
 
 def assert_files_generated(
     rule_runner: RuleRunner,
-    spec: str,
+    address: Address,
     *,
     expected_files: List[str],
     source_roots: List[str],
     mypy: bool = False,
     extra_args: list[str] | None = None,
 ) -> None:
-    options = [
-        "--backend-packages=pants.backend.codegen.protobuf.python",
-        f"--source-root-patterns={repr(source_roots)}",
-        *(extra_args or ()),
-    ]
+    args = [f"--source-root-patterns={repr(source_roots)}", *(extra_args or ())]
     if mypy:
-        options.append("--python-protobuf-mypy-plugin")
-    rule_runner.set_options(
-        options,
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
-    tgt = rule_runner.get_target(Address(spec))
+        args.append("--python-protobuf-mypy-plugin")
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    tgt = rule_runner.get_target(address)
+    print(type(tgt))
     protocol_sources = rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources])]
+        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourcesField])]
     )
     generated_sources = rule_runner.request(
         GeneratedSources,
@@ -150,24 +148,27 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    source_roots = ["src/python", "/src/protobuf", "/tests/protobuf"]
-    assert_files_generated(
-        rule_runner,
-        "src/protobuf/dir1",
-        source_roots=source_roots,
-        expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f2_pb2.py"],
+
+    def assert_gen(addr: Address, expected: str) -> None:
+        assert_files_generated(
+            rule_runner,
+            addr,
+            source_roots=["src/python", "/src/protobuf", "/tests/protobuf"],
+            expected_files=[expected],
+        )
+
+    assert_gen(
+        Address("src/protobuf/dir1", relative_file_path="f.proto"), "src/protobuf/dir1/f_pb2.py"
     )
-    assert_files_generated(
-        rule_runner,
-        "src/protobuf/dir2",
-        source_roots=source_roots,
-        expected_files=["src/python/dir2/f_pb2.py"],
+    assert_gen(
+        Address("src/protobuf/dir1", relative_file_path="f2.proto"), "src/protobuf/dir1/f2_pb2.py"
     )
-    assert_files_generated(
-        rule_runner,
-        "tests/protobuf/test_protos",
-        source_roots=source_roots,
-        expected_files=["tests/protobuf/test_protos/f_pb2.py"],
+    assert_gen(
+        Address("src/protobuf/dir2", relative_file_path="f.proto"), "src/protobuf/dir2/f_pb2.py"
+    )
+    assert_gen(
+        Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
+        "tests/protobuf/test_protos/f_pb2.py",
     )
 
 
@@ -185,7 +186,10 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
         }
     )
     assert_files_generated(
-        rule_runner, "protos", source_roots=["/"], expected_files=["protos/f_pb2.py"]
+        rule_runner,
+        Address("protos", relative_file_path="f.proto"),
+        source_roots=["/"],
+        expected_files=["protos/f_pb2.py"],
     )
 
 
@@ -204,7 +208,7 @@ def test_top_level_python_source_root(rule_runner: RuleRunner) -> None:
     )
     assert_files_generated(
         rule_runner,
-        "src/proto/protos",
+        Address("src/proto/protos", relative_file_path="f.proto"),
         source_roots=["/", "src/proto"],
         expected_files=["protos/f_pb2.py"],
     )
@@ -223,12 +227,13 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
             "src/protobuf/dir1/BUILD": "protobuf_library(python_source_root='notasourceroot')",
         }
     )
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(NoSourceRootError):
         assert_files_generated(
-            rule_runner, "src/protobuf/dir1", source_roots=["src/protobuf"], expected_files=[]
+            rule_runner,
+            Address("src/protobuf/dir1", relative_file_path="f.proto"),
+            source_roots=["src/protobuf"],
+            expected_files=[],
         )
-    assert len(exc.value.wrapped_exceptions) == 1
-    assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)
 
 
 @pytest.mark.platform_specific_behavior
@@ -257,7 +262,7 @@ def test_mypy_plugin(rule_runner: RuleRunner, major_minor_interpreter: str) -> N
     )
     assert_files_generated(
         rule_runner,
-        "src/protobuf/dir1",
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-protobuf-mypy-plugin",
@@ -276,7 +281,7 @@ def test_grpc(rule_runner: RuleRunner) -> None:
     )
     assert_files_generated(
         rule_runner,
-        "src/protobuf/dir1",
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
         source_roots=["src/protobuf"],
         expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2_grpc.py"],
     )
@@ -291,7 +296,7 @@ def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
     )
     assert_files_generated(
         rule_runner,
-        "src/protobuf/dir1",
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
         source_roots=["src/protobuf"],
         mypy=True,
         expected_files=[
@@ -312,7 +317,7 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
     )
     assert_files_generated(
         rule_runner,
-        "src/protobuf/dir1",
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-protobuf-mypy-plugin",

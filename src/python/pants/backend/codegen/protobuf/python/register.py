@@ -15,7 +15,7 @@ from pants.backend.codegen.protobuf.python import (
     python_protobuf_subsystem,
 )
 from pants.backend.codegen.protobuf.python.rules import rules as python_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_rules
 
 
@@ -33,4 +33,4 @@ def rules():
 
 
 def target_types():
-    return [ProtobufLibrary]
+    return [ProtobufSourcesGeneratorTarget]
