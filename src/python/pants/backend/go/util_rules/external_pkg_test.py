@@ -7,20 +7,18 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoExternalPackageTarget, GoModTarget
-from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
-from pants.backend.go.util_rules.external_module import (
-    AllDownloadedModules,
-    AllDownloadedModulesRequest,
-    DownloadedModule,
-    DownloadedModuleRequest,
-    ExternalModulePkgImportPaths,
-    ExternalModulePkgImportPathsRequest,
-    ResolveExternalGoPackageRequest,
+from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.util_rules import external_pkg, sdk
+from pants.backend.go.util_rules.external_pkg import (
+    ExternalModuleInfo,
+    ExternalModuleInfoRequest,
+    ExternalPkgInfo,
+    ExternalPkgInfoRequest,
+    _AllDownloadedModules,
+    _AllDownloadedModulesRequest,
+    _DownloadedModule,
+    _DownloadedModuleRequest,
 )
-from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
-from pants.engine.addresses import Address
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
@@ -32,14 +30,11 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *sdk.rules(),
-            *go_mod.rules(),
-            *go_pkg.rules(),
-            *external_module.rules(),
-            *target_type_rules.rules(),
-            QueryRule(AllDownloadedModules, [AllDownloadedModulesRequest]),
-            QueryRule(DownloadedModule, [DownloadedModuleRequest]),
-            QueryRule(ExternalModulePkgImportPaths, [ExternalModulePkgImportPathsRequest]),
-            QueryRule(ResolvedGoPackage, [ResolveExternalGoPackageRequest]),
+            *external_pkg.rules(),
+            QueryRule(_AllDownloadedModules, [_AllDownloadedModulesRequest]),
+            QueryRule(_DownloadedModule, [_DownloadedModuleRequest]),
+            QueryRule(ExternalModuleInfo, [ExternalModuleInfoRequest]),
+            QueryRule(ExternalPkgInfo, [ExternalPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -94,10 +89,15 @@ GO_SUM = dedent(
 )
 
 
+# -----------------------------------------------------------------------------------------------
+# Download modules
+# -----------------------------------------------------------------------------------------------
+
+
 def test_download_modules(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     downloaded_modules = rule_runner.request(
-        AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)]
+        _AllDownloadedModules, [_AllDownloadedModulesRequest(input_digest)]
     )
     assert len(downloaded_modules) == 7
 
@@ -110,7 +110,7 @@ def test_download_modules(rule_runner: RuleRunner) -> None:
         assert sample_file in snapshot.files
 
         extracted_module = rule_runner.request(
-            DownloadedModule, [DownloadedModuleRequest(module, version, input_digest)]
+            _DownloadedModule, [_DownloadedModuleRequest(module, version, input_digest)]
         )
         extracted_snapshot = rule_runner.request(Snapshot, [extracted_module.digest])
         assert extracted_snapshot == snapshot
@@ -130,8 +130,8 @@ def test_download_modules_missing_module(rule_runner: RuleRunner) -> None:
         AssertionError, contains="The module some_project.org/project@v1.1 was not downloaded"
     ):
         rule_runner.request(
-            DownloadedModule,
-            [DownloadedModuleRequest("some_project.org/project", "v1.1", input_digest)],
+            _DownloadedModule,
+            [_DownloadedModuleRequest("some_project.org/project", "v1.1", input_digest)],
         )
 
 
@@ -154,7 +154,7 @@ def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
         }
     ).digest
     with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
-        rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
+        rule_runner.request(_AllDownloadedModules, [_AllDownloadedModulesRequest(input_digest)])
 
 
 def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
@@ -177,110 +177,109 @@ def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
         }
     ).digest
     with engine_error(contains="`go.mod` and/or `go.sum` changed!"):
-        rule_runner.request(AllDownloadedModules, [AllDownloadedModulesRequest(input_digest)])
+        rule_runner.request(_AllDownloadedModules, [_AllDownloadedModulesRequest(input_digest)])
 
 
-def test_determine_external_package_info(rule_runner: RuleRunner) -> None:
+# -----------------------------------------------------------------------------------------------
+# Determine package info
+# -----------------------------------------------------------------------------------------------
+
+
+def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"go.mod": GO_MOD, "go.sum": GO_SUM, "BUILD": "go_mod(name='mod')"})
     input_digest = rule_runner.request(Digest, [PathGlobs(["go.mod", "go.sum"])])
 
-    def get_pkg_info(import_path: str) -> ResolvedGoPackage:
-        pkg_addr = Address("", target_name="mod", generated_name=import_path)
-        tgt = rule_runner.get_target(pkg_addr)
-        assert isinstance(tgt, GoExternalPackageTarget)
-        result = rule_runner.request(
-            ResolvedGoPackage, [ResolveExternalGoPackageRequest(tgt, input_digest)]
-        )
-        assert result.address == pkg_addr
-        assert result.module_address is None
-        assert result.import_path == import_path
-        return result
-
-    cmp_info = get_pkg_info("github.com/google/go-cmp/cmp/cmpopts")
-    assert cmp_info.module_path == "github.com/google/go-cmp"
-    assert cmp_info.module_version == "v0.5.6"
-    assert cmp_info.package_name == "cmpopts"
-    assert cmp_info.imports == (
-        "errors",
-        "fmt",
-        "github.com/google/go-cmp/cmp",
-        "github.com/google/go-cmp/cmp/internal/function",
-        "math",
-        "reflect",
-        "sort",
-        "strings",
-        "time",
-        "unicode",
-        "unicode/utf8",
-    )
-    assert cmp_info.test_imports == (
-        "bytes",
-        "errors",
-        "fmt",
-        "github.com/google/go-cmp/cmp",
-        "golang.org/x/xerrors",
-        "io",
-        "math",
-        "reflect",
-        "strings",
-        "sync",
-        "testing",
-        "time",
-    )
-    assert cmp_info.go_files == (
-        "equate.go",
-        "errors_go113.go",
-        "ignore.go",
-        "sort.go",
-        "struct_filter.go",
-        "xform.go",
-    )
-    assert cmp_info.test_go_files == ("util_test.go",)
-    assert cmp_info.xtest_go_files == ("example_test.go",)
-    assert not cmp_info.c_files
-    assert not cmp_info.cgo_files
-    assert not cmp_info.cxx_files
-    assert not cmp_info.m_files
-    assert not cmp_info.h_files
-    assert not cmp_info.s_files
-    assert not cmp_info.syso_files
-
-    # Spot check that the other modules can be analyzed.
-    for pkg in (
-        "cloud.google.com/go/bigquery",
-        "github.com/google/uuid",
-        "golang.org/x/text/collate",
-        "golang.org/x/xerrors",
-        "rsc.io/quote",
-        "rsc.io/sampler",
-    ):
-        get_pkg_info(pkg)
-
-
-def test_determine_external_module_package_import_paths(rule_runner: RuleRunner) -> None:
-    input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
-
-    def assert_packages(
-        module_path: str, version: str, expected: list[str], *, check_subset: bool = False
+    def assert_module(
+        module: str,
+        version: str,
+        expected: list[str] | dict[str, ExternalPkgInfo],
+        *,
+        check_subset: bool = False,
     ) -> None:
-        result = rule_runner.request(
-            ExternalModulePkgImportPaths,
-            [ExternalModulePkgImportPathsRequest(module_path, version, input_digest)],
+        module_info = rule_runner.request(
+            ExternalModuleInfo, [ExternalModuleInfoRequest(module, version, input_digest)]
         )
+        # If `check_subset`, check that the expected import_paths are included.
         if check_subset:
-            assert set(expected).issubset(result)
+            assert isinstance(expected, list)
+            assert set(expected).issubset(module_info.keys())
         else:
-            assert list(result) == expected
+            # If expected is a dict, check that the ExternalPkgInfo is correct for each package.
+            if isinstance(expected, dict):
+                assert dict(module_info) == expected
+            # Else, only check that the import paths are present.
+            else:
+                assert list(module_info.keys()) == expected
 
-    assert_packages(
+        # Check our subsetting logic.
+        for pkg_info in module_info.values():
+            extracted_pkg = rule_runner.request(
+                ExternalPkgInfo,
+                [ExternalPkgInfoRequest(pkg_info.import_path, module, version, input_digest)],
+            )
+            assert extracted_pkg == pkg_info
+
+    assert_module(
         "cloud.google.com/go",
         "v0.26.0",
         ["cloud.google.com/go/bigquery", "cloud.google.com/go/firestore"],
         check_subset=True,
     )
-    assert_packages("github.com/google/uuid", "v1.3.0", ["github.com/google/uuid"])
 
-    assert_packages(
+    uuid_mod = "github.com/google/uuid"
+    uuid_version = "v1.3.0"
+    uuid_digest = rule_runner.request(
+        _DownloadedModule, [_DownloadedModuleRequest(uuid_mod, uuid_version, input_digest)]
+    ).digest
+    assert_module(
+        uuid_mod,
+        uuid_version,
+        {
+            uuid_mod: ExternalPkgInfo(
+                import_path=uuid_mod,
+                module_path=uuid_mod,
+                version=uuid_version,
+                digest=uuid_digest,
+                imports=(
+                    "bytes",
+                    "crypto/md5",
+                    "crypto/rand",
+                    "crypto/sha1",
+                    "database/sql/driver",
+                    "encoding/binary",
+                    "encoding/hex",
+                    "encoding/json",
+                    "errors",
+                    "fmt",
+                    "hash",
+                    "io",
+                    "net",
+                    "os",
+                    "strings",
+                    "sync",
+                    "time",
+                ),
+                go_files=(
+                    "dce.go",
+                    "doc.go",
+                    "hash.go",
+                    "marshal.go",
+                    "node.go",
+                    "node_net.go",
+                    "null.go",
+                    "sql.go",
+                    "time.go",
+                    "util.go",
+                    "uuid.go",
+                    "version1.go",
+                    "version4.go",
+                ),
+                s_files=(),
+            )
+        },
+    )
+
+    assert_module(
         "github.com/google/go-cmp",
         "v0.5.6",
         [
@@ -296,17 +295,36 @@ def test_determine_external_module_package_import_paths(rule_runner: RuleRunner)
             "github.com/google/go-cmp/cmp/internal/value",
         ],
     )
-    assert_packages(
+    assert_module(
         "golang.org/x/text",
         "v0.0.0-20170915032832-14c0d48ead0c",
         ["golang.org/x/text/cmd/gotext", "golang.org/x/text/collate"],
         check_subset=True,
     )
-    assert_packages(
+    assert_module(
         "golang.org/x/xerrors",
         "v0.0.0-20191204190536-9bdfabe68543",
         ["golang.org/x/xerrors", "golang.org/x/xerrors/internal"],
     )
 
-    assert_packages("rsc.io/quote", "v1.5.2", ["rsc.io/quote", "rsc.io/quote/buggy"])
-    assert_packages("rsc.io/sampler", "v1.3.0", ["rsc.io/sampler"])
+    assert_module("rsc.io/quote", "v1.5.2", ["rsc.io/quote", "rsc.io/quote/buggy"])
+    assert_module("rsc.io/sampler", "v1.3.0", ["rsc.io/sampler"])
+
+
+def test_determine_pkg_info_missing(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
+    with engine_error(
+        AssertionError,
+        contains=(
+            "The package another_project.org/foo does not belong to the module "
+            "github.com/google/uuid@v1.3.0"
+        ),
+    ):
+        rule_runner.request(
+            ExternalPkgInfo,
+            [
+                ExternalPkgInfoRequest(
+                    "another_project.org/foo", "github.com/google/uuid", "v1.3.0", input_digest
+                )
+            ],
+        )
