@@ -56,8 +56,8 @@ def test_print_tool_help_info(capsys, tool_info) -> None:
     assert captured.out == dedent(
         """\
         test  Test description.
-            Version: 1.0
-            URL template: https://download/{version}
+              Version: 1.0
+              URL template: https://download/{version}
 
         """
     )

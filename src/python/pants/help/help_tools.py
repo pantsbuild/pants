@@ -64,16 +64,16 @@ class ToolHelpInfo:
         lines[0] = lines[0].replace(self.name, color.maybe_cyan(self.name), 1)
         version = _wrap(
             f"Version: {self.version}",
-            initial_indent=" " * 4,
-            subsequent_indent=_indent(13),
+            initial_indent=_indent(description_padding),
+            subsequent_indent=_indent(description_padding),
         )
         if not self.url_template:
             url_template = []
         else:
             url_template = _wrap(
                 f"URL template: {self.url_template}",
-                initial_indent=" " * 4,
-                subsequent_indent=_indent(18),
+                initial_indent=_indent(description_padding),
+                subsequent_indent=_indent(description_padding),
             )
         print("\n".join(lines))
         print(color.maybe_magenta("\n".join([*version, *url_template, ""])))
