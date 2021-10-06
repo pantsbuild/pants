@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
 from pathlib import PurePath
-from typing import Dict, Iterator
+from typing import Iterator
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
@@ -227,9 +227,9 @@ def pants_log_path(workdir: PurePath) -> PurePath:
 
 def _get_log_levels_by_target(
     global_bootstrap_options: OptionValueContainer,
-) -> Dict[str, LogLevel]:
+) -> dict[str, LogLevel]:
     raw_levels = global_bootstrap_options.log_levels_by_target
-    levels: Dict[str, LogLevel] = {}
+    levels: dict[str, LogLevel] = {}
     for key, value in raw_levels.items():
         if not isinstance(key, str):
             raise ValueError(

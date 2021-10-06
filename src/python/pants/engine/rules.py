@@ -11,19 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-    get_type_hints,
-)
+from typing import Any, Callable, Iterable, Mapping, Sequence, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
@@ -42,14 +30,14 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 class _RuleVisitor(ast.NodeVisitor):
     """Pull `Get` calls out of an @rule body."""
 
-    def __init__(self, *, resolve_type: Callable[[str], Type[Any]], source_file_name: str) -> None:
+    def __init__(self, *, resolve_type: Callable[[str], type[Any]], source_file_name: str) -> None:
         super().__init__()
         self.source_file_name = source_file_name
         self.resolve_type = resolve_type
-        self.gets: List[GetConstraints] = []
+        self.gets: list[GetConstraints] = []
 
     @staticmethod
-    def maybe_extract_get_args(call_node: ast.Call) -> Optional[List[ast.expr]]:
+    def maybe_extract_get_args(call_node: ast.Call) -> list[ast.expr] | None:
         """Check if the node looks like a Get(T, ...) call."""
         if not isinstance(call_node.func, ast.Name):
             return None
@@ -76,7 +64,7 @@ class _RuleVisitor(ast.NodeVisitor):
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
+def SubsystemRule(subsystem: type[Subsystem]) -> TaskRule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     return TaskRule(**subsystem.signature())
 
@@ -97,12 +85,12 @@ class RuleType(Enum):
 
 def _make_rule(
     rule_type: RuleType,
-    return_type: Type,
-    parameter_types: Iterable[Type],
+    return_type: type,
+    parameter_types: Iterable[type],
     *,
     cacheable: bool,
     canonical_name: str,
-    desc: Optional[str],
+    desc: str | None,
     level: LogLevel,
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
@@ -209,10 +197,10 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
 
 def _ensure_type_annotation(
     *,
-    type_annotation: Optional[Type],
+    type_annotation: type | None,
     name: str,
-    raise_type: Type[InvalidTypeAnnotation],
-) -> Type:
+    raise_type: type[InvalidTypeAnnotation],
+) -> type:
     if type_annotation is None:
         raise raise_type(f"{name} is missing a type annotation.")
     if not isinstance(type_annotation, type):
@@ -294,7 +282,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
 
 def validate_parameter_types(
-    func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool
+    func_id: str, parameter_types: tuple[type, ...], cacheable: bool
 ) -> None:
     if cacheable:
         for ty in parameter_types:
@@ -346,7 +334,7 @@ class Rule(ABC):
         """An output `type` for the rule."""
 
 
-def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
+def collect_rules(*namespaces: ModuleType | Mapping[str, Any]) -> Iterable[Rule]:
     """Collects all @rules in the given namespaces.
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
@@ -386,23 +374,23 @@ class TaskRule(Rule):
     prefer the `@rule` constructor.
     """
 
-    _output_type: Type
-    input_selectors: Tuple[Type, ...]
-    input_gets: Tuple[GetConstraints, ...]
+    _output_type: type
+    input_selectors: tuple[type, ...]
+    input_gets: tuple[GetConstraints, ...]
     func: Callable
     cacheable: bool
     canonical_name: str
-    desc: Optional[str]
+    desc: str | None
     level: LogLevel
 
     def __init__(
         self,
-        output_type: Type,
-        input_selectors: Iterable[Type],
+        output_type: type,
+        input_selectors: Iterable[type],
         func: Callable,
         input_gets: Iterable[GetConstraints],
         canonical_name: str,
-        desc: Optional[str] = None,
+        desc: str | None = None,
         level: LogLevel = LogLevel.TRACE,
         cacheable: bool = True,
     ) -> None:
@@ -438,10 +426,10 @@ class QueryRule(Rule):
     that the relevant portions of the RuleGraph are generated.
     """
 
-    _output_type: Type
-    input_types: Tuple[Type, ...]
+    _output_type: type
+    input_types: tuple[type, ...]
 
-    def __init__(self, output_type: Type, input_types: Sequence[Type]) -> None:
+    def __init__(self, output_type: type, input_types: Sequence[type]) -> None:
         self._output_type = output_type
         self.input_types = tuple(input_types)
 
