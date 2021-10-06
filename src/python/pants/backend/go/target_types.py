@@ -21,36 +21,15 @@ from pants.engine.target import (
 )
 
 
-class GoSources(Sources):
-    expected_file_extensions = (".go", ".s")
-
-
-# -----------------------------------------------------------------------------------------------
-# `go_package` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GoPackageSources(GoSources):
-    default = ("*.go", "*.s")
-
-
-class GoImportPath(StringField):
+class GoImportPathField(StringField):
     alias = "import_path"
-    help = "Import path in Go code to import this package or module."
-
-
-class GoPackageDependencies(Dependencies):
-    pass
-
-
-class GoPackage(Target):
-    alias = "go_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependencies, GoPackageSources, GoImportPath)
-    help = "A single Go package."
+    help = "Import path in Go code to import this package."
+    required = True
+    value: str
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_mod` target
+# `go_mod` target generator
 # -----------------------------------------------------------------------------------------------
 
 
@@ -88,14 +67,59 @@ class GoModSourcesField(Sources):
             )
 
 
+# TODO: This field probably shouldn't be registered.
+class GoModDependenciesField(Dependencies):
+    alias = "_dependencies"
+
+
 class GoModTarget(Target):
     alias = "go_mod"
+    core_fields = (*COMMON_TARGET_FIELDS, GoModDependenciesField, GoModSourcesField)
+    help = (
+        "A first-party Go module corresponding to a `go.mod` file.\n\n"
+        "Generates `_go_internal_package` targets for each subdirectory with a `.go` file, and "
+        "generates `_go_external_package` targets based on the `require` directives in your "
+        "`go.mod`.\n\n"
+        "If you have external packages, make sure you have an up-to-date `go.sum`. Run "
+        "`go mod tidy` directly to update your `go.mod` and `go.sum`."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `_go_internal_package` target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoInternalPackageSourcesField(Sources):
+    default = ("*.go", "*.s")
+    expected_file_extensions = (".go", ".s")
+
+
+class GoInternalPackageDependenciesField(Dependencies):
+    pass
+
+
+class GoInternalPackageSubpathField(StringField):
+    alias = "subpath"
+    help = (
+        "The path from the owning `go.mod` to this package's directory, e.g. `subdir`.\n\n"
+        "Should not include a leading `./`. If the package is in the same directory as the "
+        "`go.mod`, use the empty string."
+    )
+    required = True
+    value: str
+
+
+class GoInternalPackageTarget(Target):
+    alias = "_go_internal_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoModSourcesField,
+        GoImportPathField,
+        GoInternalPackageSubpathField,
+        GoInternalPackageDependenciesField,
+        GoInternalPackageSourcesField,
     )
-    help = "A first-party Go module corresponding to a `go.mod` file."
+    help = "A single Go package."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -103,7 +127,7 @@ class GoModTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExternalPackageDependencies(Dependencies):
+class GoExternalPackageDependenciesField(Dependencies):
     pass
 
 
@@ -124,19 +148,14 @@ class GoExternalModuleVersionField(StringField):
     value: str
 
 
-class GoExternalPackageImportPathField(GoImportPath):
-    required = True
-    value: str
-
-
 class GoExternalPackageTarget(Target):
     alias = "_go_external_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoExternalPackageDependencies,
+        GoExternalPackageDependenciesField,
         GoExternalModulePathField,
         GoExternalModuleVersionField,
-        GoExternalPackageImportPathField,
+        GoImportPathField,
     )
     help = "A package from a third-party Go module."
 

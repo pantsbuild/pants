@@ -9,8 +9,9 @@ from typing import Optional
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
-    GoExternalPackageImportPathField,
-    GoPackageSources,
+    GoImportPathField,
+    GoInternalPackageSourcesField,
+    GoInternalPackageSubpathField,
 )
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -74,19 +75,19 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         _source_files, _resolved_package = await MultiGet(
             Get(
                 SourceFiles,
-                SourceFilesRequest((target[GoPackageSources],)),
+                SourceFilesRequest((target[GoInternalPackageSourcesField],)),
             ),
             Get(ResolvedGoPackage, ResolveGoPackageRequest(address=target.address)),
         )
         source_files_digest = _source_files.snapshot.digest
-        source_files_subpath = target.address.spec_path
+        source_files_subpath = target[GoInternalPackageSubpathField].value
 
         original_import_path = _resolved_package.import_path
         go_files = _resolved_package.go_files
         s_files = _resolved_package.s_files
 
     elif is_third_party_package_target(target):
-        original_import_path = target[GoExternalPackageImportPathField].value
+        original_import_path = target[GoImportPathField].value
         _module_path = target[GoExternalModulePathField].value
         source_files_subpath = original_import_path[len(_module_path) :]
 

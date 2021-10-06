@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
-import textwrap
+from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.target_types import GoModTarget, GoPackage
-from pants.backend.go.util_rules import go_mod, go_pkg, sdk
+from pants.backend.go import target_type_rules
+from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.util_rules import external_pkg, go_mod, go_pkg, sdk
 from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
@@ -22,9 +23,11 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             *go_pkg.rules(),
             *sdk.rules(),
+            *external_pkg.rules(),
+            *target_type_rules.rules(),
             QueryRule(ResolvedGoPackage, [ResolveGoPackageRequest]),
         ],
-        target_types=[GoPackage, GoModTarget],
+        target_types=[GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -34,14 +37,13 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "go_mod()\n",
-            "foo/go.mod": textwrap.dedent(
+            "foo/go.mod": dedent(
                 """\
                 module go.example.com/foo
                 go 1.17
                 """
             ),
-            "foo/pkg/BUILD": "go_package()\n",
-            "foo/pkg/foo.go": textwrap.dedent(
+            "foo/pkg/foo.go": dedent(
                 """\
                 package pkg
                 func Grok() string {
@@ -49,8 +51,7 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "foo/cmd/BUILD": "go_package()\n",
-            "foo/cmd/main.go": textwrap.dedent(
+            "foo/cmd/main.go": dedent(
                 """\
                 package main
                 import (
@@ -62,7 +63,7 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "foo/cmd/bar_test.go": textwrap.dedent(
+            "foo/cmd/bar_test.go": dedent(
                 """\
                 package main
                 import "testing"
@@ -72,12 +73,12 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
         }
     )
     resolved_go_package = rule_runner.request(
-        ResolvedGoPackage, [ResolveGoPackageRequest(Address("foo/cmd"))]
+        ResolvedGoPackage, [ResolveGoPackageRequest(Address("foo", generated_name="./cmd"))]
     )
 
     # Compare field-by-field rather than with a `ResolvedGoPackage` instance because
     # `dependency_import_paths` is so verbose.
-    assert resolved_go_package.address == Address("foo/cmd")
+    assert resolved_go_package.address == Address("foo", generated_name="./cmd")
     assert resolved_go_package.import_path == "go.example.com/foo/cmd"
     assert resolved_go_package.module_address == Address("foo")
     assert resolved_go_package.package_name == "main"

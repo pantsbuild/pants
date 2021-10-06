@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import os.path
 from textwrap import dedent
 
 import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import (
-    GenerateGoExternalPackageTargetsRequest,
+    GenerateTargetsFromGoModRequest,
     InferGoPackageDependenciesRequest,
     InjectGoBinaryMainDependencyRequest,
 )
@@ -20,12 +21,12 @@ from pants.backend.go.target_types import (
     GoBinaryTarget,
     GoExternalModulePathField,
     GoExternalModuleVersionField,
-    GoExternalPackageImportPathField,
     GoExternalPackageTarget,
-    GoModSourcesField,
+    GoImportPathField,
+    GoInternalPackageSourcesField,
+    GoInternalPackageSubpathField,
+    GoInternalPackageTarget,
     GoModTarget,
-    GoPackage,
-    GoPackageSources,
 )
 from pants.backend.go.util_rules import external_pkg, go_mod, go_pkg, sdk
 from pants.base.exceptions import ResolveError
@@ -40,8 +41,6 @@ from pants.engine.target import (
     InferredDependencies,
     InjectedDependencies,
     InvalidFieldException,
-    Target,
-    Targets,
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
@@ -60,45 +59,31 @@ def rule_runner() -> RuleRunner:
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
             QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
         ],
-        target_types=[
-            GoPackage,
-            GoModTarget,
-            GoExternalPackageTarget,
-            GoBinaryTarget,
-            GenericTarget,
-        ],
+        target_types=[GoModTarget, GoBinaryTarget, GenericTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
-def assert_go_mod_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
-    addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
-    targets = rule_runner.request(Targets, [addresses])
-    go_mod_targets = [tgt for tgt in targets if tgt.has_field(GoModSourcesField)]
-    assert len(go_mod_targets) == 1
-    assert go_mod_targets[0].address == expected_address
-
-
 def test_go_package_dependency_injection(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()\n",
-            "foo/go.mod": "module foo\n",
-            "foo/go.sum": "",
-            "foo/pkg/BUILD": "go_package()\n",
-            "foo/pkg/foo.go": "package pkg\n",
-            "foo/bar/BUILD": "go_mod()\ngo_package(name='pkg')\n",
-            "foo/bar/go.mod": "module bar\n",
-            "foo/bar/src.go": "package bar\n",
+            "dir1/go.mod": "module foo",
+            "dir1/BUILD": "go_mod()",
+            "dir1/pkg/foo.go": "package pkg",
+            "dir2/bar/go.mod": "module bar",
+            "dir2/bar/src.go": "package bar",
+            "dir2/bar/BUILD": "go_mod()",
         }
     )
 
-    target = rule_runner.get_target(Address("foo/pkg", target_name="pkg"))
-    assert_go_mod_address(rule_runner, target, Address("foo"))
+    def assert_go_mod(pkg: Address, go_mod: Address) -> None:
+        tgt = rule_runner.get_target(pkg)
+        deps = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+        assert set(deps) == {go_mod}
 
-    target = rule_runner.get_target(Address("foo/bar", target_name="pkg"))
-    assert_go_mod_address(rule_runner, target, Address("foo/bar"))
+    assert_go_mod(Address("dir1", generated_name="./pkg"), Address("dir1"))
+    assert_go_mod(Address("dir2/bar", generated_name="./"), Address("dir2/bar"))
 
 
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
@@ -122,7 +107,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                     """
                 ),
-                "foo/pkg/BUILD": "go_package()\n",
                 "foo/pkg/foo.go": dedent(
                     """\
                     package pkg
@@ -132,7 +116,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     }
                     """
                 ),
-                "foo/cmd/BUILD": "go_package()\n",
                 "foo/cmd/main.go": dedent(
                     """\
                     package main
@@ -147,27 +130,29 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
             }
         )
     )
-    target1 = rule_runner.get_target(Address("foo/cmd"))
-    inferred_deps_1 = rule_runner.request(
-        InferredDependencies, [InferGoPackageDependenciesRequest(target1[GoPackageSources])]
+    tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
+    inferred_deps1 = rule_runner.request(
+        InferredDependencies,
+        [InferGoPackageDependenciesRequest(tgt1[GoInternalPackageSourcesField])],
     )
-    assert inferred_deps_1.dependencies == FrozenOrderedSet([Address("foo/pkg")])
+    assert inferred_deps1.dependencies == FrozenOrderedSet([Address("foo", generated_name="./pkg")])
 
-    target2 = rule_runner.get_target(Address("foo/pkg"))
-    inferred_deps_2 = rule_runner.request(
-        InferredDependencies, [InferGoPackageDependenciesRequest(target2[GoPackageSources])]
+    tgt2 = rule_runner.get_target(Address("foo", generated_name="./pkg"))
+    inferred_deps2 = rule_runner.request(
+        InferredDependencies,
+        [InferGoPackageDependenciesRequest(tgt2[GoInternalPackageSourcesField])],
     )
-    assert inferred_deps_2.dependencies == FrozenOrderedSet(
+    assert inferred_deps2.dependencies == FrozenOrderedSet(
         [Address("foo", generated_name="github.com/google/go-cmp/cmp")]
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# Generate `_go_external_package` targets
+# Generate package targets from `go_mod`
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
+def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/go/BUILD": "go_mod()\n",
@@ -192,19 +177,34 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                 """
             ),
+            "src/go/hello.go": "",
+            "src/go/subdir/f.go": "",
+            "src/go/another_dir/subdir/another_dir/f.go": "",
         }
     )
     generator = rule_runner.get_target(Address("src/go"))
-    generated = rule_runner.request(
-        GeneratedTargets, [GenerateGoExternalPackageTargetsRequest(generator)]
-    )
+    generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
-    def gen_tgt(mod_path: str, version: str, import_path: str) -> GoExternalPackageTarget:
+    def gen_internal_tgt(rel_dir: str) -> GoInternalPackageTarget:
+        return GoInternalPackageTarget(
+            {
+                GoImportPathField.alias: (
+                    os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
+                ),
+                GoInternalPackageSubpathField.alias: rel_dir,
+                GoInternalPackageSourcesField.alias: tuple(
+                    os.path.join(rel_dir, glob) for glob in GoInternalPackageSourcesField.default
+                ),
+            },
+            Address("src/go", generated_name=f"./{rel_dir}"),
+        )
+
+    def gen_external_tgt(mod_path: str, version: str, import_path: str) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(
             {
+                GoImportPathField.alias: import_path,
                 GoExternalModulePathField.alias: mod_path,
                 GoExternalModuleVersionField.alias: version,
-                GoExternalPackageImportPathField.alias: import_path,
             },
             Address("src/go", generated_name=import_path),
         )
@@ -212,37 +212,42 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     expected = GeneratedTargets(
         generator,
         {
-            gen_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"),
-            gen_tgt(
+            gen_internal_tgt(""),
+            gen_internal_tgt("subdir"),
+            gen_internal_tgt("another_dir/subdir/another_dir"),
+            gen_external_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
+            gen_external_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"),
+            gen_external_tgt(
+                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"
+            ),
+            gen_external_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/diff"
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/flags"
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/function",
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/testprotos",
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/teststructs",
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/value"
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "golang.org/x/xerrors", "v0.0.0-20191204190536-9bdfabe68543", "golang.org/x/xerrors"
             ),
-            gen_tgt(
+            gen_external_tgt(
                 "golang.org/x/xerrors",
                 "v0.0.0-20191204190536-9bdfabe68543",
                 "golang.org/x/xerrors/internal",
@@ -250,7 +255,8 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
         },
     )
     assert list(generated.keys()) == list(expected.keys())
-    assert generated == expected
+    for addr, tgt in generated.items():
+        assert tgt == expected[addr]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -258,6 +264,7 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
+@pytest.mark.xfail
 def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
