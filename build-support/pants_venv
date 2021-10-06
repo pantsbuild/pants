@@ -25,6 +25,10 @@ function activate_venv() {
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "$(venv_dir)/bin/activate"
+  # NB: The combination of `pystache` and the Python versions in our docker image are not
+  # compatible with modern setuptools, so we _downgrade_ here.
+  #   see https://stackoverflow.com/questions/65795409/create-virtualenv-with-specific-older-setuptools-version
+  pip install --upgrade "setuptools==54.2.0"
 }
 
 function remove_venv() {
