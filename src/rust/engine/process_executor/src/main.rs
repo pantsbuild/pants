@@ -448,6 +448,7 @@ fn make_request_from_flat_args(
     use_nailgun,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let metadata = ProcessMetadata {
@@ -533,6 +534,7 @@ async fn extract_request_from_action_digest(
     platform_constraint: None,
     use_nailgun: EMPTY_DIGEST,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let metadata = ProcessMetadata {

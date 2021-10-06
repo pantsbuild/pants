@@ -24,7 +24,7 @@ use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
 use bytes::BufMut;
-use cpython::{PyObject, Python, PythonObject};
+use cpython::{PyDict, PyObject, Python, PythonObject};
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -362,6 +362,25 @@ impl MultiPlatformExecuteProcess {
       externs::getattr_as_string(&externs::getattr(value, "cache_scope").unwrap(), "name")
         .try_into()?;
 
+    let reusable_input_digests = {
+      let py_reusable_input_digests: PyObject =
+        externs::getattr(value, "reusable_input_digests").unwrap();
+      let pydict: PyDict = externs::getattr(&py_reusable_input_digests, "_data").unwrap();
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      let items = pydict
+        .items(py)
+        .into_iter()
+        .map(|(key, value)| {
+          lift_directory_digest(&value).map(|digest| (externs::val_to_str(&key), digest))
+        })
+        .collect::<Result<Vec<(_, _)>, String>>()?;
+      items
+        .into_iter()
+        .map(|(path, digest)| RelativePath::new(path).map(|p| (p, digest)))
+        .collect::<Result<BTreeMap<RelativePath, Digest>, String>>()?
+    };
+
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -378,6 +397,7 @@ impl MultiPlatformExecuteProcess {
       use_nailgun,
       execution_slot_variable,
       cache_scope,
+      reusable_input_digests,
     })
   }
 

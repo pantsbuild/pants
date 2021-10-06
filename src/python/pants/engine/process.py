@@ -65,6 +65,7 @@ class Process:
     use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
+    reusable_input_digests: FrozenDict[str, Digest]
 
     def __init__(
         self,
@@ -83,6 +84,7 @@ class Process:
         use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        reusable_digests: Mapping[str, Digest] | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -127,6 +129,7 @@ class Process:
         self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
+        self.reusable_input_digests = FrozenDict(reusable_digests or {})
 
 
 @frozen_after_init
