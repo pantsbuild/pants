@@ -186,7 +186,6 @@ async def resolve_go_package(
     go_mod_spec_path = owning_go_mod.address.spec_path
     assert request.address.spec_path.startswith(go_mod_spec_path)
     spec_subpath = request.address.spec_path[len(go_mod_spec_path) :]
-    print(request.address.spec_path, go_mod_spec_path, spec_subpath)
 
     go_mod_info, pkg_sources = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
