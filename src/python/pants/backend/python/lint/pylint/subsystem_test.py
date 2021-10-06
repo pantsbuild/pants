@@ -18,7 +18,7 @@ from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PylintFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget, PythonRequirementLibrary],
+        target_types=[PythonLibrary, GenericTarget, PythonRequirementTarget],
     )
 
 
@@ -47,8 +47,8 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(name='pylint', requirements=['pylint==2.6.2'])
-                python_requirement_library(name='colors', requirements=['ansicolors'])
+                python_requirement(name='pylint', requirements=['pylint==2.6.2'])
+                python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
             "pylint-plugins/subdir1/util.py": "",
@@ -256,7 +256,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
                 interpreter_constraints=['==2.7.*', '==3.6.*'],
                 skip_pylint=True,
             )
-            python_requirement_library(name="thirdparty", requirements=["ansicolors"])
+            python_requirement(name="thirdparty", requirements=["ansicolors"])
             """
         ),
         ["==2.7.*,==3.6.*", "==3.6.*"],

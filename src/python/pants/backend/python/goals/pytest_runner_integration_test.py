@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
     PythonTests,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
@@ -72,7 +72,7 @@ def rule_runner() -> RuleRunner:
             PexBinary,
             PythonLibrary,
             PythonTests,
-            PythonRequirementLibrary,
+            PythonRequirementTarget,
             PythonDistribution,
         ],
         objects={"python_artifact": PythonArtifact},
@@ -195,7 +195,7 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
                 """\
                 python_tests()
                 python_library(name="lib")
-                python_requirement_library(
+                python_requirement(
                     name="reqs", requirements=["ansicolors==1.1.8", "ordered-set==3.1.1"]
                 )
                 """

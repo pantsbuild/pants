@@ -13,18 +13,17 @@ from pants.base.build_environment import get_buildroot
 
 
 class PythonRequirements:
-    """Translates a pip requirements file into an equivalent set of `python_requirement_library`
-    targets.
+    """Translates a pip requirements file into an equivalent set of `python_requirement` targets.
 
     If the `requirements.txt` file has lines `foo>=3.14` and `bar>=2.7`,
     then this will translate to:
 
-      python_requirement_library(
+      python_requirement(
         name="foo",
         requirements=["foo>=3.14"],
       )
 
-      python_requirement_library(
+      python_requirement(
         name="bar",
         requirements=["bar>=2.7"],
       )
@@ -93,7 +92,7 @@ class PythonRequirements:
                 else {}
             )
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=project_name,
                 requirements=list(parsed_reqs_),
                 module_mapping=req_module_mapping,

@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(MyPyFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [MyPyLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary, GenericTarget],
+        target_types=[PythonLibrary, PythonRequirementTarget, GenericTarget],
     )
 
 
@@ -99,8 +99,8 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(name='mypy', requirements=['mypy==0.81'])
-                python_requirement_library(name='colors', requirements=['ansicolors'])
+                python_requirement(name='mypy', requirements=['mypy==0.81'])
+                python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
             "mypy-plugins/subdir1/util.py": "",
@@ -240,7 +240,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
                 dependencies=[":thirdparty"],
                 skip_mypy=True,
             )
-            python_requirement_library(name="thirdparty", requirements=["ansicolors"])
+            python_requirement(name="thirdparty", requirements=["ansicolors"])
             """
         ),
         MyPy.default_interpreter_constraints,

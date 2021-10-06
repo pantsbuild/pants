@@ -14,7 +14,7 @@ from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget],
     )
 
 
@@ -204,12 +204,8 @@ def test_report_file(rule_runner: RuleRunner) -> None:
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                python_requirement_library(
-                    name="more-itertools", requirements=["more-itertools==8.4.0"],
-                )
-                """
+            "BUILD": (
+                "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
             ),
             f"{PACKAGE}/f.py": dedent(
                 """\
@@ -230,13 +226,13 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
 
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     # NB: We install `django-stubs` both with `[mypy].extra_requirements` and a user requirement
-    # (`python_requirement_library`). This awkwardness is because its used both as a plugin and
+    # (`python_requirement`). This awkwardness is because its used both as a plugin and
     # type stubs.
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
+                python_requirement(
                     name='django', requirements=['Django==2.2.5', 'django-stubs==1.8.0'],
                 )
                 """
@@ -345,12 +341,12 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
                 # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
                 # both to be usable, even though libumi is not compatible with Py3.
 
-                python_requirement_library(
+                python_requirement(
                     name="libumi",
                     requirements=["libumi==0.0.2"],
                 )
 
-                python_requirement_library(
+                python_requirement(
                     name="x690",
                     requirements=["x690==0.2.0"],
                 )
@@ -492,7 +488,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     """Test that first-party type stubs work for both first-party and third-party code."""
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='colors', requirements=['ansicolors'])",
+            "BUILD": "python_requirement(name='colors', requirements=['ansicolors'])",
             "mypy_stubs/__init__.py": "",
             "mypy_stubs/colors.pyi": "def red(s: str) -> str: ...",
             "mypy_stubs/BUILD": "python_library()",
@@ -531,7 +527,7 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='ta', requirements=['typed-ast==1.4.1'])",
+            "BUILD": "python_requirement(name='ta', requirements=['typed-ast==1.4.1'])",
             f"{PACKAGE}/f.py": "import typed_ast",
             f"{PACKAGE}/BUILD": "python_library()",
         }
@@ -576,10 +572,8 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 f"""\
-                python_requirement_library(name='mypy', requirements=['{MyPy.default_version}'])
-                python_requirement_library(
-                    name="more-itertools", requirements=["more-itertools==8.4.0"]
-                )
+                python_requirement(name='mypy', requirements=['{MyPy.default_version}'])
+                python_requirement(name="more-itertools", requirements=["more-itertools==8.4.0"])
                 """
             ),
             "pants-plugins/plugins/subdir/__init__.py": "",
@@ -661,9 +655,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     )
     rule_runner.write_files(
         {
-            "BUILD": (
-                "python_requirement_library(name='protobuf', requirements=['protobuf==3.13.0'])"
-            ),
+            "BUILD": ("python_requirement(name='protobuf', requirements=['protobuf==3.13.0'])"),
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/proto.proto": dedent(
                 """\

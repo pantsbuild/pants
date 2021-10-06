@@ -15,7 +15,7 @@ from pants.backend.python.dependency_inference.rules import (
 )
 from pants.backend.python.target_types import (
     PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
     PythonSources,
     PythonTests,
 )
@@ -33,13 +33,13 @@ def test_infer_python_imports(caplog) -> None:
             *target_types_rules.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget],
     )
     rule_runner.add_to_build_file(
         "3rdparty/python",
         dedent(
             """\
-            python_requirement_library(
+            python_requirement(
               name='Django',
               requirements=['Django==1.21'],
             )

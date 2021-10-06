@@ -354,12 +354,12 @@ class PoetryRequirements:
     For example, if pyproject.toml contains the following entries under
     poetry.tool.dependencies: `foo = ">1"` and `bar = ">2.4"`,
 
-        python_requirement_library(
+        python_requirement(
           name="foo",
           requirements=["foo>1"],
         )
 
-        python_requirement_library(
+        python_requirement(
           name="bar",
           requirements=["bar>2.4"],
         )
@@ -425,7 +425,7 @@ class PoetryRequirements:
             )
 
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 module_mapping=req_module_mapping,

@@ -56,7 +56,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -653,7 +653,7 @@ class PythonLibrary(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_requirement_library` target
+# `python_requirement` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -789,8 +789,8 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
         return normalize_module_mapping(value_or_default)
 
 
-class PythonRequirementLibrary(Target):
-    alias = "python_requirement_library"
+class PythonRequirementTarget(Target):
+    alias = "python_requirement"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
@@ -799,11 +799,26 @@ class PythonRequirementLibrary(Target):
         TypeStubsModuleMappingField,
     )
     help = (
-        "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
-        "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
-        "already, you can instead use the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{doc_url('python-third-party-dependencies')}."
+        "A Python requirement installable by pip.\n\n"
+        "This target is useful when you want to declare Python requirements inline in a "
+        "BUILD file. If you have a `requirements.txt` file already, you can instead use "
+        "the macro `python_requirements()` to convert each "
+        "requirement into a `python_requirement()` target automatically. For Poetry, use "
+        "`poetry_requirements()`."
+        "\n\n"
+        f"See {doc_url('python-third-party-dependencies')}."
+    )
+
+
+class DeprecatedPythonRequirementLibraryTarget(PythonRequirementTarget):
+    alias = "python_requirement_library"
+    help = "Deprecated. Use `python_requirement` instead."
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "Use `python_requirement` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28_test.py')}. Run "
+        f"`--help` for instructions."
     )
 
 

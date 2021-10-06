@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, List, cast
 import pytest
 from _pytest.tmpdir import TempPathFactory
 
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget],
     )
 
 
@@ -153,10 +153,10 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         "",
         dedent(
             f"""
-            python_requirement_library(name="foo", requirements=["foo-bar>=0.1.2"])
-            python_requirement_library(name="bar", requirements=["bar==5.5.5"])
-            python_requirement_library(name="baz", requirements=["baz"])
-            python_requirement_library(name="foorl", requirements=["{url_req}"])
+            python_requirement(name="foo", requirements=["foo-bar>=0.1.2"])
+            python_requirement(name="bar", requirements=["bar==5.5.5"])
+            python_requirement(name="baz", requirements=["baz"])
+            python_requirement(name="foorl", requirements=["{url_req}"])
             python_library(name="util", sources=[], dependencies=[":foo", ":bar"])
             python_library(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
             """
@@ -277,10 +277,10 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
             "constraints.txt": "foo==1.0\nbar==1.0",
             "BUILD": dedent(
                 """
-            python_requirement_library(name="foo",requirements=["foo"])
-            python_requirement_library(name="bar",requirements=["bar"])
-            python_library(name="lib",sources=[],dependencies=[":foo"])
-            """
+                python_requirement(name="foo",requirements=["foo"])
+                python_requirement(name="bar",requirements=["bar"])
+                python_library(name="lib",sources=[],dependencies=[":foo"])
+                """
             ),
         }
     )

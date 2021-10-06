@@ -24,7 +24,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ThirdPartyPythonModuleMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -174,7 +174,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ThirdPartyPythonModuleMapping, []),
             QueryRule(PythonModuleOwners, [PythonModule]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary, ProtobufLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget, ProtobufLibrary],
     )
 
 
@@ -306,7 +306,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         stubs_mapping: dict[str, list[str]] | None = None,
     ) -> str:
         return (
-            f"python_requirement_library(name='{tgt_name}', requirements=['{req_str}'], "
+            f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"module_mapping={repr(module_mapping or {})},"
             f"type_stubs_module_mapping={repr(stubs_mapping or {})})"
         )
@@ -422,12 +422,10 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 python_library(name="script", sources=["script.py"])
-                python_requirement_library(name="valid_dep", requirements=["valid_dep"])
+                python_requirement(name="valid_dep", requirements=["valid_dep"])
                 # Dependency with a type stub.
-                python_requirement_library(name="dep_w_stub", requirements=["dep_w_stub"])
-                python_requirement_library(
-                    name="dep_w_stub-types", requirements=["dep_w_stub-types"]
-                )
+                python_requirement(name="dep_w_stub", requirements=["dep_w_stub"])
+                python_requirement(name="dep_w_stub-types", requirements=["dep_w_stub-types"])
                 """
             ),
             # Normal first-party module.
@@ -445,7 +443,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             "root/BUILD": dedent(
                 """\
                 python_library()
-                python_requirement_library(name="dep", requirements=["dep_with_stub"])
+                python_requirement(name="dep", requirements=["dep_with_stub"])
                 """
             ),
             # Ambiguity.
@@ -456,8 +454,8 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             "root/ambiguous/BUILD": dedent(
                 """\
                 # Ambiguity purely within third-party deps.
-                python_requirement_library(name='thirdparty1', requirements=['ambiguous_3rdparty'])
-                python_requirement_library(name='thirdparty2', requirements=['ambiguous_3rdparty'])
+                python_requirement(name='thirdparty1', requirements=['ambiguous_3rdparty'])
+                python_requirement(name='thirdparty2', requirements=['ambiguous_3rdparty'])
 
                 # Ambiguity purely within first-party deps.
                 python_library(name="firstparty1", sources=["f1.py"])
@@ -465,10 +463,10 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
 
                 # Ambiguity within third-party, which should result in ambiguity for first-party
                 # too. These all share the module `ambiguous.f2`.
-                python_requirement_library(
+                python_requirement(
                     name='thirdparty3', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
                 )
-                python_requirement_library(
+                python_requirement(
                     name='thirdparty4', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
                 )
                 python_library(name="firstparty3", sources=["f2.py"])
@@ -477,18 +475,18 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 # too. These all share the module `ambiguous.f3`.
                 python_library(name="firstparty4", sources=["f3.py"])
                 python_library(name="firstparty5", sources=["f3.py"])
-                python_requirement_library(
+                python_requirement(
                     name='thirdparty5', requirements=['baz'], module_mapping={'baz': ['ambiguous.f3']}
                 )
 
                 # You can only write a first-party type stub for a third-party requirement if
                 # there are not third-party type stubs already.
-                python_requirement_library(
+                python_requirement(
                     name='ambiguous-stub',
                     requirements=['ambiguous-stub'],
                     module_mapping={"ambiguous-stub": ["ambiguous.f4"]},
                 )
-                python_requirement_library(
+                python_requirement(
                     name='ambiguous-stub-types',
                     requirements=['ambiguous-stub-types'],
                     type_stubs_module_mapping={"ambiguous-stub-types": ["ambiguous.f4"]},

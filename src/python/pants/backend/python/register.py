@@ -25,11 +25,12 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
+    DeprecatedPythonRequirementLibraryTarget,
     PexBinary,
     PythonDistribution,
     PythonLibrary,
-    PythonRequirementLibrary,
     PythonRequirementsFile,
+    PythonRequirementTarget,
     PythonTests,
 )
 from pants.backend.python.util_rules import (
@@ -87,7 +88,8 @@ def target_types():
         PexBinary,
         PythonDistribution,
         PythonLibrary,
-        PythonRequirementLibrary,
+        PythonRequirementTarget,
         PythonRequirementsFile,
         PythonTests,
+        DeprecatedPythonRequirementLibraryTarget,
     ]

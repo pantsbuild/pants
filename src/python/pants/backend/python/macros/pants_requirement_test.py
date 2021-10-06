@@ -8,8 +8,8 @@ from pkg_resources import Requirement
 from pants.backend.python.macros.pants_requirement import PantsRequirement
 from pants.backend.python.target_types import (
     ModuleMappingField,
-    PythonRequirementLibrary,
     PythonRequirementsField,
+    PythonRequirementTarget,
 )
 from pants.base.build_environment import pants_version
 from pants.engine.addresses import Address
@@ -21,7 +21,7 @@ from pants.util.frozendict import FrozenDict
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[PythonRequirementLibrary],
+        target_types=[PythonRequirementTarget],
         context_aware_object_factories={PantsRequirement.alias: PantsRequirement},
     )
 
@@ -36,7 +36,7 @@ def assert_pants_requirement(
 ) -> None:
     rule_runner.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
     target = rule_runner.get_target(Address("3rdparty/python", target_name=expected_target_name))
-    assert isinstance(target, PythonRequirementLibrary)
+    assert isinstance(target, PythonRequirementTarget)
     assert target[PythonRequirementsField].value == (
         Requirement.parse(f"{expected_dist}=={pants_version()}"),
     )
