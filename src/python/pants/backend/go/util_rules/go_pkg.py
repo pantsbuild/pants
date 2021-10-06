@@ -42,10 +42,6 @@ class ResolvedGoPackage:
     # or higher level of the source tree.
     module_address: Address | None
 
-    # External module information
-    module_path: str | None
-    module_version: str | None
-
     # Name of the package as given by `package` directives in the source files. Obtained from `Name` key in
     # package metadata.
     package_name: str
@@ -103,8 +99,6 @@ class ResolvedGoPackage:
         import_path: str | None = None,
         address: Address | None = None,
         module_address: Address | None = None,
-        module_path: str | None = None,
-        module_version: str | None = None,
     ) -> ResolvedGoPackage:
         # TODO: Raise an exception on errors. They are only emitted as warnings for now because the `go` tool is
         # flagging missing first-party code as a dependency error. But we want dependency inference and won't know
@@ -127,23 +121,16 @@ class ResolvedGoPackage:
             "SwigCXXFiles",
         ):
             files = metadata.get(key, [])
-            package_description = (
-                f"go_package at address {address}"
-                if address
-                else f"external package at import path {import_path} in {module_path}@{module_version}"
-            )
             if files:
                 raise ValueError(
-                    f"The {package_description} contains the following unsupported source files "
-                    f"that were detected under the key '{key}': {', '.join(files)}."
+                    f"The go_package at address {address} contains the following unsupported source "
+                    f"files that were detected under the key '{key}': {', '.join(files)}."
                 )
 
         return cls(
             address=address,
             import_path=import_path if import_path is not None else metadata["ImportPath"],
             module_address=module_address,
-            module_path=module_path,
-            module_version=module_version,
             package_name=metadata["Name"],
             imports=tuple(metadata.get("Imports", [])),
             test_imports=tuple(metadata.get("TestImports", [])),

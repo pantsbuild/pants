@@ -1,22 +1,15 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from typing import Tuple
 
 import ijson
 
-from pants.backend.go.target_types import (
-    GoExternalModulePathField,
-    GoExternalModuleVersionField,
-    GoExternalPackageImportPathField,
-    GoExternalPackageTarget,
-)
-from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
@@ -36,8 +29,12 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_v2_chroot_path
 
+# -----------------------------------------------------------------------------------------------
+# Download modules
+# -----------------------------------------------------------------------------------------------
 
-class AllDownloadedModules(FrozenDict[Tuple[str, str], Digest]):
+
+class _AllDownloadedModules(FrozenDict[Tuple[str, str], Digest]):
     """A mapping of each downloaded (module, version) to its digest.
 
     Each digest is stripped of the `gopath` prefix and also guaranteed to have a `go.mod` and
@@ -47,7 +44,7 @@ class AllDownloadedModules(FrozenDict[Tuple[str, str], Digest]):
 
 
 @dataclass(frozen=True)
-class AllDownloadedModulesRequest:
+class _AllDownloadedModulesRequest:
     """Download all modules from the `go.mod`.
 
     The `go.mod` and `go.sum` must already be up-to-date.
@@ -56,10 +53,32 @@ class AllDownloadedModulesRequest:
     go_mod_stripped_digest: Digest
 
 
+@dataclass(frozen=True)
+class _DownloadedModule:
+    """A downloaded module's directory.
+
+    The digest is stripped of the `gopath` prefix and also guaranteed to have a `go.mod` and
+    `go.sum` for the particular module. This means that you can operate on the module (e.g. `go
+    list`) directly, without needing to set the working_dir etc.
+    """
+
+    digest: Digest
+
+
+@dataclass(frozen=True)
+class _DownloadedModuleRequest(EngineAwareParameter):
+    module_path: str
+    version: str
+    go_mod_stripped_digest: Digest
+
+    def debug_hint(self) -> str:
+        return f"{self.module_path}@{self.version}"
+
+
 @rule
 async def download_external_modules(
-    request: AllDownloadedModulesRequest,
-) -> AllDownloadedModules:
+    request: _AllDownloadedModulesRequest,
+) -> _AllDownloadedModules:
     # TODO: Clean this up.
     input_digest_entries = await Get(DigestEntries, Digest, request.go_mod_stripped_digest)
     assert len(input_digest_entries) == 2
@@ -154,95 +173,75 @@ async def download_external_modules(
             module_paths_and_versions_to_dirs.keys(), stripped_subsets
         )
     }
-    return AllDownloadedModules(module_paths_and_versions_to_digests)
-
-
-@dataclass(frozen=True)
-class DownloadedModule:
-    """A downloaded module's directory.
-
-    The digest is stripped of the `gopath` prefix and also guaranteed to have a `go.mod` and
-    `go.sum` for the particular module. This means that you can operate on the module (e.g. `go
-    list`) directly, without needing to set the working_dir etc.
-    """
-
-    digest: Digest
-
-
-@dataclass(frozen=True)
-class DownloadedModuleRequest:
-    module_path: str
-    version: str
-    go_mod_stripped_digest: Digest
+    return _AllDownloadedModules(module_paths_and_versions_to_digests)
 
 
 @rule
 async def extract_module_from_downloaded_modules(
-    request: DownloadedModuleRequest,
-) -> DownloadedModule:
+    request: _DownloadedModuleRequest,
+) -> _DownloadedModule:
     all_modules = await Get(
-        AllDownloadedModules, AllDownloadedModulesRequest(request.go_mod_stripped_digest)
+        _AllDownloadedModules, _AllDownloadedModulesRequest(request.go_mod_stripped_digest)
     )
     digest = all_modules.get((request.module_path, request.version))
     if digest is None:
         raise AssertionError(
             f"The module {request.module_path}@{request.version} was not downloaded. Unless "
-            "you explicitly created an `_go_external_package`, this should not happen."
+            "you explicitly created an `_go_external_package`, this should not happen. "
             "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose with "
             "this error message."
         )
-    return DownloadedModule(digest)
+    return _DownloadedModule(digest)
+
+
+# -----------------------------------------------------------------------------------------------
+# Determine package info
+# -----------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class ResolveExternalGoPackageRequest(EngineAwareParameter):
-    tgt: GoExternalPackageTarget
+class ExternalPkgInfo:
+    """All the info needed to build an external package.
+
+    The digest is stripped of the `gopath` prefix.
+    """
+
+    import_path: str
+    module_path: str
+    version: str
+
+    digest: Digest
+
+    # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
+    # tests directly on an external package.
+    imports: tuple[str, ...]
+    go_files: tuple[str, ...]
+    s_files: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExternalPkgInfoRequest(EngineAwareParameter):
+    """Request the info and digest needed to build an external package.
+
+    The package's module must be included in the input `go.mod`/`go.sum`.
+    """
+
+    import_path: str
+    module_path: str
+    version: str
     go_mod_stripped_digest: Digest
 
     def debug_hint(self) -> str:
-        return self.tgt[GoExternalPackageImportPathField].value
+        return self.import_path
 
 
-@rule
-async def compute_external_go_package_info(
-    request: ResolveExternalGoPackageRequest,
-) -> ResolvedGoPackage:
-    module_path = request.tgt[GoExternalModulePathField].value
-    module_version = request.tgt[GoExternalModuleVersionField].value
-
-    downloaded_module = await Get(
-        DownloadedModule,
-        DownloadedModuleRequest(module_path, module_version, request.go_mod_stripped_digest),
-    )
-
-    import_path = request.tgt[GoExternalPackageImportPathField].value
-    assert import_path.startswith(module_path)
-    subpath = import_path[len(module_path) :]
-
-    json_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=("list", "-mod=readonly", "-json", f"./{subpath}"),
-            env={"GOPROXY": "off"},
-            input_digest=downloaded_module.digest,
-            description=f"Determine metadata for Go external package {import_path}",
-        ),
-    )
-
-    metadata = json.loads(json_result.stdout)
-    return ResolvedGoPackage.from_metadata(
-        metadata,
-        import_path=import_path,
-        address=request.tgt.address,
-        module_address=None,
-        module_path=module_path,
-        module_version=module_version,
-    )
+class ExternalModuleInfo(FrozenDict[str, ExternalPkgInfo]):
+    """A mapping of the import path for each package in the module to its `ExternalPackageInfo`."""
 
 
 @dataclass(frozen=True)
-class ExternalModulePkgImportPathsRequest:
-    """Request the import paths for all packages belonging to an external Go module.
+class ExternalModuleInfoRequest(EngineAwareParameter):
+    """Request info for every package contained in an external module.
 
     The module must be included in the input `go.mod`/`go.sum`.
     """
@@ -251,20 +250,17 @@ class ExternalModulePkgImportPathsRequest:
     version: str
     go_mod_stripped_digest: Digest
 
-
-class ExternalModulePkgImportPaths(DeduplicatedCollection[str]):
-    """The import paths for all packages belonging to an external Go module."""
-
-    sort_input = True
+    def debug_hint(self) -> str:
+        return f"{self.module_path}@{self.version}"
 
 
 @rule
-async def compute_package_import_paths_from_external_module(
-    request: ExternalModulePkgImportPathsRequest,
-) -> ExternalModulePkgImportPaths:
+async def compute_external_module_metadata(
+    request: ExternalModuleInfoRequest,
+) -> ExternalModuleInfo:
     downloaded_module = await Get(
-        DownloadedModule,
-        DownloadedModuleRequest(
+        _DownloadedModule,
+        _DownloadedModuleRequest(
             request.module_path, request.version, request.go_mod_stripped_digest
         ),
     )
@@ -272,19 +268,47 @@ async def compute_package_import_paths_from_external_module(
         ProcessResult,
         GoSdkProcess(
             input_digest=downloaded_module.digest,
-            # "-find" skips determining dependencies and imports for each package.
-            command=("list", "-find", "-mod=readonly", "-json", "./..."),
+            command=("list", "-mod=readonly", "-json", "./..."),
             env={"GOPROXY": "off"},
             description=(
-                "Determine packages belonging to Go external module "
-                f"{request.module_path}@{request.version}"
+                f"Determine metadata for Go external module {request.module_path}@{request.version}"
             ),
         ),
     )
-    return ExternalModulePkgImportPaths(
-        metadata["ImportPath"]
-        for metadata in ijson.items(json_result.stdout, "", multiple_values=True)
+
+    import_path_to_info = {}
+    for metadata in ijson.items(json_result.stdout, "", multiple_values=True):
+        import_path = metadata["ImportPath"]
+        pkg_info = ExternalPkgInfo(
+            import_path=import_path,
+            module_path=request.module_path,
+            version=request.version,
+            digest=downloaded_module.digest,
+            imports=tuple(metadata.get("Imports", ())),
+            go_files=tuple(metadata.get("GoFiles", ())),
+            s_files=tuple(metadata.get("SFiles", ())),
+        )
+        import_path_to_info[import_path] = pkg_info
+    return ExternalModuleInfo(import_path_to_info)
+
+
+@rule
+async def extract_package_info_from_module_info(request: ExternalPkgInfoRequest) -> ExternalPkgInfo:
+    module_info = await Get(
+        ExternalModuleInfo,
+        ExternalModuleInfoRequest(
+            request.module_path, request.version, request.go_mod_stripped_digest
+        ),
     )
+    pkg_info = module_info.get(request.import_path)
+    if pkg_info is None:
+        raise AssertionError(
+            f"The package {request.import_path} does not belong to the module "
+            f"{request.module_path}@{request.version}. Unless you explicitly created an "
+            "`_go_external_package`, this should not happen. Please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose with this error message."
+        )
+    return pkg_info
 
 
 def rules():
