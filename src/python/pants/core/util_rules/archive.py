@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, Snapshot
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
     BinaryNotFoundError,
     BinaryPath,
@@ -44,10 +44,10 @@ class ZipBinary(BinaryPath):
 
 
 class UnzipBinary(BinaryPath):
-    def extract_archive_argv(self, archive_path: str) -> tuple[str, ...]:
+    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` does not need to already exist.
         # The caller should validate that it's a valid `.zip` file.
-        return (self.path, archive_path)
+        return (self.path, archive_path, "-d", extract_path)
 
 
 class TarBinary(BinaryPath):
@@ -62,10 +62,10 @@ class TarBinary(BinaryPath):
         )
         return (self.path, f"c{compression}f", request.output_filename, *request.snapshot.files)
 
-    def extract_archive_argv(self, archive_path: str) -> tuple[str, ...]:
+    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        return (self.path, "xf", archive_path)
+        return (self.path, "xf", archive_path, "-C", extract_path)
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
@@ -204,27 +204,28 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     if len(snapshot.files) != 1:
         return ExtractedArchive(digest)
 
-    fp = snapshot.files[0]
-    is_zip = fp.endswith(".zip")
-    is_tar = fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"))
+    archive_path = snapshot.files[0]
+    is_zip = archive_path.endswith(".zip")
+    is_tar = archive_path.endswith(
+        (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
+    )
     if not is_zip and not is_tar:
         return ExtractedArchive(digest)
 
     merge_digest_get = Get(Digest, MergeDigests((digest, output_dir_digest)))
-    archive_path = f"../{fp}"
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
             Get(UnzipBinary, _UnzipBinaryRequest()),
         )
-        argv = unzip_binary.extract_archive_argv(archive_path)
+        argv = unzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
         env = {}
     else:
         input_digest, tar_binary = await MultiGet(
             merge_digest_get,
             Get(TarBinary, _TarBinaryRequest()),
         )
-        argv = tar_binary.extract_archive_argv(archive_path)
+        argv = tar_binary.extract_archive_argv(archive_path, extract_archive_dir)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
 
@@ -234,13 +235,13 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
             argv=argv,
             env=env,
             input_digest=input_digest,
-            description=f"Extract {fp}",
+            description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
-            output_directories=(".",),
-            working_directory=extract_archive_dir,
+            output_directories=(extract_archive_dir,),
         ),
     )
-    return ExtractedArchive(result.output_digest)
+    digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))
+    return ExtractedArchive(digest)
 
 
 def rules():
