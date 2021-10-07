@@ -24,7 +24,6 @@ jvm_artifact(
 
 coursier_lockfile(
     name = "lockfile",
-    requirements = [":com.fasterxml.jackson.core_jackson-databind"],
     sources = [
         "coursier_resolve.lockfile",
     ],
