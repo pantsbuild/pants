@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 
+from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
@@ -21,13 +22,21 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import InvalidTargetException, Sources, Target, Targets
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    InvalidTargetException,
+    Sources,
+    Target,
+    Targets,
+)
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
     CoursierResolvedLockfile,
 )
 from pants.jvm.target_types import (
+    JvmArtifact,
     JvmArtifactArtifactField,
     JvmArtifactGroupField,
     JvmArtifactVersionField,
@@ -114,10 +123,42 @@ class CoursierGenerateLockfileResult:
 async def coursier_generate_lockfile(
     request: CoursierGenerateLockfileRequest,
 ) -> CoursierGenerateLockfileResult:
-    artifact_requirements = await Get(
-        ArtifactRequirements,
-        GatherArtifactRequirementsRequest(request.target[JvmRequirementsField]),
+
+    # This task finds all of the sources that depend on this lockfile, and then resolves
+    # a lockfile that satisfies all of their `jvm_artifact` dependencies.
+
+    dependees = await Get(
+        Dependees,
+        DependeesRequest(
+            [request.target.address],
+            transitive=False,  # TODO: do we actually want transitives here? DISCUSS.
+            include_roots=True,
+        ),
     )
+    dependee_targets = await Get(Targets, Addresses(dependees))
+
+    # Find the JVM artifact dependencies required by each of targets that depend on this target
+
+    dependencies = await MultiGet(
+        Get(Addresses, DependenciesRequest(tgt[Dependencies]))
+        for tgt in dependee_targets
+        if tgt.has_field(Dependencies)
+    )
+    dependency_targets = await Get(Targets, Addresses(j for i in dependencies for j in i))
+    resolvable_dependencies = [i for i in dependency_targets if isinstance(i, JvmArtifact)]
+
+    # Connect this to the original code (will make more efficient later)
+    artifact_requirements = ArtifactRequirements(
+        [
+            Coordinate(
+                group=i[JvmArtifactGroupField].value or "FIXME",
+                artifact=i[JvmArtifactArtifactField].value or "FIXME",
+                version=i[JvmArtifactVersionField].value or "FIXME",
+            )
+            for i in resolvable_dependencies
+        ]
+    )
+
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
         ArtifactRequirements,

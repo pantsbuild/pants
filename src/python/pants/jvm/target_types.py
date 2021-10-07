@@ -79,5 +79,8 @@ class JvmLockfileSources(Sources):
 
 class JvmDependencyLockfile(Target):
     alias = "coursier_lockfile"
-    core_fields = (*COMMON_TARGET_FIELDS, JvmLockfileSources, JvmRequirementsField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmLockfileSources,
+    )
     help = "A Coursier lockfile along with references to the artifacts to use for the lockfile."
