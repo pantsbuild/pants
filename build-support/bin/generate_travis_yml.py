@@ -390,8 +390,8 @@ def _osx_before_install(
     return [
         "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
         "chmod 755 /usr/local/bin/jq",
-        "./build-support/bin/install_aws_cli_for_ci.sh",
         f"./build-support/bin/install_python_for_ci.sh {versions_to_install}",
+        "./build-support/bin/install_aws_cli_for_ci.sh",
     ]
 
 
