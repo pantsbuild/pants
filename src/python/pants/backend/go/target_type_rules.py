@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -21,6 +22,7 @@ from pants.backend.go.target_types import (
     GoInternalPackageSourcesField,
     GoInternalPackageSubpathField,
     GoInternalPackageTarget,
+    GoModInternalPackageSourcesField,
     GoModTarget,
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
@@ -56,6 +58,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -195,18 +198,18 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_go_mod(
-    request: GenerateTargetsFromGoModRequest,
+    request: GenerateTargetsFromGoModRequest, files_not_found_behavior: FilesNotFoundBehavior
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    # TODO: Should there be a field on `go_mod` that lets users control what the generating
-    #  sources are?
-    # TODO: Should we care about there already be owning targets?
-    _go_paths_glob = (
-        f"{generator_addr.spec_path}/**/*.go" if generator_addr.spec_path else "**/*.go"
-    )
     go_mod_info, go_paths = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(generator_addr)),
-        Get(Paths, PathGlobs([_go_paths_glob])),
+        Get(
+            Paths,
+            PathGlobs,
+            request.generator[GoModInternalPackageSourcesField].path_globs(
+                files_not_found_behavior
+            ),
+        ),
     )
     all_module_info = await MultiGet(
         Get(
@@ -221,10 +224,7 @@ async def generate_targets_from_go_mod(
     )
 
     dir_to_filenames = group_by_dir(go_paths.files)
-    dirs_with_go_files = []
-    for dir, filenames in dir_to_filenames.items():
-        if any(filename.endswith(".go") for filename in filenames):
-            dirs_with_go_files.append(dir)
+    matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
 
     def create_internal_package_tgt(dir: str) -> GoInternalPackageTarget:
         go_mod_spec_path = generator_addr.spec_path
@@ -239,24 +239,21 @@ async def generate_targets_from_go_mod(
         else:
             subpath = dir[len(go_mod_spec_path) + 1 :]
 
-        if subpath:
-            import_path = f"{go_mod_info.import_path}/{subpath}"
-            sources = tuple(f"{subpath}/{glob}" for glob in GoInternalPackageSourcesField.default)
-        else:
-            import_path = go_mod_info.import_path
-            sources = GoInternalPackageSourcesField.default
+        import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
 
         return GoInternalPackageTarget(
             {
                 GoImportPathField.alias: import_path,
                 GoInternalPackageSubpathField.alias: subpath,
-                GoInternalPackageSourcesField.alias: sources,
+                GoInternalPackageSourcesField.alias: tuple(
+                    sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
+                ),
             },
             # E.g. `src/go:mod#./subdir`.
             generator_addr.create_generated(f"./{subpath}"),
         )
 
-    internal_pkgs = (create_internal_package_tgt(dir) for dir in dirs_with_go_files)
+    internal_pkgs = (create_internal_package_tgt(dir) for dir in matched_dirs)
 
     def create_external_package_tgt(pkg_info: ExternalPkgInfo) -> GoExternalPackageTarget:
         return GoExternalPackageTarget(

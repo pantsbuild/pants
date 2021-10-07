@@ -179,22 +179,21 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             ),
             "src/go/hello.go": "",
             "src/go/subdir/f.go": "",
-            "src/go/another_dir/subdir/another_dir/f.go": "",
+            "src/go/subdir/f2.go": "",
+            "src/go/another_dir/subdir/f.go": "",
         }
     )
     generator = rule_runner.get_target(Address("src/go"))
     generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
-    def gen_internal_tgt(rel_dir: str) -> GoInternalPackageTarget:
+    def gen_internal_tgt(rel_dir: str, sources: list[str]) -> GoInternalPackageTarget:
         return GoInternalPackageTarget(
             {
                 GoImportPathField.alias: (
                     os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
                 ),
                 GoInternalPackageSubpathField.alias: rel_dir,
-                GoInternalPackageSourcesField.alias: tuple(
-                    os.path.join(rel_dir, glob) for glob in GoInternalPackageSourcesField.default
-                ),
+                GoInternalPackageSourcesField.alias: tuple(sources),
             },
             Address("src/go", generated_name=f"./{rel_dir}"),
         )
@@ -212,9 +211,9 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     expected = GeneratedTargets(
         generator,
         {
-            gen_internal_tgt(""),
-            gen_internal_tgt("subdir"),
-            gen_internal_tgt("another_dir/subdir/another_dir"),
+            gen_internal_tgt("", ["hello.go"]),
+            gen_internal_tgt("subdir", ["subdir/f.go", "subdir/f2.go"]),
+            gen_internal_tgt("another_dir/subdir", ["another_dir/subdir/f.go"]),
             gen_external_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
             gen_external_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"),
             gen_external_tgt(

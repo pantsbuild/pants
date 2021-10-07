@@ -78,7 +78,9 @@ FIXED_BAD_FILE = dedent(
 )
 
 
-PKG_TGT = "_go_internal_package(name='t', import_path='doesnt_matter', subpath='')"
+PKG_TGT = (
+    "_go_internal_package(name='t', sources=['*.go'], import_path='doesnt_matter', subpath='')"
+)
 
 
 def run_gofmt(
