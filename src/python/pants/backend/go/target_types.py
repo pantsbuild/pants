@@ -76,8 +76,8 @@ class GoModDependenciesField(Dependencies):
 
 
 # TODO(#12953): generalize this?
-class GoModInternalPackageSourcesField(StringSequenceField, AsyncFieldMixin):
-    alias = "internal_pkg_sources"
+class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
+    alias = "pkg_sources"
     default = ("**/*.go", "**/*.s")
     help = (
         "What sources to generate `_go_internal_package` targets for.\n\n"
@@ -109,7 +109,7 @@ class GoModTarget(Target):
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
         GoModSourcesField,
-        GoModInternalPackageSourcesField,
+        GoModPackageSourcesField,
     )
     help = (
         "A first-party Go module corresponding to a `go.mod` file.\n\n"

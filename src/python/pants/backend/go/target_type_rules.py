@@ -22,7 +22,7 @@ from pants.backend.go.target_types import (
     GoInternalPackageSourcesField,
     GoInternalPackageSubpathField,
     GoInternalPackageTarget,
-    GoModInternalPackageSourcesField,
+    GoModPackageSourcesField,
     GoModTarget,
 )
 from pants.backend.go.util_rules import go_pkg, import_analysis
@@ -206,9 +206,7 @@ async def generate_targets_from_go_mod(
         Get(
             Paths,
             PathGlobs,
-            request.generator[GoModInternalPackageSourcesField].path_globs(
-                files_not_found_behavior
-            ),
+            request.generator[GoModPackageSourcesField].path_globs(files_not_found_behavior),
         ),
     )
     all_module_info = await MultiGet(
