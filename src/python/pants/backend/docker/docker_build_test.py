@@ -28,7 +28,6 @@ from pants.backend.docker.subsystem import rules as docker_subsystem_rules
 from pants.backend.docker.target_types import DockerImage
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
-from pants.engine.environment import rules as environment_rules
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.option_util import create_subsystem
@@ -41,8 +40,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *docker_subsystem_rules(),
-            *environment_rules(),
             QueryRule(DockerEnvironmentVars, []),
+            QueryRule(DockerOptions, []),
         ],
         target_types=[DockerImage],
     )
@@ -72,16 +71,22 @@ def assert_build(
             output_digest=EMPTY_DIGEST,
         )
 
-    opts = options or {}
-    opts.setdefault("registries", {})
-    opts.setdefault("default_image_name_template", "{repository}/{name}")
+    if options:
+        opts = options or {}
+        opts.setdefault("registries", {})
+        opts.setdefault("default_image_name_template", "{repository}/{name}")
+        opts.setdefault("build_args", [])
+        opts.setdefault("env_vars", [])
 
-    docker_options = create_subsystem(
-        DockerOptions,
-        **opts,
-    )
+        docker_options = create_subsystem(
+            DockerOptions,
+            **opts,
+        )
+    else:
+        docker_options = rule_runner.request(DockerOptions, [])
 
     env = rule_runner.request(DockerEnvironmentVars, [])
+
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
@@ -391,5 +396,44 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
     assert_build(
         rule_runner,
         Address("docker/test", target_name="env1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_args(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", version="1.2.3")'})
+    rule_runner.set_options(
+        [],
+        env={
+            "INHERIT": "from Pants env",
+            "PANTS_DOCKER_BUILD_ARGS": '["VAR=value", "INHERIT"]',
+        },
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "-t",
+            "test/args1:1.2.3",
+            "--build-arg",
+            "INHERIT",
+            "--build-arg",
+            "VAR=value",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+        # Check that we pull in name only args via env.
+        assert process.env == FrozenDict(
+            {
+                "INHERIT": "from Pants env",
+            }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="args1"),
         process_assertions=check_docker_proc,
     )

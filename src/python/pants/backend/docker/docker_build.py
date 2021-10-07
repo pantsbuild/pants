@@ -171,10 +171,11 @@ async def build_docker_image(
         ProcessResult,
         Process,
         docker.build_image(
-            tags=tags,
+            build_args=options.build_args,
             digest=context.digest,
             dockerfile=field_set.dockerfile_path,
             env=env.vars,
+            tags=tags,
         ),
     )
 
