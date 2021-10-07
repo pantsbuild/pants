@@ -735,9 +735,9 @@ class PythonRequirementsField(_RequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
-        "A pip-style requirement string, e.g. `[\"Django==3.2.8\"]`.\n\n"
+        'A pip-style requirement string, e.g. `["Django==3.2.8"]`.\n\n'
         "You can specify multiple requirements for the same project in order to use environment "
-        "markers, such as `[\"foo>=1.2,<1.3 ; python_version>'3.6'\", \"foo==0.9 ; "
+        'markers, such as `["foo>=1.2,<1.3 ; python_version>\'3.6\'", "foo==0.9 ; '
         "python_version<'3'\"]`.\n\n"
         "If the requirement depends on some other requirement to work, such as needing "
         "`setuptools` to be built, use the `dependencies` field instead."
