@@ -140,8 +140,6 @@ from pants.testutil.rule_runner import RuleRunner
 )
 def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
     actual_output = peek._render_json(expanded_target_infos, exclude_defaults)
-    print(actual_output)
-    print(expected_output)
     assert actual_output == expected_output
 
 

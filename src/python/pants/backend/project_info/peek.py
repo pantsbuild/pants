@@ -116,7 +116,7 @@ def _render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> s
 
     def to_json(td: TargetData) -> dict:
         fields = {
-            (f"{k.alias}_raw" if k.alias in {"sources", "dependencies"} else k.alias): v.value
+            (f"{k.alias}_raw" if issubclass(k, (Sources, Dependencies)) else k.alias): v.value
             for k, v in td.target.field_values.items()
             if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
         }
