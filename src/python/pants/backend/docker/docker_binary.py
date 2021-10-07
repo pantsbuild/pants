@@ -31,11 +31,17 @@ class DockerBinary(BinaryPath):
         tags: tuple[str, ...],
         digest: Digest,
         dockerfile: str | None = None,
+        build_args: tuple[str, ...] = (),
         env: Mapping[str, str] | None = None,
     ) -> Process:
         args = [self.path, "build"]
+
         for tag in tags:
             args.extend(["-t", tag])
+
+        for build_arg in build_args:
+            args.extend(["--build-arg", build_arg])
+
         if dockerfile:
             args.extend(["-f", dockerfile])
 

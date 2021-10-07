@@ -71,6 +71,18 @@ class DockerOptions(Subsystem):
         )
 
         register(
+            "--build-args",
+            type=list,
+            member_type=str,
+            default=[],
+            help=(
+                "Build arguments (`--build-arg`) to use for `docker build` invocations. "
+                "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
+                "or just `ARG_NAME` to copy the value from Pants's own environment."
+            ),
+        )
+
+        register(
             "--env-vars",
             type=list,
             member_type=str,
@@ -84,8 +96,18 @@ class DockerOptions(Subsystem):
         )
 
     @property
+    def build_args(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.options.build_args)))
+
+    @property
     def env_vars_to_pass_to_docker(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self.options.env_vars)))
+        return tuple(
+            sorted(
+                set(self.options.env_vars).union(
+                    {build_arg for build_arg in self.build_args if "=" not in build_arg}
+                )
+            )
+        )
 
     @property
     def default_image_name_template(self) -> str:
