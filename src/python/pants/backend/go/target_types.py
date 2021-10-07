@@ -10,6 +10,7 @@ from typing import Sequence
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -17,8 +18,10 @@ from pants.engine.target import (
     InvalidFieldException,
     Sources,
     StringField,
+    StringSequenceField,
     Target,
 )
+from pants.option.global_options import FilesNotFoundBehavior
 
 
 class GoImportPathField(StringField):
@@ -72,14 +75,47 @@ class GoModDependenciesField(Dependencies):
     alias = "_dependencies"
 
 
+# TODO(#12953): generalize this?
+class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
+    alias = "pkg_sources"
+    default = ("**/*.go", "**/*.s")
+    help = (
+        "What sources to generate `_go_internal_package` targets for.\n\n"
+        "Pants will generate one target per matching directory."
+    )
+
+    def _prefix_glob_with_address(self, glob: str) -> str:
+        if glob.startswith("!"):
+            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
+        return os.path.join(self.address.spec_path, glob)
+
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
+        return PathGlobs(
+            (self._prefix_glob_with_address(glob) for glob in self.value or ()),
+            conjunction=GlobExpansionConjunction.any_match,
+            glob_match_error_behavior=error_behavior,
+            description_of_origin=(
+                f"{self.address}'s `{self.alias}` field"
+                if error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        )
+
+
 class GoModTarget(Target):
     alias = "go_mod"
-    core_fields = (*COMMON_TARGET_FIELDS, GoModDependenciesField, GoModSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoModDependenciesField,
+        GoModSourcesField,
+        GoModPackageSourcesField,
+    )
     help = (
         "A first-party Go module corresponding to a `go.mod` file.\n\n"
-        "Generates `_go_internal_package` targets for each subdirectory with a `.go` file, and "
-        "generates `_go_external_package` targets based on the `require` directives in your "
-        "`go.mod`.\n\n"
+        "Generates `_go_internal_package` targets for each directory from the "
+        "`internal_pkg_sources` field, and generates `_go_external_package` targets based on "
+        "the `require` directives in your `go.mod`.\n\n"
         "If you have external packages, make sure you have an up-to-date `go.sum`. Run "
         "`go mod tidy` directly to update your `go.mod` and `go.sum`."
     )
@@ -91,7 +127,6 @@ class GoModTarget(Target):
 
 
 class GoInternalPackageSourcesField(Sources):
-    default = ("*.go", "*.s")
     expected_file_extensions = (".go", ".s")
 
 
