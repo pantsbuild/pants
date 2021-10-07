@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
 
@@ -66,6 +70,23 @@ class DockerOptions(Subsystem):
             default=image_name_default,
         )
 
+        register(
+            "--env-vars",
+            type=list,
+            member_type=str,
+            default=[],
+            advanced=True,
+            help=(
+                "Environment variables to set for `docker` invocations. "
+                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+                "or just `ENV_VAR` to copy the value from Pants's own environment."
+            ),
+        )
+
+    @property
+    def env_vars_to_pass_to_docker(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.options.env_vars)))
+
     @property
     def default_image_name_template(self) -> str:
         return cast(str, self.options.default_image_name_template)
@@ -73,3 +94,21 @@ class DockerOptions(Subsystem):
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self.options.registries)
+
+
+@dataclass(frozen=True)
+class DockerEnvironmentVars:
+    vars: FrozenDict[str, str]
+
+
+@rule
+async def get_docker_environment(
+    docker: DockerOptions,
+) -> DockerEnvironmentVars:
+    return DockerEnvironmentVars(
+        await Get(Environment, EnvironmentRequest(docker.env_vars_to_pass_to_docker))
+    )
+
+
+def rules():
+    return collect_rules()

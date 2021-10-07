@@ -15,7 +15,7 @@ from pants.backend.docker.docker_build_context import (
     DockerVersionContextValue,
 )
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageName,
     DockerImageNameTemplate,
@@ -151,6 +151,7 @@ async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
     docker: DockerBinary,
+    env: DockerEnvironmentVars,
 ) -> BuiltPackage:
     context = await Get(
         DockerBuildContext,
@@ -173,6 +174,7 @@ async def build_docker_image(
             tags=tags,
             digest=context.digest,
             dockerfile=field_set.dockerfile_path,
+            env=env.vars,
         ),
     )
 
