@@ -97,19 +97,13 @@ async def compile_scala_source(
             exit_code=0,
         )
 
-    lockfile, transitive_components = await MultiGet(
-        Get(
-            CoursierResolvedLockfile,
-            CoursierLockfileForTargetRequest(Targets(request.component.members)),
-        ),
-        Get(
-            CoarsenedTargets,
-            Addresses(t.representative.address for t in request.component.dependencies),
-        ),
+    lockfile = await Get(
+        CoursierResolvedLockfile,
+        CoursierLockfileForTargetRequest(Targets(request.component.members)),
     )
     transitive_dependency_classfiles_fallible = await MultiGet(
         Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=component))
-        for component in transitive_components.closure()
+        for component in CoarsenedTargets(request.component.dependencies).closure()
     )
     transitive_dependency_classfiles = [
         fcc.output for fcc in transitive_dependency_classfiles_fallible if fcc.output
