@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::io;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -278,8 +279,8 @@ impl RawFdNail {
   fn input(
     tty_path: Option<PathBuf>,
   ) -> Result<(Box<dyn AsRawFd + Send>, Option<impl sink::Sink<Bytes>>), io::Error> {
-    if let Some(tty_path) = tty_path {
-      Ok((Box::new(std::fs::File::open(tty_path)?), None))
+    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().read(true)) {
+      Ok((Box::new(tty), None))
     } else {
       let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
       let write_handle =
@@ -303,11 +304,7 @@ impl RawFdNail {
     ),
     io::Error,
   > {
-    if let Some(tty_path) = tty_path {
-      let tty = std::fs::OpenOptions::new()
-        .write(true)
-        .create(false)
-        .open(tty_path)?;
+    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().write(true).create(false)) {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
       let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
@@ -315,6 +312,23 @@ impl RawFdNail {
         File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_reader.into_raw_fd()) });
       Ok((stream_for(read_handle).boxed(), Box::new(stdin_writer)))
     }
+  }
+
+  ///
+  /// Attempt to open the given TTY-path, logging any errors.
+  ///
+  fn try_open_tty(tty_path: Option<PathBuf>, open_options: &OpenOptions) -> Option<std::fs::File> {
+    let tty_path = tty_path?;
+    open_options
+      .open(&tty_path)
+      .map_err(|e| {
+        log::debug!(
+          "Failed to open TTY at {}: {:?}, falling back to socket access.",
+          tty_path.display(),
+          e
+        );
+      })
+      .ok()
   }
 
   ///
