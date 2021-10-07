@@ -19,6 +19,7 @@ from pants.backend.docker.docker_build import (
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
+    DockerVersionContext,
     DockerVersionContextError,
     DockerVersionContextValue,
 )
@@ -57,7 +58,7 @@ def assert_build(
     tgt = rule_runner.get_target(address)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
-        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=FrozenDict())
+        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=DockerVersionContext())
 
     def run_process_mock(process: Process) -> ProcessResult:
         if process_assertions:
@@ -288,7 +289,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    version_context = FrozenDict(
+    version_context = DockerVersionContext(
         {
             "baseimage": DockerVersionContextValue({"tag": "3.8"}),
             "stage0": DockerVersionContextValue({"tag": "3.8"}),
@@ -436,4 +437,22 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="args1"),
         process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="ver1", version="{build_args.VERSION}")'}
+    )
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_ARGS": '["VERSION=1.2.3"]',
+        },
+    )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="ver1"),
+        "Built docker image: test/ver1:1.2.3",
     )
