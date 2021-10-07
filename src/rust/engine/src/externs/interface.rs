@@ -493,14 +493,17 @@ py_class!(class PySession |py| {
           build_id: String,
           should_report_workunits: bool
     ) -> CPyResult<Self> {
-      Self::create_instance(py, Session::new(
-          scheduler_ptr.scheduler(py),
+      // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
+      // held.
+      let core = scheduler_ptr.scheduler(py).core.clone();
+      let session = py.allow_threads(|| Session::new(
+          core,
           should_record_zipkin_spans,
           should_render_ui,
           build_id,
           should_report_workunits,
-        )
-      )
+      ));
+      Self::create_instance(py, session)
     }
 });
 
