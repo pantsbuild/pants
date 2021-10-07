@@ -23,12 +23,12 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
-    Dependencies,
-    DependenciesRequest,
     InvalidTargetException,
     Sources,
     Target,
     Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
@@ -127,25 +127,20 @@ async def coursier_generate_lockfile(
     # This task finds all of the sources that depend on this lockfile, and then resolves
     # a lockfile that satisfies all of their `jvm_artifact` dependencies.
 
+    # Find all targets that (directly or indirectly) depend on this lockfile
     dependees = await Get(
         Dependees,
         DependeesRequest(
             [request.target.address],
-            transitive=False,  # TODO: do we actually want transitives here? DISCUSS.
+            transitive=True,
             include_roots=True,
         ),
     )
-    dependee_targets = await Get(Targets, Addresses(dependees))
 
-    # Find the JVM artifact dependencies required by each of targets that depend on this target
-
-    dependencies = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt[Dependencies]))
-        for tgt in dependee_targets
-        if tgt.has_field(Dependencies)
-    )
-    dependency_targets = await Get(Targets, Addresses(j for i in dependencies for j in i))
-    resolvable_dependencies = [i for i in dependency_targets if isinstance(i, JvmArtifact)]
+    # Find JVM artifacts in the dependency tree of the targets that depend on this lockfile.
+    # These artifacts constitute the requirements that will be resolved for this lockfile.
+    dependee_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(dependees))
+    resolvable_dependencies = [i for i in dependee_targets.closure if isinstance(i, JvmArtifact)]
 
     # Connect this to the original code (will make more efficient later)
     artifact_requirements = ArtifactRequirements(
