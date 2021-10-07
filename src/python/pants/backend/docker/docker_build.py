@@ -15,7 +15,7 @@ from pants.backend.docker.docker_build_context import (
     DockerVersionContextValue,
 )
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageName,
     DockerImageNameTemplate,
@@ -52,8 +52,6 @@ class BuiltDockerImage(BuiltPackageArtifact):
             relpath=None,
             extra_log_lines=(
                 f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-                "To try out the image interactively:",
-                f"    docker run -it --rm {tags[0]} [entrypoint args...]",
             ),
         )
 
@@ -127,10 +125,14 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
                 f"{self.address}: {self.version.value!r}.\n\n"
             )
             if isinstance(e, KeyError):
-                msg += (
-                    f"The key {e} is unknown. Try with one of: "
-                    f'{", ".join(version_context.keys())}.'
-                )
+                msg += f"The key {e} is unknown."
+                if version_context:
+                    msg += f' Try with one of: {", ".join(version_context.keys())}.'
+                else:
+                    msg += (
+                        " There are currently no known keys to use. These keys can come from "
+                        "`[docker].build_args` or parsed FROM instructions of your `Dockerfile`."
+                    )
             else:
                 msg += str(e)
             raise DockerVersionContextError(msg) from e
@@ -151,6 +153,7 @@ async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
     docker: DockerBinary,
+    env: DockerEnvironmentVars,
 ) -> BuiltPackage:
     context = await Get(
         DockerBuildContext,
@@ -160,19 +163,30 @@ async def build_docker_image(
         ),
     )
 
+    build_args_context = {
+        build_arg_name: build_arg_value or env.vars[build_arg_name]
+        for build_arg_name, _, build_arg_value in [
+            build_arg.partition("=") for build_arg in options.build_args
+        ]
+    }
+
+    version_context = context.version_context.merge({"build_args": build_args_context})
+
     tags = field_set.image_names(
         default_name_template=options.default_image_name_template,
         registries=options.registries(),
-        version_context=context.version_context,
+        version_context=version_context,
     )
 
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
-            tags=tags,
+            build_args=options.build_args,
             digest=context.digest,
             dockerfile=field_set.dockerfile_path,
+            env=env.vars,
+            tags=tags,
         ),
     )
 
