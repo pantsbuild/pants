@@ -33,7 +33,6 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ class CompileJavaSourceRequest:
 @rule(desc="Compile with javac")
 async def compile_java_source(
     bash: BashBinary,
-    coursier: Coursier,
     jdk_setup: JdkSetup,
     zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
@@ -200,26 +198,35 @@ async def compile_java_source(
     # NB: We jar up the outputs in a separate process because the nailgun runner cannot support
     # invoking via a `bash` wrapper (since the trailing portion of the command is executed by
     # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
+    output_snapshot = await Get(Snapshot, Digest, compile_result.output_digest)
     output_file = f"{request.component.representative.address.path_safe_spec}.jar"
-    jar_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                bash.path,
-                "-c",
-                " ".join(["cd", dest_dir, ";", zip_binary.path, "-r", f"../{output_file}", "."]),
-            ],
-            input_digest=compile_result.output_digest,
-            output_files=(output_file,),
-            description=f"Capture outputs of {request.component} for javac",
-            level=LogLevel.TRACE,
-        ),
-    )
+    if output_snapshot.files:
+        jar_result = await Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    " ".join(
+                        ["cd", dest_dir, ";", zip_binary.path, "-r", f"../{output_file}", "."]
+                    ),
+                ],
+                input_digest=compile_result.output_digest,
+                output_files=(output_file,),
+                description=f"Capture outputs of {request.component} for javac",
+                level=LogLevel.TRACE,
+            ),
+        )
+        jar_output_digest = jar_result.output_digest
+    else:
+        # If there was no output, then do not create a jar file. This may occur, for example, when compiling
+        # a `package-info.java` in a single partition.
+        jar_output_digest = EMPTY_DIGEST
 
     return FallibleCompiledClassfiles.from_fallible_process_result(
         str(request.component),
         compile_result,
-        CompiledClassfiles(jar_result.output_digest),
+        CompiledClassfiles(jar_output_digest),
     )
 
 

@@ -38,14 +38,14 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "sources_raw": [
-                      "*.txt"
-                    ],
+                    "dependencies": [],
                     "sources": [
                       "foo.txt",
                       "bar.txt"
                     ],
-                    "dependencies": []
+                    "sources_raw": [
+                      "*.txt"
+                    ]
                   }
                 ]
                 """
@@ -67,12 +67,12 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
+                    "dependencies": [],
                     "dependencies_raw": null,
                     "description": null,
-                    "sources_raw": [],
-                    "tags": null,
                     "sources": [],
-                    "dependencies": []
+                    "sources_raw": [],
+                    "tags": null
                   }
                 ]
                 """
@@ -109,27 +109,27 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
+                    "dependencies": [],
+                    "sources": [],
                     "sources_raw": [
                       "*.txt"
                     ],
                     "tags": [
                       "zippable"
-                    ],
-                    "sources": [],
-                    "dependencies": []
+                    ]
                   },
                   {
                     "address": "example:archive_target",
                     "target_type": "archive",
+                    "dependencies": [
+                      "foo/bar:baz",
+                      "qux:quux"
+                    ],
                     "files": [
                       "example:files_target"
                     ],
                     "format": "zip",
-                    "output_path": "my-archive.zip",
-                    "dependencies": [
-                      "foo/bar:baz",
-                      "qux:quux"
-                    ]
+                    "output_path": "my-archive.zip"
                   }
                 ]
                 """

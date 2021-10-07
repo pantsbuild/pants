@@ -631,6 +631,56 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_sources(
+                    name = 'main',
+                    dependencies = [
+                        ":lockfile",
+                    ]
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "package-info.java": dedent(
+                """
+                package org.pantsbuild.example;
+                /**
+                  * This is a package-info.java file which can have package-level annotations and
+                  * documentation comments. It does not generate any output.
+                  */
+                """
+            ),
+        }
+    )
+    compiled_classfiles = rule_runner.request(
+        CompiledClassfiles,
+        [
+            CompileJavaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                )
+            )
+        ],
+    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {}
+
+
+@maybe_skip_jdk_test
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

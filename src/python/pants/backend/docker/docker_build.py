@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from os import path
 from typing import cast
 
-from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
+from pants.backend.docker.docker_binary import DockerBinary
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -15,7 +15,7 @@ from pants.backend.docker.docker_build_context import (
     DockerVersionContextValue,
 )
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageName,
     DockerImageNameTemplate,
@@ -26,8 +26,9 @@ from pants.backend.docker.target_types import (
     DockerRepository,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, pluralize
@@ -51,14 +52,12 @@ class BuiltDockerImage(BuiltPackageArtifact):
             relpath=None,
             extra_log_lines=(
                 f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-                "To try out the image interactively:",
-                f"    docker run -it --rm {tags[0]} [entrypoint args...]",
             ),
         )
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet):
+class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
     name: DockerImageName
@@ -126,10 +125,14 @@ class DockerFieldSet(PackageFieldSet):
                 f"{self.address}: {self.version.value!r}.\n\n"
             )
             if isinstance(e, KeyError):
-                msg += (
-                    f"The key {e} is unknown. Try with one of: "
-                    f'{", ".join(version_context.keys())}.'
-                )
+                msg += f"The key {e} is unknown."
+                if version_context:
+                    msg += f' Try with one of: {", ".join(version_context.keys())}.'
+                else:
+                    msg += (
+                        " There are currently no known keys to use. These keys can come from "
+                        "`[docker].build_args` or parsed FROM instructions of your `Dockerfile`."
+                    )
             else:
                 msg += str(e)
             raise DockerVersionContextError(msg) from e
@@ -149,31 +152,41 @@ class DockerFieldSet(PackageFieldSet):
 async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
+    docker: DockerBinary,
+    env: DockerEnvironmentVars,
 ) -> BuiltPackage:
-    docker, context = await MultiGet(
-        Get(DockerBinary, DockerBinaryRequest()),
-        Get(
-            DockerBuildContext,
-            DockerBuildContextRequest(
-                address=field_set.address,
-                build_upstream_images=True,
-            ),
+    context = await Get(
+        DockerBuildContext,
+        DockerBuildContextRequest(
+            address=field_set.address,
+            build_upstream_images=True,
         ),
     )
+
+    build_args_context = {
+        build_arg_name: build_arg_value or env.vars[build_arg_name]
+        for build_arg_name, _, build_arg_value in [
+            build_arg.partition("=") for build_arg in options.build_args
+        ]
+    }
+
+    version_context = context.version_context.merge({"build_args": build_args_context})
 
     tags = field_set.image_names(
         default_name_template=options.default_image_name_template,
         registries=options.registries(),
-        version_context=context.version_context,
+        version_context=version_context,
     )
 
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
-            tags=tags,
+            build_args=options.build_args,
             digest=context.digest,
             dockerfile=field_set.dockerfile_path,
+            env=env.vars,
+            tags=tags,
         ),
     )
 
@@ -189,8 +202,24 @@ async def build_docker_image(
     )
 
 
+@rule
+async def docker_image_run_request(field_set: DockerFieldSet, docker: DockerBinary) -> RunRequest:
+    image = await Get(BuiltPackage, PackageFieldSet, field_set)
+    return RunRequest(
+        digest=image.digest,
+        args=(
+            docker.path,
+            "run",
+            "-it",
+            "--rm",
+            cast(BuiltDockerImage, image.artifacts[0]).tags[0],
+        ),
+    )
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(PackageFieldSet, DockerFieldSet),
+        UnionRule(RunFieldSet, DockerFieldSet),
     ]
