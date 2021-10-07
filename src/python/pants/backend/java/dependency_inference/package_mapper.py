@@ -6,13 +6,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.java.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
+from pants.backend.java.dependency_inference.package_prefix_tree import (
+    CodeProvence,
+    PackageRootedDependencyMap,
+)
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.target_types import CodeProvenceField, JavaSourceField
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets
+from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.logging import LogLevel
 
@@ -80,6 +83,12 @@ class FirstPartyJavaTargetsMappingMarker(FirstPartyJavaMappingImplMarker):
 async def map_first_party_java_targets_to_symbols(
     _: FirstPartyJavaTargetsMappingMarker,
 ) -> FirstPartyJavaMappingImpl:
+    def get_code_provence(tgt: Target) -> CodeProvence:
+        if not tgt.has_field(CodeProvenceField):
+            return CodeProvence.NON_TEST
+        cp_str = tgt[CodeProvenceField].value
+        return CodeProvence.from_str(cp_str)
+
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     java_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(JavaSourceField))
     source_files = await MultiGet(
@@ -89,13 +98,16 @@ async def map_first_party_java_targets_to_symbols(
         Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)
         for source_files in source_files
     )
-    address_and_analysis = zip([t.address for t in java_targets], source_analysis)
-
+    address_and_analysis = zip(
+        [(t.address, get_code_provence(t)) for t in java_targets], source_analysis
+    )
     dep_map = PackageRootedDependencyMap()
-    for address, analysis in address_and_analysis:
+    for (address, cp), analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
             package, type_ = top_level_type.rsplit(".", maxsplit=1)
-            dep_map.add_top_level_type(package=package, type_=type_, address=address)
+            dep_map.add_top_level_type(
+                package=package, type_=type_, address=address, code_provence=cp
+            )
 
     return FirstPartyJavaMappingImpl(package_rooted_dependency_map=dep_map)
 

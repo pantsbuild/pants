@@ -8,8 +8,9 @@ from typing import cast
 from pants.backend.java.dependency_inference import import_parser, package_mapper
 from pants.backend.java.dependency_inference.import_parser import ParsedJavaImports
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
+from pants.backend.java.dependency_inference.package_prefix_tree import CodeProvence
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.target_types import CodeProvenceField, JavaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
@@ -19,6 +20,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -58,10 +60,23 @@ async def infer_java_dependencies_via_imports(
     java_infer_subsystem: JavaInferSubsystem,
     first_party_dep_map: FirstPartyJavaPackageMapping,
 ) -> InferredDependencies:
+    def get_code_provence(tgt: Target) -> CodeProvence:
+        if not tgt.has_field(CodeProvenceField):
+            return CodeProvence.NON_TEST
+        cp_str = tgt[CodeProvenceField].value
+        return CodeProvence.from_str(cp_str)
+
     if not java_infer_subsystem.imports:
         return InferredDependencies([])
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    code_provence = get_code_provence(wrapped_tgt.target)
+    code_provences_set = (
+        {CodeProvence.NON_TEST}
+        if code_provence == CodeProvence.NON_TEST
+        else {CodeProvence.NON_TEST, CodeProvence.TEST}
+    )
+
     explicitly_provided_deps, source_files = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
         Get(SourceFiles, SourceFilesRequest([request.sources_field])),
@@ -74,10 +89,12 @@ async def infer_java_dependencies_via_imports(
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
     deps_from_imports = itertools.chain.from_iterable(
-        dep_map.addresses_for_symbol(imp) for imp in relevant_imports
+        dep_map.addresses_for_symbol(imp, code_provences_set) for imp in relevant_imports
     )
 
-    deps_from_same_package = dep_map.addresses_for_symbol(source_analysis.declared_package)
+    deps_from_same_package = dep_map.addresses_for_symbol(
+        source_analysis.declared_package, code_provences_set
+    )
 
     return InferredDependencies(
         dependencies=itertools.chain(deps_from_imports, deps_from_same_package),

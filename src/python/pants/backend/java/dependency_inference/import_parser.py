@@ -30,7 +30,7 @@ class ParseJavaImportsRequest:
 async def parse_java_imports(request: ParseJavaImportsRequest) -> ParsedJavaImports:
     source_files = await Get(SourceFiles, SourceFilesRequest([request.sources]))
     analysis = await Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)
-    return ParsedJavaImports.from_analysis(analysis.imports)
+    return ParsedJavaImports.from_analysis(analysis)
 
 
 def rules():

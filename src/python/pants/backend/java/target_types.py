@@ -29,6 +29,12 @@ class JavaGeneratorSources(Sources):
     expected_file_extensions = (".java",)
 
 
+class CodeProvenceField(StringField):
+    alias = "_code_prov"
+    default = "nontest"
+    help = "Provence of the code (non-test vs test)"
+
+
 # -----------------------------------------------------------------------------------------------
 # `junit_test` target
 # -----------------------------------------------------------------------------------------------
@@ -38,12 +44,17 @@ class JavaTestSourceField(JavaSourceField):
     pass
 
 
+class TestCodeProvenceField(CodeProvenceField):
+    default = "test"
+
+
 class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaTestSourceField,
+        TestCodeProvenceField,
     )
     help = "A single Java test, run with JUnit."
 
@@ -86,7 +97,6 @@ async def generate_targets_from_junit_tests(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=False,
     )
 
@@ -141,7 +151,6 @@ async def generate_targets_from_java_sources(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=False,
     )
 
