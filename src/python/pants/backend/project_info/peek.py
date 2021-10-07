@@ -8,7 +8,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
-from typing import Any, Iterable, Mapping, cast
+from typing import Iterable, cast
 
 from pkg_resources import Requirement
 
@@ -102,8 +102,9 @@ def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
 @dataclass(frozen=True)
 class TargetData:
     target: Target
-    expanded_sources: tuple[str, ...] | None  # Target may not be of a type that has sources.
-    expanded_dependencies: tuple[str, ...]
+    # These fields may not be registered on the target, so we have nothing to expand.
+    expanded_sources: tuple[str, ...] | None
+    expanded_dependencies: tuple[str, ...] | None
 
 
 class TargetDatas(Collection[TargetData]):
@@ -113,21 +114,25 @@ class TargetDatas(Collection[TargetData]):
 def _render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
     nothing = object()
 
-    targets: Iterable[Mapping[str, Any]] = [
-        {
+    def to_json(td: TargetData) -> dict:
+        fields = {
+            (f"{k.alias}_raw" if k.alias in {"sources", "dependencies"} else k.alias): v.value
+            for k, v in td.target.field_values.items()
+            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
+        }
+
+        if td.expanded_dependencies is not None:
+            fields["dependencies"] = td.expanded_dependencies
+        if td.expanded_sources is not None:
+            fields["sources"] = td.expanded_sources
+
+        return {
             "address": td.target.address.spec,
             "target_type": td.target.alias,
-            **{
-                (f"{k.alias}_raw" if k.alias in {"sources", "dependencies"} else k.alias): v.value
-                for k, v in td.target.field_values.items()
-                if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
-            },
-            **({} if td.expanded_sources is None else {"sources": td.expanded_sources}),
-            "dependencies": td.expanded_dependencies,
+            **dict(sorted(fields.items())),
         }
-        for td in tds
-    ]
-    return f"{json.dumps(targets, indent=2, cls=_PeekJsonEncoder)}\n"
+
+    return f"{json.dumps([to_json(td) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -153,29 +158,42 @@ class _PeekJsonEncoder(json.JSONEncoder):
 async def get_target_data(targets: UnexpandedTargets) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
+    # We "hydrate" these field with the engine, but not every target has them registered.
+    targets_with_dependencies = []
+    targets_with_sources = []
+    for tgt in sorted_targets:
+        if tgt.has_field(Dependencies):
+            targets_with_dependencies.append(tgt)
+        if tgt.has_field(Sources):
+            targets_with_sources.append(tgt)
+
     dependencies_per_target = await MultiGet(
         Get(
             Targets,
             DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
         )
-        for tgt in sorted_targets
+        for tgt in targets_with_dependencies
     )
-
-    # Not all targets have a sources field, so we have to do a dance here.
-    targets_with_sources = [tgt for tgt in sorted_targets if tgt.has_field(Sources)]
-    all_hydrated_sources = await MultiGet(
+    hydrated_sources_per_target = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt[Sources])) for tgt in targets_with_sources
     )
-    hydrated_sources_map = {
-        tgt.address: hs for tgt, hs in zip(targets_with_sources, all_hydrated_sources)
+
+    expanded_dependencies_map = {
+        tgt.address: tuple(dep.address.spec for dep in deps)
+        for tgt, deps in zip(targets_with_dependencies, dependencies_per_target)
     }
-    sources_per_target = [hydrated_sources_map.get(tgt.address) for tgt in sorted_targets]
+    expanded_sources_map = {
+        tgt.address: hs.snapshot.files
+        for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
+    }
 
     return TargetDatas(
         TargetData(
-            tgt, srcs.snapshot.files if srcs else None, tuple(dep.address.spec for dep in deps)
+            tgt,
+            expanded_dependencies=expanded_dependencies_map.get(tgt.address),
+            expanded_sources=expanded_sources_map.get(tgt.address),
         )
-        for tgt, srcs, deps in zip(sorted_targets, sources_per_target, dependencies_per_target)
+        for tgt in sorted_targets
     )
 
 
