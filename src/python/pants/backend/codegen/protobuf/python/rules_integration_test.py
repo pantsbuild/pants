@@ -80,7 +80,6 @@ def assert_files_generated(
         args.append("--python-protobuf-mypy-plugin")
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
-    print(type(tgt))
     protocol_sources = rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourcesField])]
     )
@@ -164,7 +163,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         Address("src/protobuf/dir1", relative_file_path="f2.proto"), "src/protobuf/dir1/f2_pb2.py"
     )
     assert_gen(
-        Address("src/protobuf/dir2", relative_file_path="f.proto"), "src/protobuf/dir2/f_pb2.py"
+        Address("src/protobuf/dir2", relative_file_path="f.proto"), "src/python/dir2/f_pb2.py"
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
