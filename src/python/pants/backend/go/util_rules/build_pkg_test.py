@@ -330,7 +330,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
         expected_import_path=xerrors_internal_import_path,
-        expected_subpath="/internal",  # TODO: Fix modeling of subpath, this seems wrong.
+        expected_subpath="internal",
         expected_go_file_names=["internal.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
