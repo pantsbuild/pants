@@ -162,6 +162,8 @@ class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
         # `go_first_party_package` target.
         assert self.address.is_generated_target
         go_mod_path = self.address.spec_path
+        if not self.value:
+            return go_mod_path
         return os.path.join(go_mod_path, self.value)
 
 

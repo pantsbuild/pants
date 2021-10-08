@@ -72,7 +72,9 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
             FirstPartyPkgInfo, FirstPartyPkgInfoRequest(address=target.address)
         )
         source_files_digest = _first_party_pkg_info.digest
-        source_files_subpath = target[GoFirstPartyPackageSubpathField].value
+        source_files_subpath = os.path.join(
+            target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
+        )
         go_files = _first_party_pkg_info.go_files
         s_files = _first_party_pkg_info.s_files
 
@@ -142,7 +144,10 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         CompiledGoSources,
         CompileGoSourcesRequest(
             digest=input_digest,
-            sources=tuple(f"./{source_files_subpath}/{name}" for name in go_files),
+            sources=tuple(
+                f"./{source_files_subpath}/{name}" if source_files_subpath else f"./{name}"
+                for name in go_files
+            ),
             import_path=import_path,
             description=f"Compile Go package: {import_path}",
             import_config_path=import_config.CONFIG_PATH,
