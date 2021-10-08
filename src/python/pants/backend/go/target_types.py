@@ -35,14 +35,6 @@ class GoImportPathField(StringField):
     value: str
 
 
-def is_first_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoFirstPartyPackageSourcesField)
-
-
-def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoThirdPartyPackageDependenciesField)
-
-
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
 # -----------------------------------------------------------------------------------------------

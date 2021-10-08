@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 
 
 @dataclass(frozen=True)
-class CompileGoSourcesRequest:
+class CompileGoSourcesRequest(EngineAwareParameter):
     """Compile Go sources into the package archive __pkg__.a."""
 
     # The `Digest` containing the input Go source files and input packages.
@@ -31,6 +32,9 @@ class CompileGoSourcesRequest:
 
     # Optional symabis file to use.
     symabis_path: str | None = None
+
+    def debug_hint(self) -> str:
+        return self.import_path
 
 
 @dataclass(frozen=True)
