@@ -1,10 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 from enum import Enum
 from typing import Callable, Pattern
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import collect_rules, goal_rule
@@ -17,6 +20,7 @@ from pants.engine.target import (
 )
 from pants.util.enums import match
 from pants.util.filtering import and_filters, create_filters
+from pants.util.memo import memoized
 
 
 class TargetGranularity(Enum):
@@ -83,6 +87,17 @@ def compile_regex(regex: str) -> Pattern:
 TargetFilter = Callable[[Target], bool]
 
 
+# Memoized so the deprecation doesn't happen repeatedly.
+@memoized
+def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
+    assert tgt_type.deprecated_alias_removal_version is not None
+    warn_or_error(
+        removal_version=tgt_type.deprecated_alias_removal_version,
+        entity=f"using `filter --target-type={tgt_type.deprecated_alias}`",
+        hint=f"Use `filter --target-type={tgt_type.alias}` instead.",
+    )
+
+
 @goal_rule
 def filter_targets(
     targets: UnexpandedTargets,
@@ -93,7 +108,16 @@ def filter_targets(
     def filter_target_type(target_type: str) -> TargetFilter:
         if target_type not in registered_target_types.aliases:
             raise UnrecognizedTargetTypeException(target_type, registered_target_types)
-        return lambda tgt: tgt.alias == target_type
+
+        def filt(tgt: Target) -> bool:
+            if tgt.alias == target_type:
+                return True
+            if tgt.deprecated_alias == target_type:
+                warn_deprecated_target_type(type(tgt))
+                return True
+            return False
+
+        return filt
 
     def filter_address_regex(address_regex: str) -> TargetFilter:
         regex = compile_regex(address_regex)

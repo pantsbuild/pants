@@ -13,7 +13,6 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
-    GoFirstPartyPackageDependenciesField,
     GoFirstPartyPackageSourcesField,
     GoFirstPartyPackageSubpathField,
     GoFirstPartyPackageTarget,
@@ -27,12 +26,7 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
-from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
-    GoModInfoRequest,
-    OwningGoMod,
-    OwningGoModRequest,
-)
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyModuleInfo,
@@ -63,18 +57,6 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-
-class InjectGoFirstPartyPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoFirstPartyPackageDependenciesField
-
-
-@rule
-async def inject_go_package_dependencies(
-    request: InjectGoFirstPartyPackageDependenciesRequest,
-) -> InjectedDependencies:
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.dependencies_field.address))
-    return InjectedDependencies([owning_go_mod.address])
 
 
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
@@ -143,11 +125,12 @@ async def inject_go_third_party_package_dependencies(
     package_mapping: ImportPathToPackages,
 ) -> InjectedDependencies:
     addr = request.dependencies_field.address
-    wrapped_target = await Get(WrappedTarget, Address, addr)
+    go_mod_address = addr.maybe_convert_to_target_generator()
+    wrapped_target, go_mod_info = await MultiGet(
+        Get(WrappedTarget, Address, addr),
+        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+    )
     tgt = wrapped_target.target
-
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(addr))
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
     pkg_info = await Get(
         ThirdPartyPkgInfo,
         ThirdPartyPkgInfoRequest(
@@ -351,7 +334,6 @@ def rules():
         *collect_rules(),
         *first_party_pkg.rules(),
         *import_analysis.rules(),
-        UnionRule(InjectDependenciesRequest, InjectGoFirstPartyPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InjectDependenciesRequest, InjectGoThirdPartyPackageDependenciesRequest),
         UnionRule(InjectDependenciesRequest, InjectGoBinaryMainDependencyRequest),

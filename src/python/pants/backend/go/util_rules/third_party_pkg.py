@@ -218,6 +218,8 @@ class ThirdPartyPkgInfo:
     go_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    unsupported_sources_error: NotImplementedError | None = None
+
 
 @dataclass(frozen=True)
 class ThirdPartyPkgInfoRequest(EngineAwareParameter):
@@ -289,6 +291,9 @@ async def compute_third_party_module_metadata(
             imports=tuple(metadata.get("Imports", ())),
             go_files=tuple(metadata.get("GoFiles", ())),
             s_files=tuple(metadata.get("SFiles", ())),
+            unsupported_sources_error=maybe_create_error_for_invalid_sources(
+                metadata, import_path, request.module_path, request.version
+            ),
         )
         import_path_to_info[import_path] = pkg_info
     return ThirdPartyModuleInfo(import_path_to_info)
@@ -313,7 +318,41 @@ async def extract_package_info_from_module_info(
             "message.\n\n"
             f"{module_info}"
         )
+
+    # We error if trying to _use_ a package with unsupported sources (vs. only generating the
+    # target definition).
+    if pkg_info.unsupported_sources_error:
+        raise pkg_info.unsupported_sources_error
+
     return pkg_info
+
+
+def maybe_create_error_for_invalid_sources(
+    go_list_json: dict, import_path: str, module_path: str, version: str
+) -> NotImplementedError | None:
+    for key in (
+        "CgoFiles",
+        "CompiledGoFiles",
+        "CFiles",
+        "CXXFiles",
+        "MFiles",
+        "HFiles",
+        "FFiles",
+        "SwigFiles",
+        "SwigCXXFiles",
+        "SysoFiles",
+    ):
+        if key in go_list_json:
+            return NotImplementedError(
+                f"The third-party package {import_path} includes `{key}`, which Pants does "
+                "not yet support. Please open a feature request at "
+                "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+                "prioritize adding support. Please include this metadata:\n\n"
+                f"package: {import_path}\n"
+                f"module: {module_path}\n"
+                f"version: {version}"
+            )
+    return None
 
 
 def rules():

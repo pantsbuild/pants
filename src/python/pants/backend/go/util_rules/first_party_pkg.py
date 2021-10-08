@@ -11,12 +11,7 @@ from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
     GoFirstPartyPackageSubpathField,
 )
-from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
-    GoModInfoRequest,
-    OwningGoMod,
-    OwningGoModRequest,
-)
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -61,16 +56,16 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest,
 ) -> FirstPartyPkgInfo:
-    wrapped_target, owning_go_mod = await MultiGet(
+    go_mod_address = request.address.maybe_convert_to_target_generator()
+    wrapped_target, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
-        Get(OwningGoMod, OwningGoModRequest(request.address)),
+        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
     )
     target = wrapped_target.target
     subpath = target[GoFirstPartyPackageSubpathField].value
 
-    go_mod_info, pkg_sources = await MultiGet(
-        Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
-        Get(HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])),
+    pkg_sources = await Get(
+        HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
     )
     input_digest = await Get(
         Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])
@@ -81,11 +76,20 @@ async def compute_first_party_package_info(
         GoSdkProcess(
             input_digest=input_digest,
             command=("list", "-json", f"./{subpath}"),
-            description=f"Determine metadata for {target.address}",
-            working_dir=owning_go_mod.address.spec_path,
+            description=f"Determine metadata for {request.address}",
+            working_dir=request.address.spec_path,
         ),
     )
     metadata = json.loads(result.stdout)
+
+    if "CgoFiles" in metadata:
+        raise NotImplementedError(
+            f"The first-party package {request.address} includes `CgoFiles`, which Pants does "
+            "not yet support. Please open a feature request at "
+            "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+            "prioritize adding support."
+        )
+
     return FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
         imports=tuple(metadata.get("Imports", [])),

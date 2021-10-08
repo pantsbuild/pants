@@ -277,9 +277,12 @@ class Target:
     core_fields: ClassVar[Tuple[Type[Field], ...]]
     help: ClassVar[str]
 
-    # Subclasses may define these.
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
+
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
+    deprecated_alias_removal_hint: ClassVar[str | None] = None
 
     # These get calculated in the constructor
     address: Address
@@ -723,20 +726,20 @@ class RegisteredTargetTypes:
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
-        return cls(
-            {
-                target_type.alias: target_type
-                for target_type in sorted(target_types, key=lambda target_type: target_type.alias)
-            }
-        )
+        result = {}
+        for target_type in sorted(target_types, key=lambda tt: tt.alias):
+            result[target_type.alias] = target_type
+            if target_type.deprecated_alias is not None:
+                result[target_type.deprecated_alias] = target_type
+        return cls(result)
 
     @property
-    def aliases(self) -> Tuple[str, ...]:
-        return tuple(self.aliases_to_types.keys())
+    def aliases(self) -> FrozenOrderedSet[str]:
+        return FrozenOrderedSet(self.aliases_to_types.keys())
 
     @property
-    def types(self) -> Tuple[Type[Target], ...]:
-        return tuple(self.aliases_to_types.values())
+    def types(self) -> FrozenOrderedSet[type[Target]]:
+        return FrozenOrderedSet(self.aliases_to_types.values())
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1125,8 +1128,7 @@ class UnrecognizedTargetTypeException(Exception):
         self,
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
-        *,
-        address: Optional[Address] = None,
+        address: Address | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
         super().__init__(
