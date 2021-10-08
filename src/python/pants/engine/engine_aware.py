@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pants.engine.fs import FileDigest, Snapshot
+from pants.engine.internals import native_engine
 from pants.util.logging import LogLevel
+
+if TYPE_CHECKING:
+    from pants.engine.fs import FileDigest, Snapshot
 
 
 class EngineAwareParameter(ABC):
@@ -84,3 +87,27 @@ class EngineAwareReturnType(ABC):
         """
 
         return None
+
+
+class SideEffecting(ABC):
+    """Marks a class as providing side-effecting APIs, which are handled specially in @rules.
+
+    Implementers of SideEffecting classes should ensure that `def side_effected` is called before
+    the class causes side-effects.
+
+    Note that logging is _not_ considered to be a side-effect, but other types of output to stdio
+    are.
+    """
+
+    # Used to disable enforcement of effects in tests.
+    _enforce_effects: bool
+
+    def side_effected(self) -> None:
+        # NB: This method is implemented by manipulating a thread/task-local property which will
+        # only be in scope if the SideEffecting property has correctly been identified on a @rule
+        # Parameter.
+        #
+        # TODO: As part of #10542, it's possible that all side-effecting methods will need to
+        # become async instead, which would avoid the need for a thread/task-local.
+        if self._enforce_effects:
+            native_engine.task_side_effected()

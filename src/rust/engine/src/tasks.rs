@@ -145,6 +145,7 @@ impl fmt::Display for Rule {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
+  pub side_effecting: bool,
   pub engine_aware_return_type: bool,
   pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
@@ -220,6 +221,7 @@ impl Tasks {
     &mut self,
     func: Function,
     return_type: TypeId,
+    side_effecting: bool,
     engine_aware_return_type: bool,
     cacheable: bool,
     name: String,
@@ -234,6 +236,7 @@ impl Tasks {
     self.preparing = Some(Task {
       cacheable,
       product: return_type,
+      side_effecting,
       engine_aware_return_type,
       clause: Vec::new(),
       gets: Vec::new(),

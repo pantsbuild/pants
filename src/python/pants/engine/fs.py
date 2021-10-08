@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 # Re-export GlobMatchErrorBehavior here as part of the public Plugin API.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.native_engine import PyDigest, PySnapshot
-from pants.engine.rules import QueryRule, side_effecting
+from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
@@ -276,12 +277,12 @@ class DownloadFile:
     expected_digest: FileDigest
 
 
-@side_effecting
 @dataclass(frozen=True)
-class Workspace:
+class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
     _scheduler: "SchedulerSession"
+    _enforce_effects: bool = True
 
     def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
         """Write a digest to disk, relative to the build root.
@@ -289,6 +290,7 @@ class Workspace:
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
         """
+        self.side_effected()
         self._scheduler.write_digest(digest, path_prefix=path_prefix)
 
 

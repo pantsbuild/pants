@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 from typing_extensions import TypedDict
 
 from pants.engine.collection import Collection
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -649,11 +649,12 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             tasks,
             rule.func,
             rule.output_type,
-            issubclass(rule.output_type, EngineAwareReturnType),
-            rule.cacheable,
-            rule.canonical_name,
-            rule.desc or "",
-            rule.level.level,
+            side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
+            engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
+            cacheable=rule.cacheable,
+            name=rule.canonical_name,
+            desc=rule.desc or "",
+            level=rule.level.level,
         )
 
         for selector in rule.input_selectors:

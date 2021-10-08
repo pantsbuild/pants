@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING, Iterable, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule, side_effecting
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -352,12 +352,15 @@ class InteractiveProcess:
         )
 
 
-@side_effecting
 @dataclass(frozen=True)
-class InteractiveRunner:
+class InteractiveRunner(SideEffecting):
     _scheduler: SchedulerSession
+    # Used to disable enforcement of effects in tests.
+    _enforce_effects: bool = True
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
+        if self._enforce_effects:
+            self.side_effected()
         if request.forward_signals_to_process:
             with ExceptionSink.ignoring_sigint():
                 return self._scheduler.run_local_interactive_process(request)

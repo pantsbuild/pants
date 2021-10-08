@@ -6,6 +6,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
@@ -44,6 +45,34 @@ use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
   WorkunitMetadata,
 };
+
+tokio::task_local! {
+    static TASK_SIDE_EFFECTED: Arc<AtomicBool>;
+}
+
+pub fn task_side_effected() -> Result<(), String> {
+  TASK_SIDE_EFFECTED
+    .try_with(|task_side_effected| {
+      task_side_effected.store(true, Ordering::SeqCst);
+    })
+    .map_err(|_| {
+      "Side-effects are not allowed in this context: SideEffecting types must be \
+            acquired via parameters to `@rule`s."
+        .to_owned()
+    })
+}
+
+pub async fn maybe_side_effecting<T, F: future::Future<Output = T>>(
+  is_side_effecting: bool,
+  side_effected: &Arc<AtomicBool>,
+  f: F,
+) -> T {
+  if is_side_effecting {
+    TASK_SIDE_EFFECTED.scope(side_effected.clone(), f).await
+  } else {
+    f.await
+  }
+}
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -172,6 +201,7 @@ impl Select {
                 product: self.product,
                 task: task.clone(),
                 entry: Arc::new(self.entry.clone()),
+                side_effected: Arc::new(AtomicBool::new(false)),
               })
               .await
           }
@@ -1054,12 +1084,18 @@ impl From<DownloadedFile> for NodeKey {
   }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Derivative, Clone)]
+#[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
   params: Params,
   product: TypeId,
   task: tasks::Task,
+  // The Params and the Task struct are sufficient to uniquely identify it.
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
   entry: Arc<rule_graph::Entry<Rule>>,
+  // Does not affect the identity of the Task.
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  side_effected: Arc<AtomicBool>,
 }
 
 impl Task {
@@ -1223,14 +1259,22 @@ impl WrappedNode for Task {
     let func = self.task.func;
     let entry = self.entry;
     let product = self.product;
+    let side_effecting = self.task.side_effecting;
     let engine_aware_return_type = self.task.engine_aware_return_type;
 
-    let result_val =
-      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
+    let result_val = maybe_side_effecting(side_effecting, &self.side_effected, async move {
+      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)
+    })
+    .await?;
     let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
-      result_val = Self::generate(&context, workunit, params, entry, result_val).await?;
+      result_val = maybe_side_effecting(
+        side_effecting,
+        &self.side_effected,
+        Self::generate(&context, workunit, params, entry, result_val),
+      )
+      .await?;
       result_type = externs::get_type_for(&result_val);
     }
 
@@ -1582,9 +1626,10 @@ impl Node for NodeKey {
   }
 
   fn restartable(&self) -> bool {
-    // TODO: This will move to being a computed value, based on whether a Node has already
-    // executed its first side-effect.
-    self.cacheable()
+    match self {
+      &NodeKey::Task(ref s) => !s.side_effected.load(Ordering::SeqCst),
+      _ => true,
+    }
   }
 
   fn cacheable(&self) -> bool {

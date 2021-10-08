@@ -125,7 +125,7 @@ def run_lint_rule(
             lint,
             rule_args=[
                 console,
-                Workspace(rule_runner.scheduler),
+                Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
                 create_goal_subsystem(
                     LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False

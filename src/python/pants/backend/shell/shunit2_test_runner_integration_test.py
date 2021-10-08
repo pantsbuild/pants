@@ -96,7 +96,9 @@ def run_shunit2(
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
         with mock_console(rule_runner.options_bootstrapper):
-            debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
+            debug_result = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False).run(
+                debug_request.process
+            )
             assert test_result.exit_code == debug_result.exit_code
     return test_result
 

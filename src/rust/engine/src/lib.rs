@@ -30,6 +30,9 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![type_length_limit = "43757804"]
 
+#[macro_use]
+extern crate derivative;
+
 mod context;
 mod externs;
 mod interning;

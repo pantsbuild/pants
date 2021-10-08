@@ -394,7 +394,7 @@ def test_specs_to_dirs() -> None:
 
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        workspace = Workspace(rule_runner.scheduler)
+        workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
         union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
         specs = Specs(
             address_specs=AddressSpecs(tuple()), filesystem_specs=FilesystemSpecs(tuple())
