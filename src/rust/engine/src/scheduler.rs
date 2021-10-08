@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::context::{Context, Core};
-use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
+use crate::python::{Failure, Params, TypeId, Value};
 use crate::session::{ObservedValueResult, Root, Session};
 
 use futures::{future, FutureExt, TryFutureExt};

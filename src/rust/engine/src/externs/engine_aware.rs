@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::context::Context;
-use crate::core::Value;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
+use crate::python::Value;
 use crate::Failure;
 use crate::Types;
 

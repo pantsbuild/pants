@@ -31,11 +31,11 @@
 #![type_length_limit = "43757804"]
 
 mod context;
-mod core;
 mod externs;
 mod interning;
 mod intrinsics;
 mod nodes;
+mod python;
 mod scheduler;
 mod selectors;
 mod session;
@@ -43,8 +43,8 @@ mod tasks;
 mod types;
 
 pub use crate::context::{Core, ExecutionStrategyOptions, LocalStoreOptions, RemotingOptions};
-pub use crate::core::{Failure, Function, Key, Params, TypeId, Value};
 pub use crate::intrinsics::Intrinsics;
+pub use crate::python::{Failure, Function, Key, Params, TypeId, Value};
 pub use crate::scheduler::{ExecutionRequest, ExecutionTermination, Scheduler};
 pub use crate::session::Session;
 pub use crate::tasks::{Rule, Tasks};

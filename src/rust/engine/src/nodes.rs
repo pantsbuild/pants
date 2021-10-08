@@ -16,9 +16,9 @@ use futures::stream::StreamExt;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::externs::engine_aware;
+use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;

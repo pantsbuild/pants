@@ -3,8 +3,8 @@
 
 use std::fmt;
 
-use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
+use crate::python::{Function, TypeId};
 use crate::selectors::{DependencyKey, Get, Select};
 
 use indexmap::IndexSet;
