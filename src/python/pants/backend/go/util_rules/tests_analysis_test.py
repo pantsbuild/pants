@@ -6,7 +6,17 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.util_rules import compile, import_analysis, link, sdk, tests_analysis
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    import_analysis,
+    link,
+    sdk,
+    tests_analysis,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.tests_analysis import (
     AnalyzedTestSources,
     AnalyzeTestSourcesRequest,
@@ -23,9 +33,13 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *tests_analysis.rules(),
+            *assembly.rules(),
+            *build_pkg.rules(),
             *import_analysis.rules(),
-            *compile.rules(),
+            *go_mod.rules(),
+            *first_party_pkg.rules(),
+            *third_party_pkg.rules(),
+            *tests_analysis.rules(),
             *link.rules(),
             *sdk.rules(),
             QueryRule(AnalyzedTestSources, [AnalyzeTestSourcesRequest]),

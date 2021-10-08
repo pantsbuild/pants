@@ -16,7 +16,6 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
-    compile,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -35,7 +34,6 @@ def rules():
     return [
         *assembly.rules(),
         *build_pkg.rules(),
-        *compile.rules(),
         *third_party_pkg.rules(),
         *golang.rules(),
         *import_analysis.rules(),
