@@ -22,12 +22,7 @@ from pants.backend.go.util_rules.assembly import (
 )
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
-from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
-    GoModInfoRequest,
-    OwningGoMod,
-    OwningGoModRequest,
-)
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
 from pants.build_graph.address import Address
@@ -82,8 +77,8 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         _module_path = target[GoThirdPartyModulePathField].value
         source_files_subpath = original_import_path[len(_module_path) :]
 
-        _owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
-        _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_owning_go_mod.address))
+        _go_mod_address = target.address.maybe_convert_to_target_generator()
+        _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgInfo,
             ThirdPartyPkgInfoRequest(
