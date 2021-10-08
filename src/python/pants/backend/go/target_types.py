@@ -93,7 +93,11 @@ class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
     default = ("**/*.go", "**/*.s")
     help = (
         "What sources to generate `go_first_party_package` targets for.\n\n"
-        "Pants will generate one target per matching directory."
+        "Pants will generate one target per matching directory.\n\n"
+        "Pants does not yet support some file types like `.c` and `.h` files, along with cgo "
+        "files. If you need to use these files, please open a feature request at "
+        "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+        "prioritize adding support."
     )
 
     def _prefix_glob_with_address(self, glob: str) -> str:
