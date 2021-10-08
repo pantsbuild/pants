@@ -189,6 +189,7 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
                         "'pants.backend.awslambda.python', "
                         "'pants.backend.python', "
                         "'pants.backend.shell', "
+                        "'pants.backend.experimental.java', "
                         "'internal_plugins.releases'"
                         "]"
                     ),
