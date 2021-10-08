@@ -344,7 +344,7 @@ def maybe_create_error_for_invalid_sources(
     ):
         if key in go_list_json:
             return NotImplementedError(
-                f"The external package {import_path} includes `{key}`, which Pants does "
+                f"The third-party package {import_path} includes `{key}`, which Pants does "
                 "not yet support. Please open a feature request at "
                 "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
                 "prioritize adding support. Please include this metadata:\n\n"
