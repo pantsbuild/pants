@@ -1581,6 +1581,12 @@ impl Node for NodeKey {
     .await
   }
 
+  fn restartable(&self) -> bool {
+    // TODO: This will move to being a computed value, based on whether a Node has already
+    // executed its first side-effect.
+    self.cacheable()
+  }
+
   fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
