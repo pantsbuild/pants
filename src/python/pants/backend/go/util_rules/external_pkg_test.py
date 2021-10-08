@@ -195,6 +195,7 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
         expected: list[str] | dict[str, ExternalPkgInfo],
         *,
         check_subset: bool = False,
+        skip_checking_pkg_info: bool = False,
     ) -> None:
         module_info = rule_runner.request(
             ExternalModuleInfo, [ExternalModuleInfoRequest(module, version, input_digest)]
@@ -212,12 +213,13 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
                 assert list(module_info.keys()) == expected
 
         # Check our subsetting logic.
-        for pkg_info in module_info.values():
-            extracted_pkg = rule_runner.request(
-                ExternalPkgInfo,
-                [ExternalPkgInfoRequest(pkg_info.import_path, module, version, input_digest)],
-            )
-            assert extracted_pkg == pkg_info
+        if not skip_checking_pkg_info:
+            for pkg_info in module_info.values():
+                extracted_pkg = rule_runner.request(
+                    ExternalPkgInfo,
+                    [ExternalPkgInfoRequest(pkg_info.import_path, module, version, input_digest)],
+                )
+                assert extracted_pkg == pkg_info
 
     assert_module(
         "cloud.google.com/go",
@@ -300,6 +302,7 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
         "v0.0.0-20170915032832-14c0d48ead0c",
         ["golang.org/x/text/cmd/gotext", "golang.org/x/text/collate"],
         check_subset=True,
+        skip_checking_pkg_info=True,  # Contains unsupported `.cgo` files.
     )
     assert_module(
         "golang.org/x/xerrors",
@@ -325,6 +328,38 @@ def test_determine_pkg_info_missing(rule_runner: RuleRunner) -> None:
             [
                 ExternalPkgInfoRequest(
                     "another_project.org/foo", "github.com/google/uuid", "v1.3.0", input_digest
+                )
+            ],
+        )
+
+
+def test_unsupported_sources(rule_runner: RuleRunner) -> None:
+    input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
+
+    # Nothing should error when computing `ExternalModuleInfo`, we only create an exception to
+    # maybe raise later.
+    module_info = rule_runner.request(
+        ExternalModuleInfo,
+        [
+            ExternalModuleInfoRequest(
+                "golang.org/x/text", "v0.0.0-20170915032832-14c0d48ead0c", input_digest
+            )
+        ],
+    )
+    assert (
+        module_info["golang.org/x/text/collate/tools/colcmp"].unsupported_sources_error is not None
+    )
+
+    # Error when requesting the `ExternalPkgInfo`.
+    with engine_error(NotImplementedError):
+        rule_runner.request(
+            ExternalPkgInfo,
+            [
+                ExternalPkgInfoRequest(
+                    "golang.org/x/text/collate/tools/colcmp",
+                    "golang.org/x/text",
+                    "v0.0.0-20170915032832-14c0d48ead0c",
+                    input_digest,
                 )
             ],
         )
