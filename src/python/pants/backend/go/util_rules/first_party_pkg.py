@@ -8,8 +8,8 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoInternalPackageSourcesField,
-    GoInternalPackageSubpathField,
+    GoFirstPartyPackageSourcesField,
+    GoFirstPartyPackageSubpathField,
 )
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -33,7 +33,7 @@ class FirstPartyPkgInfo:
     """All the info and digest needed to build a first-party Go package.
 
     The digest does not strip its source files. You must set `working_dir` appropriately to use the
-    `_go_internal_package` target's `subpath` field.
+    `go_first_party_package` target's `subpath` field.
     """
 
     digest: Digest
@@ -66,11 +66,11 @@ async def compute_first_party_package_info(
         Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
     target = wrapped_target.target
-    subpath = target[GoInternalPackageSubpathField].value
+    subpath = target[GoFirstPartyPackageSubpathField].value
 
     go_mod_info, pkg_sources = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
-        Get(HydratedSources, HydrateSourcesRequest(target[GoInternalPackageSourcesField])),
+        Get(HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])),
     )
     input_digest = await Get(
         Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])

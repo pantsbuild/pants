@@ -14,11 +14,11 @@ from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
     compile,
-    external_pkg,
     first_party_pkg,
     go_mod,
     import_analysis,
     sdk,
+    third_party_pkg,
 )
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.engine.addresses import Address
@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *import_analysis.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
-            *external_pkg.rules(),
+            *third_party_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
         ],

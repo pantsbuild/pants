@@ -8,12 +8,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import external_pkg, sdk
-from pants.backend.go.util_rules.external_pkg import (
-    ExternalModuleInfo,
-    ExternalModuleInfoRequest,
-    ExternalPkgInfo,
-    ExternalPkgInfoRequest,
+from pants.backend.go.util_rules import sdk, third_party_pkg
+from pants.backend.go.util_rules.third_party_pkg import (
+    ThirdPartyModuleInfo,
+    ThirdPartyModuleInfoRequest,
+    ThirdPartyPkgInfo,
+    ThirdPartyPkgInfoRequest,
     _AllDownloadedModules,
     _AllDownloadedModulesRequest,
     _DownloadedModule,
@@ -30,11 +30,11 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *sdk.rules(),
-            *external_pkg.rules(),
+            *third_party_pkg.rules(),
             QueryRule(_AllDownloadedModules, [_AllDownloadedModulesRequest]),
             QueryRule(_DownloadedModule, [_DownloadedModuleRequest]),
-            QueryRule(ExternalModuleInfo, [ExternalModuleInfoRequest]),
-            QueryRule(ExternalPkgInfo, [ExternalPkgInfoRequest]),
+            QueryRule(ThirdPartyModuleInfo, [ThirdPartyModuleInfoRequest]),
+            QueryRule(ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
 
 GO_MOD = dedent(
     """\
-    module example.com/external-module
+    module example.com/third-party-module
     go 1.17
 
     // No dependencies, already has `go.mod`.
@@ -140,7 +140,7 @@ def test_download_modules_invalid_go_sum(rule_runner: RuleRunner) -> None:
         {
             "go.mod": dedent(
                 """\
-                module example.com/external-module
+                module example.com/third-party-module
                 go 1.17
                 require github.com/google/uuid v1.3.0
                 """
@@ -162,7 +162,7 @@ def test_download_modules_missing_go_sum(rule_runner: RuleRunner) -> None:
         {
             "go.mod": dedent(
                 """\
-                module example.com/external-module
+                module example.com/third-party-module
                 go 1.17
                 require github.com/google/uuid v1.3.0
                 """
@@ -192,19 +192,19 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
     def assert_module(
         module: str,
         version: str,
-        expected: list[str] | dict[str, ExternalPkgInfo],
+        expected: list[str] | dict[str, ThirdPartyPkgInfo],
         *,
         check_subset: bool = False,
     ) -> None:
         module_info = rule_runner.request(
-            ExternalModuleInfo, [ExternalModuleInfoRequest(module, version, input_digest)]
+            ThirdPartyModuleInfo, [ThirdPartyModuleInfoRequest(module, version, input_digest)]
         )
         # If `check_subset`, check that the expected import_paths are included.
         if check_subset:
             assert isinstance(expected, list)
             assert set(expected).issubset(module_info.keys())
         else:
-            # If expected is a dict, check that the ExternalPkgInfo is correct for each package.
+            # If expected is a dict, check that the ThirdPartyPkgInfo is correct for each package.
             if isinstance(expected, dict):
                 assert dict(module_info) == expected
             # Else, only check that the import paths are present.
@@ -214,8 +214,8 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
         # Check our subsetting logic.
         for pkg_info in module_info.values():
             extracted_pkg = rule_runner.request(
-                ExternalPkgInfo,
-                [ExternalPkgInfoRequest(pkg_info.import_path, module, version, input_digest)],
+                ThirdPartyPkgInfo,
+                [ThirdPartyPkgInfoRequest(pkg_info.import_path, module, version, input_digest)],
             )
             assert extracted_pkg == pkg_info
 
@@ -235,7 +235,7 @@ def test_determine_pkg_info(rule_runner: RuleRunner) -> None:
         uuid_mod,
         uuid_version,
         {
-            uuid_mod: ExternalPkgInfo(
+            uuid_mod: ThirdPartyPkgInfo(
                 import_path=uuid_mod,
                 module_path=uuid_mod,
                 version=uuid_version,
@@ -321,9 +321,9 @@ def test_determine_pkg_info_missing(rule_runner: RuleRunner) -> None:
         ),
     ):
         rule_runner.request(
-            ExternalPkgInfo,
+            ThirdPartyPkgInfo,
             [
-                ExternalPkgInfoRequest(
+                ThirdPartyPkgInfoRequest(
                     "another_project.org/foo", "github.com/google/uuid", "v1.3.0", input_digest
                 )
             ],
