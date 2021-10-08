@@ -163,8 +163,7 @@ def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name='mod')
-                # TODO: Remove `main` once it's fixed for target gen.
-                go_binary(name='bin', main='//:mod#./')
+                go_binary(name='bin')
                 """
             ),
         }
