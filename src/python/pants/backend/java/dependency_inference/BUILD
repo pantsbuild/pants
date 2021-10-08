@@ -17,7 +17,6 @@ resources(
 
 java_sources(
   name='javaparser',
-  sources=['*.java'],
   dependencies=[":javaparser_lockfile"],
 )
 
