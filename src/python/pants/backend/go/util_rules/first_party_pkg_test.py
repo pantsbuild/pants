@@ -9,9 +9,10 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import external_pkg, go_mod, go_pkg, sdk
-from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
-from pants.build_graph.address import Address
+from pants.backend.go.util_rules import external_pkg, first_party_pkg, go_mod, sdk
+from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.engine.addresses import Address
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -21,11 +22,11 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_mod.rules(),
-            *go_pkg.rules(),
+            *first_party_pkg.rules(),
             *sdk.rules(),
             *external_pkg.rules(),
             *target_type_rules.rules(),
-            QueryRule(ResolvedGoPackage, [ResolveGoPackageRequest]),
+            QueryRule(FirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -72,21 +73,48 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    resolved_go_package = rule_runner.request(
-        ResolvedGoPackage, [ResolveGoPackageRequest(Address("foo", generated_name="./cmd"))]
-    )
 
-    # Compare field-by-field rather than with a `ResolvedGoPackage` instance because
-    # `dependency_import_paths` is so verbose.
-    assert resolved_go_package.address == Address("foo", generated_name="./cmd")
-    assert resolved_go_package.import_path == "go.example.com/foo/cmd"
-    assert resolved_go_package.module_address == Address("foo")
-    assert resolved_go_package.package_name == "main"
-    assert resolved_go_package.imports == ("fmt", "go.example.com/foo/pkg")
-    assert resolved_go_package.test_imports == ("testing",)
-    assert resolved_go_package.go_files == ("main.go",)
-    assert not resolved_go_package.cgo_files
-    assert not resolved_go_package.ignored_go_files
-    assert not resolved_go_package.ignored_other_files
-    assert resolved_go_package.test_go_files == ("bar_test.go",)
-    assert not resolved_go_package.xtest_go_files
+    def assert_info(
+        subpath: str,
+        *,
+        imports: list[str],
+        test_imports: list[str],
+        xtest_imports: list[str],
+        go_files: list[str],
+        test_files: list[str],
+        xtest_files: list[str],
+    ) -> None:
+        info = rule_runner.request(
+            FirstPartyPkgInfo,
+            [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{subpath}"))],
+        )
+        actual_snapshot = rule_runner.request(Snapshot, [info.digest])
+        expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{subpath}/*.go"])])
+        assert actual_snapshot == expected_snapshot
+
+        assert info.imports == tuple(imports)
+        assert info.test_imports == tuple(test_imports)
+        assert info.xtest_imports == tuple(xtest_imports)
+        assert info.go_files == tuple(go_files)
+        assert info.test_files == tuple(test_files)
+        assert info.xtest_files == tuple(xtest_files)
+        assert not info.s_files
+
+    assert_info(
+        "pkg",
+        imports=[],
+        test_imports=[],
+        xtest_imports=[],
+        go_files=["foo.go"],
+        test_files=[],
+        xtest_files=[],
+    )
+    assert_info(
+        "cmd",
+        imports=["fmt", "go.example.com/foo/pkg"],
+        test_imports=["testing"],
+        xtest_imports=[],
+        go_files=["main.go"],
+        test_files=["bar_test.go"],
+        xtest_files=[],
+    )

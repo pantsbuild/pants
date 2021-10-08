@@ -28,7 +28,7 @@ from pants.backend.go.target_types import (
     GoInternalPackageTarget,
     GoModTarget,
 )
-from pants.backend.go.util_rules import external_pkg, go_mod, go_pkg, sdk
+from pants.backend.go.util_rules import external_pkg, first_party_pkg, go_mod, sdk
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
 from pants.core.target_types import GenericTarget
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_mod.rules(),
-            *go_pkg.rules(),
+            *first_party_pkg.rules(),
             *external_pkg.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),

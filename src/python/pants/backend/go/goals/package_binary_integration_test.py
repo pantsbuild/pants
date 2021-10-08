@@ -15,17 +15,16 @@ from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
-    build_go_pkg,
+    build_pkg,
     compile,
     external_pkg,
+    first_party_pkg,
     go_mod,
-    go_pkg,
     import_analysis,
     link,
     sdk,
 )
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -38,11 +37,10 @@ def rule_runner() -> RuleRunner:
         rules=[
             *assembly.rules(),
             *compile.rules(),
-            *source_files.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),
-            *build_go_pkg.rules(),
-            *go_pkg.rules(),
+            *build_pkg.rules(),
+            *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
             *target_type_rules.rules(),

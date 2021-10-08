@@ -25,20 +25,20 @@ from pants.backend.go.target_types import (
     GoModPackageSourcesField,
     GoModTarget,
 )
-from pants.backend.go.util_rules import go_pkg, import_analysis
+from pants.backend.go.util_rules import first_party_pkg, import_analysis
 from pants.backend.go.util_rules.external_pkg import (
     ExternalModuleInfo,
     ExternalModuleInfoRequest,
     ExternalPkgInfo,
     ExternalPkgInfoRequest,
 )
+from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
@@ -109,12 +109,11 @@ async def infer_go_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
-    this_go_package = await Get(
-        ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
-    )
+    addr = request.sources_field.address
+    pkg_info = await Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
 
     inferred_dependencies = []
-    for import_path in this_go_package.imports + this_go_package.test_imports:
+    for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
         if import_path in std_lib_imports:
             continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
@@ -129,7 +128,7 @@ async def infer_go_dependencies(
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in _go_internal_package at address '{this_go_package.address}'."
+                f"in _go_internal_package at address '{addr}'."
             )
 
     return InferredDependencies(inferred_dependencies)
@@ -341,7 +340,7 @@ async def inject_go_binary_main_dependency(
 def rules():
     return (
         *collect_rules(),
-        *go_pkg.rules(),
+        *first_party_pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
