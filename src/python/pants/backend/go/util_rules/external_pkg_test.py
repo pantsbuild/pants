@@ -334,17 +334,31 @@ def test_determine_pkg_info_missing(rule_runner: RuleRunner) -> None:
 
 
 def test_unsupported_sources(rule_runner: RuleRunner) -> None:
-    input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
+    input_digest = rule_runner.make_snapshot(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/unsupported
+                go 1.17
+                require golang.org/x/text v0.3.7
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                golang.org/x/text v0.3.7 h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=
+                golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=
+                golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e h1:FDhOuMEY4JVRztM/gsbk+IKUQ8kj74bxZrgw87eMMVc=
+                golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+                """
+            ),
+        }
+    ).digest
 
     # Nothing should error when computing `ExternalModuleInfo`, we only create an exception to
     # maybe raise later.
     module_info = rule_runner.request(
         ExternalModuleInfo,
-        [
-            ExternalModuleInfoRequest(
-                "golang.org/x/text", "v0.0.0-20170915032832-14c0d48ead0c", input_digest
-            )
-        ],
+        [ExternalModuleInfoRequest("golang.org/x/text", "v0.3.7", input_digest)],
     )
     assert (
         module_info["golang.org/x/text/collate/tools/colcmp"].unsupported_sources_error is not None
@@ -358,7 +372,7 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
                 ExternalPkgInfoRequest(
                     "golang.org/x/text/collate/tools/colcmp",
                     "golang.org/x/text",
-                    "v0.0.0-20170915032832-14c0d48ead0c",
+                    "v0.3.7",
                     input_digest,
                 )
             ],
