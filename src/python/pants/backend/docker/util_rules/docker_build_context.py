@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import Mapping
 
-from pants.backend.docker.dockerfile_parser import DockerfileInfo
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageSources
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourcesField

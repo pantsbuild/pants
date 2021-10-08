@@ -8,23 +8,23 @@ from typing import Callable
 
 import pytest
 
-from pants.backend.docker.docker_binary import DockerBinary
-from pants.backend.docker.docker_build import (
+from pants.backend.docker.goals.package_image import (
     DockerFieldSet,
     DockerNameTemplateError,
     build_docker_image,
 )
-from pants.backend.docker.docker_build_context import (
+from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
+from pants.backend.docker.subsystems.docker_options import rules as docker_options_rules
+from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerVersionContext,
     DockerVersionContextError,
     DockerVersionContextValue,
 )
-from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
-from pants.backend.docker.subsystem import rules as docker_subsystem_rules
-from pants.backend.docker.target_types import DockerImage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
@@ -37,7 +37,7 @@ from pants.util.frozendict import FrozenDict
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *docker_subsystem_rules(),
+            *docker_options_rules(),
             QueryRule(DockerEnvironmentVars, []),
             QueryRule(DockerOptions, []),
         ],
