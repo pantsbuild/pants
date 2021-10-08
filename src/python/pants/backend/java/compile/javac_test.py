@@ -737,7 +737,6 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [":joda-time_joda-time"],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -747,6 +746,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     name = 'main',
                     dependencies = [
                         ':lockfile',
+                        ':joda-time_joda-time',
                     ]
                 )
                 """
