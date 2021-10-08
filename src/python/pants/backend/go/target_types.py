@@ -16,6 +16,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     Dependencies,
     InvalidFieldException,
+    InvalidTargetException,
     Sources,
     StringField,
     StringSequenceField,
@@ -26,17 +27,20 @@ from pants.option.global_options import FilesNotFoundBehavior
 
 class GoImportPathField(StringField):
     alias = "import_path"
-    help = "Import path in Go code to import this package."
+    help = (
+        "Import path in Go code to import this package.\n\n"
+        "This field should not be overridden; use the value from target generation."
+    )
     required = True
     value: str
 
 
 def is_first_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoInternalPackageSourcesField)
+    return tgt.has_field(GoFirstPartyPackageSourcesField)
 
 
 def is_third_party_package_target(tgt: Target) -> bool:
-    return tgt.has_field(GoExternalPackageDependenciesField)
+    return tgt.has_field(GoThirdPartyPackageDependenciesField)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -85,10 +89,10 @@ class GoModDependenciesField(Dependencies):
 
 # TODO(#12953): generalize this?
 class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
-    alias = "pkg_sources"
+    alias = "package_sources"
     default = ("**/*.go", "**/*.s")
     help = (
-        "What sources to generate `_go_internal_package` targets for.\n\n"
+        "What sources to generate `go_first_party_package` targets for.\n\n"
         "Pants will generate one target per matching directory."
     )
 
@@ -120,34 +124,33 @@ class GoModTarget(Target):
         GoModPackageSourcesField,
     )
     help = (
-        "A first-party Go module corresponding to a `go.mod` file.\n\n"
-        "Generates `_go_internal_package` targets for each directory from the "
-        "`internal_pkg_sources` field, and generates `_go_external_package` targets based on "
+        "A first-party Go module (corresponding to a `go.mod` file).\n\n"
+        "Generates `go_first_party_package` targets for each directory from the "
+        "`package_sources` field, and generates `go_third_party_package` targets based on "
         "the `require` directives in your `go.mod`.\n\n"
-        "If you have external packages, make sure you have an up-to-date `go.sum`. Run "
+        "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
         "`go mod tidy` directly to update your `go.mod` and `go.sum`."
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# `_go_internal_package` target
+# `go_first_party_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoInternalPackageSourcesField(Sources):
+class GoFirstPartyPackageSourcesField(Sources):
     expected_file_extensions = (".go", ".s")
 
 
-class GoInternalPackageDependenciesField(Dependencies):
+class GoFirstPartyPackageDependenciesField(Dependencies):
     pass
 
 
-class GoInternalPackageSubpathField(StringField, AsyncFieldMixin):
+class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
     alias = "subpath"
     help = (
         "The path from the owning `go.mod` to this package's directory, e.g. `subdir`.\n\n"
-        "Should not include a leading `./`. If the package is in the same directory as the "
-        "`go.mod`, use the empty string."
+        "This field should not be overridden; use the value from target generation."
     )
     required = True
     value: str
@@ -155,67 +158,97 @@ class GoInternalPackageSubpathField(StringField, AsyncFieldMixin):
     @property
     def full_dir_path(self) -> str:
         """The full path to this package's directory, relative to the build root."""
-        # NB: Assumes that the `spec_path` points to the ancestor `go.mod`, which will be the
-        # case when `go_mod` targets generate.
-        if not self.address.is_generated_target:
-            # TODO: Make this error more eager via target validation.
-            raise AssertionError(
-                f"Target was manually created, but expected to be generated: {self.address}"
-            )
+        # NB: The `spec_path` points to the `go_mod` target used to generate the
+        # `go_first_party_package` target.
+        assert self.address.is_generated_target
         go_mod_path = self.address.spec_path
         if not self.value:
             return go_mod_path
         return os.path.join(go_mod_path, self.value)
 
 
-class GoInternalPackageTarget(Target):
-    alias = "_go_internal_package"
+class GoFirstPartyPackageTarget(Target):
+    alias = "go_first_party_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoImportPathField,
-        GoInternalPackageSubpathField,
-        GoInternalPackageDependenciesField,
-        GoInternalPackageSourcesField,
+        GoFirstPartyPackageSubpathField,
+        GoFirstPartyPackageDependenciesField,
+        GoFirstPartyPackageSourcesField,
     )
-    help = "A single Go package."
+    help = (
+        "A Go package (corresponding to a directory with `.go` files).\n\n"
+        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
+        "target where you have your `go.mod` file, which will generate "
+        "`go_first_party_package` targets for you."
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
-# `_go_external_package` target
+# `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExternalPackageDependenciesField(Dependencies):
+class GoThirdPartyPackageDependenciesField(Dependencies):
     pass
 
 
-class GoExternalModulePathField(StringField):
-    alias = "path"
+class GoThirdPartyModulePathField(StringField):
+    alias = "module_path"
     help = (
         "The module path of the third-party module this package comes from, "
-        "e.g. `github.com/google/go-cmp`."
+        "e.g. `github.com/google/go-cmp`.\n\n"
+        "This field should not be overridden; use the value from target generation."
     )
     required = True
     value: str
 
 
-class GoExternalModuleVersionField(StringField):
+class GoThirdPartyModuleVersionField(StringField):
     alias = "version"
-    help = "The version of the third-party module this package comes from, e.g. `v0.4.0`."
+    help = (
+        "The version of the third-party module this package comes from, e.g. `v0.4.0`.\n\n"
+        "This field should not be overridden; use the value from target generation."
+    )
     required = True
     value: str
 
 
-class GoExternalPackageTarget(Target):
-    alias = "_go_external_package"
+class GoThirdPartyPackageTarget(Target):
+    alias = "go_third_party_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoExternalPackageDependenciesField,
-        GoExternalModulePathField,
-        GoExternalModuleVersionField,
+        GoThirdPartyPackageDependenciesField,
+        GoThirdPartyModulePathField,
+        GoThirdPartyModuleVersionField,
         GoImportPathField,
     )
-    help = "A package from a third-party Go module."
+    help = (
+        "A package from a third-party Go module.\n\n"
+        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
+        "target where you have your `go.mod` file, which will generate "
+        "`go_third_party_package` targets for you.\n\n"
+        "Make sure that your `go.mod` and `go.sum` files include this package's module."
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -226,9 +259,9 @@ class GoExternalPackageTarget(Target):
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
     help = (
-        "Address of the `_go_internal_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `_go_internal_package` for the same "
-        "directory as this target's BUILD file."
+        "Address of the `go_first_party_package` with the `main` for this binary.\n\n"
+        "If not specified, will default to the `go_first_party_package` for the same "
+        "directory as this target's BUILD file. You should usually rely on this default."
     )
     value: str
 

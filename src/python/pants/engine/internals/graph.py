@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
@@ -110,6 +111,32 @@ def target_types_to_generate_targets_requests(
     )
 
 
+# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
+# offending target.
+class _WarnDeprecatedTarget:
+    pass
+
+
+@dataclass(frozen=True)
+class _WarnDeprecatedTargetRequest:
+    tgt_type: type[Target]
+
+
+@rule
+def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnDeprecatedTarget:
+    tgt_type = request.tgt_type
+    assert tgt_type.deprecated_alias_removal_version is not None
+    warn_or_error(
+        removal_version=tgt_type.deprecated_alias_removal_version,
+        entity=f"the target name {tgt_type.deprecated_alias}",
+        hint=(
+            tgt_type.deprecated_alias_removal_hint
+            or f"Instead, use `{tgt_type.alias}`, which behaves the same."
+        ),
+    )
+    return _WarnDeprecatedTarget()
+
+
 @rule
 async def resolve_target(
     address: Address,
@@ -122,8 +149,14 @@ async def resolve_target(
         target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
         if target_type is None:
             raise UnrecognizedTargetTypeException(
-                target_adaptor.type_alias, registered_target_types, address=address
+                target_adaptor.type_alias, registered_target_types, address
             )
+        if (
+            target_type.deprecated_alias is not None
+            and target_type.deprecated_alias == target_adaptor.type_alias
+            and not address.is_generated_target
+        ):
+            await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
         target = target_type(target_adaptor.kwargs, address, union_membership)
         return WrappedTarget(target)
 
@@ -790,7 +823,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
         *,
         bad_value: str,
         address: Address,
-        registered_target_types: Sequence[Type[Target]],
+        registered_target_types: Iterable[type[Target]],
         union_membership: UnionMembership,
     ) -> None:
         applicable_target_types = sorted(

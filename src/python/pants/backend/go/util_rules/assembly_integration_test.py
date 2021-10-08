@@ -17,12 +17,12 @@ from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
     compile,
-    external_pkg,
     first_party_pkg,
     go_mod,
     import_analysis,
     link,
     sdk,
+    third_party_pkg,
 )
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             *link.rules(),
             *target_type_rules.rules(),
-            *external_pkg.rules(),
+            *third_party_pkg.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
