@@ -12,6 +12,7 @@ from typing_extensions import Literal
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
+from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import (
     AllHelp,
@@ -107,6 +108,8 @@ class HelpPrinter(MaybeColor):
                     self._print_all_targets()
                 elif thing == "global":
                     self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
+                elif thing == "tools":
+                    self._print_all_tools()
                 elif thing in self._all_help_info.scope_to_help_info:
                     self._print_options_help(thing, help_request.advanced)
                 elif thing in self._all_help_info.name_to_target_type_info:
@@ -189,6 +192,12 @@ class HelpPrinter(MaybeColor):
             f"target type.\n"
         )
 
+    def _print_all_tools(self) -> None:
+        self._print_title("External Tools")
+        ToolHelpInfo.print_all(ToolHelpInfo.iter(self._all_help_info), self)
+        tool_help_cmd = f"{self._bin_name} help $tool"
+        print(f"Use `{self.maybe_green(tool_help_cmd)}` to get help for a specific tool.\n")
+
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
             cmd = self.maybe_green(f"{self._bin_name} {args}".ljust(50))
@@ -204,6 +213,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
         print_cmd("help subsystems", "List all configurable subsystems.")
+        print_cmd("help tools", "List all external tools.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
@@ -259,7 +269,7 @@ class HelpPrinter(MaybeColor):
             print(line)
 
     def _print_target_help(self, target_alias: str) -> None:
-        self._print_title(target_alias)
+        self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
             formatted_desc = "\n".join(hard_wrap(tinfo.description, width=self._width))

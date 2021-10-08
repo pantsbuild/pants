@@ -105,7 +105,7 @@ def engine_error(
             raise AssertionError(
                 "ExecutionError occurred as expected, but the underlying exception had type "
                 f"{type(underlying)} rather than the expected type "
-                f"{expected_underlying_exception}."
+                f"{expected_underlying_exception}:\n\n{underlying}"
             )
         if contains is not None and contains not in str(underlying):
             raise AssertionError(

@@ -12,16 +12,15 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
-    build_go_pkg,
+    build_pkg,
     compile,
-    external_pkg,
+    first_party_pkg,
     go_mod,
-    go_pkg,
     import_analysis,
     sdk,
+    third_party_pkg,
 )
-from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.core.util_rules import source_files
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.rules import QueryRule
@@ -33,15 +32,14 @@ from pants.util.strutil import path_safe
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *source_files.rules(),
             *sdk.rules(),
             *assembly.rules(),
-            *build_go_pkg.rules(),
+            *build_pkg.rules(),
             *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
-            *go_pkg.rules(),
-            *external_pkg.rules(),
+            *first_party_pkg.rules(),
+            *third_party_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
         ],

@@ -55,6 +55,7 @@ COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
 
 class CoursierBinary(TemplatedExternalTool):
     options_scope = "coursier"
+    name = "coursier"
     help = "A dependency resolver for the Maven ecosystem."
 
     default_version = "v2.0.13"

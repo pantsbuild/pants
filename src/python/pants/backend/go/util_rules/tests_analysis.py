@@ -129,7 +129,7 @@ async def setup_analyzer() -> AnalyzerSetup:
         ),
     )
 
-    return AnalyzerSetup(digest=analyzer.output_digest, path="./analyzer")
+    return AnalyzerSetup(analyzer.digest, path="./analyzer")
 
 
 @rule

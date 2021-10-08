@@ -3,16 +3,16 @@
 
 from __future__ import annotations
 
-from pants.backend.go.target_types import GoInternalPackageSourcesField
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 
 
 class GoTestFieldSet(TestFieldSet):
-    required_fields = (GoInternalPackageSourcesField,)
+    required_fields = (GoFirstPartyPackageSourcesField,)
 
-    sources: GoInternalPackageSourcesField
+    sources: GoFirstPartyPackageSourcesField
 
 
 @rule
