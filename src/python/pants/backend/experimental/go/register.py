@@ -15,11 +15,11 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import (
     assembly,
-    build_go_pkg,
+    build_pkg,
     compile,
     external_pkg,
+    first_party_pkg,
     go_mod,
-    go_pkg,
     import_analysis,
     link,
     sdk,
@@ -34,13 +34,13 @@ def target_types():
 def rules():
     return [
         *assembly.rules(),
-        *build_go_pkg.rules(),
+        *build_pkg.rules(),
         *compile.rules(),
         *external_pkg.rules(),
         *golang.rules(),
         *import_analysis.rules(),
         *go_mod.rules(),
-        *go_pkg.rules(),
+        *first_party_pkg.rules(),
         *link.rules(),
         *sdk.rules(),
         *tests_analysis.rules(),

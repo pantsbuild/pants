@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.go.target_types import GoModSourcesField
-from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
-from pants.backend.go.util_rules.go_pkg import (
+from pants.backend.go.target_types import (
+    GoModSourcesField,
     is_first_party_package_target,
     is_third_party_package_target,
 )
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
