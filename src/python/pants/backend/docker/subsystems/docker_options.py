@@ -3,15 +3,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from textwrap import dedent
 from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
-from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
 
@@ -74,9 +70,12 @@ class DockerOptions(Subsystem):
             member_type=str,
             default=[],
             help=(
-                "Build arguments (`--build-arg`) to use for `docker build` invocations. "
+                "Global build arguments (`--build-arg`) to use for all `docker build` invocations. "
                 "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
-                "or just `ARG_NAME` to copy the value from Pants's own environment."
+                "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
+                "May be provided multiple times on the command line.\n\n"
+                "Use the `extra_build_args` field on a `docker_image` target for additional image "
+                "specific build arguments."
             ),
         )
 
@@ -102,37 +101,9 @@ class DockerOptions(Subsystem):
         return tuple(sorted(set(self.options.env_vars)))
 
     @property
-    def env_vars_to_pass_to_docker(self) -> tuple[str, ...]:
-        return tuple(
-            sorted(
-                set(self.options.env_vars).union(
-                    {build_arg for build_arg in self.build_args if "=" not in build_arg}
-                )
-            )
-        )
-
-    @property
     def default_repository(self) -> str:
         return cast(str, self.options.default_repository)
 
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self.options.registries)
-
-
-@dataclass(frozen=True)
-class DockerEnvironmentVars:
-    vars: FrozenDict[str, str]
-
-
-@rule
-async def get_docker_environment(
-    docker: DockerOptions,
-) -> DockerEnvironmentVars:
-    return DockerEnvironmentVars(
-        await Get(Environment, EnvironmentRequest(docker.env_vars_to_pass_to_docker))
-    )
-
-
-def rules():
-    return collect_rules()

@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.engine.fs import Digest
 from pants.engine.process import (
     BinaryNotFoundError,
@@ -31,7 +32,7 @@ class DockerBinary(BinaryPath):
         tags: tuple[str, ...],
         digest: Digest,
         dockerfile: str | None = None,
-        build_args: tuple[str, ...] = (),
+        build_args: DockerBuildArgs | None = None,
         env: Mapping[str, str] | None = None,
     ) -> Process:
         args = [self.path, "build"]
@@ -39,8 +40,9 @@ class DockerBinary(BinaryPath):
         for tag in tags:
             args.extend(["-t", tag])
 
-        for build_arg in build_args:
-            args.extend(["--build-arg", build_arg])
+        if build_args:
+            for build_arg in build_args:
+                args.extend(["--build-arg", build_arg])
 
         if dockerfile:
             args.extend(["-f", dockerfile])
