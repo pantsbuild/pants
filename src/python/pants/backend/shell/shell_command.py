@@ -14,12 +14,22 @@ from pants.backend.shell.target_types import (
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
     ShellCommandSources,
+    ShellCommandTimeout,
     ShellCommandToolsField,
 )
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.process import (
     BashBinary,
     BinaryNotFoundError,
@@ -30,6 +40,8 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     Sources,
@@ -56,6 +68,7 @@ async def run_shell_command(
     shell_command = request.protocol_target
     working_directory = shell_command.address.spec_path
     command = shell_command[ShellCommandCommandField].value
+    timeout = shell_command[ShellCommandTimeout].value
     tools = shell_command[ShellCommandToolsField].value
     outputs = shell_command[ShellCommandOutputsField].value or ()
 
@@ -101,26 +114,39 @@ async def run_shell_command(
         TransitiveTargetsRequest([shell_command.address]),
     )
 
-    sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            sources_fields=[tgt.get(Sources) for tgt in transitive_targets.dependencies],
-            for_sources_types=(
-                Sources,
-                FilesSources,
+    sources, pkgs_per_target = await MultiGet(
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                sources_fields=[tgt.get(Sources) for tgt in transitive_targets.dependencies],
+                for_sources_types=(
+                    FilesSources,
+                    Sources,
+                ),
+                enable_codegen=True,
             ),
-            enable_codegen=True,
         ),
+        Get(
+            FieldSetsPerTarget,
+            FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
+        ),
+    )
+
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
+    )
+
+    if working_directory in sources.snapshot.dirs:
+        work_dir = EMPTY_DIGEST
+    else:
+        work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
+
+    input_digest = await Get(
+        Digest, MergeDigests([sources.snapshot.digest, work_dir, *(pkg.digest for pkg in packages)])
     )
 
     output_files = [f for f in outputs if not f.endswith("/")]
     output_directories = [d for d in outputs if d.endswith("/")]
-
-    if working_directory in sources.snapshot.dirs:
-        input_digest = sources.snapshot.digest
-    else:
-        work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
-        input_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, work_dir]))
 
     # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
     bin_relpath = ".bin"
@@ -143,6 +169,7 @@ async def run_shell_command(
             input_digest=input_digest,
             output_directories=output_directories,
             output_files=output_files,
+            timeout_seconds=timeout,
             working_directory=working_directory,
         ),
     )
