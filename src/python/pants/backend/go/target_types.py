@@ -163,6 +163,8 @@ class GoInternalPackageSubpathField(StringField, AsyncFieldMixin):
                 f"Target was manually created, but expected to be generated: {self.address}"
             )
         go_mod_path = self.address.spec_path
+        if not self.value:
+            return go_mod_path
         return os.path.join(go_mod_path, self.value)
 
 
