@@ -14,9 +14,9 @@ from pants.engine.unions import UnionRule
 @rule
 async def create_go_binary_run_request(field_set: GoBinaryFieldSet) -> RunRequest:
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return RunRequest(
-        digest=binary.digest, args=(os.path.join("{chroot}", binary.artifacts[0].relpath),)
-    )
+    artifact_relpath = binary.artifacts[0].relpath
+    assert artifact_relpath is not None
+    return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact_relpath),))
 
 
 def rules():
