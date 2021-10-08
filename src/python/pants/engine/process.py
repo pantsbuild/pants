@@ -301,6 +301,7 @@ class InteractiveProcess:
     input_digest: Digest
     run_in_workspace: bool
     forward_signals_to_process: bool
+    restartable: bool
 
     def __init__(
         self,
@@ -310,6 +311,7 @@ class InteractiveProcess:
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
+        restartable: bool = False,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -327,6 +329,7 @@ class InteractiveProcess:
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
+        self.restartable = restartable
 
         self.__post_init__()
 
@@ -343,23 +346,24 @@ class InteractiveProcess:
         process: Process,
         *,
         forward_signals_to_process: bool = True,
+        restartable: bool = False,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
+            restartable=restartable,
         )
 
 
 @dataclass(frozen=True)
 class InteractiveRunner(SideEffecting):
     _scheduler: SchedulerSession
-    # Used to disable enforcement of effects in tests.
     _enforce_effects: bool = True
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        if self._enforce_effects:
+        if not request.restartable:
             self.side_effected()
         if request.forward_signals_to_process:
             with ExceptionSink.ignoring_sigint():

@@ -30,6 +30,7 @@ from pkg_resources import Requirement
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.run import Restartable
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
@@ -523,6 +524,7 @@ class PexBinary(Target):
         PexEmitWarningsField,
         PexExecutionModeField,
         PexIncludeToolsField,
+        Restartable,
     )
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "

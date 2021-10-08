@@ -251,7 +251,9 @@ async def run_tests_with_shunit2(
 async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     return TestDebugRequest(
-        InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 

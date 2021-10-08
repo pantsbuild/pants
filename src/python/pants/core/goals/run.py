@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
+from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
@@ -14,10 +15,12 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import (
+    BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    WrappedTarget,
 )
 from pants.engine.unions import union
 from pants.option.custom_types import shell_str
@@ -30,6 +33,15 @@ from pants.util.meta import frozen_after_init
 @union
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
+
+
+class Restartable(BoolField):
+    alias = "restartable"
+    default = False
+    help = (
+        "If true, runs of this target may be interrupted and "
+        "restarted when its input files change."
+    )
 
 
 @frozen_after_init
@@ -104,10 +116,16 @@ async def run(
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, RunFieldSet, field_set)
+    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
+    restartable = wrapped_target.target.get(Restartable).value
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
         workspace.write_digest(
-            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+            request.digest,
+            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+            # We don't want to influence whether the InteractiveProcess is able to restart. Because
+            # we're writing into a temp directory, we can safely mark this side_effecting=False.
+            side_effecting=False,
         )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
@@ -118,6 +136,7 @@ async def run(
                     argv=(*args, *run_subsystem.args),
                     env=env,
                     run_in_workspace=True,
+                    restartable=restartable,
                 )
             )
             exit_code = result.exit_code
