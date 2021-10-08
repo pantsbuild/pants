@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.go.target_types import GoInternalPackageSourcesField
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -18,7 +18,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 # While gofmt is one of those, this is more generic and can work with other formatters.
 @dataclass(frozen=True)
 class GoLangFmtTargets(LanguageFmtTargets):
-    required_fields = (GoInternalPackageSourcesField,)
+    required_fields = (GoFirstPartyPackageSourcesField,)
 
 
 @union
@@ -33,7 +33,7 @@ async def format_golang_targets(
     original_sources = await Get(
         SourceFiles,
         SourceFilesRequest(
-            target[GoInternalPackageSourcesField] for target in go_fmt_targets.targets
+            target[GoFirstPartyPackageSourcesField] for target in go_fmt_targets.targets
         ),
     )
     prior_formatter_result = original_sources.snapshot

@@ -76,7 +76,7 @@ class _DownloadedModuleRequest(EngineAwareParameter):
 
 
 @rule
-async def download_external_modules(
+async def download_third_party_modules(
     request: _AllDownloadedModulesRequest,
 ) -> _AllDownloadedModules:
     # TODO: Clean this up.
@@ -94,7 +94,7 @@ async def download_external_modules(
             command=("mod", "download", "-json", "all"),
             input_digest=request.go_mod_stripped_digest,
             # TODO: make this more descriptive: point to the actual `go_mod` target or path.
-            description="Download all external Go modules",
+            description="Download all third-party Go modules",
             output_files=("go.mod", "go.sum"),
             output_directories=("gopath",),
         ),
@@ -186,10 +186,10 @@ async def extract_module_from_downloaded_modules(
     digest = all_modules.get((request.module_path, request.version))
     if digest is None:
         raise AssertionError(
-            f"The module {request.module_path}@{request.version} was not downloaded. Unless "
-            "you explicitly created an `_go_external_package`, this should not happen. "
-            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose with "
-            "this error message."
+            f"The module {request.module_path}@{request.version} was not downloaded. This should "
+            "not happen: please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose with this error message.\n\n"
+            f"{all_modules}"
         )
     return _DownloadedModule(digest)
 
@@ -200,8 +200,8 @@ async def extract_module_from_downloaded_modules(
 
 
 @dataclass(frozen=True)
-class ExternalPkgInfo:
-    """All the info needed to build an external package.
+class ThirdPartyPkgInfo:
+    """All the info needed to build a third-party package.
 
     The digest is stripped of the `gopath` prefix.
     """
@@ -213,15 +213,15 @@ class ExternalPkgInfo:
     digest: Digest
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
-    # tests directly on an external package.
+    # tests directly on a third-party package.
     imports: tuple[str, ...]
     go_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
 
 @dataclass(frozen=True)
-class ExternalPkgInfoRequest(EngineAwareParameter):
-    """Request the info and digest needed to build an external package.
+class ThirdPartyPkgInfoRequest(EngineAwareParameter):
+    """Request the info and digest needed to build a third-party package.
 
     The package's module must be included in the input `go.mod`/`go.sum`.
     """
@@ -235,13 +235,14 @@ class ExternalPkgInfoRequest(EngineAwareParameter):
         return self.import_path
 
 
-class ExternalModuleInfo(FrozenDict[str, ExternalPkgInfo]):
-    """A mapping of the import path for each package in the module to its `ExternalPackageInfo`."""
+class ThirdPartyModuleInfo(FrozenDict[str, ThirdPartyPkgInfo]):
+    """A mapping of the import path for each package in the module to its
+    `ThirdPartyPackageInfo`."""
 
 
 @dataclass(frozen=True)
-class ExternalModuleInfoRequest(EngineAwareParameter):
-    """Request info for every package contained in an external module.
+class ThirdPartyModuleInfoRequest(EngineAwareParameter):
+    """Request info for every package contained in a third-party module.
 
     The module must be included in the input `go.mod`/`go.sum`.
     """
@@ -255,9 +256,9 @@ class ExternalModuleInfoRequest(EngineAwareParameter):
 
 
 @rule
-async def compute_external_module_metadata(
-    request: ExternalModuleInfoRequest,
-) -> ExternalModuleInfo:
+async def compute_third_party_module_metadata(
+    request: ThirdPartyModuleInfoRequest,
+) -> ThirdPartyModuleInfo:
     downloaded_module = await Get(
         _DownloadedModule,
         _DownloadedModuleRequest(
@@ -271,7 +272,8 @@ async def compute_external_module_metadata(
             command=("list", "-mod=readonly", "-json", "./..."),
             env={"GOPROXY": "off"},
             description=(
-                f"Determine metadata for Go external module {request.module_path}@{request.version}"
+                "Determine metadata for Go third-party module"
+                f"{request.module_path}@{request.version}"
             ),
         ),
     )
@@ -279,7 +281,7 @@ async def compute_external_module_metadata(
     import_path_to_info = {}
     for metadata in ijson.items(json_result.stdout, "", multiple_values=True):
         import_path = metadata["ImportPath"]
-        pkg_info = ExternalPkgInfo(
+        pkg_info = ThirdPartyPkgInfo(
             import_path=import_path,
             module_path=request.module_path,
             version=request.version,
@@ -289,14 +291,16 @@ async def compute_external_module_metadata(
             s_files=tuple(metadata.get("SFiles", ())),
         )
         import_path_to_info[import_path] = pkg_info
-    return ExternalModuleInfo(import_path_to_info)
+    return ThirdPartyModuleInfo(import_path_to_info)
 
 
 @rule
-async def extract_package_info_from_module_info(request: ExternalPkgInfoRequest) -> ExternalPkgInfo:
+async def extract_package_info_from_module_info(
+    request: ThirdPartyPkgInfoRequest,
+) -> ThirdPartyPkgInfo:
     module_info = await Get(
-        ExternalModuleInfo,
-        ExternalModuleInfoRequest(
+        ThirdPartyModuleInfo,
+        ThirdPartyModuleInfoRequest(
             request.module_path, request.version, request.go_mod_stripped_digest
         ),
     )
@@ -304,9 +308,10 @@ async def extract_package_info_from_module_info(request: ExternalPkgInfoRequest)
     if pkg_info is None:
         raise AssertionError(
             f"The package {request.import_path} does not belong to the module "
-            f"{request.module_path}@{request.version}. Unless you explicitly created an "
-            "`_go_external_package`, this should not happen. Please open an issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose with this error message."
+            f"{request.module_path}@{request.version}. This should not happen: please open an "
+            "issue at https://github.com/pantsbuild/pants/issues/new/choose with this error "
+            "message.\n\n"
+            f"{module_info}"
         )
     return pkg_info
 

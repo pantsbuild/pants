@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import external_pkg, first_party_pkg, go_mod, sdk
+from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *sdk.rules(),
-            *external_pkg.rules(),
+            *third_party_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(FirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
         ],
