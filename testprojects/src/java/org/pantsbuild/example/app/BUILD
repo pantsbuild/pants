@@ -17,7 +17,6 @@ java_sources(
 
 coursier_lockfile(
     name = "lockfile",
-    requirements = [],
     sources = [
         "coursier_resolve.lockfile",
     ],
