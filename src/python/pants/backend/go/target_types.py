@@ -142,7 +142,7 @@ class GoInternalPackageDependenciesField(Dependencies):
     pass
 
 
-class GoInternalPackageSubpathField(StringField):
+class GoInternalPackageSubpathField(StringField, AsyncFieldMixin):
     alias = "subpath"
     help = (
         "The path from the owning `go.mod` to this package's directory, e.g. `subdir`.\n\n"
@@ -151,6 +151,19 @@ class GoInternalPackageSubpathField(StringField):
     )
     required = True
     value: str
+
+    @property
+    def full_dir_path(self) -> str:
+        """The full path to this package's directory, relative to the build root."""
+        # NB: Assumes that the `spec_path` points to the ancestor `go.mod`, which will be the
+        # case when `go_mod` targets generate.
+        if not self.address.is_generated_target:
+            # TODO: Make this error more eager via target validation.
+            raise AssertionError(
+                f"Target was manually created, but expected to be generated: {self.address}"
+            )
+        go_mod_path = self.address.spec_path
+        return os.path.join(go_mod_path, self.value)
 
 
 class GoInternalPackageTarget(Target):
@@ -211,9 +224,9 @@ class GoExternalPackageTarget(Target):
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
     help = (
-        "Address of the `go_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `go_package` in the same directory as this target's "
-        "BUILD file."
+        "Address of the `_go_internal_package` with the `main` for this binary.\n\n"
+        "If not specified, will default to the `_go_internal_package` for the same "
+        "directory as this target's BUILD file."
     )
     value: str
 

@@ -41,7 +41,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses, DescendantAddresses
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import PathGlobs, Paths
@@ -290,34 +290,40 @@ async def determine_main_pkg_for_go_binary(
         if not wrapped_specified_tgt.target.has_field(GoInternalPackageSourcesField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_package` target, but was the address for a "
+                "a `_go_internal_package` target, but was the address for a "
                 f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
-                "Hint: consider leaving off this field so that Pants will find the `go_package` "
-                "target for you."
+                "Hint: consider leaving off this field so that Pants will find the "
+                "`_go_internal_package` target for you."
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
-    # TODO: fix this to account for `_go_internal_package` being generated.
-    build_dir_targets = await Get(Targets, AddressSpecs([SiblingAddresses(addr.spec_path)]))
-    internal_pkg_targets = [
-        tgt for tgt in build_dir_targets if tgt.has_field(GoInternalPackageSourcesField)
+    candidate_targets = await Get(Targets, AddressSpecs([AscendantAddresses(addr.spec_path)]))
+    relevant_pkg_targets = [
+        tgt
+        for tgt in candidate_targets
+        if (
+            tgt.has_field(GoInternalPackageSubpathField)
+            and tgt[GoInternalPackageSubpathField].full_dir_path == addr.spec_path
+        )
     ]
-    if len(internal_pkg_targets) == 1:
-        return GoBinaryMainPackage(internal_pkg_targets[0].address)
+    if len(relevant_pkg_targets) == 1:
+        return GoBinaryMainPackage(relevant_pkg_targets[0].address)
 
     wrapped_tgt = await Get(WrappedTarget, Address, addr)
     alias = wrapped_tgt.target.alias
-    if not internal_pkg_targets:
+    if not relevant_pkg_targets:
         raise ResolveError(
-            f"The `{alias}` target {addr} requires that there is a `go_package` "
-            "target in the same directory, but none were found."
+            f"The `{alias}` target {addr} requires that there is a `_go_internal_package` "
+            f"target for its directory {addr.spec_path}, but none were found.\n\n"
+            "Have you added a `go_mod` target (which will generate `_go_internal_package` targets)?"
         )
     raise ResolveError(
-        f"There are multiple `go_package` targets in the same directory of the `{alias}` "
-        f"target {addr}, so it is ambiguous what to use as the `main` package.\n\n"
+        f"There are multiple `_go_internal_package` targets for the same directory of the "
+        "`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
+        "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
-        "`go_package` targets so that only one remains: "
-        f"{sorted(tgt.address.spec for tgt in internal_pkg_targets)}"
+        "`_go_internal_package` targets so that only one remains: "
+        f"{sorted(tgt.address.spec for tgt in relevant_pkg_targets)}"
     )
 
 

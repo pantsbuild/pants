@@ -263,29 +263,29 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@pytest.mark.xfail
 def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "explicit/BUILD": dedent(
+            "go.mod": dedent(
                 """\
-                go_package(name='pkg', sources=[])
-                go_binary(main=':pkg')
+                module example.com/foo
+                go 1.17
                 """
             ),
-            "inferred/BUILD": dedent(
+            "BUILD": "go_mod(name='mod')",
+            "explicit/f.go": "",
+            "explicit/BUILD": "go_binary(main='//:mod#./explicit')",
+            "inferred/f.go": "",
+            "inferred/BUILD": "go_binary()",
+            "ambiguous/f.go": "",
+            "ambiguous/go.mod": dedent(
                 """\
-                go_package(name='pkg', sources=[])
-                go_binary()
+                module example.com/ambiguous
+                go 1.17
                 """
             ),
-            "ambiguous/BUILD": dedent(
-                """\
-                go_package(name='pkg1', sources=[])
-                go_package(name='pkg2', sources=[])
-                go_binary()
-                """
-            ),
+            "ambiguous/BUILD": "go_binary()",
+            # Note there are no `.go` files in this dir, so no package targets will be created.
             "missing/BUILD": "go_binary()",
             "explicit_wrong_type/BUILD": dedent(
                 """\
@@ -307,12 +307,18 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
         assert [main_addr] == list(injected_addresses)
         return main_addr
 
-    assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")
-    assert get_main(Address("inferred")) == Address("inferred", target_name="pkg")
+    assert get_main(Address("explicit")) == Address(
+        "", target_name="mod", generated_name="./explicit"
+    )
+    assert get_main(Address("inferred")) == Address(
+        "", target_name="mod", generated_name="./inferred"
+    )
 
     with engine_error(ResolveError, contains="none were found"):
         get_main(Address("missing"))
-    with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
+    with engine_error(ResolveError, contains="There are multiple `_go_internal_package` targets"):
         get_main(Address("ambiguous"))
-    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
+    with engine_error(
+        InvalidFieldException, contains="must point to a `_go_internal_package` target"
+    ):
         get_main(Address("explicit_wrong_type"))
