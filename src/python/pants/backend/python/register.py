@@ -25,7 +25,6 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
-    DeprecatedPythonRequirementLibraryTarget,
     PexBinary,
     PythonDistribution,
     PythonLibrary,
@@ -91,5 +90,4 @@ def target_types():
         PythonRequirementTarget,
         PythonRequirementsFile,
         PythonTests,
-        DeprecatedPythonRequirementLibraryTarget,
     ]

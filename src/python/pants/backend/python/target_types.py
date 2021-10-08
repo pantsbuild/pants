@@ -813,16 +813,13 @@ class PythonRequirementTarget(Target):
         f"See {doc_url('python-third-party-dependencies')}."
     )
 
-
-class DeprecatedPythonRequirementLibraryTarget(PythonRequirementTarget):
-    alias = "python_requirement_library"
-    help = "Deprecated. Use `python_requirement` instead."
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
+    deprecated_alias = "python_requirement_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
         "Use `python_requirement` instead, which behaves the same.\n\n"
         "To automate fixing this, download "
-        f"{git_url('build-support/migration-support/rename_targets_pants28_test.py')}. Run "
-        f"`--help` for instructions."
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
     )
 
 
