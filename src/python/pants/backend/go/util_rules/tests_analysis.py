@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import pkgutil
 from dataclasses import dataclass
+from typing import ClassVar
 
-from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
@@ -80,7 +81,7 @@ class AnalyzedTestSources:
 @dataclass(frozen=True)
 class AnalyzerSetup:
     digest: Digest
-    path: str
+    PATH: ClassVar[str] = "./analyzer"
 
 
 @rule
@@ -91,45 +92,41 @@ async def setup_analyzer() -> AnalyzerSetup:
     if not source_entry_content:
         raise AssertionError("Unable to find resource for `analyze_test_sources.go`.")
 
-    source_entry = FileContent(
-        "analyze_test_sources.go",
-        source_entry_content,
-    )
+    source_entry = FileContent("analyze_test_sources.go", source_entry_content)
 
     source_digest, import_config = await MultiGet(
         Get(Digest, CreateDigest([source_entry])),
         Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
     )
 
-    input_digest = await Get(Digest, MergeDigests([source_digest, import_config.digest]))
-
-    compiled_analyzer = await Get(
-        CompiledGoSources,
-        CompileGoSourcesRequest(
-            digest=input_digest,
-            sources=(source_entry.path,),
+    built_analyzer_pkg = await Get(
+        BuiltGoPackage,
+        BuildGoPackageRequest(
             import_path="main",
-            description="Compile Go test sources analyzer",
-            import_config_path=import_config.CONFIG_PATH,
+            subpath="",
+            digest=source_digest,
+            go_file_names=(source_entry.path,),
+            s_file_names=(),
+            direct_dependencies=(),
         ),
     )
-
-    link_input_digest = await Get(
-        Digest, MergeDigests([compiled_analyzer.output_digest, import_config.digest])
+    main_pkg_a_file_path = built_analyzer_pkg.import_paths_to_pkg_a_files["main"]
+    input_digest = await Get(
+        Digest, MergeDigests([built_analyzer_pkg.digest, import_config.digest])
     )
 
     analyzer = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=link_input_digest,
-            archives=("__pkg__.a",),
+            input_digest=input_digest,
+            archives=(main_pkg_a_file_path,),
             import_config_path=import_config.CONFIG_PATH,
-            output_filename="./analyzer",
+            output_filename=AnalyzerSetup.PATH,
             description="Link Go test sources analyzer",
         ),
     )
 
-    return AnalyzerSetup(analyzer.digest, path="./analyzer")
+    return AnalyzerSetup(analyzer.digest)
 
 
 @rule
@@ -141,7 +138,7 @@ async def analyze_test_sources(
     result = await Get(
         ProcessResult,
         Process(
-            argv=(analyzer.path, *request.paths),
+            argv=(analyzer.PATH, *request.paths),
             input_digest=input_digest,
             description="Analyze Go test sources.",
         ),

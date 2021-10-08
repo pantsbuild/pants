@@ -18,14 +18,15 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilation,
     AssemblyPreCompilationRequest,
 )
-from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.frozendict import FrozenDict
@@ -96,21 +97,35 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         assembly_digests = assembly_setup.assembly_digests
         symabis_path = "./symabis"
 
-    result = await Get(
-        CompiledGoSources,
-        CompileGoSourcesRequest(
-            digest=input_digest,
-            sources=tuple(
-                f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
-                for name in request.go_file_names
-            ),
-            import_path=request.import_path,
+    compile_args = [
+        "tool",
+        "compile",
+        "-o",
+        "__pkg__.a",
+        "-pack",
+        "-p",
+        request.import_path,
+        "-importcfg",
+        import_config.CONFIG_PATH,
+    ]
+    if symabis_path:
+        compile_args.extend(["-symabis", symabis_path])
+    relativized_sources = (
+        f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
+        for name in request.go_file_names
+    )
+    compile_args.extend(["--", *relativized_sources])
+    compile_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            input_digest=input_digest,
+            command=tuple(compile_args),
             description=f"Compile Go package: {request.import_path}",
-            import_config_path=import_config.CONFIG_PATH,
-            symabis_path=symabis_path,
+            output_files=("__pkg__.a",),
         ),
     )
-    compilation_digest = result.output_digest
+
+    compilation_digest = compile_result.output_digest
     if assembly_digests:
         assembly_result = await Get(
             AssemblyPostCompilation,

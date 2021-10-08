@@ -16,7 +16,6 @@ from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
-    compile,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -36,7 +35,6 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *assembly.rules(),
-            *compile.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),
             *build_pkg.rules(),
