@@ -86,6 +86,15 @@ async def compute_first_party_package_info(
         ),
     )
     metadata = json.loads(result.stdout)
+
+    if "CgoFiles" in metadata:
+        raise NotImplementedError(
+            f"The first-party package {request.address} includes `CgoFiles`, which Pants does "
+            "not yet support. Please open a feature request at "
+            "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+            "prioritize adding support."
+        )
+
     return FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
         imports=tuple(metadata.get("Imports", [])),

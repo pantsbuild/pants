@@ -14,7 +14,7 @@ from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, First
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_resolve_go_package(rule_runner: RuleRunner) -> None:
+def test_package_info(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "go_mod()\n",
@@ -118,3 +118,39 @@ def test_resolve_go_package(rule_runner: RuleRunner) -> None:
         test_files=["bar_test.go"],
         xtest_files=[],
     )
+
+
+def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "hello.go": dedent(
+                """\
+                package main
+
+                // int fortytwo()
+                // {
+                //	    return 42;
+                // }
+                import "C"
+                import "fmt"
+
+                func main() {
+                    f := C.intFunc(C.fortytwo)
+                    fmt.Println(C.intFunc(C.fortytwo))
+                }
+                """
+            ),
+        }
+    )
+    with engine_error(NotImplementedError):
+        rule_runner.request(
+            FirstPartyPkgInfo,
+            [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+        )
