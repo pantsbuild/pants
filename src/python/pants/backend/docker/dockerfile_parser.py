@@ -19,6 +19,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 
 _DOCKERFILE_SANDBOX_TOOL = "dockerfile_wrapper_script.py"
 
@@ -100,8 +101,9 @@ async def setup_process_for_parse_dockerfile(
         VenvPexProcess(
             parser.pex,
             argv=request.args,
-            input_digest=request.sources_digest,
             description="Parse Dockerfile.",
+            input_digest=request.sources_digest,
+            level=LogLevel.DEBUG,
         ),
     )
     return process

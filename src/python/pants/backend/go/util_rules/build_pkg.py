@@ -9,8 +9,10 @@ from typing import Optional
 from pants.backend.go.target_types import (
     GoExternalModulePathField,
     GoExternalModuleVersionField,
-    GoExternalPackageImportPathField,
-    GoPackageSources,
+    GoImportPathField,
+    GoInternalPackageSubpathField,
+    is_first_party_package_target,
+    is_third_party_package_target,
 )
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -20,21 +22,15 @@ from pants.backend.go.util_rules.assembly import (
 )
 from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.external_pkg import ExternalPkgInfo, ExternalPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.go_pkg import (
-    ResolvedGoPackage,
-    ResolveGoPackageRequest,
-    is_first_party_package_target,
-    is_third_party_package_target,
-)
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -69,30 +65,24 @@ class BuiltGoPackage:
 async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
+    original_import_path = target[GoImportPathField].value
 
     if is_first_party_package_target(target):
-        _source_files, _resolved_package = await MultiGet(
-            Get(
-                SourceFiles,
-                SourceFilesRequest((target[GoPackageSources],)),
-            ),
-            Get(ResolvedGoPackage, ResolveGoPackageRequest(address=target.address)),
+        _internal_pkg_info = await Get(
+            FirstPartyPkgInfo, FirstPartyPkgInfoRequest(address=target.address)
         )
-        source_files_digest = _source_files.snapshot.digest
-        source_files_subpath = target.address.spec_path
-
-        original_import_path = _resolved_package.import_path
-        go_files = _resolved_package.go_files
-        s_files = _resolved_package.s_files
+        source_files_digest = _internal_pkg_info.digest
+        source_files_subpath = target[GoInternalPackageSubpathField].value
+        go_files = _internal_pkg_info.go_files
+        s_files = _internal_pkg_info.s_files
 
     elif is_third_party_package_target(target):
-        original_import_path = target[GoExternalPackageImportPathField].value
         _module_path = target[GoExternalModulePathField].value
         source_files_subpath = original_import_path[len(_module_path) :]
 
         _owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(target.address))
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_owning_go_mod.address))
-        _pkg_info = await Get(
+        _external_pkg_info = await Get(
             ExternalPkgInfo,
             ExternalPkgInfoRequest(
                 import_path=original_import_path,
@@ -102,9 +92,9 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
             ),
         )
 
-        source_files_digest = _pkg_info.digest
-        go_files = _pkg_info.go_files
-        s_files = _pkg_info.s_files
+        source_files_digest = _external_pkg_info.digest
+        go_files = _external_pkg_info.go_files
+        s_files = _external_pkg_info.s_files
 
     else:
         raise AssertionError(f"Unknown how to build target at address {request.address} with Go.")

@@ -1,9 +1,11 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from itertools import chain
+from typing import Mapping
 
 from pants.backend.docker.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageSources
@@ -44,10 +46,17 @@ class DockerVersionContextValue(FrozenDict[str, str]):
         return self[attribute]
 
 
+class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
+    def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
+        merged: dict[str, DockerVersionContextValue] = dict(self)
+        merged.update({key: DockerVersionContextValue(value) for key, value in other.items()})
+        return DockerVersionContext(merged)
+
+
 @dataclass(frozen=True)
 class DockerBuildContext:
     digest: Digest
-    version_context: FrozenDict[str, DockerVersionContextValue]
+    version_context: DockerVersionContext
 
 
 @dataclass(frozen=True)
@@ -128,7 +137,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     return DockerBuildContext(
         digest=context,
-        version_context=FrozenDict(version_context),
+        version_context=DockerVersionContext(version_context),
     )
 
 

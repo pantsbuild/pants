@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.go.target_types import GoPackage
+from pants.backend.go.target_types import GoInternalPackageTarget
 from pants.engine.target import BoolField
 
 
@@ -12,4 +12,4 @@ class SkipGofmtField(BoolField):
 
 
 def rules():
-    return [GoPackage.register_plugin_field(SkipGofmtField)]
+    return [GoInternalPackageTarget.register_plugin_field(SkipGofmtField)]

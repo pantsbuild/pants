@@ -236,14 +236,15 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
     .stdout
     .as_mut()
     .ok_or_else(|| "No stdout found!".to_string());
-  let port_line = stdout.and_then(|stdout| {
-    let reader = io::BufReader::new(stdout);
-    reader
-      .lines()
-      .next()
-      .ok_or("There is no line ready in the child's output")?
-      .map_err(|e| e.to_string())
-  });
+  let port_line = stdout
+    .and_then(|stdout| {
+      let reader = io::BufReader::new(stdout);
+      reader
+        .lines()
+        .next()
+        .ok_or_else(|| "There is no line ready in the child's output".to_string())
+    })
+    .and_then(|res| res.map_err(|e| format!("Failed to read from stdout: {}", e)));
 
   // If we failed to read a port line and the child has exited, report that.
   if port_line.is_err() {

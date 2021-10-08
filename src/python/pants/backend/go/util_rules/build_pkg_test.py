@@ -9,19 +9,18 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget, GoPackage
+from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
-    build_go_pkg,
+    build_pkg,
     compile,
     external_pkg,
+    first_party_pkg,
     go_mod,
-    go_pkg,
     import_analysis,
     sdk,
 )
-from pants.backend.go.util_rules.build_go_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.core.util_rules import source_files
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.rules import QueryRule
@@ -33,19 +32,18 @@ from pants.util.strutil import path_safe
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *source_files.rules(),
             *sdk.rules(),
             *assembly.rules(),
-            *build_go_pkg.rules(),
+            *build_pkg.rules(),
             *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
-            *go_pkg.rules(),
+            *first_party_pkg.rules(),
             *external_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
         ],
-        target_types=[GoPackage, GoModTarget],
+        target_types=[GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -84,16 +82,13 @@ def test_build_internal_pkg(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "BUILD": dedent(
-                """\
-                go_mod(name="mod")
-                go_package(name="pkg")
-                """
-            ),
+            "BUILD": "go_mod(name='mod')",
         }
     )
     assert_built(
-        rule_runner, Address("", target_name="pkg"), expected_import_paths=["example.com/greeter"]
+        rule_runner,
+        Address("", target_name="mod", generated_name="./"),
+        expected_import_paths=["example.com/greeter"],
     )
 
 
@@ -139,7 +134,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "greeter/quoter/BUILD": "go_package()",
             "greeter/lib.go": dedent(
                 """\
                 package greeter
@@ -156,7 +150,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "greeter/BUILD": "go_package()",
             "main.go": dedent(
                 """\
                 package main
@@ -184,7 +177,6 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name='mod')
-                go_package(name='pkg')
                 """
             ),
         }
@@ -205,17 +197,25 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     quoter_import_path = "example.com/project/greeter/quoter"
-    assert_built(rule_runner, Address("greeter/quoter"), expected_import_paths=[quoter_import_path])
+    assert_built(
+        rule_runner,
+        Address("", target_name="mod", generated_name="./greeter/quoter"),
+        expected_import_paths=[quoter_import_path],
+    )
 
     greeter_import_paths = [
         "example.com/project/greeter",
         quoter_import_path,
         *xerrors_import_paths,
     ]
-    assert_built(rule_runner, Address("greeter"), expected_import_paths=greeter_import_paths)
+    assert_built(
+        rule_runner,
+        Address("", target_name="mod", generated_name="./greeter"),
+        expected_import_paths=greeter_import_paths,
+    )
 
     assert_built(
         rule_runner,
-        Address("", target_name="pkg"),
+        Address("", target_name="mod", generated_name="./"),
         expected_import_paths=["example.com/project", *greeter_import_paths],
     )

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Mapping
 
 from pants.engine.fs import Digest
 from pants.engine.process import (
@@ -27,11 +27,21 @@ class DockerBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
     def build_image(
-        self, tags: tuple[str, ...], digest: Digest, dockerfile: Optional[str] = None
+        self,
+        tags: tuple[str, ...],
+        digest: Digest,
+        dockerfile: str | None = None,
+        build_args: tuple[str, ...] = (),
+        env: Mapping[str, str] | None = None,
     ) -> Process:
         args = [self.path, "build"]
+
         for tag in tags:
             args.extend(["-t", tag])
+
+        for build_arg in build_args:
+            args.extend(["--build-arg", build_arg])
+
         if dockerfile:
             args.extend(["-f", dockerfile])
 
@@ -40,11 +50,12 @@ class DockerBinary(BinaryPath):
 
         return Process(
             argv=tuple(args),
-            input_digest=digest,
             description=(
                 f"Building docker image {tags[0]}"
                 + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else ".")
             ),
+            env=env,
+            input_digest=digest,
         )
 
     def push_image(self, tags: tuple[str, ...]) -> Process | None:

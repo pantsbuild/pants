@@ -308,7 +308,9 @@ class ReferenceGenerator:
         for goal, goal_info in help_info["name_to_goal_info"].items():
             consumed_scopes = sorted(goal_info["consumed_scopes"])
             linked_consumed_scopes = [
-                f"[{cs}]({cls._link(cs, sync=sync)})" for cs in consumed_scopes if cs
+                f"[{cs}]({cls._link(cs, sync=sync)})"
+                for cs in consumed_scopes
+                if cs and cs != goal_info.name
             ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][

@@ -4,66 +4,99 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Callable
 
 import pytest
 
-from pants.backend.docker.docker_binary import DockerBinary, DockerBinaryRequest
+from pants.backend.docker.docker_binary import DockerBinary
 from pants.backend.docker.docker_build import (
+    BuiltDockerImage,
     DockerFieldSet,
     DockerNameTemplateError,
     build_docker_image,
+    docker_image_run_request,
 )
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
+    DockerVersionContext,
     DockerVersionContextError,
     DockerVersionContextValue,
 )
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
+from pants.backend.docker.subsystem import rules as docker_subsystem_rules
 from pants.backend.docker.target_types import DockerImage
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[],
+        rules=[
+            *docker_subsystem_rules(),
+            QueryRule(DockerEnvironmentVars, []),
+            QueryRule(DockerOptions, []),
+        ],
         target_types=[DockerImage],
     )
 
 
 def assert_build(
-    rule_runner: RuleRunner, address: Address, *extra_log_lines: str, options: dict | None = None
+    rule_runner: RuleRunner,
+    address: Address,
+    *extra_log_lines: str,
+    options: dict | None = None,
+    process_assertions: Callable[[Process], None] | None = None,
 ) -> None:
     tgt = rule_runner.get_target(address)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
-        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=FrozenDict())
+        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=DockerVersionContext())
 
-    opts = options or {}
-    opts.setdefault("registries", {})
-    opts.setdefault("default_image_name_template", "{repository}/{name}")
+    def run_process_mock(process: Process) -> ProcessResult:
+        if process_assertions:
+            process_assertions(process)
 
-    docker_options = create_subsystem(
-        DockerOptions,
-        **opts,
-    )
+        return ProcessResult(
+            stdout=b"stdout",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr=b"stderr",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+        )
+
+    if options:
+        opts = options or {}
+        opts.setdefault("registries", {})
+        opts.setdefault("default_image_name_template", "{repository}/{name}")
+        opts.setdefault("build_args", [])
+        opts.setdefault("env_vars", [])
+
+        docker_options = create_subsystem(
+            DockerOptions,
+            **opts,
+        )
+    else:
+        docker_options = rule_runner.request(DockerOptions, [])
+
+    env = rule_runner.request(DockerEnvironmentVars, [])
 
     result = run_rule_with_mocks(
         build_docker_image,
-        rule_args=[DockerFieldSet.create(tgt), docker_options],
+        rule_args=[
+            DockerFieldSet.create(tgt),
+            docker_options,
+            DockerBinary("/dummy/docker"),
+            env,
+        ],
         mock_gets=[
-            MockGet(
-                output_type=DockerBinary,
-                input_type=DockerBinaryRequest,
-                mock=lambda _: DockerBinary("/dummy/docker"),
-            ),
             MockGet(
                 output_type=DockerBuildContext,
                 input_type=DockerBuildContextRequest,
@@ -72,14 +105,7 @@ def assert_build(
             MockGet(
                 output_type=ProcessResult,
                 input_type=Process,
-                # Process() generation has its own tests in test_docker_binary_build_image
-                mock=lambda _: ProcessResult(
-                    stdout=b"stdout",
-                    stdout_digest=EMPTY_FILE_DIGEST,
-                    stderr=b"stderr",
-                    stderr_digest=EMPTY_FILE_DIGEST,
-                    output_digest=EMPTY_DIGEST,
-                ),
+                mock=run_process_mock,
             ),
         ],
     )
@@ -263,7 +289,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    version_context = FrozenDict(
+    version_context = DockerVersionContext(
         {
             "baseimage": DockerVersionContextValue({"tag": "3.8"}),
             "stage0": DockerVersionContextValue({"tag": "3.8"}),
@@ -319,3 +345,114 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     )
     with pytest.raises(DockerVersionContextError, match=err_2):
         assert_tags("err_2")
+
+
+def test_docker_run(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file("docker/test/BUILD", "docker_image()")
+    tgt = rule_runner.get_target(Address("docker/test"))
+    result = run_rule_with_mocks(
+        docker_image_run_request,
+        rule_args=[DockerFieldSet.create(tgt), DockerBinary("/dummy/docker")],
+        mock_gets=[
+            MockGet(
+                output_type=BuiltPackage,
+                input_type=DockerFieldSet,
+                mock=lambda _: BuiltPackage(
+                    EMPTY_DIGEST, (BuiltDockerImage.create(("test:latest",)),)
+                ),
+            ),
+        ],
+    )
+
+    assert result.args == ("/dummy/docker", "run", "-it", "--rm", "test:latest")
+
+
+def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="env1", version="1.2.3")'})
+    rule_runner.set_options(
+        [],
+        env={
+            "INHERIT": "from Pants env",
+            "PANTS_DOCKER_ENV_VARS": '["VAR=value", "INHERIT"]',
+        },
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "-t",
+            "test/env1:1.2.3",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
+        )
+        assert process.env == FrozenDict(
+            {
+                "INHERIT": "from Pants env",
+                "VAR": "value",
+            }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="env1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_args(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", version="1.2.3")'})
+    rule_runner.set_options(
+        [],
+        env={
+            "INHERIT": "from Pants env",
+            "PANTS_DOCKER_BUILD_ARGS": '["VAR=value", "INHERIT"]',
+        },
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "-t",
+            "test/args1:1.2.3",
+            "--build-arg",
+            "INHERIT",
+            "--build-arg",
+            "VAR=value",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+        # Check that we pull in name only args via env.
+        assert process.env == FrozenDict(
+            {
+                "INHERIT": "from Pants env",
+            }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="args1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="ver1", version="{build_args.VERSION}")'}
+    )
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_ARGS": '["VERSION=1.2.3"]',
+        },
+    )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="ver1"),
+        "Built docker image: test/ver1:1.2.3",
+    )
