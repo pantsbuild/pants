@@ -11,18 +11,12 @@ import ijson
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, RemovePrefix
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
-    UnexpandedTargets,
-    WrappedTarget,
-)
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -120,41 +114,6 @@ async def determine_go_mod_info(
         digest=sources_digest,
         stripped_digest=stripped_sources,
     )
-
-
-# TODO: Have `go_package` have a required field associating with `go_mod` target.
-@dataclass(frozen=True)
-class OwningGoModRequest:
-    address: Address
-
-
-@dataclass(frozen=True)
-class OwningGoMod(EngineAwareParameter):
-    address: Address
-
-    def debug_hint(self) -> str:
-        return self.address.spec
-
-
-@rule
-async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
-    candidate_targets = await Get(
-        UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
-    )
-    # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
-    go_mod_targets = sorted(
-        (tgt for tgt in candidate_targets if tgt.has_field(GoModSourcesField)),
-        key=lambda tgt: tgt.address.spec_path,
-        reverse=True,
-    )
-    if not go_mod_targets:
-        raise Exception(
-            f"The target {request.address} does not have any `go_mod` target in any ancestor "
-            "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
-            "`go_mod` target (you can run `./pants tailor` to do this)."
-        )
-    nearest_go_mod_target = go_mod_targets[0]
-    return OwningGoMod(nearest_go_mod_target.address)
 
 
 def rules():
