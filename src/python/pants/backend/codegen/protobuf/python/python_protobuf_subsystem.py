@@ -3,7 +3,7 @@
 
 from typing import cast
 
-from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
+from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
@@ -84,7 +84,7 @@ def setup_mypy_protobuf_lockfile(
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
+    inject_for = ProtobufDependenciesField
 
 
 @rule

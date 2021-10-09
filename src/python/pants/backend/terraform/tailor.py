@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
-from pants.backend.terraform.target_types import TerraformModules
+from pants.backend.terraform.target_types import TerraformModulesGeneratorTarget
 from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
@@ -90,7 +90,7 @@ async def find_putative_terrform_modules_targets(
 
     putative_targets = [
         PutativeTarget.for_target_type(
-            TerraformModules,
+            TerraformModulesGeneratorTarget,
             str(PurePath(*dir_parts)),
             "tf_mods",
             [str(PurePath(*dir_parts).joinpath("**/*.tf"))],

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.project_info import filedeps
 from pants.engine.target import Dependencies, Sources, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -22,7 +22,7 @@ class MockTarget(Target):
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=filedeps.rules(), target_types=[MockTarget, ProtobufLibrary])
+    return RuleRunner(rules=filedeps.rules(), target_types=[MockTarget, ProtobufSourceTarget])
 
 
 def assert_filedeps(
@@ -174,5 +174,5 @@ def test_build_with_file_ext(rule_runner: RuleRunner) -> None:
 
 def test_codegen_targets_use_protocol_files(rule_runner: RuleRunner) -> None:
     # That is, don't output generated files.
-    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_library()"})
+    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_library(sources=['f.proto'])"})
     assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.proto"})

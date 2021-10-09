@@ -38,6 +38,7 @@ def run_goal(
     address_regex: list[str] | None = None,
     tag_regex: list[str] | None = None,
     granularity: TargetGranularity | None = None,
+    expect_stderr: bool = False,
 ) -> str:
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
         run_rule_with_mocks(
@@ -62,7 +63,10 @@ def run_goal(
                 RegisteredTargetTypes.create({type(tgt) for tgt in targets}),
             ],
         )
-        assert not stdio_reader.get_stderr()
+        if expect_stderr:
+            assert stdio_reader.get_stderr()
+        else:
+            assert not stdio_reader.get_stderr()
         return stdio_reader.get_stdout()
 
 
@@ -82,6 +86,8 @@ def test_filter_by_target_type() -> None:
     class Fortran(Target):
         alias = "fortran"
         core_fields = ()
+        deprecated_alias = "deprecated_fortran"
+        deprecated_alias_removal_version = "99.9.0.dev0"
 
     class Smalltalk(Target):
         alias = "smalltalk"
@@ -102,6 +108,12 @@ def test_filter_by_target_type() -> None:
         //:s1
         //:s2
         """
+    )
+
+    # The deprecated alias works too.
+    assert (
+        run_goal(targets, target_type=["deprecated_fortran"], expect_stderr=True).strip()
+        == "//:f1\n//:f2"
     )
 
     # A target can only have one type, so this output should be empty.

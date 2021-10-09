@@ -12,20 +12,18 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinary, GoModTarget, GoPackage
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
-    build_go_pkg,
-    compile,
-    external_module,
+    build_pkg,
+    first_party_pkg,
     go_mod,
-    go_pkg,
     import_analysis,
     link,
     sdk,
+    third_party_pkg,
 )
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -37,20 +35,18 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *assembly.rules(),
-            *compile.rules(),
-            *source_files.rules(),
             *import_analysis.rules(),
             *package_binary.rules(),
-            *build_go_pkg.rules(),
-            *go_pkg.rules(),
+            *build_pkg.rules(),
+            *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
             *target_type_rules.rules(),
-            *external_module.rules(),
+            *third_party_pkg.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
-        target_types=[GoBinary, GoPackage, GoModTarget],
+        target_types=[GoBinaryTarget, GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -113,8 +109,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg")
-                go_binary(name="bin", main=":pkg")
+                go_binary(name="bin")
                 """
             ),
         }

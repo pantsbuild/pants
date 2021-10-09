@@ -9,7 +9,7 @@ from pants.backend.terraform import style, tool
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.validate import validate
 from pants.backend.terraform.lint.validate.validate import ValidateRequest
-from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModule
+from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -22,7 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[TerraformModule],
+        target_types=[TerraformModuleTarget],
         rules=[
             *external_tool.rules(),
             *fmt.rules(),

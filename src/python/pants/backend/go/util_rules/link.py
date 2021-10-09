@@ -25,8 +25,7 @@ class LinkGoBinaryRequest:
 class LinkedGoBinary:
     """A linked Go binary stored in a `Digest`."""
 
-    output_digest: Digest
-    output_filename: str
+    digest: Digest
 
 
 @rule
@@ -50,9 +49,7 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
         ),
     )
 
-    return LinkedGoBinary(
-        output_digest=result.output_digest, output_filename=request.output_filename
-    )
+    return LinkedGoBinary(result.output_digest)
 
 
 def rules():

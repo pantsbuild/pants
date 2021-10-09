@@ -8,14 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java import util_rules as java_util_rules
-from pants.backend.java.compile.javac import (
-    CompiledClassfiles,
-    CompileJavaSourceRequest,
-    CompileResult,
-    FallibleCompiledClassfiles,
-    JavacCheckRequest,
-)
+from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
@@ -30,6 +23,8 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.jvm import jdk_rules
+from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
@@ -61,7 +56,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *target_types_rules(),
             *coursier_rules(),
-            *java_util_rules.rules(),
+            *jdk_rules.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
@@ -191,7 +186,11 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     # Additionally validate that `check` works.
     check_results = rule_runner.request(
         CheckResults,
-        [JavacCheckRequest([JavacCheckRequest.field_set_type.create(coarsened_target.members[0])])],
+        [
+            JavacCheckRequest(
+                [JavacCheckRequest.field_set_type.create(coarsened_target.representative)]
+            )
+        ],
     )
 
     assert len(check_results.results) == 1
@@ -629,6 +628,56 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
+
+
+@maybe_skip_jdk_test
+def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name = 'lockfile',
+                    requirements = [],
+                    sources = [
+                        "coursier_resolve.lockfile",
+                    ],
+                )
+
+                java_sources(
+                    name = 'main',
+                    dependencies = [
+                        ":lockfile",
+                    ]
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "package-info.java": dedent(
+                """
+                package org.pantsbuild.example;
+                /**
+                  * This is a package-info.java file which can have package-level annotations and
+                  * documentation comments. It does not generate any output.
+                  */
+                """
+            ),
+        }
+    )
+    compiled_classfiles = rule_runner.request(
+        CompiledClassfiles,
+        [
+            CompileJavaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                )
+            )
+        ],
+    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {}
 
 
 @maybe_skip_jdk_test

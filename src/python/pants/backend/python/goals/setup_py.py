@@ -17,6 +17,7 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
 from pants.backend.python.target_types import (
+    GenerateSetupField,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
     PythonRequirementsField,
@@ -170,12 +171,6 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
 
 
 @dataclass(frozen=True)
-class SetupPySourcesRequest:
-    targets: Targets
-    py2: bool  # Whether to use py2 or py3 package semantics.
-
-
-@dataclass(frozen=True)
 class SetupPySources:
     """The sources required by a setup.py command.
 
@@ -290,12 +285,7 @@ class SetupPyChroot:
     """A chroot containing a setup.py and the sources it operates on."""
 
     digest: Digest
-    setup_script: str  # The path of the setup script within the digest.
-
-    # Note that this field is merely informational, used primarily in tests, and
-    # to construct the chroot name from the name and version kwargs, when setup is
-    # run with no args.
-    setup_kwargs: FinalizedSetupKwargs
+    working_directory: str  # Path to dir within digest.
 
 
 @dataclass(frozen=True)
@@ -332,6 +322,21 @@ class SetupPyGeneration(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        # Generating setup is the more aggressive thing to do, so we'd prefer that the default
+        # be False. However that would break widespread existing usage, so we'll make that
+        # change in a future deprecation cycle.
+        register(
+            "--generate-setup-default",
+            type=bool,
+            default=True,
+            help=(
+                "The default value for the `generate_setup` field on `python_distribution` targets."
+                "Can be overridden per-target by setting that field explicitly. Set this to False "
+                "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
+                "Leave as True if you mostly rely on Pants generating setup files for you."
+            ),
+        )
+
         register(
             "--first-party-dependency-version-scheme",
             type=FirstPartyDependencyVersionScheme,
@@ -343,6 +348,10 @@ class SetupPyGeneration(Subsystem):
                 "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
             ),
         )
+
+    @property
+    def generate_setup_default(self) -> bool:
+        return cast(bool, self.options.generate_setup_default)
 
     def first_party_dependency_version(self, version: str) -> str:
         """Return the version string (e.g. '~=4.0') for a first-party dependency.
@@ -426,7 +435,7 @@ async def package_python_dist(
             "Creating a raw dump of the generated setup.py and its chroot",
             "This exposed an internal implementation detail, and is no longer supported.",
         )
-        dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
+        dirname = field_set.address.path_safe_spec
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
         return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
 
@@ -483,15 +492,9 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     # changes setup made within it (e.g., when running 'develop') without also capturing other
     # artifacts of the pex process invocation.
     chroot_prefix = "chroot"
+    working_directory = os.path.join(chroot_prefix, req.chroot.working_directory)
 
     prefixed_chroot = await Get(Digest, AddPrefix(req.chroot.digest, chroot_prefix))
-
-    # setup.py basically always expects to be run with the cwd as its own directory
-    # (e.g., paths in it are relative to that directory). This is true of the setup.py
-    # we generate and is overwhelmingly likely to be true for existing setup.py files,
-    # as there is no robust way to run them otherwise.
-    setup_script_reldir, setup_script_name = os.path.split(req.chroot.setup_script)
-    working_directory = os.path.join(chroot_prefix, setup_script_reldir)
 
     result = await Get(
         DistBuildResult,
@@ -539,56 +542,99 @@ async def determine_setup_kwargs(
     return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
 
 
+@dataclass(frozen=True)
+class GenerateSetupPyRequest:
+    exported_target: ExportedTarget
+    sources: SetupPySources
+
+
+@dataclass(frozen=True)
+class GeneratedSetupPy:
+    digest: Digest
+
+
 @rule
-async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
+async def generate_chroot(
+    request: SetupPyChrootRequest, subsys: SetupPyGeneration
+) -> SetupPyChroot:
+    generate_setup = request.exported_target.target.get(GenerateSetupField).value
+    if generate_setup is None:
+        generate_setup = subsys.generate_setup_default
+
+    # TODO: In 2.9.0.dev0 delete from here...
+    resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, request.exported_target)
+    setup_script = resolved_setup_kwargs.kwargs.get("setup_script")
+    if setup_script:
+        generate_setup = False
+        warn_or_error(
+            "2.9.0.dev0",
+            "explicitly specifying a setup_script",
+            f"This kwarg is ignored. Instead set generate_setup=False on the python_distribution "
+            f"target at {request.exported_target.target.address.spec}, and setup will run on "
+            f"whatever relevant files it finds in the dependency closure (e.g., setup.py, "
+            f"setup.cfg, pyproject.toml",
+        )
+    # ... to here.
+
+    sources = await Get(SetupPySources, SetupPyChrootRequest, request)
+
+    if generate_setup:
+        generated_setup_py = await Get(
+            GeneratedSetupPy, GenerateSetupPyRequest(request.exported_target, sources)
+        )
+        # We currently generate a setup.py that expects to be in the source root.
+        # TODO: It might make sense to generate one in the target's directory, for
+        #  consistency with the existing setup.py case.
+        working_directory = ""
+        chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
+    else:
+        # To get the stripped target directory we need a dummy path under it. Note that this
+        # is just a dummy string, required because our source root stripping mechanism assumes
+        # that paths are files and starts searching from the parent dir. It doesn't correspond
+        # to an actual file on disk, so there are no collision issues.
+        # TODO: Add source root stripping functionality for directories.
+        stripped = await Get(
+            StrippedSourceFileNames,
+            SourcesPaths(
+                files=(os.path.join(request.exported_target.target.address.spec_path, "dummy.py"),),
+                dirs=(),
+            ),
+        )
+        working_directory = os.path.dirname(stripped[0])
+        chroot_digest = sources.digest
+    return SetupPyChroot(chroot_digest, working_directory)
+
+
+@rule
+async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy:
+    # Generate the setup script.
+    finalized_setup_kwargs = await Get(FinalizedSetupKwargs, GenerateSetupPyRequest, request)
+    setup_py_content = SETUP_BOILERPLATE.format(
+        target_address_spec=request.exported_target.target.address.spec,
+        setup_kwargs_str=distutils_repr(finalized_setup_kwargs.kwargs),
+    ).encode()
+    files_to_create = [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", b"include *.py"),
+    ]
+    digest = await Get(Digest, CreateDigest(files_to_create))
+    return GeneratedSetupPy(digest)
+
+
+@rule
+async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
     exported_target = request.exported_target
-    exported_addr = exported_target.target.address
+    sources = request.sources
+    requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 
-    owned_deps, transitive_targets = await MultiGet(
-        Get(OwnedDependencies, DependencyOwner(exported_target)),
-        Get(
-            TransitiveTargets,
-            TransitiveTargetsRequest([exported_target.target.address]),
-        ),
-    )
-    # files() targets aren't owned by a single exported target - they aren't code, so
-    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
-    # a standard license file in a dist.
-    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
-    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
-
-    sources, requirements = await MultiGet(
-        Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
-        Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
-    )
     # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
     # explicitly provided or generated via a user's plugin, we add additional kwargs based on the
     # resolved requirements and sources.
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
-
-    setup_script = setup_kwargs.pop("setup_script", None)
-    if setup_script:
-        # The target points to an existing setup.py script, so use that.
-        invalid_keys = set(setup_kwargs.keys()) - {"name", "version"}
-        if invalid_keys:
-            raise InvalidSetupPyArgs(
-                f"The `provides` field in {exported_addr} specifies a setup_script kwarg, so it "
-                f"must only specify the name and version kwargs, but it also specified "
-                f"{','.join(sorted(invalid_keys))}."
-            )
-        stripped_setup_script = await Get(
-            StrippedSourceFileNames,
-            SourcesPaths(files=(os.path.join(target.address.spec_path, setup_script),), dirs=()),
-        )
-        return SetupPyChroot(
-            sources.digest,
-            stripped_setup_script[0],
-            FinalizedSetupKwargs(setup_kwargs, address=target.address),
-        )
-
-    # There is no existing setup.py script, so we generate one.
+    # TODO: Delete this line in 2.9.0.dev0.
+    setup_kwargs.pop("setup_script", None)
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
     # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
@@ -631,6 +677,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
 
     # Gather entry points with source description for any error messages when merging them.
+    exported_addr = exported_target.target.address
     entry_point_sources = {
         f"{exported_addr}'s field `entry_points`": _format_entry_points(
             resolved_from_entry_points_field
@@ -648,29 +695,29 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             for category, entry_points in all_entry_points.items()
         }
 
-    # Generate the setup script.
-    setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=target.address.spec,
-        setup_kwargs_str=distutils_repr(setup_kwargs),
-    ).encode()
-    files_to_create = [
-        FileContent("setup.py", setup_py_content),
-        FileContent("MANIFEST.in", b"include *.py"),
-    ]
-    extra_files_digest = await Get(Digest, CreateDigest(files_to_create))
-    chroot_digest = await Get(Digest, MergeDigests((sources.digest, extra_files_digest)))
-    return SetupPyChroot(
-        chroot_digest, "setup.py", FinalizedSetupKwargs(setup_kwargs, address=target.address)
-    )
+    return FinalizedSetupKwargs(setup_kwargs, address=target.address)
 
 
 @rule
-async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
+async def get_sources(request: SetupPyChrootRequest) -> SetupPySources:
+    owned_deps, transitive_targets = await MultiGet(
+        Get(OwnedDependencies, DependencyOwner(request.exported_target)),
+        Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest([request.exported_target.target.address]),
+        ),
+    )
+    # files() targets aren't owned by a single exported target - they aren't code, so
+    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
+    # a standard license file in a dist.
+    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
+    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
+
     python_sources_request = PythonSourceFilesRequest(
-        targets=request.targets, include_resources=False, include_files=False
+        targets=targets, include_resources=False, include_files=False
     )
     all_sources_request = PythonSourceFilesRequest(
-        targets=request.targets, include_resources=True, include_files=True
+        targets=targets, include_resources=True, include_files=True
     )
     python_sources, all_sources = await MultiGet(
         Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, python_sources_request),

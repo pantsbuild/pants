@@ -38,6 +38,7 @@ class ShellSourcesField(Sources):
     # file extension, so we don't use this.
     uses_source_roots = False
     expected_num_files = 1
+    required = True
 
 
 class ShellGeneratingSources(Sources):

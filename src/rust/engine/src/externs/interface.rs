@@ -610,13 +610,17 @@ py_class!(class PySession |py| {
           session_values: PyObject,
           cancellation_latch: PySessionCancellationLatch,
     ) -> CPyResult<Self> {
-      let session = Session::new(
-          scheduler.scheduler(py),
+      // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
+      // held.
+      let core = scheduler.scheduler(py).core.clone();
+      let cancellation_latch = cancellation_latch.cancelled(py).clone();
+      let session = py.allow_threads(|| Session::new(
+          core,
           should_render_ui,
           build_id,
           session_values.into(),
-          cancellation_latch.cancelled(py).clone(),
-        ).map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?;
+          cancellation_latch,
+        )).map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?;
       Self::create_instance(py, session)
     }
 

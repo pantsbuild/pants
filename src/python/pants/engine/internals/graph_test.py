@@ -95,6 +95,8 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
 class MockTarget(Target):
     alias = "target"
     core_fields = (MockDependencies, Sources, SpecialCasedDeps1, SpecialCasedDeps2)
+    deprecated_alias = "deprecated_target"
+    deprecated_alias_removal_version = "9.9.9.dev0"
 
 
 class MockGeneratedTarget(Target):
@@ -372,7 +374,11 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             [Addresses([a])],
         )
         assert list(sorted(t.address for t in coarsened_targets[0].members)) == expected_members
-        assert list(sorted(d for d in coarsened_targets[0].dependencies)) == expected_dependencies
+        # NB: Only the direct dependencies are compared.
+        assert (
+            list(sorted(d.address for ct in coarsened_targets[0].dependencies for d in ct.members))
+            == expected_dependencies
+        )
 
     # Non-file-level targets are already validated to not have cycles, so they coarsen to
     # themselves.
@@ -527,6 +533,13 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
         Address("", target_name="t1"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
     }
+
+
+def test_resolve_deprecated_target_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
+    transitive_targets_rule_runner.write_files({"BUILD": "deprecated_target(name='t')"})
+    transitive_targets_rule_runner.get_target(Address("", target_name="t"))
+    assert len(caplog.records) == 1
+    assert "Instead, use `target`"
 
 
 def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) -> None:

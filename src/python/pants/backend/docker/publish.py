@@ -1,0 +1,77 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from itertools import chain
+from typing import cast
+
+from pants.backend.docker.docker_binary import DockerBinary
+from pants.backend.docker.docker_build import BuiltDockerImage
+from pants.backend.docker.subsystem import DockerOptions
+from pants.backend.docker.target_types import DockerRegistriesField, DockerSkipPushField
+from pants.core.goals.publish import (
+    PublishFieldSet,
+    PublishPackages,
+    PublishProcesses,
+    PublishRequest,
+)
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import collect_rules, rule
+
+logger = logging.getLogger(__name__)
+
+
+class PublishDockerImageRequest(PublishRequest):
+    pass
+
+
+@dataclass(frozen=True)
+class PublishDockerImageFieldSet(PublishFieldSet):
+    publish_request_type = PublishDockerImageRequest
+    required_fields = (DockerRegistriesField,)
+
+    registries: DockerRegistriesField
+    skip_push: DockerSkipPushField
+
+
+@rule
+async def push_docker_images(
+    request: PublishDockerImageRequest, docker: DockerBinary, options: DockerOptions
+) -> PublishProcesses:
+    tags = tuple(
+        chain.from_iterable(
+            cast(BuiltDockerImage, image).tags
+            for pkg in request.packages
+            for image in pkg.artifacts
+        )
+    )
+
+    if request.field_set.skip_push.value:
+        return PublishProcesses(
+            [
+                PublishPackages(
+                    names=tags,
+                    description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
+                ),
+            ]
+        )
+
+    process = docker.push_image(tags)
+    return PublishProcesses(
+        [
+            PublishPackages(
+                names=tags,
+                process=InteractiveProcess.from_process(process) if process else None,
+            ),
+        ]
+    )
+
+
+def rules():
+    return (
+        *collect_rules(),
+        *PublishDockerImageFieldSet.rules(),
+    )

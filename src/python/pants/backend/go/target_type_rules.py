@@ -4,44 +4,42 @@
 from __future__ import annotations
 
 import logging
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoExternalModulePathField,
-    GoExternalModuleVersionField,
-    GoExternalPackageDependencies,
-    GoExternalPackageImportPathField,
-    GoExternalPackageTarget,
-    GoImportPath,
+    GoBinaryDependenciesField,
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
+    GoFirstPartyPackageSourcesField,
+    GoFirstPartyPackageSubpathField,
+    GoFirstPartyPackageTarget,
+    GoImportPathField,
+    GoModPackageSourcesField,
     GoModTarget,
-    GoPackageDependencies,
-    GoPackageSources,
+    GoThirdPartyModulePathField,
+    GoThirdPartyModuleVersionField,
+    GoThirdPartyPackageDependenciesField,
+    GoThirdPartyPackageTarget,
 )
-from pants.backend.go.util_rules import go_pkg, import_analysis
-from pants.backend.go.util_rules.external_module import (
-    ExternalModulePkgImportPaths,
-    ExternalModulePkgImportPathsRequest,
-    ResolveExternalGoPackageRequest,
-)
-from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
-    GoModInfoRequest,
-    ModuleDescriptor,
-    OwningGoMod,
-    OwningGoModRequest,
-)
-from pants.backend.go.util_rules.go_pkg import ResolvedGoPackage, ResolveGoPackageRequest
+from pants.backend.go.util_rules import first_party_pkg, import_analysis
+from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
-from pants.base.specs import (
-    AddressSpecs,
-    DescendantAddresses,
-    MaybeEmptyDescendantAddresses,
-    MaybeEmptySiblingAddresses,
+from pants.backend.go.util_rules.third_party_pkg import (
+    ThirdPartyModuleInfo,
+    ThirdPartyModuleInfoRequest,
+    ThirdPartyPkgInfo,
+    ThirdPartyPkgInfoRequest,
 )
-from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.base.exceptions import ResolveError
+from pants.base.specs import AddressSpecs, AscendantAddresses, DescendantAddresses
+from pants.core.goals.tailor import group_by_dir
+from pants.engine.addresses import Address, AddressInput
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -49,205 +47,156 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    InvalidFieldException,
     Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
-# Inject a dependency between a go_package and its owning go_mod.
-class InjectGoPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoPackageDependencies
-
-
-@rule
-async def inject_go_package_dependencies(
-    request: InjectGoPackageDependenciesRequest,
-) -> InjectedDependencies:
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.dependencies_field.address))
-    return InjectedDependencies([owning_go_mod.address])
-
-
 # TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
 @dataclass(frozen=True)
-class GoImportPathToPackageMapping:
-    # Maps import paths to the address of go_package or (more likely) go_external_package targets.
+class ImportPathToPackages:
     mapping: FrozenDict[str, tuple[Address, ...]]
 
 
 @rule
-async def analyze_import_path_to_package_mapping() -> GoImportPathToPackageMapping:
+async def map_import_paths_to_packages() -> ImportPathToPackages:
     mapping: dict[str, list[Address]] = defaultdict(list)
-
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     for tgt in all_targets:
-        if not tgt.has_field(GoImportPath):
+        if not tgt.has_field(GoImportPathField):
             continue
-
-        # Note: This will usually skip go_package targets since they need analysis to infer the import path
-        # since there is no way in the engine to attach inferred values as fields.
-        import_path = tgt[GoImportPath].value
-        if not import_path:
-            continue
-
+        import_path = tgt[GoImportPathField].value
         mapping[import_path].append(tgt.address)
-
     frozen_mapping = FrozenDict({ip: tuple(tgts) for ip, tgts in mapping.items()})
-    return GoImportPathToPackageMapping(mapping=frozen_mapping)
+    return ImportPathToPackages(frozen_mapping)
 
 
+# TODO: Use dependency injection. This doesn't actually look at the Sources field.
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoPackageSources
+    infer_from = GoFirstPartyPackageSourcesField
 
 
-# TODO(12761): Refactor this rule so as much as possible is memoized by invoking other rules. Consider
-# for example `FirstPartyPythonModuleMapping` and `ThirdPartyPythonModuleMapping`.
 @rule
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
-    package_mapping: GoImportPathToPackageMapping,
+    package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
-    this_go_package = await Get(
-        ResolvedGoPackage, ResolveGoPackageRequest(request.sources_field.address)
-    )
+    addr = request.sources_field.address
+    pkg_info = await Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
 
-    # Obtain all go_package targets under this package's go_mod.
-    assert this_go_package.module_address is not None
-    spec_path = this_go_package.module_address.spec_path
-    address_specs = [
-        MaybeEmptySiblingAddresses(spec_path),
-        MaybeEmptyDescendantAddresses(spec_path),
-    ]
-    candidate_targets = await Get(Targets, AddressSpecs(address_specs))
-    go_package_targets = [
-        tgt
-        for tgt in candidate_targets
-        if tgt.has_field(GoPackageSources) and tgt.address != this_go_package.address
-    ]
-
-    # Resolve all of the packages found.
-    first_party_import_path_to_address = {}
-    first_party_go_packages = await MultiGet(
-        Get(ResolvedGoPackage, ResolveGoPackageRequest(tgt.address)) for tgt in go_package_targets
-    )
-    for first_party_go_package in first_party_go_packages:
-        # Skip packages that are not part of this package's module.
-        # TODO: This requires that all first-party code in the monorepo be part of the same go_mod. Will need
-        # figure out how multiple modules in a monorepo can interact.
-        if first_party_go_package.module_address != this_go_package.module_address:
-            continue
-
-        address = first_party_go_package.address
-        if not address:
-            continue
-
-        first_party_import_path_to_address[first_party_go_package.import_path] = address
-
-    # Loop through all of the imports of this package and add dependencies on other packages and
-    # external modules.
     inferred_dependencies = []
-    for import_path in this_go_package.imports + this_go_package.test_imports:
+    for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
         if import_path in std_lib_imports:
             continue
-
-        # Infer first-party dependencies to other packages in same go_mod.
-        if import_path in first_party_import_path_to_address:
-            inferred_dependencies.append(first_party_import_path_to_address[import_path])
-            continue
-
-        # Infer third-party dependencies on _go_external_package targets.
-        candidate_third_party_packages = package_mapping.mapping.get(import_path, ())
-        if len(candidate_third_party_packages) > 1:
+        candidate_packages = package_mapping.mapping.get(import_path, ())
+        if len(candidate_packages) > 1:
             # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
             # way of doing disambiguation.
             logger.warning(
-                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_third_party_packages}"
+                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
-        elif len(candidate_third_party_packages) == 1:
-            inferred_dependencies.append(candidate_third_party_packages[0])
+        elif len(candidate_packages) == 1:
+            inferred_dependencies.append(candidate_packages[0])
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in go_package at address '{this_go_package.address}'."
+                f"in go_first_party_package at address '{addr}'."
             )
 
     return InferredDependencies(inferred_dependencies)
 
 
-class InjectGoExternalPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoExternalPackageDependencies
+class InjectGoThirdPartyPackageDependenciesRequest(InjectDependenciesRequest):
+    inject_for = GoThirdPartyPackageDependenciesField
 
 
-# TODO(#12761): This duplicates first-party dependency inference but that other rule cannot operate
-#  on _go_external_package targets since there is no sources field in a _go_external_package.
-#  Consider how to merge the inference/injection rules into one. Maybe use a private Sources field?
 @rule
-async def inject_go_external_package_dependencies(
-    request: InjectGoExternalPackageDependenciesRequest,
+async def inject_go_third_party_package_dependencies(
+    request: InjectGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
-    package_mapping: GoImportPathToPackageMapping,
+    package_mapping: ImportPathToPackages,
 ) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    addr = request.dependencies_field.address
+    go_mod_address = addr.maybe_convert_to_target_generator()
+    wrapped_target, go_mod_info = await MultiGet(
+        Get(WrappedTarget, Address, addr),
+        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+    )
     tgt = wrapped_target.target
-    assert isinstance(tgt, GoExternalPackageTarget)
-
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(tgt.address))
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
-
-    this_go_package = await Get(
-        ResolvedGoPackage, ResolveExternalGoPackageRequest(tgt, go_mod_info.stripped_digest)
+    pkg_info = await Get(
+        ThirdPartyPkgInfo,
+        ThirdPartyPkgInfoRequest(
+            module_path=tgt[GoThirdPartyModulePathField].value,
+            version=tgt[GoThirdPartyModuleVersionField].value,
+            import_path=tgt[GoImportPathField].value,
+            go_mod_stripped_digest=go_mod_info.stripped_digest,
+        ),
     )
 
-    # Loop through all of the imports of this package and add dependencies on other packages and
-    # external modules.
     inferred_dependencies = []
-    for import_path in this_go_package.imports + this_go_package.test_imports:
+    for import_path in pkg_info.imports:
         if import_path in std_lib_imports:
             continue
 
-        # Infer third-party dependencies on _go_external_package targets.
-        candidate_third_party_packages = package_mapping.mapping.get(import_path, ())
-        if len(candidate_third_party_packages) > 1:
+        candidate_packages = package_mapping.mapping.get(import_path, ())
+        if len(candidate_packages) > 1:
             # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
             # way of doing disambiguation.
             logger.warning(
-                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_third_party_packages}"
+                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
-        elif len(candidate_third_party_packages) == 1:
-            inferred_dependencies.append(candidate_third_party_packages[0])
+        elif len(candidate_packages) == 1:
+            inferred_dependencies.append(candidate_packages[0])
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in go_external_package at address '{this_go_package.address}'."
+                f"in go_third_party_package at address '{addr}'."
             )
 
     return InjectedDependencies(inferred_dependencies)
 
 
 # -----------------------------------------------------------------------------------------------
-# Generate `_go_external_package` targets
+# Generate `go_first_party_package` and `go_third_party_package` targets
 # -----------------------------------------------------------------------------------------------
 
 
-class GenerateGoExternalPackageTargetsRequest(GenerateTargetsRequest):
+class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
     generate_from = GoModTarget
 
 
-@rule(desc="Generate targets for each external package in `go.mod`", level=LogLevel.DEBUG)
-async def generate_go_external_package_targets(
-    request: GenerateGoExternalPackageTargetsRequest,
+@rule(
+    desc=(
+        "Generate `go_first_party_package` and `go_third_party_package` targets from `go_mod` "
+        "target"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def generate_targets_from_go_mod(
+    request: GenerateTargetsFromGoModRequest, files_not_found_behavior: FilesNotFoundBehavior
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
-    all_pkg_import_paths = await MultiGet(
+    go_mod_info, go_paths = await MultiGet(
+        Get(GoModInfo, GoModInfoRequest(generator_addr)),
         Get(
-            ExternalModulePkgImportPaths,
-            ExternalModulePkgImportPathsRequest(
+            Paths,
+            PathGlobs,
+            request.generator[GoModPackageSourcesField].path_globs(files_not_found_behavior),
+        ),
+    )
+    all_module_info = await MultiGet(
+        Get(
+            ThirdPartyModuleInfo,
+            ThirdPartyModuleInfoRequest(
                 module_path=module_descriptor.path,
                 version=module_descriptor.version,
                 go_mod_stripped_digest=go_mod_info.stripped_digest,
@@ -256,42 +205,127 @@ async def generate_go_external_package_targets(
         for module_descriptor in go_mod_info.modules
     )
 
-    def create_tgt(
-        module_descriptor: ModuleDescriptor, pkg_import_path: str
-    ) -> GoExternalPackageTarget:
-        return GoExternalPackageTarget(
+    dir_to_filenames = group_by_dir(go_paths.files)
+    matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
+
+    def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
+        subpath = fast_relpath(dir, generator_addr.spec_path)
+        import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
+
+        return GoFirstPartyPackageTarget(
             {
-                GoExternalModulePathField.alias: module_descriptor.path,
-                GoExternalModuleVersionField.alias: module_descriptor.version,
-                GoExternalPackageImportPathField.alias: pkg_import_path,
+                GoImportPathField.alias: import_path,
+                GoFirstPartyPackageSubpathField.alias: subpath,
+                GoFirstPartyPackageSourcesField.alias: tuple(
+                    sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
+                ),
             },
-            # E.g. `src/go:mod#github.com/google/uuid`.
-            Address(
-                generator_addr.spec_path,
-                target_name=generator_addr.target_name,
-                generated_name=pkg_import_path,
-            ),
+            # E.g. `src/go:mod#./subdir`.
+            generator_addr.create_generated(f"./{subpath}"),
         )
 
-    return GeneratedTargets(
-        request.generator,
-        (
-            create_tgt(module_descriptor, pkg_import_path)
-            for module_descriptor, pkg_import_paths in zip(
-                go_mod_info.modules, all_pkg_import_paths
-            )
-            for pkg_import_path in pkg_import_paths
-        ),
+    first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
+
+    def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
+        return GoThirdPartyPackageTarget(
+            {
+                GoThirdPartyModulePathField.alias: pkg_info.module_path,
+                GoThirdPartyModuleVersionField.alias: pkg_info.version,
+                GoImportPathField.alias: pkg_info.import_path,
+            },
+            # E.g. `src/go:mod#github.com/google/uuid`.
+            generator_addr.create_generated(pkg_info.import_path),
+        )
+
+    third_party_pkgs = (
+        create_third_party_package_tgt(pkg_info)
+        for module_info in all_module_info
+        for pkg_info in module_info.values()
     )
+    return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
+
+
+# -----------------------------------------------------------------------------------------------
+# The `main` field for `go_binary`
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def determine_main_pkg_for_go_binary(
+    request: GoBinaryMainPackageRequest,
+) -> GoBinaryMainPackage:
+    addr = request.field.address
+    if request.field.value:
+        wrapped_specified_tgt = await Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(request.field.value, relative_to=addr.spec_path),
+        )
+        if not wrapped_specified_tgt.target.has_field(GoFirstPartyPackageSourcesField):
+            raise InvalidFieldException(
+                f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
+                "a `go_first_party_package` target, but was the address for a "
+                f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
+                "Hint: you should normally not specify this field so that Pants will find the "
+                "`go_first_party_package` target for you. (Pants generates "
+                "`go_first_party_package` targets based on the `go_mod` target)."
+            )
+        return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
+
+    candidate_targets = await Get(Targets, AddressSpecs([AscendantAddresses(addr.spec_path)]))
+    relevant_pkg_targets = [
+        tgt
+        for tgt in candidate_targets
+        if (
+            tgt.has_field(GoFirstPartyPackageSubpathField)
+            and tgt[GoFirstPartyPackageSubpathField].full_dir_path == addr.spec_path
+        )
+    ]
+    if len(relevant_pkg_targets) == 1:
+        return GoBinaryMainPackage(relevant_pkg_targets[0].address)
+
+    wrapped_tgt = await Get(WrappedTarget, Address, addr)
+    alias = wrapped_tgt.target.alias
+    if not relevant_pkg_targets:
+        raise ResolveError(
+            f"The `{alias}` target {addr} requires that there is a `go_first_party_package` "
+            f"target for its directory {addr.spec_path}, but none were found.\n\n"
+            "Have you added a `go_mod` target (which will generate `go_first_party_package` "
+            "targets)?"
+        )
+    raise ResolveError(
+        f"There are multiple `go_first_party_package` targets for the same directory of the "
+        "`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
+        "package.\n\n"
+        f"To fix, please either set the `main` field for `{addr} or remove these "
+        "`go_first_party_package` targets so that only one remains: "
+        f"{sorted(tgt.address.spec for tgt in relevant_pkg_targets)}"
+    )
+
+
+class InjectGoBinaryMainDependencyRequest(InjectDependenciesRequest):
+    inject_for = GoBinaryDependenciesField
+
+
+@rule
+async def inject_go_binary_main_dependency(
+    request: InjectGoBinaryMainDependencyRequest,
+) -> InjectedDependencies:
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    main_pkg = await Get(
+        GoBinaryMainPackage,
+        GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),
+    )
+    return InjectedDependencies([main_pkg.address])
 
 
 def rules():
     return (
         *collect_rules(),
-        *go_pkg.rules(),
+        *first_party_pkg.rules(),
         *import_analysis.rules(),
-        UnionRule(InjectDependenciesRequest, InjectGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
-        UnionRule(InjectDependenciesRequest, InjectGoExternalPackageDependenciesRequest),
-        UnionRule(GenerateTargetsRequest, GenerateGoExternalPackageTargetsRequest),
+        UnionRule(InjectDependenciesRequest, InjectGoThirdPartyPackageDependenciesRequest),
+        UnionRule(InjectDependenciesRequest, InjectGoBinaryMainDependencyRequest),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
     )

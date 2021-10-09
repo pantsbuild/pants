@@ -19,12 +19,12 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
 )
 from pants.backend.java.target_types import JavaSourceField, JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as java_target_rules
-from pants.backend.java.util_rules import rules as java_util_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.process import rules as process_rules
 from pants.engine.target import Targets
+from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.testutil import maybe_skip_jdk_test

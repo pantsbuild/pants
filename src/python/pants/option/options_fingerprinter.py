@@ -150,7 +150,7 @@ class OptionsFingerprinter:
         for k, v in option_val.items():
             for sub_value in sorted(v.split(",")):
                 if os.path.isfile(sub_value):
-                    with open(sub_value, "r") as f:
+                    with open(sub_value) as f:
                         final[k].append(f.read())
                 else:
                     final[k].append(sub_value)

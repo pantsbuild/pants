@@ -1037,6 +1037,20 @@ class SetupPyCommandsField(StringSequenceField):
     )
 
 
+class GenerateSetupField(TriBoolField):
+    alias = "generate_setup"
+    required = False
+    # The default behavior if this field is unspecified is controlled by the
+    # --generate-setup-default option in the setup-py-generation scope.
+    default = None
+
+    help = (
+        "Whether to generate setup information for this distribution, based on analyzing "
+        "sources and dependencies. Set to False to use existing setup information, such as "
+        "existing setup.py, setup.cfg, pyproject.toml files or similar."
+    )
+
+
 class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
@@ -1044,6 +1058,7 @@ class PythonDistribution(Target):
         PythonDistributionDependencies,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
+        GenerateSetupField,
         WheelField,
         SDistField,
         WheelConfigSettingsField,

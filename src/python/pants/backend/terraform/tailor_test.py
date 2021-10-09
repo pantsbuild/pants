@@ -7,7 +7,10 @@ from pants.backend.terraform.tailor import (
     find_disjoint_longest_common_prefixes,
 )
 from pants.backend.terraform.tailor import rules as terraform_tailor_rules
-from pants.backend.terraform.target_types import TerraformModule, TerraformModules
+from pants.backend.terraform.target_types import (
+    TerraformModulesGeneratorTarget,
+    TerraformModuleTarget,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -28,8 +31,8 @@ def test_find_putative_targets() -> None:
             QueryRule(AllOwnedSources, ()),
         ],
         target_types=[
-            TerraformModule,
-            TerraformModules,
+            TerraformModuleTarget,
+            TerraformModulesGeneratorTarget,
         ],
     )
     rule_runner.write_files(
@@ -65,19 +68,19 @@ def test_find_putative_targets() -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    TerraformModules,
+                    TerraformModulesGeneratorTarget,
                     "prod/terraform",
                     "tf_mods",
                     ("prod/terraform/**/*.tf",),
                 ),
                 PutativeTarget.for_target_type(
-                    TerraformModules,
+                    TerraformModulesGeneratorTarget,
                     "service1/src/terraform",
                     "tf_mods",
                     ("service1/src/terraform/**/*.tf",),
                 ),
                 PutativeTarget.for_target_type(
-                    TerraformModules,
+                    TerraformModulesGeneratorTarget,
                     "service2/src/terraform",
                     "tf_mods",
                     ("service2/src/terraform/**/*.tf",),

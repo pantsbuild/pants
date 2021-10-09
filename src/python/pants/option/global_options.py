@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -334,8 +334,8 @@ class ExecutionOptions:
     remote_cache_rpc_concurrency: int
 
     remote_execution_address: str | None
-    remote_execution_extra_platform_properties: List[str]
-    remote_execution_headers: Dict[str, str]
+    remote_execution_extra_platform_properties: list[str]
+    remote_execution_headers: dict[str, str]
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
 
@@ -1556,7 +1556,7 @@ class GlobalOptions(Subsystem):
     @staticmethod
     def compute_pantsd_invalidation_globs(
         buildroot: str, bootstrap_options: OptionValueContainer
-    ) -> Tuple[str, ...]:
+    ) -> tuple[str, ...]:
         """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those

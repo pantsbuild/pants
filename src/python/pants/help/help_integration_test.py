@@ -53,8 +53,8 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-            archive
-            -------
+            `archive` target
+            ----------------
 
             A ZIP or TAR file containing loose files and code packages.
 

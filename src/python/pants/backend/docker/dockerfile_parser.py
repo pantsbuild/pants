@@ -6,6 +6,7 @@ from __future__ import annotations
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Generator
 
 from pants.backend.docker.target_types import DockerImageSources
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
@@ -18,6 +19,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 
 _DOCKERFILE_SANDBOX_TOOL = "dockerfile_wrapper_script.py"
 
@@ -87,7 +89,7 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
 @dataclass(frozen=True)
 class DockerfileParseRequest:
     sources_digest: Digest
-    paths: tuple[str, ...]
+    args: tuple[str, ...]
 
 
 @rule
@@ -98,9 +100,10 @@ async def setup_process_for_parse_dockerfile(
         Process,
         VenvPexProcess(
             parser.pex,
-            argv=request.paths,
-            input_digest=request.sources_digest,
+            argv=request.args,
             description="Parse Dockerfile.",
+            input_digest=request.sources_digest,
+            level=LogLevel.DEBUG,
         ),
     )
     return process
@@ -109,6 +112,17 @@ async def setup_process_for_parse_dockerfile(
 @dataclass(frozen=True)
 class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
+    version_tags: tuple[str, ...] = ()
+
+
+def split_iterable(
+    sep: str, obj: list[str] | tuple[str, ...]
+) -> Generator[tuple[str, ...], None, None]:
+    while sep in obj:
+        idx = obj.index(sep)
+        yield tuple(obj[:idx])
+        obj = obj[idx + 1 :]
+    yield tuple(obj)
 
 
 @rule
@@ -116,13 +130,17 @@ async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources))
     result = await Get(
         ProcessResult,
-        DockerfileParseRequest(hydrated_sources.snapshot.digest, hydrated_sources.snapshot.files),
+        DockerfileParseRequest(
+            hydrated_sources.snapshot.digest,
+            ("version-tags,putative-targets", *hydrated_sources.snapshot.files),
+        ),
     )
 
-    putative_target_addresses = [line for line in result.stdout.decode("utf-8").split("\n") if line]
-
+    output = result.stdout.decode("utf-8").strip().split("\n")
+    version_tags, putative_targets = split_iterable("---", output)
     return DockerfileInfo(
-        putative_target_addresses=tuple(putative_target_addresses),
+        putative_target_addresses=putative_targets,
+        version_tags=version_tags,
     )
 
 

@@ -284,8 +284,9 @@ impl super::CommandRunner for CommandRunner {
             // that the temporary directory will no longer be automatically deleted when dropped.
             let preserved_path = workdir.into_path();
             info!(
-              "preserving local process execution dir `{:?}` for {:?}",
-              preserved_path, req.description
+              "Preserving local process execution dir {} for {:?}",
+              preserved_path.display(),
+              req.description
             );
             (preserved_path, None)
           }

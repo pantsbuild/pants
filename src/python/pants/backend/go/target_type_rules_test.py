@@ -1,26 +1,37 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
+
+from __future__ import annotations
+
+import os.path
+from textwrap import dedent
 
 import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import (
-    GenerateGoExternalPackageTargetsRequest,
+    GenerateTargetsFromGoModRequest,
     InferGoPackageDependenciesRequest,
+    InjectGoBinaryMainDependencyRequest,
 )
 from pants.backend.go.target_types import (
-    GoExternalModulePathField,
-    GoExternalModuleVersionField,
-    GoExternalPackageImportPathField,
-    GoExternalPackageTarget,
-    GoModSourcesField,
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
+    GoBinaryTarget,
+    GoFirstPartyPackageSourcesField,
+    GoFirstPartyPackageSubpathField,
+    GoFirstPartyPackageTarget,
+    GoImportPathField,
     GoModTarget,
-    GoPackage,
-    GoPackageSources,
+    GoThirdPartyModulePathField,
+    GoThirdPartyModuleVersionField,
+    GoThirdPartyPackageTarget,
 )
-from pants.backend.go.util_rules import external_module, go_mod, go_pkg, sdk
+from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
@@ -28,11 +39,16 @@ from pants.engine.target import (
     DependenciesRequest,
     GeneratedTargets,
     InferredDependencies,
-    Target,
-    Targets,
+    InjectedDependencies,
+    InvalidFieldException,
+    InvalidTargetException,
 )
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
+
+# -----------------------------------------------------------------------------------------------
+# Dependency inference
+# -----------------------------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -40,45 +56,18 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_mod.rules(),
-            *go_pkg.rules(),
-            *external_module.rules(),
+            *first_party_pkg.rules(),
+            *third_party_pkg.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             QueryRule(Addresses, [DependenciesRequest]),
+            QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
+            QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
         ],
-        target_types=[GoPackage, GoModTarget, GoExternalPackageTarget],
+        target_types=[GoModTarget, GoBinaryTarget, GenericTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
-
-
-def assert_go_mod_address(rule_runner: RuleRunner, target: Target, expected_address: Address):
-    addresses = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
-    targets = rule_runner.request(Targets, [addresses])
-    go_mod_targets = [tgt for tgt in targets if tgt.has_field(GoModSourcesField)]
-    assert len(go_mod_targets) == 1
-    assert go_mod_targets[0].address == expected_address
-
-
-def test_go_package_dependency_injection(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod()\n",
-            "foo/go.mod": "module foo\n",
-            "foo/go.sum": "",
-            "foo/pkg/BUILD": "go_package()\n",
-            "foo/pkg/foo.go": "package pkg\n",
-            "foo/bar/BUILD": "go_mod()\ngo_package(name='pkg')\n",
-            "foo/bar/go.mod": "module bar\n",
-            "foo/bar/src.go": "package bar\n",
-        }
-    )
-
-    target = rule_runner.get_target(Address("foo/pkg", target_name="pkg"))
-    assert_go_mod_address(rule_runner, target, Address("foo"))
-
-    target = rule_runner.get_target(Address("foo/bar", target_name="pkg"))
-    assert_go_mod_address(rule_runner, target, Address("foo/bar"))
 
 
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
@@ -86,7 +75,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         (
             {
                 "foo/BUILD": "go_mod()",
-                "foo/go.mod": textwrap.dedent(
+                "foo/go.mod": dedent(
                     """\
                     module go.example.com/foo
                     go 1.17
@@ -94,7 +83,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     require github.com/google/go-cmp v0.4.0
                     """
                 ),
-                "foo/go.sum": textwrap.dedent(
+                "foo/go.sum": dedent(
                     """\
                     github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
                     github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
@@ -102,8 +91,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                     """
                 ),
-                "foo/pkg/BUILD": "go_package()\n",
-                "foo/pkg/foo.go": textwrap.dedent(
+                "foo/pkg/foo.go": dedent(
                     """\
                     package pkg
                     import "github.com/google/go-cmp/cmp"
@@ -112,8 +100,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     }
                     """
                 ),
-                "foo/cmd/BUILD": "go_package()\n",
-                "foo/cmd/main.go": textwrap.dedent(
+                "foo/cmd/main.go": dedent(
                     """\
                     package main
                     import (
@@ -127,31 +114,33 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
             }
         )
     )
-    target1 = rule_runner.get_target(Address("foo/cmd"))
-    inferred_deps_1 = rule_runner.request(
-        InferredDependencies, [InferGoPackageDependenciesRequest(target1[GoPackageSources])]
+    tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
+    inferred_deps1 = rule_runner.request(
+        InferredDependencies,
+        [InferGoPackageDependenciesRequest(tgt1[GoFirstPartyPackageSourcesField])],
     )
-    assert inferred_deps_1.dependencies == FrozenOrderedSet([Address("foo/pkg")])
+    assert inferred_deps1.dependencies == FrozenOrderedSet([Address("foo", generated_name="./pkg")])
 
-    target2 = rule_runner.get_target(Address("foo/pkg"))
-    inferred_deps_2 = rule_runner.request(
-        InferredDependencies, [InferGoPackageDependenciesRequest(target2[GoPackageSources])]
+    tgt2 = rule_runner.get_target(Address("foo", generated_name="./pkg"))
+    inferred_deps2 = rule_runner.request(
+        InferredDependencies,
+        [InferGoPackageDependenciesRequest(tgt2[GoFirstPartyPackageSourcesField])],
     )
-    assert inferred_deps_2.dependencies == FrozenOrderedSet(
+    assert inferred_deps2.dependencies == FrozenOrderedSet(
         [Address("foo", generated_name="github.com/google/go-cmp/cmp")]
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# Generate `_go_external_package` targets
+# Generate package targets from `go_mod`
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
+def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/go/BUILD": "go_mod()\n",
-            "src/go/go.mod": textwrap.dedent(
+            "src/go/go.mod": dedent(
                 """\
                 module example.com/src/go
                 go 1.17
@@ -162,7 +151,7 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/go/go.sum": textwrap.dedent(
+            "src/go/go.sum": dedent(
                 """\
                 github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
                 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
@@ -172,19 +161,35 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                 """
             ),
+            "src/go/hello.go": "",
+            "src/go/subdir/f.go": "",
+            "src/go/subdir/f2.go": "",
+            "src/go/another_dir/subdir/f.go": "",
         }
     )
     generator = rule_runner.get_target(Address("src/go"))
-    generated = rule_runner.request(
-        GeneratedTargets, [GenerateGoExternalPackageTargetsRequest(generator)]
-    )
+    generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
-    def gen_tgt(mod_path: str, version: str, import_path: str) -> GoExternalPackageTarget:
-        return GoExternalPackageTarget(
+    def gen_first_party_tgt(rel_dir: str, sources: list[str]) -> GoFirstPartyPackageTarget:
+        return GoFirstPartyPackageTarget(
             {
-                GoExternalModulePathField.alias: mod_path,
-                GoExternalModuleVersionField.alias: version,
-                GoExternalPackageImportPathField.alias: import_path,
+                GoImportPathField.alias: (
+                    os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
+                ),
+                GoFirstPartyPackageSubpathField.alias: rel_dir,
+                GoFirstPartyPackageSourcesField.alias: tuple(sources),
+            },
+            Address("src/go", generated_name=f"./{rel_dir}"),
+        )
+
+    def gen_third_party_tgt(
+        mod_path: str, version: str, import_path: str
+    ) -> GoThirdPartyPackageTarget:
+        return GoThirdPartyPackageTarget(
+            {
+                GoImportPathField.alias: import_path,
+                GoThirdPartyModulePathField.alias: mod_path,
+                GoThirdPartyModuleVersionField.alias: version,
             },
             Address("src/go", generated_name=import_path),
         )
@@ -192,37 +197,44 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
     expected = GeneratedTargets(
         generator,
         {
-            gen_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"),
-            gen_tgt("github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"),
-            gen_tgt(
+            gen_first_party_tgt("", ["hello.go"]),
+            gen_first_party_tgt("subdir", ["subdir/f.go", "subdir/f2.go"]),
+            gen_first_party_tgt("another_dir/subdir", ["another_dir/subdir/f.go"]),
+            gen_third_party_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
+            gen_third_party_tgt(
+                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"
+            ),
+            gen_third_party_tgt(
+                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"
+            ),
+            gen_third_party_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/diff"
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/flags"
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/function",
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/testprotos",
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/teststructs",
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/value"
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "golang.org/x/xerrors", "v0.0.0-20191204190536-9bdfabe68543", "golang.org/x/xerrors"
             ),
-            gen_tgt(
+            gen_third_party_tgt(
                 "golang.org/x/xerrors",
                 "v0.0.0-20191204190536-9bdfabe68543",
                 "golang.org/x/xerrors/internal",
@@ -230,4 +242,88 @@ def test_generate_go_external_package_targets(rule_runner: RuleRunner) -> None:
         },
     )
     assert list(generated.keys()) == list(expected.keys())
-    assert generated == expected
+    for addr, tgt in generated.items():
+        assert tgt == expected[addr]
+
+
+def test_package_targets_cannot_be_manually_created() -> None:
+    with pytest.raises(InvalidTargetException):
+        GoFirstPartyPackageTarget(
+            {GoImportPathField.alias: "foo", GoFirstPartyPackageSubpathField.alias: "foo"},
+            Address("foo"),
+        )
+    with pytest.raises(InvalidTargetException):
+        GoThirdPartyPackageTarget(
+            {
+                GoImportPathField.alias: "foo",
+                GoThirdPartyModulePathField.alias: "foo",
+                GoThirdPartyModuleVersionField.alias: "foo",
+            },
+            Address("foo"),
+        )
+
+
+# -----------------------------------------------------------------------------------------------
+# The `main` field for `go_binary`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/foo
+                go 1.17
+                """
+            ),
+            "BUILD": "go_mod(name='mod')",
+            "explicit/f.go": "",
+            "explicit/BUILD": "go_binary(main='//:mod#./explicit')",
+            "inferred/f.go": "",
+            "inferred/BUILD": "go_binary()",
+            "ambiguous/f.go": "",
+            "ambiguous/go.mod": dedent(
+                """\
+                module example.com/ambiguous
+                go 1.17
+                """
+            ),
+            "ambiguous/BUILD": "go_binary()",
+            # Note there are no `.go` files in this dir, so no package targets will be created.
+            "missing/BUILD": "go_binary()",
+            "explicit_wrong_type/BUILD": dedent(
+                """\
+                target(name='dep')
+                go_binary(main=':dep')
+                """
+            ),
+        }
+    )
+
+    def get_main(addr: Address) -> Address:
+        tgt = rule_runner.get_target(addr)
+        main_addr = rule_runner.request(
+            GoBinaryMainPackage, [GoBinaryMainPackageRequest(tgt[GoBinaryMainPackageField])]
+        ).address
+        injected_addresses = rule_runner.request(
+            InjectedDependencies, [InjectGoBinaryMainDependencyRequest(tgt[Dependencies])]
+        )
+        assert [main_addr] == list(injected_addresses)
+        return main_addr
+
+    assert get_main(Address("explicit")) == Address(
+        "", target_name="mod", generated_name="./explicit"
+    )
+    assert get_main(Address("inferred")) == Address(
+        "", target_name="mod", generated_name="./inferred"
+    )
+
+    with engine_error(ResolveError, contains="none were found"):
+        get_main(Address("missing"))
+    with engine_error(ResolveError, contains="There are multiple `go_first_party_package` targets"):
+        get_main(Address("ambiguous"))
+    with engine_error(
+        InvalidFieldException, contains="must point to a `go_first_party_package` target"
+    ):
+        get_main(Address("explicit_wrong_type"))

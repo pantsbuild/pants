@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -12,6 +13,7 @@ from pants.engine.target import (
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
+    StringField,
     Target,
     generate_file_level_targets,
 )
@@ -141,6 +143,34 @@ async def generate_targets_from_java_sources(
         union_membership,
         # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=True,
+    )
+
+
+# Things for JARs
+#
+
+
+class JvmMainClassName(StringField):
+    alias = "main"
+    required = True
+    help = (
+        "`.`-separated name of the JVM class containing the `main()` method to be called when "
+        "executing this JAR."
+    )
+
+
+class DeployJar(Target):
+    alias = "deploy_jar"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        OutputPathField,
+        JvmMainClassName,
+    )
+    help = (
+        "A `jar` file that contains the compiled source code along with its dependency class "
+        "files, where the compiled class files from all dependency JARs, along with first-party "
+        "class files, exist in a common directory structure."
     )
 
 

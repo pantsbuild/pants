@@ -7,8 +7,13 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.docker_build_context import DockerBuildContext, DockerBuildContextRequest
+from pants.backend.docker.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextRequest,
+    DockerVersionContextValue,
+)
 from pants.backend.docker.docker_build_context import rules as context_rules
+from pants.backend.docker.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerImage
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
@@ -21,15 +26,17 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *context_rules(),
             *core_target_types_rules(),
             *package_pex_binary.rules(),
+            *parser_rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
@@ -37,12 +44,15 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[DockerImage, Files, PexBinary],
     )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    return rule_runner
 
 
 def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
     expected_files: list[str],
+    expected_version_context: FrozenDict[str, DockerVersionContextValue] | None = None,
 ) -> None:
     context = rule_runner.request(
         DockerBuildContext,
@@ -56,6 +66,8 @@ def assert_build_context(
 
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
+    if expected_version_context is not None:
+        assert expected_version_context == context.version_context
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
@@ -159,7 +171,6 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
 def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
     # This test is here to ensure that we catch if there is any change in the generated path where
     # built pex binaries go, as we rely on that for dependency inference in the Dockerfile.
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.write_files(
         {
             "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
@@ -173,4 +184,35 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker", target_name="docker"),
         expected_files=["src/docker/Dockerfile", "src.python.proj.cli/bin.pex"],
+    )
+
+
+def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": """docker_image()""",
+            "src/docker/Dockerfile": dedent(
+                """\
+                FROM python:3.8
+                FROM alpine as interim
+                FROM interim
+                FROM scratch:1-1 as output
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile"],
+        expected_version_context=FrozenDict(
+            {
+                "baseimage": DockerVersionContextValue({"tag": "3.8"}),
+                "stage0": DockerVersionContextValue({"tag": "3.8"}),
+                "interim": DockerVersionContextValue({"tag": "latest"}),
+                "stage2": DockerVersionContextValue({"tag": "latest"}),
+                "output": DockerVersionContextValue({"tag": "1-1"}),
+            }
+        ),
     )

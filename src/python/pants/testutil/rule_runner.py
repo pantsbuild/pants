@@ -14,7 +14,7 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -27,7 +27,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
@@ -73,6 +73,46 @@ def logging(func):
             return func(*args, **kwargs)
 
     return wrapper
+
+
+@contextmanager
+def engine_error(
+    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+) -> Iterator[None]:
+    """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
+    is expected.
+
+    Use like this:
+
+        with engine_error(ValueError, contains="foo"):
+            rule_runner.request(OutputType, [input])
+
+    Will raise AssertionError if no ExecutionError occurred.
+    """
+    try:
+        yield
+    except ExecutionError as exec_error:
+        if not len(exec_error.wrapped_exceptions) == 1:
+            formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
+            raise ValueError(
+                "Multiple underlying exceptions, but this helper function expected only one. "
+                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
+                "`exc.value.wrapped_exceptions`.\n\n"
+                f"Errors: {formatted_errors}"
+            )
+        underlying = exec_error.wrapped_exceptions[0]
+        if not isinstance(underlying, expected_underlying_exception):
+            raise AssertionError(
+                "ExecutionError occurred as expected, but the underlying exception had type "
+                f"{type(underlying)} rather than the expected type "
+                f"{expected_underlying_exception}:\n\n{underlying}"
+            )
+        if contains is not None and contains not in str(underlying):
+            raise AssertionError(
+                "Expected value not found in exception.\n"
+                f"expected: {contains}\n\n"
+                f"exception: {underlying}"
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -225,7 +265,7 @@ class RuleRunner:
         return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
-    def target_types(self) -> Tuple[Type[Target], ...]:
+    def target_types(self) -> tuple[type[Target], ...]:
         return self.build_config.target_types
 
     @property
@@ -237,7 +277,7 @@ class RuleRunner:
         """Mutates this RuleRunner to begin a new Session with the same Scheduler."""
         self.scheduler = self.scheduler.scheduler.new_session(build_id)
 
-    def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
+    def request(self, output_type: type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
             self.scheduler.product_request(output_type, [Params(*inputs)])
         )
@@ -245,7 +285,7 @@ class RuleRunner:
 
     def run_goal_rule(
         self,
-        goal: Type[Goal],
+        goal: type[Goal],
         *,
         global_args: Iterable[str] | None = None,
         args: Iterable[str] | None = None,
@@ -439,8 +479,8 @@ class RuleRunner:
 #  `Callable[[InputType], OutputType]`.
 @dataclass(frozen=True)
 class MockGet:
-    output_type: Type
-    input_type: Type
+    output_type: type
+    input_type: type
     mock: Callable[[Any], Any]
 
 
@@ -552,12 +592,12 @@ def run_rule_with_mocks(
 @contextmanager
 def stdin_context(content: bytes | str | None = None):
     if content is None:
-        yield open("/dev/null", "r")
+        yield open("/dev/null")
     else:
         with temporary_file(binary_mode=isinstance(content, bytes)) as stdin_file:
             stdin_file.write(content)
             stdin_file.close()
-            yield open(stdin_file.name, "r")
+            yield open(stdin_file.name)
 
 
 @contextmanager
@@ -565,7 +605,7 @@ def mock_console(
     options_bootstrapper: OptionsBootstrapper,
     *,
     stdin_content: bytes | str | None = None,
-) -> Iterator[Tuple[Console, StdioReader]]:
+) -> Iterator[tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     colors = (
         options_bootstrapper.full_options_for_scopes(

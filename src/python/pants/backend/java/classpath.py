@@ -7,16 +7,11 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
-from pants.backend.java.compile.javac import CompiledClassfiles, CompileJavaSourceRequest
-from pants.engine.addresses import Addresses
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import CoarsenedTargets, Targets
+from pants.jvm.compile import CompiledClassfiles
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
@@ -63,16 +58,10 @@ class Classpath:
 
 
 @rule
-async def classpath(addresses: Addresses) -> Classpath:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(t.address for t in transitive_targets.closure)
-    )
+async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
+    targets = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
 
-    lockfile = await Get(
-        CoursierResolvedLockfile,
-        CoursierLockfileForTargetRequest(Targets(transitive_targets.closure)),
-    )
+    lockfile = await Get(CoursierResolvedLockfile, CoursierLockfileForTargetRequest(targets))
     materialized_classpath = await Get(
         MaterializedClasspath,
         MaterializedClasspathRequest(
@@ -81,7 +70,8 @@ async def classpath(addresses: Addresses) -> Classpath:
         ),
     )
     transitive_user_classfiles = await MultiGet(
-        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t)) for t in coarsened_targets
+        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t))
+        for t in coarsened_targets.closure()
     )
     merged_transitive_user_classfiles_digest = await Get(
         Digest, MergeDigests(classfiles.digest for classfiles in transitive_user_classfiles)

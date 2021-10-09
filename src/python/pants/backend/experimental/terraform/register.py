@@ -5,13 +5,16 @@ from pants.backend.terraform import dependency_inference, style, tailor, target_
 from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
 from pants.backend.terraform.lint.validate.validate import rules as validate_rules
-from pants.backend.terraform.target_types import TerraformModule, TerraformModules
+from pants.backend.terraform.target_types import (
+    TerraformModulesGeneratorTarget,
+    TerraformModuleTarget,
+)
 from pants.backend.terraform.target_types import rules as target_types_rules
 from pants.engine.rules import collect_rules
 
 
 def target_types():
-    return [TerraformModule, TerraformModules]
+    return [TerraformModuleTarget, TerraformModulesGeneratorTarget]
 
 
 def rules():

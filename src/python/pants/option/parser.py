@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, DefaultDict, Dict, Iterable, List, Mapping, Set, Tuple, Type
+from typing import Any, DefaultDict, Iterable, Mapping
 
 import yaml
 
@@ -59,7 +59,7 @@ from pants.util.meta import frozen_after_init
 
 @dataclass(frozen=True)
 class OptionValueHistory:
-    ranked_values: Tuple[RankedValue]
+    ranked_values: tuple[RankedValue]
 
     @property
     def final_value(self) -> RankedValue:
@@ -123,13 +123,13 @@ class Parser:
         self._scope = self._scope_info.scope
 
         # All option args registered with this parser.  Used to prevent conflicts.
-        self._known_args: Set[str] = set()
+        self._known_args: set[str] = set()
 
         # List of (args, kwargs) registration pairs, exactly as captured at registration time.
-        self._option_registrations: List[Tuple[Tuple[str, ...], Dict[str, Any]]] = []
+        self._option_registrations: list[tuple[tuple[str, ...], dict[str, Any]]] = []
 
         # Map of dest -> history.
-        self._history: Dict[str, OptionValueHistory] = {}
+        self._history: dict[str, OptionValueHistory] = {}
 
     @property
     def scope_info(self) -> ScopeInfo:
@@ -145,16 +145,16 @@ class Parser:
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class ParseArgsRequest:
-        flag_value_map: Dict[str, List[Any]]
+        flag_value_map: dict[str, list[Any]]
         namespace: OptionValueContainerBuilder
-        passthrough_args: List[str]
+        passthrough_args: list[str]
         allow_unknown_flags: bool
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainerBuilder,
-            passthrough_args: List[str],
+            passthrough_args: list[str],
             allow_unknown_flags: bool,
         ) -> None:
             """
@@ -199,7 +199,7 @@ class Parser:
         flag_value_map = parse_args_request.flag_value_map
         namespace = parse_args_request.namespace
 
-        mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
+        mutex_map: DefaultDict[str, list[str]] = defaultdict(list)
         for args, kwargs in self._option_registrations:
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
@@ -386,7 +386,7 @@ class Parser:
         """Validate option registration arguments."""
 
         def error(
-            exception_type: Type[RegistrationError],
+            exception_type: type[RegistrationError],
             arg_name: str | None = None,
             **msg_kwargs,
         ) -> None:
@@ -562,7 +562,7 @@ class Parser:
                 else:
                     fromfile = val_or_str[1:]
                     try:
-                        with open(fromfile, "r") as fp:
+                        with open(fromfile) as fp:
                             s = fp.read().strip()
                             if fromfile.endswith(".json"):
                                 return json.loads(s)
@@ -570,7 +570,7 @@ class Parser:
                                 return yaml.safe_load(s)
                             else:
                                 return s
-                    except (IOError, ValueError, yaml.YAMLError) as e:
+                    except (OSError, ValueError, yaml.YAMLError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"
                         )
@@ -650,14 +650,14 @@ class Parser:
         # instances of RankedValue (so none will be None, although they may wrap a None value).
         ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
-        def group(value_component_type, process_val_func) -> List[RankedValue]:
+        def group(value_component_type, process_val_func) -> list[RankedValue]:
             # We group any values that are merged together, so that the history can reflect
             # merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
             # and then replace it with [d, e], the history will contain:
             #   - [d, e] (from command-line flag)
             #   - [a, b, c] (from env var, from config)
             # And similarly for dicts.
-            grouped: List[List[RankedValue]] = [[]]
+            grouped: list[list[RankedValue]] = [[]]
             for ranked_val in ranked_vals:
                 if ranked_val.value and ranked_val.value.action == value_component_type.REPLACE:
                     grouped.append([])

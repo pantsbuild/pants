@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Mapping
 
 from pants.engine.fs import Digest
 from pants.engine.process import (
@@ -27,11 +27,21 @@ class DockerBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
     def build_image(
-        self, tags: tuple[str, ...], digest: Digest, dockerfile: Optional[str] = None
+        self,
+        tags: tuple[str, ...],
+        digest: Digest,
+        dockerfile: str | None = None,
+        build_args: tuple[str, ...] = (),
+        env: Mapping[str, str] | None = None,
     ) -> Process:
         args = [self.path, "build"]
+
         for tag in tags:
             args.extend(["-t", tag])
+
+        for build_arg in build_args:
+            args.extend(["--build-arg", build_arg])
+
         if dockerfile:
             args.extend(["-f", dockerfile])
 
@@ -40,11 +50,20 @@ class DockerBinary(BinaryPath):
 
         return Process(
             argv=tuple(args),
-            input_digest=digest,
             description=(
                 f"Building docker image {tags[0]}"
                 + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else ".")
             ),
+            env=env,
+            input_digest=digest,
+        )
+
+    def push_image(self, tags: tuple[str, ...]) -> Process | None:
+        if not tags:
+            return None
+
+        return Process(
+            argv=(self.path, "push", *tags), description="Pushing docker image {tags[0]}"
         )
 
 
@@ -65,6 +84,11 @@ async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
     if not first_path:
         raise BinaryNotFoundError.from_request(request, rationale="interact with the docker daemon")
     return DockerBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+async def get_docker() -> DockerBinary:
+    return await Get(DockerBinary, DockerBinaryRequest())
 
 
 def rules():

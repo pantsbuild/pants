@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
 from hashlib import sha1
-from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Sequence, Union, cast
 
 import toml
 from typing_extensions import Protocol
@@ -96,7 +96,7 @@ class Config(ABC):
 
     @classmethod
     def _parse_toml(
-        cls, config_content: str, normalized_seed_values: Dict[str, str]
+        cls, config_content: str, normalized_seed_values: dict[str, str]
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = cast(Dict[str, Any], toml.loads(config_content))
@@ -107,7 +107,7 @@ class Config(ABC):
         return _ConfigValues(toml_values)
 
     @staticmethod
-    def _determine_seed_values(*, seed_values: SeedValues | None = None) -> Dict[str, str]:
+    def _determine_seed_values(*, seed_values: SeedValues | None = None) -> dict[str, str]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
         This sets up those defaults and checks if the user overrode any of the values.
@@ -115,7 +115,7 @@ class Config(ABC):
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
 
-        all_seed_values: Dict[str, str] = {
+        all_seed_values: dict[str, str] = {
             "buildroot": buildroot,
             "homedir": os.path.expanduser("~"),
             "user": getpass.getuser(),
@@ -152,15 +152,15 @@ class Config(ABC):
         )
 
     @abstractmethod
-    def configs(self) -> Sequence["_SingleFileConfig"]:
+    def configs(self) -> Sequence[_SingleFileConfig]:
         """Returns the underlying single-file configs represented by this object."""
 
     @abstractmethod
-    def sources(self) -> List[str]:
+    def sources(self) -> list[str]:
         """Returns the sources of this config as a list of filenames."""
 
     @abstractmethod
-    def sections(self) -> List[str]:
+    def sections(self) -> list[str]:
         """Returns the sections in this config (not including DEFAULT)."""
 
     @abstractmethod
@@ -194,7 +194,7 @@ _TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 class _ConfigValues:
     """The parsed contents of a TOML config file."""
 
-    values: Dict[str, Any]
+    values: dict[str, Any]
 
     @staticmethod
     def _is_an_option(option_value: _TomlValue | dict) -> bool:
@@ -212,7 +212,7 @@ class _ConfigValues:
         *,
         option: str,
         section: str,
-        section_values: Dict,
+        section_values: dict,
     ) -> str:
         """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or
         the same section."""
@@ -254,7 +254,7 @@ class _ConfigValues:
         *,
         option: str,
         section: str,
-        section_values: Dict,
+        section_values: dict,
         interpolate: bool = True,
         list_prefix: str | None = None,
     ) -> str:
@@ -489,7 +489,7 @@ class TomlSerializer:
     parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]
 
     def normalize(self) -> dict:
-        def normalize_section_value(option, option_value) -> Tuple[str, Any]:
+        def normalize_section_value(option, option_value) -> tuple[str, Any]:
             # With TOML, we store dict values as strings (for now).
             if isinstance(option_value, dict):
                 option_value = str(option_value)

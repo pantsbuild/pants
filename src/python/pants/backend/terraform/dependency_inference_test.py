@@ -11,7 +11,7 @@ from pants.backend.terraform.dependency_inference import (
     ParseTerraformModuleSources,
     TerraformHcl2Parser,
 )
-from pants.backend.terraform.target_types import TerraformModule
+from pants.backend.terraform.target_types import TerraformModuleTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.process import ProcessResult
@@ -30,7 +30,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[TerraformModule],
+        target_types=[TerraformModuleTarget],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),

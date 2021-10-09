@@ -9,8 +9,9 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type
+from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
@@ -77,7 +78,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -110,6 +111,32 @@ def target_types_to_generate_targets_requests(
     )
 
 
+# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
+# offending target.
+class _WarnDeprecatedTarget:
+    pass
+
+
+@dataclass(frozen=True)
+class _WarnDeprecatedTargetRequest:
+    tgt_type: type[Target]
+
+
+@rule
+def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnDeprecatedTarget:
+    tgt_type = request.tgt_type
+    assert tgt_type.deprecated_alias_removal_version is not None
+    warn_or_error(
+        removal_version=tgt_type.deprecated_alias_removal_version,
+        entity=f"the target name {tgt_type.deprecated_alias}",
+        hint=(
+            tgt_type.deprecated_alias_removal_hint
+            or f"Instead, use `{tgt_type.alias}`, which behaves the same."
+        ),
+    )
+    return _WarnDeprecatedTarget()
+
+
 @rule
 async def resolve_target(
     address: Address,
@@ -122,8 +149,14 @@ async def resolve_target(
         target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
         if target_type is None:
             raise UnrecognizedTargetTypeException(
-                target_adaptor.type_alias, registered_target_types, address=address
+                target_adaptor.type_alias, registered_target_types, address
             )
+        if (
+            target_type.deprecated_alias is not None
+            and target_type.deprecated_alias == target_adaptor.type_alias
+            and not address.is_generated_target
+        ):
+            await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
         target = target_type(target_adaptor.kwargs, address, union_membership)
         return WrappedTarget(target)
 
@@ -369,27 +402,45 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
             expanded_targets=False,
         ),
     )
+    addresses_to_targets = {
+        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
+    }
+
+    # Because this is Tarjan's SCC (TODO: update signature to guarantee), components are returned
+    # in reverse topological order. We can thus assume when building the structure shared
+    # `CoarsenedTarget` instances that each instance will already have had its dependencies
+    # constructed.
     components = native_engine.strongly_connected_components(
         list(dependency_mapping.mapping.items())
     )
 
-    addresses_set = set(addresses)
-    addresses_to_targets = {
-        t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
-    }
-    targets = []
+    coarsened_targets: dict[Address, CoarsenedTarget] = {}
+    root_coarsened_targets = []
+    root_addresses_set = set(addresses)
     for component in components:
-        if not any(component_address in addresses_set for component_address in component):
-            continue
+        component = sorted(component)
         component_set = set(component)
-        members = tuple(
-            sorted((addresses_to_targets[a] for a in component), key=lambda t: t.address)
+
+        # For each member of the component, include the CoarsenedTarget for each of its external
+        # dependencies.
+        coarsened_target = CoarsenedTarget(
+            (addresses_to_targets[a] for a in component),
+            (
+                coarsened_targets[d]
+                for a in component
+                for d in dependency_mapping.mapping[a]
+                if d not in component_set
+            ),
         )
-        dependencies = FrozenOrderedSet(
-            [d for a in component for d in dependency_mapping.mapping[a] if d not in component_set]
-        )
-        targets.append(CoarsenedTarget(members, dependencies))
-    return CoarsenedTargets(targets)
+
+        # Add to the coarsened_targets mapping under each of the component's Addresses.
+        for address in component:
+            coarsened_targets[address] = coarsened_target
+
+        # If any of the input Addresses was a member of this component, it is a root.
+        if component_set & root_addresses_set:
+            root_coarsened_targets.append(coarsened_target)
+    return CoarsenedTargets(tuple(root_coarsened_targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -487,6 +538,11 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 # -----------------------------------------------------------------------------------------------
 
 
+@rule
+def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
+    return cast(OwnersNotFoundBehavior, global_options.options.owners_not_found_behavior)
+
+
 def _log_or_raise_unmatched_owners(
     file_paths: Sequence[PurePath],
     owners_not_found_behavior: OwnersNotFoundBehavior,
@@ -523,14 +579,13 @@ def _log_or_raise_unmatched_owners(
 
 @rule
 async def addresses_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions
+    filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
     """Find the owner(s) for each FilesystemSpec.
 
     Every returned address will be a generated subtarget, meaning that each address will have
     exactly one file in its `sources` field.
     """
-    owners_not_found_behavior = global_options.options.owners_not_found_behavior
     paths_per_include = await MultiGet(
         Get(
             Paths,
@@ -553,7 +608,7 @@ async def addresses_from_filesystem_specs(
         ):
             _log_or_raise_unmatched_owners(
                 [PurePath(str(spec))],
-                global_options.options.owners_not_found_behavior,
+                owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
         addresses.update(owners)
@@ -577,7 +632,9 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(specs: Specs, global_options: GlobalOptions) -> SpecsSnapshot:
+async def resolve_specs_snapshot(
+    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
+) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
     Address specs will use their `Sources` field, and Filesystem specs will use whatever args were
@@ -595,7 +652,7 @@ async def resolve_specs_snapshot(specs: Specs, global_options: GlobalOptions) ->
             Digest,
             PathGlobs,
             specs.filesystem_specs.to_path_globs(
-                global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
+                owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
         if specs.filesystem_specs
@@ -614,6 +671,11 @@ async def resolve_specs_snapshot(specs: Specs, global_options: GlobalOptions) ->
 # -----------------------------------------------------------------------------------------------
 # Resolve the Sources field
 # -----------------------------------------------------------------------------------------------
+
+
+@rule
+def extract_files_not_found_behavior(global_options: GlobalOptions) -> FilesNotFoundBehavior:
+    return cast(FilesNotFoundBehavior, global_options.options.files_not_found_behavior)
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -661,7 +723,7 @@ class AmbiguousCodegenImplementationsException(Exception):
 @rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
-    global_options: GlobalOptions,
+    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
@@ -707,7 +769,7 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
+    path_globs = sources_field.path_globs(files_not_found_behavior)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 
@@ -727,10 +789,10 @@ async def hydrate_sources(
 
 @rule(desc="Resolve `sources` field file names")
 async def resolve_source_paths(
-    request: SourcesPathsRequest, global_options: GlobalOptions
+    request: SourcesPathsRequest, files_not_found_behavior: FilesNotFoundBehavior
 ) -> SourcesPaths:
     sources_field = request.field
-    path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
+    path_globs = sources_field.path_globs(files_not_found_behavior)
     paths = await Get(Paths, PathGlobs, path_globs)
     sources_field.validate_resolved_files(paths.files)
     return SourcesPaths(files=paths.files, dirs=paths.dirs)
@@ -739,6 +801,15 @@ async def resolve_source_paths(
 # -----------------------------------------------------------------------------------------------
 # Resolve addresses, including the Dependencies field
 # -----------------------------------------------------------------------------------------------
+
+
+class SubprojectRoots(Collection[str]):
+    pass
+
+
+@rule
+def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
+    return SubprojectRoots(global_options.options.subproject_roots)
 
 
 class ParsedDependencies(NamedTuple):
@@ -752,7 +823,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
         *,
         bad_value: str,
         address: Address,
-        registered_target_types: Sequence[Type[Target]],
+        registered_target_types: Iterable[type[Target]],
         union_membership: UnionMembership,
     ) -> None:
         applicable_target_types = sorted(
@@ -778,12 +849,12 @@ async def determine_explicitly_provided_dependencies(
     request: DependenciesRequest,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
-    global_options: GlobalOptions,
+    subproject_roots: SubprojectRoots,
 ) -> ExplicitlyProvidedDependencies:
     parse = functools.partial(
         AddressInput.parse,
         relative_to=request.field.address.spec_path,
-        subproject_roots=global_options.options.subproject_roots,
+        subproject_roots=subproject_roots,
     )
 
     addresses: List[AddressInput] = []
@@ -823,7 +894,7 @@ async def resolve_dependencies(
     request: DependenciesRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
-    global_options: GlobalOptions,
+    subproject_roots: SubprojectRoots,
 ) -> Addresses:
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(WrappedTarget, Address, request.field.address),
@@ -888,7 +959,7 @@ async def resolve_dependencies(
                 AddressInput.parse(
                     addr,
                     relative_to=tgt.address.spec_path,
-                    subproject_roots=global_options.options.subproject_roots,
+                    subproject_roots=subproject_roots,
                 ),
             )
             for special_cased_field in special_cased_fields
@@ -911,16 +982,14 @@ async def resolve_dependencies(
 
 @rule(desc="Resolve addresses")
 async def resolve_unparsed_address_inputs(
-    request: UnparsedAddressInputs, global_options: GlobalOptions
+    request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
 ) -> Addresses:
     addresses = await MultiGet(
         Get(
             Address,
             AddressInput,
             AddressInput.parse(
-                v,
-                relative_to=request.relative_to,
-                subproject_roots=global_options.options.subproject_roots,
+                v, relative_to=request.relative_to, subproject_roots=subproject_roots
             ),
         )
         for v in request.values
