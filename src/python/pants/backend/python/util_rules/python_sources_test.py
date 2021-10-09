@@ -14,7 +14,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -49,7 +49,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PythonSourceFiles, [PythonSourceFilesRequest]),
             QueryRule(StrippedPythonSourceFiles, [PythonSourceFilesRequest]),
         ],
-        target_types=[PythonTarget, NonPythonTarget, ProtobufLibrary],
+        target_types=[PythonTarget, NonPythonTarget, ProtobufSourceTarget],
     )
 
 
@@ -74,11 +74,7 @@ def get_stripped_sources(
     extra_args: list[str] | None = None,
 ) -> StrippedPythonSourceFiles:
     rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns={source_roots or ['src/python']}",
-            *(extra_args or []),
-        ]
+        [f"--source-root-patterns={source_roots or ['src/python']}", *(extra_args or [])]
     )
     return rule_runner.request(
         StrippedPythonSourceFiles,
@@ -210,7 +206,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 package dir;
                 """
             ),
-            "src/protobuf/dir/BUILD": "protobuf_library()",
+            "src/protobuf/dir/BUILD": "protobuf_library(sources=['f.proto'])",
             "src/protobuf/other_dir/f.proto": dedent(
                 """\
                 syntax = "proto2";
@@ -218,17 +214,17 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 package other_dir;
                 """
             ),
-            "src/protobuf/other_dir/BUILD": "protobuf_library(python_source_root='src/python')",
+            "src/protobuf/other_dir/BUILD": (
+                "protobuf_library(sources=['f.proto'], python_source_root='src/python')"
+            ),
         }
     )
     targets = [
-        ProtobufLibrary({}, Address("src/protobuf/dir")),
-        ProtobufLibrary({}, Address("src/protobuf/other_dir")),
+        rule_runner.get_target(Address("src/protobuf/dir", relative_file_path="f.proto")),
+        rule_runner.get_target(Address("src/protobuf/other_dir", relative_file_path="f.proto")),
     ]
-    backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
-
     stripped_result = get_stripped_sources(
-        rule_runner, targets, source_roots=["src/protobuf", "src/python"], extra_args=backend_args
+        rule_runner, targets, source_roots=["src/protobuf", "src/python"]
     )
     assert stripped_result.stripped_source_files.snapshot.files == (
         "dir/f_pb2.py",
@@ -236,7 +232,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
     )
 
     unstripped_result = get_unstripped_sources(
-        rule_runner, targets, source_roots=["src/protobuf", "src/python"], extra_args=backend_args
+        rule_runner, targets, source_roots=["src/protobuf", "src/python"]
     )
     assert unstripped_result.source_files.snapshot.files == (
         "src/protobuf/dir/f_pb2.py",

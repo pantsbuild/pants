@@ -6,7 +6,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -34,7 +34,7 @@ async def find_putative_targets(
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(
-            ProtobufLibrary,
+            ProtobufSourcesGeneratorTarget,
             path=dirname,
             name=os.path.basename(dirname),
             triggering_sources=sorted(filenames),

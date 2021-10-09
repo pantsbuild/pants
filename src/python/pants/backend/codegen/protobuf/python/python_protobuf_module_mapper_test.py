@@ -7,7 +7,7 @@ from pants.backend.codegen.protobuf.python import additional_fields, python_prot
 from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import (
     PythonProtobufMappingMarker,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as python_protobuf_target_types_rules
 from pants.backend.python.dependency_inference.module_mapper import FirstPartyPythonMappingImpl
 from pants.core.util_rules import stripped_source_files
@@ -26,7 +26,7 @@ def rule_runner() -> RuleRunner:
             *python_protobuf_target_types_rules(),
             QueryRule(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker]),
         ],
-        target_types=[ProtobufLibrary],
+        target_types=[ProtobufSourcesGeneratorTarget],
     )
 
 

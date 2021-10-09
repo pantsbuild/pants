@@ -1,7 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
+)
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.engine.target import StringField
 
@@ -20,6 +23,8 @@ class PythonSourceRootField(StringField):
 
 def rules():
     return [
-        ProtobufLibrary.register_plugin_field(ProtobufPythonInterpreterConstraints),
-        ProtobufLibrary.register_plugin_field(PythonSourceRootField),
+        ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraints),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonInterpreterConstraints),
+        ProtobufSourceTarget.register_plugin_field(PythonSourceRootField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PythonSourceRootField),
     ]

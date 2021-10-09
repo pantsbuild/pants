@@ -4,7 +4,10 @@
 from collections import defaultdict
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufGrpcToggleField,
+    ProtobufSourcesField,
+)
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
@@ -32,10 +35,10 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
 async def map_protobuf_to_python_modules(
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(ProtobufSources))
+    targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourcesField))
     stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSources]))
+        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourcesField]))
         for tgt in protobuf_targets
     )
 
@@ -57,7 +60,7 @@ async def map_protobuf_to_python_modules(
             # sharing the same module as the implementation `_pb2.py`. Because both generated files
             # come from the same original Protobuf target, we're covered.
             add_module(proto_path_to_py_module(stripped_f, suffix="_pb2"), tgt)
-            if tgt.get(ProtobufGrpcToggle).value:
+            if tgt.get(ProtobufGrpcToggleField).value:
                 add_module(proto_path_to_py_module(stripped_f, suffix="_pb2_grpc"), tgt)
 
     # Remove modules with ambiguous owners.
