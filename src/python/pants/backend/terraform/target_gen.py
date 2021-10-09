@@ -47,8 +47,7 @@ async def generate_terraform_module_targets(
             value: ImmutableValue | None
             if isinstance(field, Sources):
                 value = tuple(
-                    os.path.join(relpath_to_generator, f)
-                    for f in sorted(dir_to_filenames[dir])
+                    os.path.join(relpath_to_generator, f) for f in sorted(dir_to_filenames[dir])
                 )
             else:
                 value = field.value
@@ -57,9 +56,7 @@ async def generate_terraform_module_targets(
             generated_target_fields, generator.address.create_generated(relpath_to_generator or ".")
         )
 
-    return GeneratedTargets(
-        request.generator, [gen_target(dir) for dir in matched_dirs]
-    )
+    return GeneratedTargets(request.generator, [gen_target(dir) for dir in matched_dirs])
 
 
 def rules():
