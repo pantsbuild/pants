@@ -29,6 +29,7 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import path_safe
 
@@ -179,7 +180,7 @@ async def setup_build_go_package_target_request(
 
     elif target.has_field(GoThirdPartyModulePathField):
         _module_path = target[GoThirdPartyModulePathField].value
-        subpath = import_path[len(_module_path) :]
+        subpath = fast_relpath(import_path, _module_path)
 
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
