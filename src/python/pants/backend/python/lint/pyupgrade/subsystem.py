@@ -48,7 +48,10 @@ class PyUpgrade(PythonToolBase):
             type=list,
             default=["--py36-plus"],
             member_type=shell_str,
-            help="Arguments to pass directly to pyupgrade",
+            help=(
+                f"Arguments to pass directly to pyupgrade, e.g. "
+                f'`--{cls.options_scope}-args="--py39-plus --keep-runtime-typing"`'
+            ),
         )
 
     @property
