@@ -1,11 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -14,13 +13,9 @@ use crate::nodes::{Select, Visualizer};
 use crate::python::{Failure, Params, TypeId, Value};
 use crate::session::{ObservedValueResult, Root, Session};
 
-use futures::{future, FutureExt, TryFutureExt};
+use futures::{future, FutureExt};
 use graph::LastObserved;
-use hashing::{Digest, EMPTY_DIGEST};
-use log::{debug, warn};
-use stdio::TryCloneAsFile;
-use tempfile::TempDir;
-use tokio::process;
+use log::debug;
 use tokio::time;
 use ui::ConsoleUI;
 use watch::Invalidatable;
@@ -167,111 +162,6 @@ impl Scheduler {
     digests
   }
 
-  pub async fn run_local_interactive_process(
-    &self,
-    session: &Session,
-    input_digest: Digest,
-    argv: Vec<String>,
-    env: BTreeMap<String, String>,
-    run_in_workspace: bool,
-  ) -> Result<i32, String> {
-    let maybe_tempdir = if run_in_workspace {
-      None
-    } else {
-      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
-    };
-
-    if input_digest != EMPTY_DIGEST {
-      if run_in_workspace {
-        warn!(
-          "Local interactive process should not attempt to materialize files when run in workspace"
-        );
-      } else {
-        let destination = match maybe_tempdir {
-          Some(ref dir) => dir.path().to_path_buf(),
-          None => unreachable!(),
-        };
-
-        self
-          .core
-          .store()
-          .materialize_directory(destination, input_digest)
-          .await?;
-      }
-    }
-
-    let p = Path::new(&argv[0]);
-    let program_name = match maybe_tempdir {
-      Some(ref tempdir) if p.is_relative() => {
-        let mut buf = PathBuf::new();
-        buf.push(tempdir);
-        buf.push(p);
-        buf
-      }
-      _ => p.to_path_buf(),
-    };
-
-    let mut command = process::Command::new(program_name);
-    for arg in argv[1..].iter() {
-      command.arg(arg);
-    }
-
-    if let Some(ref tempdir) = maybe_tempdir {
-      command.current_dir(tempdir.path());
-    }
-
-    command.env_clear();
-    command.envs(env);
-
-    command.kill_on_drop(true);
-
-    let exit_status = session
-      .with_console_ui_disabled(async move {
-        // Once any UI is torn down, grab exclusive access to the console.
-        let (term_stdin, term_stdout, term_stderr) =
-          stdio::get_destination().exclusive_start(Box::new(|_| {
-            // A stdio handler that will immediately trigger logging.
-            Err(())
-          }))?;
-        // NB: Command's stdio methods take ownership of a file-like to use, so we use
-        // `TryCloneAsFile` here to `dup` our thread-local stdio.
-        command
-          .stdin(Stdio::from(
-            term_stdin
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stdin: {}", e))?,
-          ))
-          .stdout(Stdio::from(
-            term_stdout
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stdout: {}", e))?,
-          ))
-          .stderr(Stdio::from(
-            term_stderr
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
-          ));
-        let mut subprocess = command
-          .spawn()
-          .map_err(|e| format!("Error executing interactive process: {}", e))?;
-        tokio::select! {
-          _ = session.cancelled() => {
-            // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
-            // zombies).
-            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
-            subprocess.wait().await.map_err(|e| e.to_string())
-          }
-          exit_status = subprocess.wait() => {
-            // The process exited.
-            exit_status.map_err(|e| e.to_string())
-          }
-        }
-      })
-      .await?;
-
-    Ok(exit_status.code().unwrap_or(-1))
-  }
-
   async fn poll_or_create(
     context: &Context,
     root: Root,
@@ -303,11 +193,10 @@ impl Scheduler {
   /// Attempts to complete all of the given roots.
   ///
   async fn execute_helper(
-    &self,
     request: &ExecutionRequest,
     session: &Session,
   ) -> Vec<ObservedValueResult> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = Context::new(session.core().clone(), session.clone());
     let roots = session.roots_zip_last_observed(&request.roots);
     let poll = request.poll;
     let poll_delay = request.poll_delay;
@@ -364,12 +253,13 @@ impl Scheduler {
 
     let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
+    let executor = self.core.executor.clone();
 
     // Spawn and wait for all roots to complete.
-    session.maybe_display_initialize(&self.core.executor);
-    let mut execution_task = self.execute_helper(request, session).boxed();
-
     self.core.executor.block_on(async move {
+      session.maybe_display_initialize(&executor).await;
+      let mut execution_task = Self::execute_helper(request, session).boxed();
+
       let mut refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
       let result = loop {
         tokio::select! {

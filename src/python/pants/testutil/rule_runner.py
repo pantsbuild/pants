@@ -14,7 +14,7 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -28,9 +28,9 @@ from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
-from pants.engine.internals.selectors import Get, Params
+from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
@@ -120,6 +120,7 @@ def engine_error(
 # -----------------------------------------------------------------------------------------------
 
 
+_I = TypeVar("_I")
 _O = TypeVar("_O")
 
 
@@ -309,7 +310,6 @@ class RuleRunner:
                 specs,
                 console,
                 Workspace(self.scheduler, _enforce_effects=False),
-                InteractiveRunner(self.scheduler, _enforce_effects=False),
             ),
         )
 
@@ -469,10 +469,20 @@ class RuleRunner:
             self.scheduler.py_scheduler, self.scheduler.py_session, digest, path_prefix or ""
         )
 
+    def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
+        return native_engine.session_run_interactive_process(self.scheduler.py_session, request)
+
 
 # -----------------------------------------------------------------------------------------------
 # `run_rule_with_mocks()`
 # -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MockEffect(Generic[_O, _I]):
+    output_type: type[_O]
+    input_type: type[_I]
+    mock: Callable[[_I], _O]
 
 
 # TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
@@ -488,8 +498,8 @@ class MockGet:
 def run_rule_with_mocks(
     rule: Callable,
     *,
-    rule_args: Sequence[Any] | None = None,
-    mock_gets: Sequence[MockGet] | None = None,
+    rule_args: Sequence[Any] = (),
+    mock_gets: Sequence[MockGet | MockEffect] = (),
     union_membership: UnionMembership | None = None,
 ):
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
@@ -502,9 +512,9 @@ def run_rule_with_mocks(
     ```
 
     In the case of an @rule that makes Get requests, things get more interesting: the
-    `mock_gets` argument must be provided as a sequence of `MockGet`s. Each MockGet takes the Product
-    and Subject type, along with a one-argument function that takes a subject value and returns a
-    product value.
+    `mock_gets` argument must be provided as a sequence of `MockGet`s and `MockEffect`s. Each
+    MockGet takes the Product and Subject type, along with a one-argument function that takes a
+    subject value and returns a product value.
 
     So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
     for a product type `Listing` with subject type `Dir`, the invoke might look like:
@@ -535,12 +545,12 @@ def run_rule_with_mocks(
     if task_rule is None:
         raise TypeError(f"Expected to receive a decorated `@rule`; got: {rule}")
 
-    if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
+    if len(rule_args) != len(task_rule.input_selectors):
         raise ValueError(
             f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
         )
 
-    if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
+    if len(mock_gets) != len(task_rule.input_gets):
         raise ValueError(
             f"Rule expected to receive Get providers for:\n"
             f"{pformat(task_rule.input_gets)}\ngot:\n"
@@ -551,37 +561,35 @@ def run_rule_with_mocks(
     if not isinstance(res, (CoroutineType, GeneratorType)):
         return res
 
-    def get(product, subject):
+    def get(res: Get | Effect):
         provider = next(
             (
                 mock_get.mock
                 for mock_get in mock_gets
-                if mock_get.output_type == product
+                if mock_get.output_type == res.output_type
                 and (
-                    mock_get.input_type == type(subject)
+                    mock_get.input_type == type(res.input)  # noqa: E721
                     or (
                         union_membership
-                        and union_membership.is_member(mock_get.input_type, subject)
+                        and union_membership.is_member(mock_get.input_type, res.input)
                     )
                 )
             ),
             None,
         )
         if provider is None:
-            raise AssertionError(
-                f"Rule requested: Get{(product, type(subject), subject)}, which cannot be satisfied."
-            )
-        return provider(subject)
+            raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
+        return provider(res.input)
 
     rule_coroutine = res
     rule_input = None
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, Get):
-                rule_input = get(res.output_type, res.input)
+            if isinstance(res, (Get, Effect)):
+                rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g.output_type, g.input) for g in res]
+                rule_input = [get(g) for g in res]
             else:
                 return res
         except StopIteration as e:

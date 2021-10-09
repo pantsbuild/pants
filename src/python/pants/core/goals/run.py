@@ -12,8 +12,8 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -100,7 +100,6 @@ async def run(
     run_subsystem: RunSubsystem,
     global_options: GlobalOptions,
     console: Console,
-    interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
@@ -130,19 +129,16 @@ async def run(
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
-        try:
-            result = interactive_runner.run(
-                InteractiveProcess(
-                    argv=(*args, *run_subsystem.args),
-                    env=env,
-                    run_in_workspace=True,
-                    restartable=restartable,
-                )
-            )
-            exit_code = result.exit_code
-        except Exception as e:
-            console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
-            exit_code = -1
+        result = await Effect(
+            InteractiveProcessResult,
+            InteractiveProcess(
+                argv=(*args, *run_subsystem.args),
+                env=env,
+                run_in_workspace=True,
+                restartable=restartable,
+            ),
+        )
+        exit_code = result.exit_code
 
     return Run(exit_code)
 

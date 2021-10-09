@@ -706,7 +706,9 @@ def native_engine_generator_send(
         raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
     try:
         res = func.send(arg)
-        if isinstance(res, Get):
+        # TODO: It isn't currently necessary to differentiate between `Get` and `Effect` here, as
+        # the static analysis of `@rule`s has already validated usage.
+        if isinstance(res, (Get, Effect)):
             return PyGeneratorResponseGet(res.output_type, res.input_type, res.input)
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(

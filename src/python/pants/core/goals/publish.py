@@ -23,7 +23,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import chain
-from typing import ClassVar, Generic, Iterable, Type, TypeVar
+from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
@@ -31,8 +31,8 @@ from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     NoApplicableTargetsBehavior,
@@ -155,7 +155,7 @@ class Publish(Goal):
 
 
 @goal_rule
-async def run_publish(console: Console, interactive_runner: InteractiveRunner) -> Publish:
+async def run_publish(console: Console) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
             TargetRootsToFieldSets,
@@ -189,41 +189,19 @@ async def run_publish(console: Console, interactive_runner: InteractiveRunner) -
     )
 
     # Run all processes interactively.
-    exit_code, results = run_publish_processes(
-        console, interactive_runner, chain.from_iterable(processes)
-    )
-
-    console.print_stderr("")
-    if not results:
-        sigil = console.sigil_skipped()
-        console.print_stderr(f"{sigil} Nothing published.")
-
-    # We collect all results to the end, so all output from the interactive processes are done,
-    # before printing the results.
-    for line in results:
-        console.print_stderr(line)
-
-    return Publish(exit_code)
-
-
-def run_publish_processes(
-    console: Console,
-    interactive_runner: InteractiveRunner,
-    publish_processes: Iterable[PublishPackages],
-) -> tuple[int, list[str]]:
     exit_code = 0
-    output = []
-    for pub in publish_processes:
+    results = []
+    for pub in chain.from_iterable(processes):
         if not pub.process:
             sigil = console.sigil_skipped()
             status = "skipped"
             if pub.description:
                 status += f" {pub.description}"
             for name in pub.names:
-                output.append(f"{sigil} {name} {status}.")
+                results.append(f"{sigil} {name} {status}.")
             continue
 
-        res = interactive_runner.run(pub.process)
+        res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "published"
@@ -238,8 +216,19 @@ def run_publish_processes(
             status += f" {prep} {pub.description}"
 
         for name in pub.names:
-            output.append(f"{sigil} {name} {status}.")
-    return exit_code, output
+            results.append(f"{sigil} {name} {status}.")
+
+    console.print_stderr("")
+    if not results:
+        sigil = console.sigil_skipped()
+        console.print_stderr(f"{sigil} Nothing published.")
+
+    # We collect all results to the end, so all output from the interactive processes are done,
+    # before printing the results.
+    for line in results:
+        console.print_stderr(line)
+
+    return Publish(exit_code)
 
 
 @rule

@@ -45,14 +45,12 @@ from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
-    CreateDigest,
     Digest,
-    FileContent,
     MergeDigests,
     Snapshot,
     Workspace,
 )
-from pants.engine.process import InteractiveProcess, InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.target import (
     MultipleSourcesField,
     Target,
@@ -62,6 +60,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import (
+    MockEffect,
     MockGet,
     QueryRule,
     RuleRunner,
@@ -150,7 +149,6 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
     )
-    interactive_runner = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False)
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
@@ -168,11 +166,7 @@ def run_test_rule(
         return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
 
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
-        digest = rule_runner.request(
-            Digest, [CreateDigest((FileContent(path="program.py", content=b"def test(): pass"),))]
-        )
-        process = InteractiveProcess(["/usr/bin/python", "program.py"], input_digest=digest)
-        return TestDebugRequest(process)
+        return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
@@ -194,7 +188,6 @@ def run_test_rule(
             rule_args=[
                 console,
                 test_subsystem,
-                interactive_runner,
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -242,6 +235,11 @@ def run_test_rule(
                     output_type=OpenFiles,
                     input_type=OpenFilesRequest,
                     mock=lambda _: OpenFiles(()),
+                ),
+                MockEffect(
+                    output_type=InteractiveProcessResult,
+                    input_type=InteractiveProcess,
+                    mock=lambda _: InteractiveProcessResult(0),
                 ),
             ],
             union_membership=union_membership,

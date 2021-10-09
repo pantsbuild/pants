@@ -12,8 +12,8 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
@@ -96,7 +96,6 @@ class ReplRequest:
 async def run_repl(
     console: Console,
     workspace: Workspace,
-    interactive_runner: InteractiveRunner,
     repl_subsystem: ReplSubsystem,
     all_specified_addresses: Addresses,
     build_root: BuildRoot,
@@ -135,13 +134,14 @@ async def run_repl(
             side_effecting=False,
         )
         env = {**complete_env, **request.extra_env}
-        result = interactive_runner.run(
+        result = await Effect(
+            InteractiveProcessResult,
             InteractiveProcess(
                 argv=request.args,
                 env=env,
                 run_in_workspace=True,
                 restartable=repl_subsystem.restartable,
-            )
+            ),
         )
     return Repl(result.exit_code)
 

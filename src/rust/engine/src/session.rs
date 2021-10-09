@@ -104,7 +104,7 @@ struct SessionHandle {
   // non-isolated Sessions).
   isolated: bool,
   // The display mechanism to use in this Session.
-  display: Mutex<SessionDisplay>,
+  display: tokio::sync::Mutex<SessionDisplay>,
 }
 
 impl SessionHandle {
@@ -148,7 +148,7 @@ impl Session {
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
     let workunit_store = WorkunitStore::new(!should_render_ui);
-    let display = Mutex::new(SessionDisplay::new(
+    let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,
       should_render_ui,
@@ -184,7 +184,7 @@ impl Session {
   /// when a client disconnects, or killed by Ctrl+C.
   ///
   pub fn isolated_shallow_clone(&self, build_id: String) -> Result<Session, String> {
-    let display = Mutex::new(SessionDisplay::new(
+    let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
       false,
@@ -282,14 +282,14 @@ impl Session {
   }
 
   pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
-    match *self.handle.display.lock() {
+    match *self.handle.display.lock().await {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
       SessionDisplay::Logging { .. } => f.await,
     }
   }
 
-  pub fn maybe_display_initialize(&self, executor: &Executor) {
-    let result = match *self.handle.display.lock() {
+  pub async fn maybe_display_initialize(&self, executor: &Executor) {
+    let result = match *self.handle.display.lock().await {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.initialize(executor.clone()),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
@@ -305,7 +305,7 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.handle.display.lock() {
+    let teardown = match *self.handle.display.lock().await {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
@@ -321,7 +321,13 @@ impl Session {
   }
 
   pub fn maybe_display_render(&self) {
-    match *self.handle.display.lock() {
+    let mut display = if let Ok(display) = self.handle.display.try_lock() {
+      display
+    } else {
+      // Else, the UI is currently busy: skip rendering.
+      return;
+    };
+    match *display {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.render(),
       SessionDisplay::Logging {
         straggler_threshold,

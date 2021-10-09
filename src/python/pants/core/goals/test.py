@@ -25,8 +25,8 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -381,7 +381,6 @@ def builtin_xml_dir_source(_: BuiltinXMLDirSource, test_subsystem: TestSubsystem
 async def run_tests(
     console: Console,
     test_subsystem: TestSubsystem,
-    interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
     dist_dir: DistDir,
@@ -401,7 +400,9 @@ async def run_tests(
         )
         exit_code = 0
         for debug_request in debug_requests:
-            debug_result = interactive_runner.run(debug_request.process)
+            debug_result = await Effect(
+                InteractiveProcessResult, InteractiveProcess, debug_request.process
+            )
             if debug_result.exit_code != 0:
                 exit_code = debug_result.exit_code
         return Test(exit_code)
@@ -490,7 +491,7 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                interactive_runner.run(process)
+                _ = await Effect(InteractiveProcessResult, InteractiveProcess, process)
 
         for coverage_reports in coverage_reports_collections:
             if coverage_reports.coverage_insufficient:

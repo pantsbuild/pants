@@ -11,7 +11,6 @@ from enum import Enum
 from textwrap import dedent
 from typing import TYPE_CHECKING, Iterable, Mapping
 
-from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
@@ -26,7 +25,7 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize
 
 if TYPE_CHECKING:
-    from pants.engine.internals.scheduler import SchedulerSession
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -295,7 +294,7 @@ class InteractiveProcessResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class InteractiveProcess:
+class InteractiveProcess(SideEffecting):
     argv: tuple[str, ...]
     env: FrozenDict[str, str]
     input_digest: Digest
@@ -317,8 +316,8 @@ class InteractiveProcess:
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, request `InteractiveRunner` in a `@goal_rule`, then use
-        `interactive_runner.run()`.
+        To run the process, use `await Effect(InteractiveProcessResult, InteractiveProcess(..))`
+        in a `@goal_rule`.
 
         `forward_signals_to_process` controls whether pants will allow a SIGINT signal
         sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
@@ -355,21 +354,6 @@ class InteractiveProcess:
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
         )
-
-
-@dataclass(frozen=True)
-class InteractiveRunner(SideEffecting):
-    _scheduler: SchedulerSession
-    _enforce_effects: bool = True
-
-    def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        if not request.restartable:
-            self.side_effected()
-        if request.forward_signals_to_process:
-            with ExceptionSink.ignoring_sigint():
-                return self._scheduler.run_local_interactive_process(request)
-
-        return self._scheduler.run_local_interactive_process(request)
 
 
 @frozen_after_init
