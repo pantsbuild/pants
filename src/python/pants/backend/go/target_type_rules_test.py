@@ -37,11 +37,13 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DescriptionField,
     GeneratedTargets,
     InferredDependencies,
     InjectedDependencies,
     InvalidFieldException,
     InvalidTargetException,
+    Tags,
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
@@ -139,7 +141,20 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/go/BUILD": "go_mod()\n",
+            "src/go/BUILD": dedent(
+                """\
+                go_mod(
+                    overrides={
+                        (
+                            "github.com/google/go-cmp/cmp/cmpopts",
+                            "github.com/google/go-cmp/cmp/internal/function",
+                        ): {"tags": ["third_party_tag"]},
+                        ("./subdir",): {"tags": ["first_party_tag"]},
+                        ("./subdir", "./"): {"description": "a first party pkg"},
+                    },
+                )
+                """
+            ),
             "src/go/go.mod": dedent(
                 """\
                 module example.com/src/go
@@ -170,26 +185,35 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     generator = rule_runner.get_target(Address("src/go"))
     generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
-    def gen_first_party_tgt(rel_dir: str, sources: list[str]) -> GoFirstPartyPackageTarget:
+    def gen_first_party_tgt(
+        rel_dir: str,
+        sources: list[str],
+        *,
+        tags: list[str] | None = None,
+        description: str | None = None,
+    ) -> GoFirstPartyPackageTarget:
         return GoFirstPartyPackageTarget(
             {
                 GoImportPathField.alias: (
                     os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
                 ),
                 GoFirstPartyPackageSubpathField.alias: rel_dir,
-                GoFirstPartyPackageSourcesField.alias: tuple(sources),
+                GoFirstPartyPackageSourcesField.alias: sources,
+                Tags.alias: tags,
+                DescriptionField.alias: description,
             },
             Address("src/go", generated_name=f"./{rel_dir}"),
         )
 
     def gen_third_party_tgt(
-        mod_path: str, version: str, import_path: str
+        mod_path: str, version: str, import_path: str, *, tags: list[str] | None = None
     ) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {
                 GoImportPathField.alias: import_path,
                 GoThirdPartyModulePathField.alias: mod_path,
                 GoThirdPartyModuleVersionField.alias: version,
+                Tags.alias: tags,
             },
             Address("src/go", generated_name=import_path),
         )
@@ -197,15 +221,23 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     expected = GeneratedTargets(
         generator,
         {
-            gen_first_party_tgt("", ["hello.go"]),
-            gen_first_party_tgt("subdir", ["subdir/f.go", "subdir/f2.go"]),
+            gen_first_party_tgt("", ["hello.go"], description="a first party pkg"),
+            gen_first_party_tgt(
+                "subdir",
+                ["subdir/f.go", "subdir/f2.go"],
+                description="a first party pkg",
+                tags=["first_party_tag"],
+            ),
             gen_first_party_tgt("another_dir/subdir", ["another_dir/subdir/f.go"]),
             gen_third_party_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
             gen_third_party_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"
             ),
             gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"
+                "github.com/google/go-cmp",
+                "v0.4.0",
+                "github.com/google/go-cmp/cmp/cmpopts",
+                tags=["third_party_tag"],
             ),
             gen_third_party_tgt(
                 "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/diff"
@@ -217,6 +249,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                 "github.com/google/go-cmp",
                 "v0.4.0",
                 "github.com/google/go-cmp/cmp/internal/function",
+                tags=["third_party_tag"],
             ),
             gen_third_party_tgt(
                 "github.com/google/go-cmp",
@@ -244,6 +277,35 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     assert list(generated.keys()) == list(expected.keys())
     for addr, tgt in generated.items():
         assert tgt == expected[addr]
+
+
+def test_generate_targets_conflicting_overrides(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                go_mod(
+                    name="mod",
+                    overrides={
+                        ("./",): {"tags": ["root"]},
+                        ("./subdir", "./"): {"tags": ["pkg"]},
+                    },
+                )
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module example.com/overrides
+                go 1.17
+                """
+            ),
+            "hello.go": "",
+            "subdir/f.go": "",
+        }
+    )
+    generator = rule_runner.get_target(Address("", target_name="mod"))
+    with engine_error(InvalidFieldException, contains="Conflicting overrides"):
+        rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
 
 def test_package_targets_cannot_be_manually_created() -> None:

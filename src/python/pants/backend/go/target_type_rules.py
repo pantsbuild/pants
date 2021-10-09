@@ -7,6 +7,7 @@ import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
@@ -17,6 +18,7 @@ from pants.backend.go.target_types import (
     GoFirstPartyPackageSubpathField,
     GoFirstPartyPackageTarget,
     GoImportPathField,
+    GoModOverridesField,
     GoModPackageSourcesField,
     GoModTarget,
     GoThirdPartyModulePathField,
@@ -185,6 +187,31 @@ async def generate_targets_from_go_mod(
     request: GenerateTargetsFromGoModRequest, files_not_found_behavior: FilesNotFoundBehavior
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
+    _overrides_field = request.generator[GoModOverridesField]
+
+    def maybe_get_overrides(generated_name: str) -> dict[str, Any] | None:
+        relevant_overrides = [
+            overrides
+            for tgt_names, overrides in (_overrides_field.value or {}).items()
+            if generated_name in tgt_names
+        ]
+        if not relevant_overrides:
+            return None
+        merged_result: dict[str, Any] = {}
+        for overrides in relevant_overrides:
+            for k, v in overrides.items():
+                if k in merged_result:
+                    raise InvalidFieldException(
+                        f"Conflicting overrides in the `{_overrides_field.alias}` field of "
+                        f"`{generator_addr}` for the generated target name `{generated_name}` for "
+                        f"the field `{k}`. You cannot specify the same field name multiple times "
+                        "for the same generated target.\n\n"
+                        f"(One override sets the field to `{repr(merged_result[k])}` but another "
+                        f"sets to `{repr(v)}`.)"
+                    )
+                merged_result[k] = v
+        return merged_result
+
     go_mod_info, go_paths = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(generator_addr)),
         Get(
@@ -210,8 +237,10 @@ async def generate_targets_from_go_mod(
 
     def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
         subpath = fast_relpath(dir, generator_addr.spec_path)
+        generated_tgt_name = f"./{subpath}"
         import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
 
+        overrides = maybe_get_overrides(generated_tgt_name) or {}
         return GoFirstPartyPackageTarget(
             {
                 GoImportPathField.alias: import_path,
@@ -219,19 +248,22 @@ async def generate_targets_from_go_mod(
                 GoFirstPartyPackageSourcesField.alias: tuple(
                     sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
                 ),
+                **overrides,
             },
             # E.g. `src/go:mod#./subdir`.
-            generator_addr.create_generated(f"./{subpath}"),
+            generator_addr.create_generated(generated_tgt_name),
         )
 
     first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
 
     def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
+        overrides = maybe_get_overrides(pkg_info.import_path) or {}
         return GoThirdPartyPackageTarget(
             {
                 GoThirdPartyModulePathField.alias: pkg_info.module_path,
                 GoThirdPartyModuleVersionField.alias: pkg_info.version,
                 GoImportPathField.alias: pkg_info.import_path,
+                **overrides,
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),

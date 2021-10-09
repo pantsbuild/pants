@@ -17,6 +17,7 @@ from pants.engine.target import (
     Dependencies,
     InvalidFieldException,
     InvalidTargetException,
+    OverridesField,
     Sources,
     StringField,
     StringSequenceField,
@@ -111,6 +112,29 @@ class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
         )
 
 
+class GoModOverridesField(OverridesField):
+    help = (
+        "Override the field values for generated `go_first_party_packages` and "
+        "`go_third_party_packages` targets.\n\n"
+        "Expects a dictionary of a tuple of generated target names to a dictionary for the "
+        "overrides. Each override is a dictionary of field names to the overridden value. For "
+        "example:\n\n"
+        "  overrides={\n"
+        '    ("./subdir",): {"tags": ["overridden"]},\n'
+        '    ("./subdir", "github.com/google/uuid"): {"description": ["these are overridden"]},\n'
+        "  }\n\n"
+        "The generated target name for a `go_first_party_package` is the directory path relative "
+        "to the `go_mod` target, with a `./` prefix. For example, if your `go.mod` is located at "
+        "`src/go`, and you want to override metadata for the Go package at `src/go/subdir`, then "
+        "the generated target name would be `./subdir`. If the Go package is in the same directory "
+        "as your `go.mod`, then the generated target name would be `./`.\n\n"
+        "The generated target name for a `go_third_party_package` is its Go import path, such as "
+        "`github.com/google/go-cmp/cmp/cmpopts` and `github.com/google/uuid`.\n\n"
+        "You can specify a generated target multiple times, so long as you don't override the "
+        "same field more than one time. "
+    )
+
+
 class GoModTarget(Target):
     alias = "go_mod"
     core_fields = (
@@ -118,6 +142,7 @@ class GoModTarget(Target):
         GoModDependenciesField,
         GoModSourcesField,
         GoModPackageSourcesField,
+        GoModOverridesField,
     )
     help = (
         "A first-party Go module (corresponding to a `go.mod` file).\n\n"
@@ -174,7 +199,7 @@ class GoFirstPartyPackageTarget(Target):
     )
     help = (
         "A Go package (corresponding to a directory with `.go` files).\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
+        "You cannot explicitly create this target in BUILD files. Instead, add a `go_mod` "
         "target where you have your `go.mod` file, which will generate "
         "`go_first_party_package` targets for you."
     )
@@ -230,7 +255,7 @@ class GoThirdPartyPackageTarget(Target):
     )
     help = (
         "A package from a third-party Go module.\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
+        "You cannot explicitly create this target in BUILD files. Instead, add a `go_mod` "
         "target where you have your `go.mod` file, which will generate "
         "`go_third_party_package` targets for you.\n\n"
         "Make sure that your `go.mod` and `go.sum` files include this package's module."

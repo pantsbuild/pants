@@ -26,6 +26,7 @@ from pants.engine.target import (
     InvalidGeneratedTargetException,
     InvalidTargetException,
     NestedDictStringToStringField,
+    OverridesField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -38,6 +39,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
+from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -1155,3 +1157,42 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
     assert f"['{another_dir}', '{addr_a}']" in caplog.text
     maybe_warn([addr_a, addr_b, another_dir], ignores=[addr_b], owners_must_be_ancestors=True)
     assert not caplog.records
+
+
+# -----------------------------------------------------------------------------------------------
+# Test `overrides` field
+# -----------------------------------------------------------------------------------------------
+
+
+def test_overrides_field_validation() -> None:
+    addr = Address("", target_name="example")
+
+    assert OverridesField(None, addr).value is None
+    assert OverridesField({}, addr).value == {}
+
+    # Note that the `list_field` is not hashable. We have to override `__hash__` for this to work.
+    override_value = {("tgt1",): {"str_field": "value", "list_field": [0, 1, 3]}}
+    field = OverridesField(override_value, addr)
+    assert field.value == override_value
+    with no_exception():
+        hash(field)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            OverridesField(raw_value, addr)
+
+    for v in [
+        0,
+        object(),
+        "hello",
+        ["hello"],
+        ["hello", "world"],
+        {"hello": 0},
+        {0: "world"},
+        {"hello": "world"},
+        {("hello",): "world"},
+        {("hello",): ["world"]},
+        {(0,): {"field": "value"}},
+        {("hello",): {0: "value"}},
+    ]:
+        assert_invalid_type(v)
