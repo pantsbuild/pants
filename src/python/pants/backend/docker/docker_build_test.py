@@ -10,11 +10,9 @@ import pytest
 
 from pants.backend.docker.docker_binary import DockerBinary
 from pants.backend.docker.docker_build import (
-    BuiltDockerImage,
     DockerFieldSet,
     DockerNameTemplateError,
     build_docker_image,
-    docker_image_run_request,
 )
 from pants.backend.docker.docker_build_context import (
     DockerBuildContext,
@@ -27,7 +25,6 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.subsystem import rules as docker_subsystem_rules
 from pants.backend.docker.target_types import DockerImage
-from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.process import Process, ProcessResult
@@ -345,26 +342,6 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     )
     with pytest.raises(DockerVersionContextError, match=err_2):
         assert_tags("err_2")
-
-
-def test_docker_run(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("docker/test/BUILD", "docker_image()")
-    tgt = rule_runner.get_target(Address("docker/test"))
-    result = run_rule_with_mocks(
-        docker_image_run_request,
-        rule_args=[DockerFieldSet.create(tgt), DockerBinary("/dummy/docker")],
-        mock_gets=[
-            MockGet(
-                output_type=BuiltPackage,
-                input_type=DockerFieldSet,
-                mock=lambda _: BuiltPackage(
-                    EMPTY_DIGEST, (BuiltDockerImage.create(("test:latest",)),)
-                ),
-            ),
-        ],
-    )
-
-    assert result.args == ("/dummy/docker", "run", "-it", "--rm", "test:latest")
 
 
 def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
