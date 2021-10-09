@@ -10,7 +10,10 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufGrpcToggleField,
+    ProtobufSourcesField,
+)
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
@@ -43,7 +46,7 @@ from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
-    input = ProtobufSources
+    input = ProtobufSourcesField
     output = PythonSources
 
 
@@ -76,11 +79,11 @@ async def generate_python_from_protobuf(
         StrippedSourceFiles,
         SourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.closure),
-            for_sources_types=(ProtobufSources,),
+            for_sources_types=(ProtobufSourcesField,),
         ),
     )
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]])
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourcesField]])
     )
 
     (
@@ -111,7 +114,7 @@ async def generate_python_from_protobuf(
             VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),
         )
 
-        if request.protocol_target.get(ProtobufGrpcToggle).value:
+        if request.protocol_target.get(ProtobufGrpcToggleField).value:
             mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
@@ -134,7 +137,7 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrpcToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggleField).value
         else None
     )
 
