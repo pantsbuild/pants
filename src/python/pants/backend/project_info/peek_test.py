@@ -8,7 +8,7 @@ import pytest
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.target_types import ArchiveTarget, Files, GenericTarget
+from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -26,7 +26,9 @@ from pants.testutil.rule_runner import RuleRunner
         pytest.param(
             [
                 TargetData(
-                    Files({"sources": ["*.txt"]}, Address("example", target_name="files_target")),
+                    FilesGeneratorTarget(
+                        {"sources": ["*.txt"]}, Address("example", target_name="files_target")
+                    ),
                     ("foo.txt", "bar.txt"),
                     tuple(),
                 )
@@ -55,7 +57,9 @@ from pants.testutil.rule_runner import RuleRunner
         pytest.param(
             [
                 TargetData(
-                    Files({"sources": []}, Address("example", target_name="files_target")),
+                    FilesGeneratorTarget(
+                        {"sources": []}, Address("example", target_name="files_target")
+                    ),
                     tuple(),
                     tuple(),
                 )
@@ -82,7 +86,7 @@ from pants.testutil.rule_runner import RuleRunner
         pytest.param(
             [
                 TargetData(
-                    Files(
+                    FilesGeneratorTarget(
                         {"sources": ["*.txt"], "tags": ["zippable"]},
                         Address("example", target_name="files_target"),
                     ),
@@ -150,7 +154,7 @@ def rule_runner() -> RuleRunner:
             *peek.rules(),
             QueryRule(TargetDatas, [AddressSpecs]),
         ],
-        target_types=[Files, GenericTarget],
+        target_types=[FilesGeneratorTarget, GenericTarget],
     )
 
 
@@ -183,7 +187,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
                 ("foo:baz",),
             ),
             TargetData(
-                Files({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+                FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
                 ("foo/a.txt", "foo/b.txt"),
                 tuple(),
             ),

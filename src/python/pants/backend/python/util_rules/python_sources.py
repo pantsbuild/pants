@@ -7,7 +7,7 @@ from typing import Iterable, List, Tuple, Type
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import ancestor_files
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourcesSources
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -71,7 +71,7 @@ class PythonSourceFilesRequest:
         if self.include_resources:
             types.append(ResourcesSources)
         if self.include_files:
-            types.append(FilesSources)
+            types.append(FileSourcesField)
         return tuple(types)
 
 

@@ -23,7 +23,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourcesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
@@ -172,7 +172,7 @@ async def setup_shunit2_for_target(
         SourceFiles,
         SourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.dependencies),
-            for_sources_types=(ShellSourcesField, FilesSources, ResourcesSources),
+            for_sources_types=(ShellSourcesField, FileSourcesField, ResourcesSources),
             enable_codegen=True,
         ),
     )

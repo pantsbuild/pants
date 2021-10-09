@@ -14,8 +14,8 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     ArchiveFieldSet,
     ArchiveTarget,
-    Files,
-    FilesSources,
+    FilesGeneratorTarget,
+    FileSourcesField,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
 )
@@ -44,7 +44,7 @@ def test_relocated_files() -> None:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[Files, RelocatedFiles],
+        target_types=[FilesGeneratorTarget, RelocatedFiles],
     )
 
     def assert_prefix_mapping(
@@ -91,7 +91,7 @@ def test_relocated_files() -> None:
                 SourceFilesRequest(
                     (tgt.get(Sources) for tgt in transitive_targets.closure),
                     enable_codegen=True,
-                    for_sources_types=(FilesSources,),
+                    for_sources_types=(FileSourcesField,),
                 )
             ],
         )
@@ -166,11 +166,9 @@ def test_archive() -> None:
             *python_target_type_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
-        target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
+        target_types=[ArchiveTarget, FilesGeneratorTarget, RelocatedFiles, PexBinary],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
-    )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
     rule_runner.write_files(
         {

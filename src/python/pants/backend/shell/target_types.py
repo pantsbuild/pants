@@ -259,7 +259,7 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandSources(Sources):
+class ShellCommandSourcesField(Sources):
     # We solely register this field for codegen to work.
     alias = "_sources"
     uses_source_roots = False
@@ -307,7 +307,7 @@ class ShellCommand(Target):
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
-        ShellCommandSources,
+        ShellCommandSourcesField,
         ShellCommandTimeout,
         ShellCommandToolsField,
     )

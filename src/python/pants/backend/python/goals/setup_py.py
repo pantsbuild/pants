@@ -42,7 +42,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourcesSources
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -713,10 +713,10 @@ async def get_sources(
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
-    files_targets = targets_with_sources_types(
-        [FilesSources], transitive_targets.closure, union_membership
+    file_targets = targets_with_sources_types(
+        [FileSourcesField], transitive_targets.closure, union_membership
     )
-    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
+    targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
 
     python_sources_request = PythonSourceFilesRequest(
         targets=targets, include_resources=False, include_files=False
