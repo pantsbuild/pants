@@ -5,19 +5,12 @@
 python_library(
   name='entry_point',
   sources=['__main__.py'],
-  dependencies=[
-    'src/python/pants/bin:pants_loader',
-  ],
+  dependencies=['src/python/pants/bin:pants_loader'],
 )
 
 python_distribution(
   name='pants-packaged',
-  dependencies=[
-    ':dummy_c',
-    ':entry_point',
-    ':version',
-    ':py_typed',
-  ],
+  dependencies=[':entry_point', ':resources'],
   # Because we have native code, this will cause the wheel to use whatever the ABI is for the
   # interpreter used to run setup.py, e.g. `cp36m-macosx_10_15_x86_64`.
   sdist = False,
@@ -38,15 +31,6 @@ python_distribution(
   },
 )
 
-# NB: we use this to avoid clang/gcc complaining `error: no input files` when building
-# `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
-# use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
-# native code. This is just a dummy file.
-resources(
-  name="dummy_c",
-  sources=['dummy.c'],
-)
-
 python_library(
   name='conftest',
   sources=['conftest.py'],
@@ -55,17 +39,11 @@ python_library(
 python_library(
   name='version',
   sources=['version.py'],
-  dependencies = [
-    ':version-resource',
-  ],
+  dependencies=["./VERSION:resources"],
 )
 
-resources(
-  name='version-resource',
-  sources=['VERSION'],
-)
-
-resources(
-  name="py_typed",
-  sources=["py.typed"],
-)
+# NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
+# `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
+# use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
+# native code. This is just a dummy file.
+resources(name="resources", sources=["VERSION", "py.typed", "dummy.c"])

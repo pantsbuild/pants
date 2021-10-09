@@ -11,14 +11,19 @@ import pytest
 from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest
 from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
-from pants.core.target_types import FilesGeneratorTarget
+from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourcesField
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
-from pants.engine.target import GeneratedSources, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    GeneratedSources,
+    Sources,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -34,7 +39,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[ShellCommand, ShellSourcesGeneratorTarget, FilesGeneratorTarget],
+        target_types=[
+            ShellCommand,
+            ShellSourcesGeneratorTarget,
+            ArchiveTarget,
+            FilesGeneratorTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -231,4 +241,87 @@ def test_tool_search_path_stable(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src", target_name="paths"),
         expected_contents={},
+    )
+
+
+def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="content-gen",
+                  command="echo contents > contents.txt",
+                  tools=["echo"],
+                  outputs=["contents.txt"]
+                )
+                """
+            ),
+        }
+    )
+
+    src_contents = rule_runner.get_target(Address("src", target_name="content-gen"))
+    sources = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(
+                (src_contents[Sources],),
+                enable_codegen=True,
+                for_sources_types=(FileSourcesField,),
+            )
+        ],
+    )
+
+    assert sources.files == ("src/contents.txt",)
+    assert sources.unrooted_files == sources.files
+
+    contents = rule_runner.request(DigestContents, [sources.snapshot.digest])
+    assert len(contents) == 1
+
+    fc = contents[0]
+    assert fc.path == "src/contents.txt"
+    assert fc.content == b"contents\n"
+
+
+def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg-gen",
+                  command="echo message > msg.txt",
+                  tools=["echo"],
+                  outputs=["msg.txt"],
+                )
+
+                archive(
+                  name="msg-archive",
+                  format="zip",
+                  files=[":msg-gen"],
+                )
+
+                experimental_shell_command(
+                  name="test",
+                  command="ls .",
+                  tools=["ls"],
+                  log_output=True,
+                  dependencies=[":msg-archive"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner, Address("src", target_name="test"), expected_contents={}
+    )
+    assert_logged(
+        caplog,
+        [
+            (logging.INFO, "msg-archive.zip\n"),
+        ],
     )
