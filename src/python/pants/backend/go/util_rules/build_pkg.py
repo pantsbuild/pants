@@ -50,6 +50,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
     # These dependencies themselves often have dependencies, such that we recursively build.
     direct_dependencies: tuple[BuildGoPackageRequest, ...]
 
+    for_tests: bool = False
+
     def debug_hint(self) -> str | None:
         return self.import_path
 
@@ -154,6 +156,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
     address: Address
     is_main: bool = False
+    for_tests: bool = False
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -176,6 +179,11 @@ async def setup_build_go_package_target_request(
             target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
         )
         go_file_names = _first_party_pkg_info.go_files
+        if request.for_tests:
+            # TODO: Build the test sources separately and link the two object files into the package archive?
+            # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
+            #   need to do something similar?
+            go_file_names += _first_party_pkg_info.test_files
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyModulePathField):
@@ -224,6 +232,7 @@ async def setup_build_go_package_target_request(
         go_file_names=go_file_names,
         s_file_names=s_file_names,
         direct_dependencies=direct_dependencies,
+        for_tests=request.for_tests,
     )
 
 

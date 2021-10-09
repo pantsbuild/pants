@@ -14,22 +14,24 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class AnalyzeTestSourcesRequest:
     digest: Digest
-    paths: FrozenOrderedSet[str]
+    test_paths: FrozenOrderedSet[str]
+    xtest_paths: FrozenOrderedSet[str]
 
 
 @dataclass(frozen=True)
-class GoTestCase:
+class TestFunc:
     name: str
     package: str
 
     @classmethod
-    def from_json_dict(cls, data: dict) -> GoTestCase:
+    def from_json_dict(cls, data: dict) -> TestFunc:
         return cls(name=data["name"], package=data["package"])
 
 
@@ -52,10 +54,29 @@ class Example:
 
 @dataclass(frozen=True)
 class AnalyzedTestSources:
-    tests: FrozenOrderedSet[GoTestCase]
-    benchmarks: FrozenOrderedSet[GoTestCase]
+    tests: FrozenOrderedSet[TestFunc]
+    benchmarks: FrozenOrderedSet[TestFunc]
     examples: FrozenOrderedSet[Example]
-    test_main: GoTestCase | None
+    test_main: TestFunc | None
+
+    TEST_PKG = "_test"
+    XTEST_PKG = "_xtest"
+
+    def has_at_least_one_test(self):
+        return (
+            any(t.package == self.TEST_PKG for t in self.tests)
+            or any(b.package == self.TEST_PKG for b in self.benchmarks)
+            or any(e.package == self.TEST_PKG for e in self.examples)
+            or (self.test_main and self.test_main.package == self.TEST_PKG)
+        )
+
+    def has_at_least_one_xtest(self):
+        return (
+            any(t.package == self.XTEST_PKG for t in self.tests)
+            or any(b.package == self.XTEST_PKG for b in self.benchmarks)
+            or any(e.package == self.XTEST_PKG for e in self.examples)
+            or (self.test_main and self.test_main.package == self.XTEST_PKG)
+        )
 
     @classmethod
     def from_json_dict(cls, data: dict) -> AnalyzedTestSources:
@@ -64,12 +85,12 @@ class AnalyzedTestSources:
 
         test_main = None
         if "test_main" in data:
-            test_main = GoTestCase.from_json_dict(data["test_main"])
+            test_main = TestFunc.from_json_dict(data["test_main"])
 
         return cls(
-            tests=FrozenOrderedSet([GoTestCase.from_json_dict(d) for d in data.get("tests") or []]),
+            tests=FrozenOrderedSet([TestFunc.from_json_dict(d) for d in data.get("tests") or []]),
             benchmarks=FrozenOrderedSet(
-                [GoTestCase.from_json_dict(d) for d in data.get("benchmarks") or []]
+                [TestFunc.from_json_dict(d) for d in data.get("benchmarks") or []]
             ),
             examples=FrozenOrderedSet(
                 [Example.from_json_dict(d) for d in data.get("examples") or []]
@@ -135,12 +156,16 @@ async def analyze_test_sources(
 ) -> AnalyzedTestSources:
     input_digest = await Get(Digest, MergeDigests([request.digest, analyzer.digest]))
 
+    test_paths = tuple(f"{AnalyzedTestSources.TEST_PKG}:{path}" for path in request.test_paths)
+    xtest_paths = tuple(f"{AnalyzedTestSources.XTEST_PKG}:{path}" for path in request.xtest_paths)
+
     result = await Get(
         ProcessResult,
         Process(
-            argv=(analyzer.PATH, *request.paths),
+            argv=(analyzer.PATH, *test_paths, *xtest_paths),
             input_digest=input_digest,
             description="Analyze Go test sources.",
+            level=LogLevel.DEBUG,
         ),
     )
 
