@@ -6,10 +6,10 @@
 # {
 #   "version": 2,
 #   "valid_for_interpreter_constraints": [
-#     "CPython>=3.6.1"
+#     "CPython>=3.7"
 #   ],
 #   "generated_with_requirements": [
-#     "pyupgrade==2.29.0"
+#     "pyupgrade<2.30,>=2.29.0"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
