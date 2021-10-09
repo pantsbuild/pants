@@ -21,7 +21,7 @@ from pants.backend.go.util_rules.tests_analysis import (
     AnalyzedTestSources,
     AnalyzeTestSourcesRequest,
     Example,
-    GoTestCase,
+    TestFunc,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
@@ -62,18 +62,35 @@ def test_basic_test_analysis(rule_runner: RuleRunner) -> None:
                 func Test(t *testing.T) {
                 }
                 """
-            )
+            ),
+            "bar_test.go": dedent(
+                """
+                package foo_test
+
+                func BenchmarkThisIsABenchmark(b *testing.B) {
+                }
+
+                func Benchmark(b *testing.B) {
+                }
+                """
+            ),
         },
     ).digest
 
     metadata = rule_runner.request(
         AnalyzedTestSources,
-        [AnalyzeTestSourcesRequest(input_digest, FrozenOrderedSet(["foo_test.go"]))],
+        [
+            AnalyzeTestSourcesRequest(
+                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(["bar_test.go"])
+            )
+        ],
     )
 
     assert metadata == AnalyzedTestSources(
-        tests=FrozenOrderedSet([GoTestCase("TestThisIsATest", "foo"), GoTestCase("Test", "foo")]),
-        benchmarks=FrozenOrderedSet(),
+        tests=FrozenOrderedSet([TestFunc("TestThisIsATest", "_test"), TestFunc("Test", "_test")]),
+        benchmarks=FrozenOrderedSet(
+            [TestFunc("BenchmarkThisIsABenchmark", "_xtest"), TestFunc("Benchmark", "_xtest")]
+        ),
         examples=FrozenOrderedSet(),
         test_main=None,
     )
@@ -108,7 +125,11 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
 
     metadata = rule_runner.request(
         AnalyzedTestSources,
-        [AnalyzeTestSourcesRequest(input_digest, FrozenOrderedSet(["foo_test.go"]))],
+        [
+            AnalyzeTestSourcesRequest(
+                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet()
+            )
+        ],
     )
 
     assert metadata == AnalyzedTestSources(
@@ -117,12 +138,12 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
         examples=FrozenOrderedSet(
             [
                 Example(
-                    package="foo", name="ExampleAnotherOne", output="foo\nbar\n", unordered=False
+                    package="_test", name="ExampleAnotherOne", output="foo\nbar\n", unordered=False
                 ),
                 Example(
-                    package="foo", name="ExampleEmptyOutputExpected", output="", unordered=False
+                    package="_test", name="ExampleEmptyOutputExpected", output="", unordered=False
                 ),
-                Example(package="foo", name="ExampleSomeOutput", output="foo\n", unordered=False),
+                Example(package="_test", name="ExampleSomeOutput", output="foo\n", unordered=False),
             ]
         ),
         test_main=None,
@@ -159,7 +180,11 @@ def test_incorrect_signatures(rule_runner: RuleRunner) -> None:
         with pytest.raises(ExecutionError) as exc_info:
             rule_runner.request(
                 AnalyzedTestSources,
-                [AnalyzeTestSourcesRequest(input_digest, FrozenOrderedSet(["foo_test.go"]))],
+                [
+                    AnalyzeTestSourcesRequest(
+                        input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet()
+                    )
+                ],
             )
         assert "" in str(exc_info.value)
 
@@ -186,7 +211,9 @@ def test_duplicate_test_mains_same_file(rule_runner: RuleRunner) -> None:
             AnalyzedTestSources,
             [
                 AnalyzeTestSourcesRequest(
-                    input_digest, FrozenOrderedSet(["foo_test.go", "bar_test.go"])
+                    input_digest,
+                    FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                    FrozenOrderedSet(),
                 )
             ],
         )
@@ -221,7 +248,9 @@ def test_duplicate_test_mains_different_files(rule_runner: RuleRunner) -> None:
             AnalyzedTestSources,
             [
                 AnalyzeTestSourcesRequest(
-                    input_digest, FrozenOrderedSet(["foo_test.go", "bar_test.go"])
+                    input_digest,
+                    FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                    FrozenOrderedSet(),
                 )
             ],
         )
