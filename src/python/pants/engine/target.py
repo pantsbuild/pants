@@ -15,6 +15,7 @@ from pathlib import PurePath
 from typing import (
     Any,
     ClassVar,
+    Dict,
     Generic,
     Iterable,
     Iterator,
@@ -24,6 +25,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     get_type_hints,
 )
@@ -122,12 +124,12 @@ class Field:
     removal_hint: ClassVar[str | None] = None
 
     @final
-    def __init__(self, raw_value: Any | None, address: Address) -> None:
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         self._check_deprecated(raw_value, address)
-        self.value: ImmutableValue | None = self.compute_value(raw_value, address)
+        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
 
     @classmethod
-    def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any optional validation and/or hydration here. For example, you may want
@@ -142,7 +144,7 @@ class Field:
         return raw_value
 
     @classmethod
-    def _check_deprecated(cls, raw_value: Any | None, address: Address) -> None:
+    def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
         if not cls.removal_version or address.is_generated_target or raw_value is None:
             return
         if not cls.removal_hint:
@@ -168,7 +170,7 @@ class Field:
     def __hash__(self) -> int:
         return hash((self.__class__, self.value))
 
-    def __eq__(self, other: Any | Field) -> bool:
+    def __eq__(self, other: Union[Any, Field]) -> bool:
         if not isinstance(other, Field):
             return NotImplemented
         return (self.__class__, self.value) == (other.__class__, other.value)
@@ -223,7 +225,7 @@ class AsyncFieldMixin(Field):
     """
 
     @final  # type: ignore[misc]
-    def __init__(self, raw_value: Any | None, address: Address) -> None:
+    def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         super().__init__(raw_value, address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
@@ -243,7 +245,7 @@ class AsyncFieldMixin(Field):
     def __hash__(self) -> int:
         return hash((self.__class__, self.value, self.address))
 
-    def __eq__(self, other: Any | AsyncFieldMixin) -> bool:
+    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
         if not isinstance(other, AsyncFieldMixin):
             return NotImplemented
         return (self.__class__, self.value, self.address) == (
@@ -273,7 +275,7 @@ class Target:
 
     # Subclasses must define these
     alias: ClassVar[str]
-    core_fields: ClassVar[tuple[type[Field], ...]]
+    core_fields: ClassVar[Tuple[Type[Field], ...]]
     help: ClassVar[str]
 
     removal_version: ClassVar[str | None] = None
@@ -285,13 +287,13 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: tuple[type[Field], ...]
-    field_values: FrozenDict[type[Field], Field]
+    plugin_fields: Tuple[Type[Field], ...]
+    field_values: FrozenDict[Type[Field], Field]
 
     @final
     def __init__(
         self,
-        unhydrated_values: dict[str, Any],
+        unhydrated_values: Dict[str, Any],
         address: Address,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
@@ -339,7 +341,7 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> tuple[type[Field], ...]:
+    def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
     @final
@@ -371,7 +373,7 @@ class Target:
     def __hash__(self) -> int:
         return hash((self.__class__, self.address, self.field_values))
 
-    def __eq__(self, other: Target | Any) -> bool:
+    def __eq__(self, other: Union[Target, Any]) -> bool:
         if not isinstance(other, Target):
             return NotImplemented
         return (self.__class__, self.address, self.field_values) == (
@@ -382,14 +384,14 @@ class Target:
 
     @final
     @classmethod
-    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
         return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
 
     @final
     @classmethod
     def _find_registered_field_subclass(
-        cls, requested_field: type[_F], *, registered_fields: Iterable[type[Field]]
-    ) -> type[_F] | None:
+        cls, requested_field: Type[_F], *, registered_fields: Iterable[Type[Field]]
+    ) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
@@ -408,7 +410,7 @@ class Target:
         return cast(Optional[Type[_F]], subclass)
 
     @final
-    def _maybe_get(self, field: type[_F]) -> _F | None:
+    def _maybe_get(self, field: Type[_F]) -> Optional[_F]:
         result = self.field_values.get(field, None)
         if result is not None:
             return cast(_F, result)
@@ -420,7 +422,7 @@ class Target:
         return None
 
     @final
-    def __getitem__(self, field: type[_F]) -> _F:
+    def __getitem__(self, field: Type[_F]) -> _F:
         """Get the requested `Field` instance belonging to this target.
 
         If the `Field` is not registered on this `Target` type, this method will raise a
@@ -441,7 +443,7 @@ class Target:
         )
 
     @final
-    def get(self, field: type[_F], *, default_raw_value: Any | None = None) -> _F:
+    def get(self, field: Type[_F], *, default_raw_value: Optional[Any] = None) -> _F:
         """Get the requested `Field` instance belonging to this target.
 
         This will return an instance of the requested field type, e.g. an instance of
@@ -467,7 +469,7 @@ class Target:
     @final
     @classmethod
     def _has_fields(
-        cls, fields: Iterable[type[Field]], *, registered_fields: Iterable[type[Field]]
+        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
     ) -> bool:
         unrecognized_fields = [field for field in fields if field not in registered_fields]
         if not unrecognized_fields:
@@ -481,7 +483,7 @@ class Target:
         return True
 
     @final
-    def has_field(self, field: type[Field]) -> bool:
+    def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
@@ -491,7 +493,7 @@ class Target:
         return self.has_fields([field])
 
     @final
-    def has_fields(self, fields: Iterable[type[Field]]) -> bool:
+    def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
@@ -502,7 +504,7 @@ class Target:
 
     @final
     @classmethod
-    def class_field_types(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
         """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
@@ -512,7 +514,7 @@ class Target:
 
     @final
     @classmethod
-    def class_has_field(cls, field: type[Field], union_membership: UnionMembership) -> bool:
+    def class_has_field(cls, field: Type[Field], union_membership: UnionMembership) -> bool:
         """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
         method."""
         return cls.class_has_fields([field], union_membership)
@@ -520,7 +522,7 @@ class Target:
     @final
     @classmethod
     def class_has_fields(
-        cls, fields: Iterable[type[Field]], union_membership: UnionMembership
+        cls, fields: Iterable[Type[Field]], union_membership: UnionMembership
     ) -> bool:
         """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
         method."""
@@ -528,7 +530,7 @@ class Target:
 
     @final
     @classmethod
-    def class_get_field(cls, field: type[_F], union_membership: UnionMembership) -> type[_F]:
+    def class_get_field(cls, field: Type[_F], union_membership: UnionMembership) -> Type[_F]:
         """Get the requested Field type registered with this target type.
 
         This will error if the field is not registered, so you should call Target.class_has_field()
@@ -553,7 +555,7 @@ class Target:
 
     @final
     @classmethod
-    def register_plugin_field(cls, field: type[Field]) -> UnionRule:
+    def register_plugin_field(cls, field: Type[Field]) -> UnionRule:
         """Register a new field on the target type.
 
         In the `rules()` register.py entry-point, include
@@ -629,7 +631,7 @@ class CoarsenedTarget(EngineAwareParameter):
     def debug_hint(self) -> str:
         return str(self)
 
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> Dict[str, Any]:
         return {"addresses": [t.address.spec for t in self.members]}
 
     @property
@@ -687,7 +689,7 @@ class TransitiveTargets:
     and in `dependencies`.
     """
 
-    roots: tuple[Target, ...]
+    roots: Tuple[Target, ...]
     dependencies: FrozenOrderedSet[Target]
 
     @memoized_property
@@ -705,7 +707,7 @@ class TransitiveTargetsRequest:
     TransitiveTargetsRequest([addr1, addr2])`.
     """
 
-    roots: tuple[Address, ...]
+    roots: Tuple[Address, ...]
     include_special_cased_deps: bool
 
     def __init__(
@@ -718,13 +720,13 @@ class TransitiveTargetsRequest:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
-    aliases_to_types: FrozenDict[str, type[Target]]
+    aliases_to_types: FrozenDict[str, Type[Target]]
 
-    def __init__(self, aliases_to_types: Mapping[str, type[Target]]) -> None:
+    def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
         self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
-    def create(cls, target_types: Iterable[type[Target]]) -> RegisteredTargetTypes:
+    def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
         result = {}
         for target_type in sorted(target_types, key=lambda tt: tt.alias):
             result[target_type.alias] = target_type
@@ -848,7 +850,7 @@ def generate_file_level_targets(
     def gen_tgt(full_fp: str, address: Address) -> Target:
         generated_target_fields = {}
         for field in generator.field_values.values():
-            value: ImmutableValue | None
+            value: Optional[ImmutableValue]
             if isinstance(field, Sources):
                 if not bool(matches_filespec(field.filespec, paths=[full_fp])):
                     raise AssertionError(
@@ -875,9 +877,9 @@ def generate_file_level_targets(
 
 
 def _get_field_set_fields_from_target(
-    field_set: type[FieldSet], target: Target
-) -> dict[str, Field]:
-    all_expected_fields: dict[str, type[Field]] = {
+    field_set: Type[FieldSet], target: Target
+) -> Dict[str, Field]:
+    all_expected_fields: Dict[str, Type[Field]] = {
         name: field_type
         for name, field_type in get_type_hints(field_set).items()
         if isinstance(field_type, type) and issubclass(field_type, Field)
@@ -934,7 +936,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         print(field_set.sources)
     """
 
-    required_fields: ClassVar[tuple[type[Field], ...]]
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
 
@@ -959,8 +961,8 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @final
     @classmethod
     def applicable_target_types(
-        cls, target_types: Iterable[type[Target]], union_membership: UnionMembership
-    ) -> tuple[type[Target], ...]:
+        cls, target_types: Iterable[Type[Target]], union_membership: UnionMembership
+    ) -> Tuple[Type[Target], ...]:
         return tuple(
             tgt_type
             for tgt_type in target_types
@@ -969,7 +971,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def create(cls: type[_FS], tgt: Target) -> _FS:
+    def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
             address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
         )
@@ -977,7 +979,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     def debug_hint(self) -> str:
         return self.address.spec
 
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> Dict[str, Any]:
         return {"address": self.address.spec}
 
     def __repr__(self) -> str:
@@ -989,13 +991,13 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSets(Generic[_FS]):
-    mapping: FrozenDict[Target, tuple[_FS, ...]]
+    mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
     def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
         self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
 
     @memoized_property
-    def field_sets(self) -> tuple[_FS, ...]:
+    def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(
             itertools.chain.from_iterable(
                 field_sets_per_target for field_sets_per_target in self.mapping.values()
@@ -1003,7 +1005,7 @@ class TargetRootsToFieldSets(Generic[_FS]):
         )
 
     @memoized_property
-    def targets(self) -> tuple[Target, ...]:
+    def targets(self) -> Tuple[Target, ...]:
         return tuple(self.mapping.keys())
 
 
@@ -1016,7 +1018,7 @@ class NoApplicableTargetsBehavior(Enum):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
-    field_set_superclass: type[_FS]
+    field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
@@ -1025,7 +1027,7 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
 
     def __init__(
         self,
-        field_set_superclass: type[_FS],
+        field_set_superclass: Type[_FS],
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
@@ -1041,23 +1043,23 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
 @dataclass(unsafe_hash=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
-    collection: tuple[tuple[_FS, ...], ...]
+    collection: Tuple[Tuple[_FS, ...], ...]
 
     def __init__(self, collection: Iterable[Iterable[_FS]]):
         self.collection = tuple(tuple(iterable) for iterable in collection)
 
     @memoized_property
-    def field_sets(self) -> tuple[_FS, ...]:
+    def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
-    field_set_superclass: type[_FS]
-    targets: tuple[Target, ...]
+    field_set_superclass: Type[_FS]
+    targets: Tuple[Target, ...]
 
-    def __init__(self, field_set_superclass: type[_FS], targets: Iterable[Target]):
+    def __init__(self, field_set_superclass: Type[_FS], targets: Iterable[Target]):
         self.field_set_superclass = field_set_superclass
         self.targets = tuple(targets)
 
@@ -1094,7 +1096,7 @@ class InvalidFieldTypeException(InvalidFieldException):
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Any | None, *, expected_type: str
+        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
     ) -> None:
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
@@ -1112,7 +1114,7 @@ class InvalidFieldChoiceException(InvalidFieldException):
         self,
         address: Address,
         field_alias: str,
-        raw_value: Any | None,
+        raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
     ) -> None:
@@ -1165,13 +1167,13 @@ class ScalarField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_type: ClassVar[type[T]]
+    expected_type: ClassVar[Type[T]]
     expected_type_description: ClassVar[str]
-    value: T | None
-    default: ClassVar[T | None] = None
+    value: Optional[T]
+    default: ClassVar[Optional[T]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Any | None, address: Address) -> T | None:
+    def compute_value(cls, raw_value: Optional[Any], address: Address) -> Optional[T]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
             raise InvalidFieldTypeException(
@@ -1210,7 +1212,7 @@ class TriBoolField(ScalarField[bool]):
     expected_type_description = "a boolean or None"
 
     @classmethod
-    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None:
+    def compute_value(cls, raw_value: Optional[bool], address: Address) -> Optional[bool]:
         return super().compute_value(raw_value, address)
 
 
@@ -1219,7 +1221,7 @@ class IntField(ScalarField[int]):
     expected_type_description = "an integer"
 
     @classmethod
-    def compute_value(cls, raw_value: int | None, address: Address) -> int | None:
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
         return super().compute_value(raw_value, address)
 
 
@@ -1228,7 +1230,7 @@ class FloatField(ScalarField[float]):
     expected_type_description = "a float"
 
     @classmethod
-    def compute_value(cls, raw_value: float | None, address: Address) -> float | None:
+    def compute_value(cls, raw_value: Optional[float], address: Address) -> Optional[float]:
         return super().compute_value(raw_value, address)
 
 
@@ -1241,10 +1243,10 @@ class StringField(ScalarField[str]):
 
     expected_type = str
     expected_type_description = "a string"
-    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None] = None
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
             valid_choices = set(
@@ -1278,15 +1280,15 @@ class SequenceField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_element_type: ClassVar[type[T]]
+    expected_element_type: ClassVar[Type[T]]
     expected_type_description: ClassVar[str]
-    value: tuple[T, ...] | None
-    default: ClassVar[tuple[T, ...] | None] = None
+    value: Optional[Tuple[T, ...]]
+    default: ClassVar[Optional[Tuple[T, ...]]] = None
 
     @classmethod
     def compute_value(
-        cls, raw_value: Iterable[Any] | None, address: Address
-    ) -> tuple[T, ...] | None:
+        cls, raw_value: Optional[Iterable[Any]], address: Address
+    ) -> Optional[Tuple[T, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
@@ -1308,19 +1310,19 @@ class StringSequenceField(SequenceField[str]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Iterable[str] | None, address: Address
-    ) -> tuple[str, ...] | None:
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
         return super().compute_value(raw_value, address)
 
 
 class DictStringToStringField(Field):
-    value: FrozenDict[str, str] | None
-    default: ClassVar[FrozenDict[str, str] | None] = None
+    value: Optional[FrozenDict[str, str]]
+    default: ClassVar[Optional[FrozenDict[str, str]]] = None
 
     @classmethod
     def compute_value(
-        cls, raw_value: dict[str, str] | None, address: Address
-    ) -> FrozenDict[str, str] | None:
+        cls, raw_value: Optional[Dict[str, str]], address: Address
+    ) -> Optional[FrozenDict[str, str]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
@@ -1335,13 +1337,13 @@ class DictStringToStringField(Field):
 
 
 class NestedDictStringToStringField(Field):
-    value: FrozenDict[str, FrozenDict[str, str]] | None
-    default: ClassVar[FrozenDict[str, FrozenDict[str, str]] | None] = None
+    value: Optional[FrozenDict[str, FrozenDict[str, str]]]
+    default: ClassVar[Optional[FrozenDict[str, FrozenDict[str, str]]]] = None
 
     @classmethod
     def compute_value(
-        cls, raw_value: dict[str, dict[str, str]] | None, address: Address
-    ) -> FrozenDict[str, FrozenDict[str, str]] | None:
+        cls, raw_value: Optional[Dict[str, Dict[str, str]]], address: Address
+    ) -> Optional[FrozenDict[str, FrozenDict[str, str]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
@@ -1364,13 +1366,13 @@ class NestedDictStringToStringField(Field):
 
 
 class DictStringToStringSequenceField(Field):
-    value: FrozenDict[str, tuple[str, ...]] | None
-    default: ClassVar[FrozenDict[str, tuple[str, ...]] | None] = None
+    value: Optional[FrozenDict[str, Tuple[str, ...]]]
+    default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
-        cls, raw_value: dict[str, Iterable[str]] | None, address: Address
-    ) -> FrozenDict[str, tuple[str, ...]] | None:
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
@@ -1412,7 +1414,7 @@ class Sources(StringSequenceField, AsyncFieldMixin):
 
     alias = "sources"
 
-    expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
+    expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
 
@@ -1523,7 +1525,7 @@ class Sources(StringSequenceField, AsyncFieldMixin):
 
     @final
     @classmethod
-    def can_generate(cls, output_type: type[Sources], union_membership: UnionMembership) -> bool:
+    def can_generate(cls, output_type: Type["Sources"], union_membership: UnionMembership) -> bool:
         """Can this Sources field be used to generate the output_type?
 
         Generally, this method does not need to be used. Most call sites can simply use the below,
@@ -1554,14 +1556,14 @@ class Sources(StringSequenceField, AsyncFieldMixin):
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest(EngineAwareParameter):
     field: Sources
-    for_sources_types: tuple[type[Sources], ...]
+    for_sources_types: Tuple[Type[Sources], ...]
     enable_codegen: bool
 
     def __init__(
         self,
         field: Sources,
         *,
-        for_sources_types: Iterable[type[Sources]] = (Sources,),
+        for_sources_types: Iterable[Type[Sources]] = (Sources,),
         enable_codegen: bool = False,
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
@@ -1607,7 +1609,7 @@ class HydratedSources:
 
     snapshot: Snapshot
     filespec: Filespec
-    sources_type: type[Sources] | None
+    sources_type: Optional[Type[Sources]]
 
 
 @union
@@ -1642,8 +1644,8 @@ class GenerateSourcesRequest:
     protocol_sources: Snapshot
     protocol_target: Target
 
-    input: ClassVar[type[Sources]]
-    output: ClassVar[type[Sources]]
+    input: ClassVar[Type[Sources]]
+    output: ClassVar[Type[Sources]]
 
 
 @dataclass(frozen=True)
@@ -1710,10 +1712,10 @@ class SecondaryOwnerMixin(ABC):
 
 
 def targets_with_sources_types(
-    sources_types: Iterable[type[Sources]],
+    sources_types: Iterable[Type[Sources]],
     targets: Iterable[Target],
     union_membership: UnionMembership,
-) -> tuple[Target, ...]:
+) -> Tuple[Target, ...]:
     """Return all targets either with the specified sources subclass(es) or which can generate those
     sources."""
     return tuple(
@@ -1792,7 +1794,7 @@ class ExplicitlyProvidedDependencies:
     ignores: FrozenOrderedSet[Address]
 
     @memoized_method
-    def any_are_covered_by_includes(self, addresses: tuple[Address, ...]) -> bool:
+    def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
         Note that if the input addresses are generated targets, they will still be marked as covered
@@ -1805,7 +1807,7 @@ class ExplicitlyProvidedDependencies:
 
     @memoized_method
     def remaining_after_disambiguation(
-        self, addresses: tuple[Address, ...], owners_must_be_ancestors: bool
+        self, addresses: Tuple[Address, ...], owners_must_be_ancestors: bool
     ) -> frozenset[Address]:
         """All addresses that remain after ineligible candidates are discarded.
 
@@ -1835,7 +1837,7 @@ class ExplicitlyProvidedDependencies:
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
-        ambiguous_addresses: tuple[Address, ...],
+        ambiguous_addresses: Tuple[Address, ...],
         original_address: Address,
         *,
         context: str,
@@ -1869,7 +1871,7 @@ class ExplicitlyProvidedDependencies:
         )
 
     def disambiguated(
-        self, ambiguous_addresses: tuple[Address, ...], owners_must_be_ancestors: bool = False
+        self, ambiguous_addresses: Tuple[Address, ...], owners_must_be_ancestors: bool = False
     ) -> Address | None:
         """If exactly one of the input addresses remains after disambiguation, return it.
 
@@ -1922,7 +1924,7 @@ class InjectDependenciesRequest(EngineAwareParameter, ABC):
     """
 
     dependencies_field: Dependencies
-    inject_for: ClassVar[type[Dependencies]]
+    inject_for: ClassVar[Type[Dependencies]]
 
     def debug_hint(self) -> str:
         return self.dependencies_field.address.spec
@@ -1965,7 +1967,7 @@ class InferDependenciesRequest(EngineAwareParameter):
     """
 
     sources_field: Sources
-    infer_from: ClassVar[type[Sources]]
+    infer_from: ClassVar[Type[Sources]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec
@@ -2059,4 +2061,4 @@ class ProvidesField(Field):
     """An `artifact` that describes how to represent this target to the outside world."""
 
     alias = "provides"
-    default: ClassVar[Any | None] = None
+    default: ClassVar[Optional[Any]] = None
