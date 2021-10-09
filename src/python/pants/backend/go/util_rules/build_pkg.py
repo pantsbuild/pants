@@ -180,8 +180,9 @@ async def setup_build_go_package_target_request(
         go_file_names = _first_party_pkg_info.go_files
         if request.for_tests:
             # TODO: Build the test sources separately and link the two object files into the package archive?
+            # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
+            #   need to do something similar?
             go_file_names += _first_party_pkg_info.test_files
-            # import_path = f"{import_path} [test]"
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyModulePathField):

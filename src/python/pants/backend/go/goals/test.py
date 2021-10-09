@@ -9,7 +9,11 @@ from typing import cast
 
 import pystache
 
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
+from pants.backend.go.target_types import (
+    GoFirstPartyPackageSourcesField,
+    GoImportPathField,
+    GoThirdPartyModulePathField,
+)
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuildGoPackageTargetRequest,
@@ -23,12 +27,12 @@ from pants.backend.go.util_rules.tests_analysis import (
     AnalyzeTestSourcesRequest,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.test import ShowOutput, TestDebugRequest, TestFieldSet, TestResult
+from pants.core.goals.test import ShowOutput, TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.fs import EMPTY_FILE_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -135,14 +139,15 @@ class GoTestFieldSet(TestFieldSet):
 
 
 @rule
-async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
-    # Obtain the package's metadata.
-    pkg_info = await Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address))
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
+async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem) -> TestResult:
+    pkg_info, wrapped_target = await MultiGet(
+        Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
+        Get(WrappedTarget, Address, field_set.address),
+    )
+
     target = wrapped_target.target
     import_path = target[GoImportPathField].value
 
-    # Analyze the test sources to obtain the test names.
     analyzed_sources = await Get(
         AnalyzedTestSources,
         AnalyzeTestSourcesRequest(
@@ -169,7 +174,7 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
             stderr="",
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
-            output_setting=ShowOutput.ALL,
+            output_setting=test_subsystem.output,
         )
 
     # Construct the build request for the package under test.
@@ -184,7 +189,7 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
             'The Go plugin does not currently support external tests ("xtest"\'s).'
         )
 
-    # Generate the synthetic main package which imports the package under test.
+    # Generate the synthetic main package which imports the test and/or xtest packages.
     main_content = FileContent(
         path="_testmain.go",
         content=generate_main(
@@ -194,7 +199,6 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
     main_sources_digest = await Get(Digest, CreateDigest([main_content]))
     main_import_path = "main"
 
-    # Build the test binary's main package.
     built_main_pkg = await Get(
         BuiltGoPackage,
         BuildGoPackageRequest(
@@ -207,7 +211,6 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
         ),
     )
 
-    # Link the test binary.
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files[main_import_path]
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
@@ -225,6 +228,10 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
         ),
     )
 
+    cache_scope = (
+        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
+    )
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -233,7 +240,7 @@ async def run_go_tests(field_set: GoTestFieldSet) -> TestResult:
             description=f"Run Go tests: {field_set.address}",
         ),
     )
-    return TestResult.from_fallible_process_result(result, field_set.address, ShowOutput.ALL)
+    return TestResult.from_fallible_process_result(result, field_set.address, test_subsystem.output)
 
 
 @rule
