@@ -238,6 +238,7 @@ async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem)
             ["./test_runner"],
             input_digest=binary.digest,
             description=f"Run Go tests: {field_set.address}",
+            cache_scope=cache_scope,
         ),
     )
     return TestResult.from_fallible_process_result(result, field_set.address, test_subsystem.output)
