@@ -8,7 +8,7 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Tuple, Type, Union, cast, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
@@ -71,22 +71,22 @@ class OptionHelpInfo:
     choices: If this option has a constrained set of choices, a tuple of the stringified choices.
     """
 
-    display_args: tuple[str, ...]
+    display_args: Tuple[str, ...]
     comma_separated_display_args: str
-    scoped_cmd_line_args: tuple[str, ...]
-    unscoped_cmd_line_args: tuple[str, ...]
+    scoped_cmd_line_args: Tuple[str, ...]
+    unscoped_cmd_line_args: Tuple[str, ...]
     env_var: str
     config_key: str
-    typ: type
+    typ: Type
     default: Any
     help: str
     deprecation_active: bool
-    deprecated_message: str | None
-    removal_version: str | None
-    removal_hint: str | None
-    choices: tuple[str, ...] | None
-    comma_separated_choices: str | None
-    value_history: OptionValueHistory | None
+    deprecated_message: Optional[str]
+    removal_version: Optional[str]
+    removal_hint: Optional[str]
+    choices: Optional[Tuple[str, ...]]
+    comma_separated_choices: Optional[str]
+    value_history: Optional[OptionValueHistory]
 
 
 @dataclass(frozen=True)
@@ -100,19 +100,19 @@ class OptionScopeHelpInfo:
     scope: str
     description: str
     is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
-    basic: tuple[OptionHelpInfo, ...]
-    advanced: tuple[OptionHelpInfo, ...]
-    deprecated: tuple[OptionHelpInfo, ...]
+    basic: Tuple[OptionHelpInfo, ...]
+    advanced: Tuple[OptionHelpInfo, ...]
+    deprecated: Tuple[OptionHelpInfo, ...]
 
-    def collect_unscoped_flags(self) -> list[str]:
-        flags: list[str] = []
+    def collect_unscoped_flags(self) -> List[str]:
+        flags: List[str] = []
         for options in (self.basic, self.advanced, self.deprecated):
             for ohi in options:
                 flags.extend(ohi.unscoped_cmd_line_args)
         return flags
 
-    def collect_scoped_flags(self) -> list[str]:
-        flags: list[str] = []
+    def collect_scoped_flags(self) -> List[str]:
+        flags: List[str] = []
         for options in (self.basic, self.advanced, self.deprecated):
             for ohi in options:
                 flags.extend(ohi.scoped_cmd_line_args)
@@ -126,7 +126,7 @@ class GoalHelpInfo:
     name: str
     description: str
     is_implemented: bool  # True iff all unions required by the goal are implemented.
-    consumed_scopes: tuple[str, ...]  # The scopes of subsystems consumed by this goal.
+    consumed_scopes: Tuple[str, ...]  # The scopes of subsystems consumed by this goal.
 
 
 def pretty_print_type_hint(hint: Any) -> str:
@@ -151,10 +151,10 @@ class TargetFieldHelpInfo:
     description: str
     type_hint: str
     required: bool
-    default: str | None
+    default: Optional[str]
 
     @classmethod
-    def create(cls, field: type[Field]) -> TargetFieldHelpInfo:
+    def create(cls, field: Type[Field]) -> TargetFieldHelpInfo:
         raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
@@ -192,11 +192,11 @@ class TargetTypeHelpInfo:
     alias: str
     summary: str
     description: str
-    fields: tuple[TargetFieldHelpInfo, ...]
+    fields: Tuple[TargetFieldHelpInfo, ...]
 
     @classmethod
     def create(
-        cls, target_type: type[Target], *, union_membership: UnionMembership
+        cls, target_type: Type[Target], *, union_membership: UnionMembership
     ) -> TargetTypeHelpInfo:
         return cls(
             alias=target_type.alias,
@@ -214,9 +214,9 @@ class TargetTypeHelpInfo:
 class AllHelpInfo:
     """All available help info."""
 
-    scope_to_help_info: dict[str, OptionScopeHelpInfo]
-    name_to_goal_info: dict[str, GoalHelpInfo]
-    name_to_target_type_info: dict[str, TargetTypeHelpInfo]
+    scope_to_help_info: Dict[str, OptionScopeHelpInfo]
+    name_to_goal_info: Dict[str, GoalHelpInfo]
+    name_to_target_type_info: Dict[str, TargetTypeHelpInfo]
 
 
 ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
@@ -301,7 +301,7 @@ class HelpInfoExtracter:
         return default
 
     @staticmethod
-    def stringify_type(t: type) -> str:
+    def stringify_type(t: Type) -> str:
         if t == dict:
             return "{'key1': val1, 'key2': val2, ...}"
         return f"<{t.__name__}>"
@@ -331,7 +331,7 @@ class HelpInfoExtracter:
         return metavar
 
     @staticmethod
-    def compute_choices(kwargs) -> tuple[str, ...] | None:
+    def compute_choices(kwargs) -> Optional[Tuple[str, ...]]:
         """Compute the option choices to display."""
         typ = kwargs.get("type", [])
         member_type = kwargs.get("member_type", str)
