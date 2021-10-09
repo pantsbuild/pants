@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Mapping, Optional, Pattern, Tuple
+from typing import Callable, Iterable, Mapping, Pattern
 
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
@@ -25,7 +25,7 @@ class AddressMap:
     """Maps target adaptors from a byte source."""
 
     path: str
-    name_to_target_adaptor: Dict[str, TargetAdaptor]
+    name_to_target_adaptor: dict[str, TargetAdaptor]
 
     @classmethod
     def parse(
@@ -44,7 +44,7 @@ class AddressMap:
             target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
-        name_to_target_adaptors: Dict[str, TargetAdaptor] = {}
+        name_to_target_adaptors: dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
             name = target_adaptor.name
             if name in name_to_target_adaptors:
@@ -78,7 +78,7 @@ class AddressFamily:
 
     # The directory from which the adaptors were parsed.
     namespace: str
-    name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]]
+    name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
 
     @classmethod
     def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> AddressFamily:
@@ -97,7 +97,7 @@ class AddressFamily:
                     f"but received: {address_map.path!r}"
                 )
 
-        name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]] = {}
+        name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]] = {}
         for address_map in address_maps:
             for name, target_adaptor in address_map.name_to_target_adaptor.items():
                 if name in name_to_target_adaptors:
@@ -121,7 +121,7 @@ class AddressFamily:
         }
 
     @memoized_property
-    def build_file_addresses(self) -> Tuple[BuildFileAddress, ...]:
+    def build_file_addresses(self) -> tuple[BuildFileAddress, ...]:
         return tuple(
             BuildFileAddress(
                 rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
@@ -130,10 +130,10 @@ class AddressFamily:
         )
 
     @property
-    def target_names(self) -> Tuple[str, ...]:
+    def target_names(self) -> tuple[str, ...]:
         return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
 
-    def get_target_adaptor(self, address: Address) -> Optional[TargetAdaptor]:
+    def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)
         if entry is None:
@@ -156,20 +156,20 @@ class AddressFamily:
 class AddressSpecsFilter:
     """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
 
-    tags: Tuple[str, ...]
-    exclude_target_regexps: Tuple[str, ...]
+    tags: tuple[str, ...]
+    exclude_target_regexps: tuple[str, ...]
 
     def __init__(
         self,
         *,
-        tags: Optional[Iterable[str]] = None,
-        exclude_target_regexps: Optional[Iterable[str]] = None,
+        tags: Iterable[str] | None = None,
+        exclude_target_regexps: Iterable[str] | None = None,
     ) -> None:
         self.tags = tuple(tags or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
 
     @memoized_property
-    def _exclude_regexps(self) -> Tuple[Pattern, ...]:
+    def _exclude_regexps(self) -> tuple[Pattern, ...]:
         return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
 
     def _is_excluded_by_pattern(self, address: Address) -> bool:

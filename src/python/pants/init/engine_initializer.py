@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import Any, ClassVar, Iterable, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -56,8 +56,8 @@ class GraphScheduler:
         build_id,
         dynamic_ui: bool = False,
         use_colors=True,
-        session_values: Optional[SessionValues] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> GraphSession:
         session = self.scheduler.new_session(
             build_id,
@@ -78,9 +78,9 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
+    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
 
-    def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
+    def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
         goal_product = self.goal_map.get(goal_name)
         if not goal_product:
@@ -105,7 +105,7 @@ class GraphSession:
         goals: Iterable[str],
         specs: Specs,
         poll: bool = False,
-        poll_delay: Optional[float] = None,
+        poll_delay: float | None = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -202,15 +202,15 @@ class EngineInitializer:
         execution_options: ExecutionOptions,
         *,
         executor: PyExecutor,
-        pants_ignore_patterns: List[str],
+        pants_ignore_patterns: list[str],
         use_gitignore: bool,
         local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        ca_certs_path: Optional[str] = None,
-        build_root: Optional[str] = None,
+        ca_certs_path: str | None = None,
+        build_root: str | None = None,
         include_trace_on_error: bool = True,
-        engine_visualize_to: Optional[str] = None,
+        engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
@@ -279,7 +279,7 @@ class EngineInitializer:
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
 
-        def ensure_optional_absolute_path(v: Optional[str]) -> Optional[str]:
+        def ensure_optional_absolute_path(v: str | None) -> str | None:
             if v is None:
                 return None
             return ensure_absolute_path(v)

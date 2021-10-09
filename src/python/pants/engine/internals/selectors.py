@@ -9,20 +9,7 @@ import os
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
-from typing import (
-    Any,
-    Generator,
-    Generic,
-    Iterable,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, Generator, Generic, Iterable, Sequence, Tuple, Type, TypeVar, cast, overload
 
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
@@ -65,13 +52,13 @@ class GetParseError(ValueError):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class GetConstraints:
-    output_type: Type
-    input_type: Type
+    output_type: type
+    input_type: type
 
     @classmethod
     def parse_input_and_output_types(
         cls, get_args: Sequence[ast.expr], *, source_file_name: str
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
 
         if len(get_args) not in (2, 3):
@@ -140,23 +127,23 @@ class Get(GetConstraints, Generic[_Output, _Input]):
     """
 
     @overload
-    def __init__(self, output_type: Type[_Output], input_arg0: _Input) -> None:
+    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
         ...
 
     @overload
     def __init__(
         self,
-        output_type: Type[_Output],
-        input_arg0: Type[_Input],
+        output_type: type[_Output],
+        input_arg0: type[_Input],
         input_arg1: _Input,
     ) -> None:
         ...
 
     def __init__(
         self,
-        output_type: Type[_Output],
-        input_arg0: Union[Type[_Input], _Input],
-        input_arg1: Optional[_Input] = None,
+        output_type: type[_Output],
+        input_arg0: type[_Input] | _Input,
+        input_arg1: _Input | None = None,
     ) -> None:
         self.output_type = self._validate_output_type(output_type)
         if input_arg1 is None:
@@ -167,7 +154,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
             self.input = self._validate_input(input_arg1, shorthand_form=False)
 
     @staticmethod
-    def _validate_output_type(output_type: Any) -> Type[_Output]:
+    def _validate_output_type(output_type: Any) -> type[_Output]:
         if not isinstance(output_type, type):
             raise TypeError(
                 "Invalid Get. The first argument (the output type) must be a type, but given "
@@ -176,7 +163,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         return cast(Type[_Output], output_type)
 
     @staticmethod
-    def _validate_explicit_input_type(input_type: Any) -> Type[_Input]:
+    def _validate_explicit_input_type(input_type: Any) -> type[_Input]:
         if not isinstance(input_type, type):
             raise TypeError(
                 "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, "
@@ -238,9 +225,9 @@ class Get(GetConstraints, Generic[_Output, _Input]):
 
 @dataclass(frozen=True)
 class _MultiGet:
-    gets: Tuple[Get, ...]
+    gets: tuple[Get, ...]
 
-    def __await__(self) -> Generator[Tuple[Get, ...], None, Tuple]:
+    def __await__(self) -> Generator[tuple[Get, ...], None, tuple]:
         result = yield self.gets
         return cast(Tuple, result)
 
@@ -272,7 +259,7 @@ _In9 = TypeVar("_In9")
 
 
 @overload
-async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> Tuple[_Output, ...]:  # noqa: F811
+async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> tuple[_Output, ...]:  # noqa: F811
     ...
 
 
@@ -290,7 +277,7 @@ async def MultiGet(  # noqa: F811
     __get9: Get[_Output, _Input],
     __get10: Get[_Output, _Input],
     *__gets: Get[_Output, _Input],
-) -> Tuple[_Output, ...]:
+) -> tuple[_Output, ...]:
     ...
 
 
@@ -306,7 +293,7 @@ async def MultiGet(  # noqa: F811
     __get7: Get[_Out7, _In7],
     __get8: Get[_Out8, _In8],
     __get9: Get[_Out9, _In9],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
     ...
 
 
@@ -321,7 +308,7 @@ async def MultiGet(  # noqa: F811
     __get6: Get[_Out6, _In6],
     __get7: Get[_Out7, _In7],
     __get8: Get[_Out8, _In8],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
     ...
 
 
@@ -335,7 +322,7 @@ async def MultiGet(  # noqa: F811
     __get5: Get[_Out5, _In5],
     __get6: Get[_Out6, _In6],
     __get7: Get[_Out7, _In7],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
     ...
 
 
@@ -348,7 +335,7 @@ async def MultiGet(  # noqa: F811
     __get4: Get[_Out4, _In4],
     __get5: Get[_Out5, _In5],
     __get6: Get[_Out6, _In6],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
     ...
 
 
@@ -360,7 +347,7 @@ async def MultiGet(  # noqa: F811
     __get3: Get[_Out3, _In3],
     __get4: Get[_Out4, _In4],
     __get5: Get[_Out5, _In5],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
     ...
 
 
@@ -371,7 +358,7 @@ async def MultiGet(  # noqa: F811
     __get2: Get[_Out2, _In2],
     __get3: Get[_Out3, _In3],
     __get4: Get[_Out4, _In4],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
     ...
 
 
@@ -381,49 +368,49 @@ async def MultiGet(  # noqa: F811
     __get1: Get[_Out1, _In1],
     __get2: Get[_Out2, _In2],
     __get3: Get[_Out3, _In3],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
     __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1], __get2: Get[_Out2, _In2]
-) -> Tuple[_Out0, _Out1, _Out2]:
+) -> tuple[_Out0, _Out1, _Out2]:
     ...
 
 
 @overload
 async def MultiGet(
     __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1]
-) -> Tuple[_Out0, _Out1]:  # noqa: F811
+) -> tuple[_Out0, _Out1]:  # noqa: F811
     ...
 
 
 async def MultiGet(  # noqa: F811
-    __arg0: Union[Iterable[Get[_Output, _Input]], Get[_Out0, _In0]],
-    __arg1: Optional[Get[_Out1, _In1]] = None,
-    __arg2: Optional[Get[_Out2, _In2]] = None,
-    __arg3: Optional[Get[_Out3, _In3]] = None,
-    __arg4: Optional[Get[_Out4, _In4]] = None,
-    __arg5: Optional[Get[_Out5, _In5]] = None,
-    __arg6: Optional[Get[_Out6, _In6]] = None,
-    __arg7: Optional[Get[_Out7, _In7]] = None,
-    __arg8: Optional[Get[_Out8, _In8]] = None,
-    __arg9: Optional[Get[_Out9, _In9]] = None,
+    __arg0: Iterable[Get[_Output, _Input]] | Get[_Out0, _In0],
+    __arg1: Get[_Out1, _In1] | None = None,
+    __arg2: Get[_Out2, _In2] | None = None,
+    __arg3: Get[_Out3, _In3] | None = None,
+    __arg4: Get[_Out4, _In4] | None = None,
+    __arg5: Get[_Out5, _In5] | None = None,
+    __arg6: Get[_Out6, _In6] | None = None,
+    __arg7: Get[_Out7, _In7] | None = None,
+    __arg8: Get[_Out8, _In8] | None = None,
+    __arg9: Get[_Out9, _In9] | None = None,
     *__args: Get[_Output, _Input],
-) -> Union[
-    Tuple[_Output, ...],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4],
-    Tuple[_Out0, _Out1, _Out2, _Out3],
-    Tuple[_Out0, _Out1, _Out2],
-    Tuple[_Out0, _Out1],
-    Tuple[_Out0],
-]:
+) -> (
+    tuple[_Output, ...]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4]
+    | tuple[_Out0, _Out1, _Out2, _Out3]
+    | tuple[_Out0, _Out1, _Out2]
+    | tuple[_Out0, _Out1]
+    | tuple[_Out0]
+):
     """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
@@ -617,7 +604,7 @@ async def MultiGet(  # noqa: F811
 
     args = __arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9, *__args
 
-    def render_arg(arg: Any) -> Optional[str]:
+    def render_arg(arg: Any) -> str | None:
         if arg is None:
             return None
         if isinstance(arg, Get):
@@ -677,7 +664,7 @@ class Params:
     Distinct types are enforced at consumption time by the rust type of the same name.
     """
 
-    params: Tuple[Any, ...]
+    params: tuple[Any, ...]
 
     def __init__(self, *args: Any) -> None:
         self.params = tuple(args)
