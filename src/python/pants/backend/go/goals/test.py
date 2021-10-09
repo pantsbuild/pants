@@ -9,11 +9,7 @@ from typing import cast
 
 import pystache
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoImportPathField,
-    GoThirdPartyModulePathField,
-)
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuildGoPackageTargetRequest,
@@ -27,12 +23,12 @@ from pants.backend.go.util_rules.tests_analysis import (
     AnalyzeTestSourcesRequest,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.test import ShowOutput, TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.fs import EMPTY_FILE_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
+from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
 
