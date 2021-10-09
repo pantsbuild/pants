@@ -54,9 +54,14 @@ def run_pyupgrade(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
+    pyupgrade_arg: str = "--py36-plus",
 ) -> tuple[tuple[LintResult, ...], FmtResult]:
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python.lint.pyupgrade", *(extra_args or ())],
+        [
+            "--backend-packages=pants.backend.python.lint.pyupgrade",
+            f'--pyupgrade-args="{pyupgrade_arg}"',
+            *(extra_args or ()),
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     field_sets = [PyUpgradeFieldSet.create(tgt) for tgt in targets]
@@ -141,7 +146,9 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
         Address("", target_name="t", relative_file_path="some_file_name.py")
     )
     lint_results, fmt_result = run_pyupgrade(
-        rule_runner, [tgt], extra_args=["--pyupgrade-args=--py38-plus"]
+        rule_runner,
+        [tgt],
+        pyupgrade_arg="--py38-plus",
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1

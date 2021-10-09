@@ -46,7 +46,7 @@ class PyUpgrade(PythonToolBase):
         register(
             "--args",
             type=list,
-            default=["--py36-plus"],
+            default=[],
             member_type=shell_str,
             help=(
                 f"Arguments to pass directly to pyupgrade, e.g. "
