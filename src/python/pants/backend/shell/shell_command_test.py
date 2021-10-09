@@ -11,8 +11,8 @@ import pytest
 from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest
 from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
-from pants.core.target_types import Files
-from pants.core.target_types import rules as target_type_rules
+from pants.core.target_types import FilesGeneratorTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
@@ -29,12 +29,12 @@ def rule_runner() -> RuleRunner:
             *archive_rules(),
             *shell_command_rules(),
             *source_files_rules(),
-            *target_type_rules(),
+            *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[ShellCommand, ShellSourcesGeneratorTarget, Files],
+        target_types=[ShellCommand, ShellSourcesGeneratorTarget, FilesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

@@ -10,7 +10,7 @@ from typing import Mapping
 from pants.backend.docker.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageSources
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.target_types import FilesSources
+from pants.core.target_types import FileSourcesField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
@@ -90,7 +90,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[t.get(Sources) for t in chain(*root_dependencies)],
-            for_sources_types=(FilesSources,),
+            for_sources_types=(FileSourcesField,),
         ),
     )
 

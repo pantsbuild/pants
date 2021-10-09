@@ -13,10 +13,10 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
-    ShellCommandSources,
+    ShellCommandSourcesField,
     ShellCommandToolsField,
 )
-from pants.core.target_types import FilesSources
+from pants.core.target_types import FileSourcesField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, Snapshot
@@ -43,8 +43,8 @@ logger = logging.getLogger(__name__)
 
 
 class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
-    input = ShellCommandSources
-    output = FilesSources
+    input = ShellCommandSourcesField
+    output = FileSourcesField
 
 
 @rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
@@ -105,10 +105,7 @@ async def run_shell_command(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(Sources) for tgt in transitive_targets.dependencies],
-            for_sources_types=(
-                Sources,
-                FilesSources,
-            ),
+            for_sources_types=(Sources, FileSourcesField),
             enable_codegen=True,
         ),
     )

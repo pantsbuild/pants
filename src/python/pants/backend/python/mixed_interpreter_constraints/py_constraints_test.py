@@ -13,7 +13,7 @@ from pants.backend.python.mixed_interpreter_constraints.py_constraints import (
     rules as py_constraints_rules,
 )
 from pants.backend.python.target_types import PythonLibrary, PythonTests
-from pants.core.target_types import Files
+from pants.core.target_types import FileTarget
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 
@@ -21,7 +21,7 @@ from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(*py_constraints_rules(), *target_types_rules.rules()),
-        target_types=[Files, PythonLibrary, PythonTests],
+        target_types=[FileTarget, PythonLibrary, PythonTests],
     )
 
 

@@ -259,9 +259,10 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandSources(Sources):
+class ShellCommandSourcesField(Sources):
     # We solely register this field for codegen to work.
     alias = "_sources"
+    expected_num_files = 0
 
 
 class ShellCommandToolsField(StringSequenceField):
@@ -289,7 +290,7 @@ class ShellCommand(Target):
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
-        ShellCommandSources,
+        ShellCommandSourcesField,
         ShellCommandToolsField,
     )
     help = (
