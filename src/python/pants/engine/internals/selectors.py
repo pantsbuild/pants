@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import itertools
 import os
+from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
@@ -51,14 +52,23 @@ class GetParseError(ValueError):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class GetConstraints:
+class AwaitableConstraints:
     output_type: type
     input_type: type
+    is_effect: bool
 
     @classmethod
-    def parse_input_and_output_types(
-        cls, get_args: Sequence[ast.expr], *, source_file_name: str
-    ) -> tuple[str, str]:
+    def signature_from_call_node(
+        cls, call_node: ast.Call, *, source_file_name: str
+    ) -> tuple[str, str, bool] | None:
+        if not isinstance(call_node.func, ast.Name):
+            return None
+        if call_node.func.id not in ("Get", "Effect"):
+            return None
+        is_effect = call_node.func.id == "Effect"
+
+        get_args = call_node.args
+
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
 
         if len(get_args) not in (2, 3):
@@ -89,7 +99,7 @@ class GetConstraints:
                     "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
                     "than a method call."
                 )
-            return output_type, input_constructor.func.id  # type: ignore[attr-defined]
+            return output_type, input_constructor.func.id, is_effect  # type: ignore[attr-defined]
 
         input_type, _ = input_args
         if not isinstance(input_type, ast.Name):
@@ -98,34 +108,19 @@ class GetConstraints:
                 "input), the second argument should be a type, like `MergeDigests` or "
                 "`Process`."
             )
-        return output_type, input_type.id
+        return output_type, input_type.id, is_effect
+
+    def __repr__(self) -> str:
+        name = "Effect" if self.is_effect else "Get"
+        return f"{name}({self.output_type.__name__}, {self.input_type.__name__}, ..)"
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class Get(GetConstraints, Generic[_Output, _Input]):
-    """Asynchronous generator API.
-
-    A Get can be constructed in 2 ways with two variants each:
-
-    + Long form:
-        Get(<OutputType>, <InputType>, input)
-
-    + Short form
-        Get(<OutputType>, <InputType>(<constructor args for input>))
-
-    The long form supports providing type information to the rule engine that it could not otherwise
-    infer from the input variable [1]. Likewise, the short form must use inline construction of the
-    input in order to convey the input type to the engine.
-
-    [1] The engine needs to determine all rule and Get input and output types statically before
-    executing any rules. Since Gets are declared inside function bodies, the only way to extract this
-    information is through a parse of the rule function. The parse analysis is rudimentary and cannot
-    infer more than names and calls; so a variable name does not give enough information to infer its
-    type, only a constructor call unambiguously gives this information without more in-depth parsing
-    that includes following imports and more.
-    """
-
+class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
         ...
@@ -200,7 +195,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
 
     def __await__(
         self,
-    ) -> Generator[Get[_Output, _Input], None, _Output]:
+    ) -> Generator[Awaitable[_Output, _Input], None, _Output]:
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within
@@ -221,6 +216,37 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         """
         result = yield self
         return cast(_Output, result)
+
+
+class Effect(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+    """Asynchronous generator API for effectful types.
+
+    See Get for more information on supported syntaxes.
+    """
+
+
+class Get(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+    """Asynchronous generator API for side-effect-free types.
+
+    A Get can be constructed in 2 ways with two variants each:
+
+    + Long form:
+        Get(<OutputType>, <InputType>, input)
+
+    + Short form
+        Get(<OutputType>, <InputType>(<constructor args for input>))
+
+    The long form supports providing type information to the rule engine that it could not otherwise
+    infer from the input variable [1]. Likewise, the short form must use inline construction of the
+    input in order to convey the input type to the engine.
+
+    [1] The engine needs to determine all rule and Get input and output types statically before
+    executing any rules. Since Gets are declared inside function bodies, the only way to extract this
+    information is through a parse of the rule function. The parse analysis is rudimentary and cannot
+    infer more than names and calls; so a variable name does not give enough information to infer its
+    type, only a constructor call unambiguously gives this information without more in-depth parsing
+    that includes following imports and more.
+    """
 
 
 @dataclass(frozen=True)

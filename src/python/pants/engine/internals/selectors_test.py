@@ -7,18 +7,22 @@ from typing import Any, Callable, Tuple
 
 import pytest
 
-from pants.engine.internals.selectors import Get, GetConstraints, GetParseError, MultiGet
+from pants.engine.internals.selectors import AwaitableConstraints, Get, GetParseError, MultiGet
 from pants.engine.unions import union
 
 
-def parse_get_types(get: str) -> Tuple[str, str]:
-    get_args = ast.parse(get).body[0].value.args  # type: ignore[attr-defined]
-    return GetConstraints.parse_input_and_output_types(get_args, source_file_name="test.py")
+def parse_get_types(get: str) -> Tuple[str, str, bool]:
+    call_node = ast.parse(get).body[0].value  # type: ignore[attr-defined]
+    signature = AwaitableConstraints.signature_from_call_node(call_node, source_file_name="test.py")
+    assert signature
+    return signature
 
 
 def test_parse_get_types_valid() -> None:
-    assert parse_get_types("Get(O, I, input)") == ("O", "I")
-    assert parse_get_types("Get(O, I())") == ("O", "I")
+    assert parse_get_types("Get(O, I, input)") == ("O", "I", False)
+    assert parse_get_types("Get(O, I())") == ("O", "I", False)
+    assert parse_get_types("Effect(O, I, input)") == ("O", "I", True)
+    assert parse_get_types("Effect(O, I())") == ("O", "I", True)
 
 
 def assert_parse_get_types_fails(get: str, *, expected_explanation: str) -> None:

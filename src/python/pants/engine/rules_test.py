@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
-from pants.engine.internals.selectors import GetConstraints, GetParseError
+from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
 from pants.engine.rules import (
     Get,
     MissingParameterTypeAnnotation,
@@ -89,7 +89,7 @@ def fmt_rule(
 
 class RuleVisitorTest(unittest.TestCase):
     @staticmethod
-    def _parse_rule_gets(rule_text: str, **types: Type) -> List[GetConstraints]:
+    def _parse_rule_gets(rule_text: str, **types: Type) -> List[AwaitableConstraints]:
         rule_visitor = _RuleVisitor(
             resolve_type=lambda name: types[name], source_file_name="parse_rules.py"
         )
@@ -97,7 +97,7 @@ class RuleVisitorTest(unittest.TestCase):
         return rule_visitor.gets
 
     @classmethod
-    def _parse_single_get(cls, rule_text: str, **types) -> GetConstraints:
+    def _parse_single_get(cls, rule_text: str, **types) -> AwaitableConstraints:
         gets = cls._parse_rule_gets(rule_text, **types)
         assert len(gets) == 1, f"Expected 1 Get expression, found {len(gets)}."
         return gets[0]
@@ -414,7 +414,7 @@ class RuleTest(unittest.TestCase):
 
         error_str = str(cm.exception)
         assert (
-            "(@rule pants.engine.rules_test:invalid_rule) has a `SideEffecting` parameter"
+            "(@rule pants.engine.rules_test:invalid_rule) may not have a side-effecting parameter"
             in error_str
         )
         assert "pants.engine.console.Console" in error_str

@@ -27,8 +27,8 @@ from typing import (
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
+from pants.engine.internals.selectors import AwaitableConstraints
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
-from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
@@ -46,24 +46,17 @@ class _RuleVisitor(ast.NodeVisitor):
         super().__init__()
         self.source_file_name = source_file_name
         self.resolve_type = resolve_type
-        self.gets: List[GetConstraints] = []
-
-    @staticmethod
-    def maybe_extract_get_args(call_node: ast.Call) -> Optional[List[ast.expr]]:
-        """Check if the node looks like a Get(T, ...) call."""
-        if not isinstance(call_node.func, ast.Name):
-            return None
-        if call_node.func.id != "Get":
-            return None
-        return call_node.args
+        self.gets: List[AwaitableConstraints] = []
 
     def visit_Call(self, call_node: ast.Call) -> None:
-        get_args = self.maybe_extract_get_args(call_node)
-        if get_args is not None:
-            product_str, subject_str = GetConstraints.parse_input_and_output_types(
-                get_args, source_file_name=self.source_file_name
+        signature = AwaitableConstraints.signature_from_call_node(
+            call_node, source_file_name=self.source_file_name
+        )
+        if signature is not None:
+            product_str, subject_str, effect = signature
+            get = AwaitableConstraints(
+                self.resolve_type(product_str), self.resolve_type(subject_str), effect
             )
-            get = GetConstraints(self.resolve_type(product_str), self.resolve_type(subject_str))
             self.gets.append(get)
         # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
         self.generic_visit(call_node)
@@ -96,6 +89,7 @@ class RuleType(Enum):
 
 
 def _make_rule(
+    func_id: str,
     rule_type: RuleType,
     return_type: Type,
     parameter_types: Iterable[Type],
@@ -167,6 +161,8 @@ def _make_rule(
         rule_visitor.visit(rule_func_node)
 
         gets = FrozenOrderedSet(rule_visitor.gets)
+
+        validate_requirements(func_id, parameter_types, gets, cacheable)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -264,7 +260,6 @@ def rule_decorator(func, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     is_goal_cls = issubclass(return_type, Goal)
-    validate_parameter_types(func_id, parameter_types, cacheable)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it. This is used as the workunit name.
@@ -283,6 +278,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         )
 
     return _make_rule(
+        func_id,
         rule_type,
         return_type,
         parameter_types,
@@ -293,17 +289,36 @@ def rule_decorator(func, **kwargs) -> Callable:
     )(func)
 
 
-def validate_parameter_types(
-    func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool
+def validate_requirements(
+    func_id: str,
+    parameter_types: Tuple[Type, ...],
+    gets: Tuple[AwaitableConstraints, ...],
+    cacheable: bool,
 ) -> None:
-    if cacheable:
-        for ty in parameter_types:
-            if issubclass(ty, SideEffecting):
-                # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't
-                #  expose those as part of the API, so it's OK for this error not to mention them.
-                raise ValueError(
-                    f"A `@rule` that was not a @goal_rule ({func_id}) has a `SideEffecting` parameter: {ty}"
-                )
+    if not cacheable:
+        return
+    # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
+    # part of the API, so it's OK for these errors not to mention them.
+    for ty in parameter_types:
+        if cacheable and issubclass(ty, SideEffecting):
+            raise ValueError(
+                f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
+                f"a side-effecting parameter: {ty}."
+            )
+    for get in gets:
+        input_type_side_effecting = issubclass(get.input_type, SideEffecting)
+        if input_type_side_effecting and not get.is_effect:
+            raise ValueError(
+                f"A `Get` may not request a side-effecting type ({get.input_type}). Use `Effect` instead: `{get}`."
+            )
+        if not input_type_side_effecting and get.is_effect:
+            raise ValueError(
+                f"An `Effect` should not be used with a pure type ({get.input_type}). Use `Get` instead: `{get}`."
+            )
+        if cacheable and get.is_effect:
+            raise ValueError(
+                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an Effect: `{get}`."
+            )
 
 
 def inner_rule(*args, **kwargs) -> Callable:
@@ -388,7 +403,7 @@ class TaskRule(Rule):
 
     _output_type: Type
     input_selectors: Tuple[Type, ...]
-    input_gets: Tuple[GetConstraints, ...]
+    input_gets: Tuple[AwaitableConstraints, ...]
     func: Callable
     cacheable: bool
     canonical_name: str
@@ -400,7 +415,7 @@ class TaskRule(Rule):
         output_type: Type,
         input_selectors: Iterable[Type],
         func: Callable,
-        input_gets: Iterable[GetConstraints],
+        input_gets: Iterable[AwaitableConstraints],
         canonical_name: str,
         desc: Optional[str] = None,
         level: LogLevel = LogLevel.TRACE,

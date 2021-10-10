@@ -9,7 +9,7 @@ import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
 
-from pants.engine.internals.selectors import Get, GetConstraints
+from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -60,7 +60,9 @@ class Subsystem(metaclass=ABCMeta):
             output_type=cls,
             input_selectors=(),
             func=partial_construct_subsystem,
-            input_gets=(GetConstraints(output_type=ScopedOptions, input_type=Scope),),
+            input_gets=(
+                AwaitableConstraints(output_type=ScopedOptions, input_type=Scope, is_effect=False),
+            ),
             canonical_name=name,
         )
 
