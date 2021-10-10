@@ -54,7 +54,7 @@ compilation_failure_dir_layout = {
     os.path.join("compilation_failure", "main.py"): "if __name__ == '__main__':\n    import sys¡",
     os.path.join(
         "compilation_failure", "BUILD"
-    ): "python_library()\npex_binary(name='bin', entry_point='main.py')",
+    ): "python_sources()\npex_binary(name='bin', entry_point='main.py')",
 }
 
 
@@ -479,7 +479,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 ctx.checker.assert_started()
 
                 safe_file_dump(
-                    test_build_file, "python_library(sources=['some_non_existent_file.py'])"
+                    test_build_file, "python_sources(sources=['some_non_existent_file.py'])"
                 )
                 non_existent_file = os.path.join(test_path, "some_non_existent_file.py")
 
@@ -487,7 +487,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 ctx.checker.assert_running()
                 assert non_existent_file not in result.stdout
 
-                safe_file_dump(test_build_file, "python_library(sources=['*.py'])")
+                safe_file_dump(test_build_file, "python_sources(sources=['*.py'])")
                 result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
                 assert non_existent_file not in result.stdout
@@ -600,13 +600,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_dependencies_swap(self):
         template = dedent(
             """
-            python_library(
+            python_sources(
               name = 'A',
               source = 'A.py',
               {a_deps}
             )
 
-            python_library(
+            python_sources(
               name = 'B',
               source = 'B.py',
               {b_deps}

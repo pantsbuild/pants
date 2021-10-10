@@ -194,7 +194,7 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests()
-                python_library(name="lib")
+                python_sources(name="lib")
                 python_requirement(
                     name="reqs", requirements=["ansicolors==1.1.8", "ordered-set==3.1.1"]
                 )
@@ -494,7 +494,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(name='bin_lib', sources=['say_hello.py'])
+                python_sources(name='bin_lib', sources=['say_hello.py'])
                 pex_binary(name='bin', entry_point='say_hello.py', output_path="bin.pex")
                 python_tests(runtime_package_dependencies=[':bin'])
                 """
@@ -527,7 +527,7 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/foo/BUILD": dedent(
                 """\
-                python_library(name="lib")
+                python_sources(name="lib")
 
                 python_distribution(
                     name="dist",

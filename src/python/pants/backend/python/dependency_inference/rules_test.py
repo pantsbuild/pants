@@ -50,10 +50,10 @@ def test_infer_python_imports(caplog) -> None:
     # If there's a `.py` and `.pyi` file for the same module, we should infer a dependency on both.
     rule_runner.create_file("src/python/str_import/subdir/f.py")
     rule_runner.create_file("src/python/str_import/subdir/f.pyi")
-    rule_runner.add_to_build_file("src/python/str_import/subdir", "python_library()")
+    rule_runner.add_to_build_file("src/python/str_import/subdir", "python_sources()")
 
     rule_runner.create_file("src/python/util/dep.py")
-    rule_runner.add_to_build_file("src/python/util", "python_library()")
+    rule_runner.add_to_build_file("src/python/util", "python_sources()")
 
     rule_runner.create_file(
         "src/python/app.py",
@@ -80,7 +80,7 @@ def test_infer_python_imports(caplog) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file("src/python", "python_library()")
+    rule_runner.add_to_build_file("src/python", "python_sources()")
 
     def run_dep_inference(
         address: Address, *, enable_string_imports: bool = False
@@ -127,9 +127,9 @@ def test_infer_python_imports(caplog) -> None:
         "src/python/ambiguous",
         dedent(
             """\
-            python_library(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
-            python_library(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
-            python_library(
+            python_sources(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_sources(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_sources(
                 name='main',
                 sources=['main.py'],
                 dependencies=['!./disambiguated_via_ignores.py:dep2'],
@@ -175,13 +175,13 @@ def test_infer_python_inits() -> None:
     )
 
     rule_runner.create_file("src/python/root/__init__.py")
-    rule_runner.add_to_build_file("src/python/root", "python_library()")
+    rule_runner.add_to_build_file("src/python/root", "python_sources()")
 
     rule_runner.create_file("src/python/root/mid/__init__.py")
-    rule_runner.add_to_build_file("src/python/root/mid", "python_library()")
+    rule_runner.add_to_build_file("src/python/root/mid", "python_sources()")
 
     rule_runner.create_file("src/python/root/mid/leaf/__init__.py")
-    rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_library()")
+    rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_sources()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address)

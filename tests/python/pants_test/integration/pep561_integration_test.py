@@ -37,7 +37,7 @@ def test_typechecking() -> None:
                 name="testutil",
                 requirements=["pantsbuild.pants.testutil @ file://{testutil_wheel}"],
             )
-            python_library(name="lib", dependencies=[":pants", ":testutil"])
+            python_sources(name="lib", dependencies=[":pants", ":testutil"])
             """
         ),
         "ok.py": dedent(

@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
             "src/python/BUILD": (
                 "protobuf_sources(name='proto', sources=['foo.proto'])\n"
-                "python_library(dependencies=[':proto'])"
+                "python_sources(dependencies=[':proto'])"
             ),
         }
     )

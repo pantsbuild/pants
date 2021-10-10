@@ -15,7 +15,7 @@ def test_completed_log_output() -> None:
                 return x + y
             """
         ),
-        "src/python/project/BUILD": "python_library()",
+        "src/python/project/BUILD": "python_sources()",
     }
     with setup_tmpdir(sources) as tmpdir:
         result = run_pants(
@@ -36,7 +36,7 @@ def test_completed_log_output() -> None:
 def test_log_filtering_by_target() -> None:
     sources = {
         "src/python/project/__init__.py": "",
-        "src/python/project/BUILD": "python_library()",
+        "src/python/project/BUILD": "python_sources()",
     }
     with setup_tmpdir(sources) as tmpdir:
         result = run_pants(

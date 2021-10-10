@@ -102,7 +102,7 @@ def test_prelude_parsing_illegal_import() -> None:
         """\
         import os
         def make_target():
-            python_library()
+            python_sources()
         """
     )
     with pytest.raises(

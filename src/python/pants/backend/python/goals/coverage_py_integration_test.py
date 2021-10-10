@@ -53,15 +53,14 @@ SOURCES = {
     ),
     "src/python/project/BUILD": dedent(
         """\
-        python_library()
-
+        python_sources()
         python_tests(
             name="tests",
             dependencies=[":project"],
         )
         """
     ),
-    "src/python/core/BUILD": "python_library()",
+    "src/python/core/BUILD": "python_sources()",
     "src/python/core/__init__.py": "",
     "src/python/core/untested.py": "CONSTANT = 42",
     "foo/bar.py": "BAZ = True",
@@ -281,7 +280,7 @@ def test_default_coverage_issues_12390() -> None:
             """
         ),
         "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
-        "minimalcov/minimalcov/src/BUILD": "python_library()",
+        "minimalcov/minimalcov/src/BUILD": "python_sources()",
         "minimalcov/minimalcov/tests/test_foo.py": dedent(
             """\
             import minimalcov.src.foo

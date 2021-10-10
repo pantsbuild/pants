@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_library` and `python_tests` target generation rules
+# `python_sources` and `python_tests` target generation rules
 # -----------------------------------------------------------------------------------------------
 
 
@@ -93,7 +93,7 @@ class GenerateTargetsFromPythonLibrary(GenerateTargetsRequest):
 
 
 @rule
-async def generate_targets_from_python_library(
+async def generate_targets_from_python_sources(
     request: GenerateTargetsFromPythonLibrary,
     python_infer: PythonInferSubsystem,
     union_membership: UnionMembership,

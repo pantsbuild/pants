@@ -213,7 +213,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
             "project/ambiguous_in_another_root.py": "",
             "project/BUILD": dedent(
                 """\
-                python_library(sources=['app.py'])
+                python_sources(sources=['app.py'])
                 pex_binary(name='first_party', entry_point='project.app')
                 pex_binary(name='first_party_func', entry_point='project.app:func')
                 pex_binary(name='first_party_shorthand', entry_point='app.py')
@@ -222,8 +222,8 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                 pex_binary(name='third_party_func', entry_point='colors:func')
                 pex_binary(name='unrecognized', entry_point='who_knows.module')
 
-                python_library(name="dep1", sources=["ambiguous.py"])
-                python_library(name="dep2", sources=["ambiguous.py"])
+                python_sources(name="dep1", sources=["ambiguous.py"])
+                python_sources(name="dep2", sources=["ambiguous.py"])
                 pex_binary(name="ambiguous", entry_point="ambiguous.py")
                 pex_binary(
                     name="disambiguated",
@@ -231,7 +231,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                     dependencies=["!./ambiguous.py:dep2"],
                 )
 
-                python_library(
+                python_sources(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
                 pex_binary(
@@ -244,7 +244,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                 """
             ),
             "src/py/project/ambiguous_in_another_root.py": "",
-            "src/py/project/BUILD.py": "python_library()",
+            "src/py/project/BUILD.py": "python_sources()",
         }
     )
 
@@ -413,7 +413,7 @@ def test_inject_python_distribution_dependencies() -> None:
             """\
             pex_binary(name="my_binary", entry_point="who_knows.module:main")
 
-            python_library(name="my_library", sources=["app.py"])
+            python_sources(name="my_library", sources=["app.py"])
 
             python_distribution(
                 name="dist-a",
@@ -473,7 +473,7 @@ def test_inject_python_distribution_dependencies() -> None:
         "who_knows",
         dedent(
             """\
-            python_library(name="random_lib", sources=["module.py"])
+            python_sources(name="random_lib", sources=["module.py"])
             """
         ),
     )

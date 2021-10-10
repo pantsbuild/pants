@@ -243,7 +243,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
             "src/py/main.py": "",
             "src/py/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 pex_binary(name='main', entry_point='main.py')
                 """
             ),
