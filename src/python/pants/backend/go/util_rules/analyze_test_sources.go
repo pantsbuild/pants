@@ -15,6 +15,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -127,13 +128,13 @@ func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Test
 
 	for _, e := range doc.Examples(p) {
 		if e.Output == "" && !e.EmptyOutput {
-			// Don't run examples with no output.
+			// Don't run examples with no output directive.
 			continue
 		}
 		metadata.Examples = append(metadata.Examples, &Example{
 			Name:      "Example" + e.Name,
 			Package:   pkgName,
-			Output:    e.Output,
+			Output:    strconv.Quote(e.Output),
 			Unordered: e.Unordered,
 		})
 	}
