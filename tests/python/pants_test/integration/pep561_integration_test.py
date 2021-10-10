@@ -29,12 +29,11 @@ def test_typechecking() -> None:
     project = {
         "BUILD": dedent(
             f"""\
-            python_requirement_library(
+            python_requirement(
                 name="pants",
                 requirements=["pantsbuild.pants @ file://{pants_wheel}"],
-
             )
-            python_requirement_library(
+            python_requirement(
                 name="testutil",
                 requirements=["pantsbuild.pants.testutil @ file://{testutil_wheel}"],
             )

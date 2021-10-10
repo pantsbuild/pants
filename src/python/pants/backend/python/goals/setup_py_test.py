@@ -45,7 +45,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import FileTarget, ResourceTarget
@@ -66,7 +66,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
             PexBinary,
             PythonDistribution,
             PythonLibrary,
-            PythonRequirementLibrary,
+            PythonRequirementTarget,
             ResourceTarget,
             FileTarget,
         ],
@@ -693,18 +693,9 @@ def test_get_requirements() -> None:
         "3rdparty",
         textwrap.dedent(
             """
-            python_requirement_library(
-                name='ext1',
-                requirements=['ext1==1.22.333'],
-            )
-            python_requirement_library(
-                name='ext2',
-                requirements=['ext2==4.5.6'],
-            )
-            python_requirement_library(
-                name='ext3',
-                requirements=['ext3==0.0.1'],
-            )
+            python_requirement(name='ext1', requirements=['ext1==1.22.333'])
+            python_requirement(name='ext2', requirements=['ext2==4.5.6'])
+            python_requirement(name='ext3', requirements=['ext3==0.0.1'])
             """
         ),
     )
@@ -792,18 +783,9 @@ def test_get_requirements_with_exclude() -> None:
         "3rdparty",
         textwrap.dedent(
             """
-            python_requirement_library(
-                name='ext1',
-                requirements=['ext1==1.22.333'],
-            )
-            python_requirement_library(
-                name='ext2',
-                requirements=['ext2==4.5.6'],
-            )
-            python_requirement_library(
-                name='ext3',
-                requirements=['ext3==0.0.1'],
-            )
+            python_requirement(name='ext1', requirements=['ext1==1.22.333'])
+            python_requirement(name='ext2', requirements=['ext2==4.5.6'])
+            python_requirement(name='ext3', requirements=['ext3==0.0.1'])
             """
         ),
     )

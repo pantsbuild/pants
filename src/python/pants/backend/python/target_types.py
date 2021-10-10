@@ -56,7 +56,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -653,7 +653,7 @@ class PythonLibrary(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_requirement_library` target
+# `python_requirement` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -735,8 +735,12 @@ class PythonRequirementsField(_RequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
-        "A sequence of pip-style requirement strings, e.g. `['foo==1.8', "
-        "\"bar<=3 ; python_version<'3'\"]`."
+        'A pip-style requirement string, e.g. `["Django==3.2.8"]`.\n\n'
+        "You can specify multiple requirements for the same project in order to use environment "
+        'markers, such as `["foo>=1.2,<1.3 ; python_version>\'3.6\'", "foo==0.9 ; '
+        "python_version<'3'\"]`.\n\n"
+        "If the requirement depends on some other requirement to work, such as needing "
+        "`setuptools` to be built, use the `dependencies` field instead."
     )
 
 
@@ -789,8 +793,8 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
         return normalize_module_mapping(value_or_default)
 
 
-class PythonRequirementLibrary(Target):
-    alias = "python_requirement_library"
+class PythonRequirementTarget(Target):
+    alias = "python_requirement"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
@@ -799,11 +803,23 @@ class PythonRequirementLibrary(Target):
         TypeStubsModuleMappingField,
     )
     help = (
-        "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
-        "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
-        "already, you can instead use the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{doc_url('python-third-party-dependencies')}."
+        "A Python requirement installable by pip.\n\n"
+        "This target is useful when you want to declare Python requirements inline in a "
+        "BUILD file. If you have a `requirements.txt` file already, you can instead use "
+        "the macro `python_requirements()` to convert each "
+        "requirement into a `python_requirement()` target automatically. For Poetry, use "
+        "`poetry_requirements()`."
+        "\n\n"
+        f"See {doc_url('python-third-party-dependencies')}."
+    )
+
+    deprecated_alias = "python_requirement_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `python_requirement` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
     )
 
 

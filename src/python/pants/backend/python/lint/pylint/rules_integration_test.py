@@ -12,7 +12,7 @@ from pants.backend.python.lint.pylint import subsystem
 from pants.backend.python.lint.pylint.rules import PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LintResults, [PylintRequest]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget],
     )
 
 
@@ -202,8 +202,8 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(name='transitive_req', requirements=['fake'])
-                python_requirement_library(name='direct_req', requirements=['ansicolors'])
+                python_requirement(name='transitive_req', requirements=['fake'])
+                python_requirement(name='direct_req', requirements=['ansicolors'])
                 """
             ),
             f"{PACKAGE}/transitive_dep.py": "",
@@ -323,15 +323,8 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
-                    name='pylint',
-                    requirements=['pylint>=2.6.2,<2.7'],
-                )
-
-                python_requirement_library(
-                    name='colors',
-                    requirements=['ansicolors'],
-                )
+                python_requirement(name='pylint', requirements=['pylint>=2.6.2,<2.7'])
+                python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
             "pants-plugins/plugins/subdir/dep.py": dedent(

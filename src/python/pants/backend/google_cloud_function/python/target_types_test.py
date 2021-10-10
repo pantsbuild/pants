@@ -16,7 +16,7 @@ from pants.backend.google_cloud_function.python.target_types import (
     ResolvePythonGoogleHandlerRequest,
 )
 from pants.backend.google_cloud_function.python.target_types import rules as target_type_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ResolvedPythonGoogleHandler, [ResolvePythonGoogleHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonCloudFunctionHandlerDependency]),
         ],
-        target_types=[PythonGoogleCloudFunction, PythonRequirementLibrary, PythonLibrary],
+        target_types=[PythonGoogleCloudFunction, PythonRequirementTarget, PythonLibrary],
     )
 
 
@@ -104,7 +104,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
+                python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
                     module_mapping={'ansicolors': ['colors']},

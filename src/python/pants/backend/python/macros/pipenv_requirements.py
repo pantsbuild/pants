@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 class PipenvRequirements:
-    """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
+    """Translates a Pipenv.lock file into an equivalent set `python_requirement` targets.
 
     You may also use the parameter `module_mapping` to teach Pants what modules each of your
     requirements provide. For any requirement unspecified, Pants will default to the name of the
@@ -93,7 +93,7 @@ class PipenvRequirements:
             )
 
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],

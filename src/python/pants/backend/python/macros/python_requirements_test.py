@@ -8,7 +8,7 @@ import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_requirements import PythonRequirements
-from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
+from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -20,7 +20,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(Targets, (Specs,))],
-        target_types=[PythonRequirementLibrary, PythonRequirementsFile],
+        target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"python_requirements": PythonRequirements},
     )
 
@@ -31,7 +31,7 @@ def assert_python_requirements(
     requirements_txt: str,
     *,
     expected_file_dep: PythonRequirementsFile,
-    expected_targets: Iterable[PythonRequirementLibrary],
+    expected_targets: Iterable[PythonRequirementTarget],
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
@@ -43,7 +43,7 @@ def assert_python_requirements(
 
 
 def test_requirements_txt(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each entry in a
+    """This tests that we correctly create a new python_requirement for each entry in a
     requirements.txt file, where each dependency is unique.
 
     Some edge cases:
@@ -78,7 +78,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             Address("", target_name="requirements.txt"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
@@ -86,14 +86,14 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="ansicolors"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Django==3.2 ; python_version>'3'")],
                 },
                 Address("", target_name="Django"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Django-types")],
@@ -101,14 +101,14 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="Django-types"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Un_Normalized_PROJECT")],
                 },
                 Address("", target_name="Un-Normalized-PROJECT"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
@@ -120,9 +120,9 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_versions(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each unique
-    dependency name in a requirements.txt file, grouping duplicated dependency names to handle
-    multiple requirement strings per PEP 508."""
+    """This tests that we correctly create a new python_requirement for each unique dependency name
+    in a requirements.txt file, grouping duplicated dependency names to handle multiple requirement
+    strings per PEP 508."""
 
     assert_python_requirements(
         rule_runner,
@@ -140,7 +140,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
             Address("", target_name="requirements.txt"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [
@@ -150,14 +150,14 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="Django"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("confusedmonkey==86")],
                 },
                 Address("", target_name="confusedmonkey"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("repletewateringcan>=7")],
@@ -206,7 +206,7 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
             Address("", target_name="subdir_requirements.txt"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":subdir_requirements.txt"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
