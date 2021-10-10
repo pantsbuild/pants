@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type, cast
+from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -219,7 +219,7 @@ async def resolve_targets(
 
 
 class CycleException(Exception):
-    def __init__(self, subject: Address, path: Tuple[Address, ...]) -> None:
+    def __init__(self, subject: Address, path: tuple[Address, ...]) -> None:
         path_string = "\n".join((f"-> {a}" if a == subject else f"   {a}") for a in path)
         super().__init__(
             f"The dependency graph contained a cycle:\n{path_string}\n\nTo fix this, first verify "
@@ -237,10 +237,10 @@ class CycleException(Exception):
 
 
 def _detect_cycles(
-    roots: Tuple[Address, ...], dependency_mapping: Dict[Address, Tuple[Address, ...]]
+    roots: tuple[Address, ...], dependency_mapping: dict[Address, tuple[Address, ...]]
 ) -> None:
     path_stack: OrderedSet[Address] = OrderedSet()
-    visited: Set[Address] = set()
+    visited: set[Address] = set()
 
     def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
@@ -293,7 +293,7 @@ class _DependencyMappingRequest:
 
 @dataclass(frozen=True)
 class _DependencyMapping:
-    mapping: FrozenDict[Address, Tuple[Address, ...]]
+    mapping: FrozenDict[Address, tuple[Address, ...]]
     visited: FrozenOrderedSet[Target]
     roots_as_targets: Collection[Target]
 
@@ -308,7 +308,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
-    dependency_mapping: dict[Address, Tuple[Address, ...]] = {}
+    dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
@@ -456,7 +456,7 @@ class InvalidOwnersOfArgs(Exception):
 class OwnersRequest:
     """A request for the owners of a set of file paths."""
 
-    sources: Tuple[str, ...]
+    sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
 
 
@@ -546,7 +546,7 @@ def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNo
 def _log_or_raise_unmatched_owners(
     file_paths: Sequence[PurePath],
     owners_not_found_behavior: OwnersNotFoundBehavior,
-    ignore_option: Optional[str] = None,
+    ignore_option: str | None = None,
 ) -> None:
     option_msg = (
         f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
@@ -599,7 +599,7 @@ async def addresses_from_filesystem_specs(
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
     )
-    addresses: Set[Address] = set()
+    addresses: set[Address] = set()
     for spec, owners in zip(filesystem_specs.includes, owners_per_include):
         if (
             owners_not_found_behavior != OwnersNotFoundBehavior.ignore
@@ -684,12 +684,12 @@ class AmbiguousCodegenImplementationsException(Exception):
 
     def __init__(
         self,
-        generators: Iterable[Type["GenerateSourcesRequest"]],
+        generators: Iterable[type[GenerateSourcesRequest]],
         *,
-        for_sources_types: Iterable[Type["Sources"]],
+        for_sources_types: Iterable[type[Sources]],
     ) -> None:
         all_same_generator_paths = (
-            len(set((generator.input, generator.output) for generator in generators)) == 1
+            len({(generator.input, generator.output) for generator in generators}) == 1
         )
         example_generator = list(generators)[0]
         input = example_generator.input.__name__
@@ -747,7 +747,7 @@ async def hydrate_sources(
 
     # Now, determine if any of the `for_sources_types` may be used, either because the
     # sources_field is a direct subclass or can be generated into one of the valid types.
-    def compatible_with_sources_field(valid_type: Type[Sources]) -> bool:
+    def compatible_with_sources_field(valid_type: type[Sources]) -> bool:
         is_instance = isinstance(sources_field, valid_type)
         can_be_generated = (
             request.enable_codegen
@@ -813,8 +813,8 @@ def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
 
 
 class ParsedDependencies(NamedTuple):
-    addresses: List[AddressInput]
-    ignored_addresses: List[AddressInput]
+    addresses: list[AddressInput]
+    ignored_addresses: list[AddressInput]
 
 
 class TransitiveExcludesNotSupportedError(ValueError):
@@ -857,8 +857,8 @@ async def determine_explicitly_provided_dependencies(
         subproject_roots=subproject_roots,
     )
 
-    addresses: List[AddressInput] = []
-    ignored_addresses: List[AddressInput] = []
+    addresses: list[AddressInput] = []
+    ignored_addresses: list[AddressInput] = []
     for v in request.field.value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
@@ -912,7 +912,7 @@ async def resolve_dependencies(
 
     # Infer any dependencies (based on `Sources` field).
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred: Tuple[InferredDependencies, ...] = ()
+    inferred: tuple[InferredDependencies, ...] = ()
     if inference_request_types:
         sources_field = tgt.get(Sources)
         relevant_inference_request_types = [
@@ -942,7 +942,7 @@ async def resolve_dependencies(
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
     # being handled elsewhere in the calling code.
-    special_cased: Tuple[Address, ...] = ()
+    special_cased: tuple[Address, ...] = ()
     if request.include_special_cased_deps:
         # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
         # SpecialCasedDependencies.
@@ -1009,7 +1009,7 @@ class NoApplicableTargetsException(Exception):
         specs: Specs,
         union_membership: UnionMembership,
         *,
-        applicable_target_types: Iterable[Type[Target]],
+        applicable_target_types: Iterable[type[Target]],
         goal_description: str,
     ) -> None:
         applicable_target_aliases = sorted(

@@ -48,7 +48,7 @@ from pants.backend.python.target_types import (
     PythonRequirementLibrary,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.target_types import Files, Resources
+from pants.core.target_types import FileTarget, Resources
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -68,7 +68,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
             PythonLibrary,
             PythonRequirementLibrary,
             Resources,
-            Files,
+            FileTarget,
         ],
         objects={"setup_py": PythonArtifact},
     )

@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, cast
+from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
 
@@ -76,8 +76,8 @@ Workunit = Dict[str, Any]
 
 
 class PolledWorkunits(TypedDict):
-    started: Tuple[Workunit, ...]
-    completed: Tuple[Workunit, ...]
+    started: tuple[Workunit, ...]
+    completed: tuple[Workunit, ...]
 
 
 @dataclass(frozen=True)
@@ -105,19 +105,19 @@ class Scheduler:
     def __init__(
         self,
         *,
-        ignore_patterns: List[str],
+        ignore_patterns: list[str],
         use_gitignore: bool,
         build_root: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        ca_certs_path: Optional[str],
+        ca_certs_path: str | None,
         rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
         executor: PyExecutor,
         include_trace_on_error: bool = True,
-        visualize_to_dir: Optional[str] = None,
+        visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
         watch_filesystem: bool = True,
     ) -> None:
@@ -265,12 +265,12 @@ class Scheduler:
     def rule_subgraph_visualization(self, root_subject_types: list[type], product_type: type):
         with temporary_file_path() as path:
             self.visualize_rule_subgraph_to_file(path, root_subject_types, product_type)
-            with open(path, "r") as fd:
+            with open(path) as fd:
                 for line in fd.readlines():
                     yield line.rstrip()
 
     def rule_graph_consumed_types(
-        self, root_subject_types: Sequence[Type], product_type: Type
+        self, root_subject_types: Sequence[type], product_type: type
     ) -> Sequence[type]:
         return native_engine.rule_graph_consumed_types(
             self.py_scheduler, root_subject_types, product_type
@@ -611,7 +611,7 @@ class SchedulerSession:
             self.py_scheduler, self.py_session, request
         )
 
-    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():
             raise ValueError(

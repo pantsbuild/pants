@@ -22,7 +22,7 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.core.target_types import Files, Resources
+from pants.core.target_types import FileTarget, Resources
 from pants.engine.addresses import Address
 from pants.engine.target import Sources, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -97,7 +97,6 @@ def get_unstripped_sources(
 ) -> PythonSourceFiles:
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.python",
             f"--source-root-patterns={source_roots or ['src/python']}",
             *(extra_args or []),
         ]
@@ -115,7 +114,7 @@ def get_unstripped_sources(
 def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
     targets = [
         create_target(rule_runner, "src/python", ["p.py"], PythonTarget),
-        create_target(rule_runner, "src/python", ["f.txt"], Files),
+        create_target(rule_runner, "src/python", ["f.txt"], FileTarget),
         create_target(rule_runner, "src/python", ["r.txt"], Resources),
         create_target(rule_runner, "src/python", ["j.java"], NonPythonTarget),
     ]
@@ -189,7 +188,7 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
 def test_files_not_used_for_source_roots(rule_runner: RuleRunner) -> None:
     targets = [
         create_target(rule_runner, "src/py", ["f.py"], PythonTarget),
-        create_target(rule_runner, "src/files", ["f.txt"], Files),
+        create_target(rule_runner, "src/files", ["f.txt"], FileTarget),
     ]
     assert get_unstripped_sources(
         rule_runner, targets, include_files=True, source_roots=["src/py", "src/files"]

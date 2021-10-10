@@ -32,14 +32,14 @@ python_library(
 python_library(
   name="rule_runner",
   sources=["rule_runner.py", "test_base.py"],
-  dependencies=["//:build_root"],
+  dependencies=["//BUILD_ROOT:files"],
 )
 
 python_library(
   name = 'pants_integration_test',
   sources = ['pants_integration_test.py'],
   dependencies = [
-    '//:build_root',
+    "//BUILD_ROOT:files",
     'src/python/pants:entry_point'
   ],
 )

@@ -14,7 +14,7 @@ python_tests(
   name='changed_integration',
   sources=['changed_integration_test.py'],
   dependencies=[
-    '//:gitignore',
+    '//.gitignore:files',
     'testprojects/src/python:python_targets_directory',
     'testprojects/src/python:sources_directory',
   ],

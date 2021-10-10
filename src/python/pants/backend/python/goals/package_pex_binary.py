@@ -35,7 +35,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.core.target_types import FilesSources
+from pants.core.target_types import FileSourcesField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     TransitiveTargets,
@@ -107,13 +107,13 @@ async def package_pex_binary(
 
     # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
     # gotcha.
-    files_tgts = targets_with_sources_types(
-        [FilesSources], transitive_targets.dependencies, union_membership
+    file_tgts = targets_with_sources_types(
+        [FileSourcesField], transitive_targets.dependencies, union_membership
     )
-    if files_tgts:
-        files_addresses = sorted(tgt.address.spec for tgt in files_tgts)
+    if file_tgts:
+        files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
         logger.warning(
-            f"The pex_binary target {field_set.address} transitively depends on the below files "
+            f"The `pex_binary` target {field_set.address} transitively depends on the below `files` "
             "targets, but Pants will not include them in the PEX. Filesystem APIs like `open()` "
             "are not able to load files within the binary itself; instead, they read from the "
             "current working directory."

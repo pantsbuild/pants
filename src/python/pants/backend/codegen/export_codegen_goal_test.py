@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.codegen.export_codegen_goal import ExportCodegen
 from pants.backend.codegen.export_codegen_goal import rules as write_codegen_rules
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourcesSources
 from pants.core.util_rules import distdir
 from pants.engine.fs import CreateDigest, FileContent, Snapshot
 from pants.engine.rules import Get, rule
@@ -36,7 +36,7 @@ class Gen2Target(Target):
 
 class Gen1Request(GenerateSourcesRequest):
     input = Gen1Sources
-    output = FilesSources
+    output = FileSourcesField
 
 
 class Gen2Request(GenerateSourcesRequest):
