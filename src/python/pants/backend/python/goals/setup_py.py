@@ -42,7 +42,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.target_types import FileSourcesField, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourceSourcesField
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -908,8 +908,9 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
         or tgt.has_field(PythonSources)
-        or tgt.has_field(ResourcesSources)
+        or tgt.has_field(ResourceSourcesField)
         or tgt.get(Sources).can_generate(PythonSources, union_membership)
+        or tgt.get(Sources).can_generate(ResourceSourcesField, union_membership)
     )
 
 

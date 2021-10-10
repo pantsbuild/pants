@@ -48,7 +48,8 @@ from pants.backend.python.target_types import (
     PythonRequirementLibrary,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.target_types import FileTarget, Resources
+from pants.core.target_types import FileTarget, ResourcesGeneratorTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -61,13 +62,13 @@ _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
     rule_runner = RuleRunner(
-        rules=rules,
+        rules=(*rules, *core_target_type_rules()),
         target_types=[
             PexBinary,
             PythonDistribution,
             PythonLibrary,
             PythonRequirementLibrary,
-            Resources,
+            ResourcesGeneratorTarget,
             FileTarget,
         ],
         objects={"setup_py": PythonArtifact},

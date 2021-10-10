@@ -222,17 +222,34 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 
 
 # -----------------------------------------------------------------------------------------------
-# `resources` target
+# `resource` and `resources` target
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourcesSources(Sources):
+class ResourceSourcesField(Sources):
+    required = True
+    expected_num_files = 1
+
+
+class ResourceTarget(Target):
+    alias = "resources"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourcesField)
+    help = (
+        "A single resource file embedded in a code package and accessed in a "
+        "location-independent manner.\n\n"
+        "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
+        "of a `resources` target are accessed via language-specific resource APIs, such as "
+        "Python's `pkgutil` or JVM's ClassLoader, via paths relative to the target's source root."
+    )
+
+
+class ResourcesGeneratingSourcesField(Sources):
     required = True
 
 
-class Resources(Target):
+class ResourcesGeneratorTarget(Target):
     alias = "resources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesSources)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesGeneratingSourcesField)
     help = (
         "Data embedded in a code package and accessed in a location-independent manner.\n\n"
         "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
@@ -242,16 +259,18 @@ class Resources(Target):
 
 
 class GenerateTargetsFromResources(GenerateTargetsRequest):
-    generate_from = Resources
+    generate_from = ResourcesGeneratorTarget
 
 
 @rule
 async def generate_targets_from_resources(
     request: GenerateTargetsFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ResourcesSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[ResourcesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
-        Resources,
+        ResourceTarget,
         request.generator,
         paths.files,
         union_membership,
