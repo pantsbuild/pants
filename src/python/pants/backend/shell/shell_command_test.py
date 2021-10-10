@@ -99,7 +99,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   sources=["*.txt"],
                 )
 
-                shell_library(name="build-utils")
+                shell_sources(name="build-utils")
                 """
             ),
             "src/intro.txt": MSG[0],

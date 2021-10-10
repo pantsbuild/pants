@@ -333,7 +333,7 @@ class ShellCommand(Target):
                   outputs=["results/", "logs/my-script.log"],
                 )
 
-                shell_library(name="scripts")
+                shell_sources(name="scripts")
 
             """
         )
