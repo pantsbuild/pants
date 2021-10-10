@@ -638,7 +638,7 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
-    alias = "python_library"
+    alias = "python_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
@@ -649,6 +649,15 @@ class PythonLibrary(Target):
         "Python source code.\n\nA `python_library` does not necessarily correspond to a "
         "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
         "`python_library` targets may be packaged into a distribution or binary."
+    )
+
+    deprecated_alias = "python_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `python_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
     )
 
 

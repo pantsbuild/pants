@@ -16,7 +16,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -43,7 +43,7 @@ class ProtobufSourcesField(Sources):
 
 
 class ProtobufSourceTarget(Target):
-    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
+    alias = "protobuf_sources"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
@@ -51,6 +51,9 @@ class ProtobufSourceTarget(Target):
         ProtobufGrpcToggleField,
     )
     help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."
+
+    deprecated_alias = "protobuf_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -64,7 +67,7 @@ class ProtobufSourcesGeneratingSourcesField(Sources):
 
 
 class ProtobufSourcesGeneratorTarget(Target):
-    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_sources` when ready. Update `help` too.
+    alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
@@ -72,6 +75,15 @@ class ProtobufSourcesGeneratorTarget(Target):
         ProtobufGrpcToggleField,
     )
     help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."
+
+    deprecated_alias = "protobuf_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `protobuf_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
+    )
 
 
 class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):

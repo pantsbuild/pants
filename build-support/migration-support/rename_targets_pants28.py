@@ -21,6 +21,9 @@ from token import NAME, OP
 
 RENAMES = {
     "python_requirement_library": "python_requirement",
+    "python_library": "python_sources",
+    "protobuf_library": "protobuf_sources",
+    "shell_library": "shell_sources",
 }
 
 
