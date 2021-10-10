@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import cast
 
@@ -110,8 +109,7 @@ def generate_main(
             {
                 "package": example.package,
                 "name": example.name,
-                # TODO: Does JSON string quoting handle all escaping in Go-compatible way?
-                "output": json.dumps(example.output),
+                "output": example.output,  # already quoted for Go in the Go wrapper
                 "unordered": "true" if example.unordered else "false",
             }
             for example in analyzed_sources.examples

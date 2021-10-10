@@ -138,12 +138,17 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
         examples=FrozenOrderedSet(
             [
                 Example(
-                    package="_test", name="ExampleAnotherOne", output="foo\nbar\n", unordered=False
+                    package="_test",
+                    name="ExampleAnotherOne",
+                    output='"foo\\nbar\\n"',
+                    unordered=False,
                 ),
                 Example(
-                    package="_test", name="ExampleEmptyOutputExpected", output="", unordered=False
+                    package="_test", name="ExampleEmptyOutputExpected", output='""', unordered=False
                 ),
-                Example(package="_test", name="ExampleSomeOutput", output="foo\n", unordered=False),
+                Example(
+                    package="_test", name="ExampleSomeOutput", output='"foo\\n"', unordered=False
+                ),
             ]
         ),
         test_main=None,
