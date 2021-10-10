@@ -679,7 +679,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_library(dependencies=[':proto'])
-                protobuf_library(name='proto', sources=['proto.proto'])
+                protobuf_sources(name='proto', sources=['proto.proto'])
                 """
             ),
         }

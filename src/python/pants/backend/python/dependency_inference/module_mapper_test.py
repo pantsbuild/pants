@@ -212,7 +212,7 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             "src/python/protos/f2_pb2.py": "",
             "src/python/protos/BUILD": dedent(
                 """\
-                protobuf_library(name='protos')
+                protobuf_sources(name='protos')
                 python_library(name='py')
                 """
             ),
@@ -225,8 +225,8 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             "src/python/protos_ambiguous/f_pb2.py": "",
             "src/python/protos_ambiguous/BUILD": dedent(
                 """\
-                protobuf_library(name='protos1')
-                protobuf_library(name='protos2')
+                protobuf_sources(name='protos1')
+                protobuf_sources(name='protos2')
                 python_library(name='py')
                 """
             ),

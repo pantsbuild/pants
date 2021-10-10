@@ -174,5 +174,5 @@ def test_build_with_file_ext(rule_runner: RuleRunner) -> None:
 
 def test_codegen_targets_use_protocol_files(rule_runner: RuleRunner) -> None:
     # That is, don't output generated files.
-    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_library(sources=['f.proto'])"})
+    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_sources(sources=['f.proto'])"})
     assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.proto"})

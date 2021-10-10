@@ -118,7 +118,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 package dir1;
                 """
             ),
-            "src/protobuf/dir1/BUILD": "protobuf_library()",
+            "src/protobuf/dir1/BUILD": "protobuf_sources()",
             "src/protobuf/dir2/f.proto": dedent(
                 """\
                 syntax = "proto3";
@@ -129,7 +129,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 """
             ),
             "src/protobuf/dir2/BUILD": (
-                "protobuf_library(dependencies=['src/protobuf/dir1'], "
+                "protobuf_sources(dependencies=['src/protobuf/dir1'], "
                 "python_source_root='src/python')"
             ),
             # Test another source root.
@@ -143,7 +143,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 """
             ),
             "tests/protobuf/test_protos/BUILD": (
-                "protobuf_library(dependencies=['src/protobuf/dir2'])"
+                "protobuf_sources(dependencies=['src/protobuf/dir2'])"
             ),
         }
     )
@@ -181,7 +181,7 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
                 package protos;
                 """
             ),
-            "protos/BUILD": "protobuf_library()",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     assert_files_generated(
@@ -202,7 +202,7 @@ def test_top_level_python_source_root(rule_runner: RuleRunner) -> None:
                 package protos;
                 """
             ),
-            "src/proto/protos/BUILD": "protobuf_library(python_source_root='.')",
+            "src/proto/protos/BUILD": "protobuf_sources(python_source_root='.')",
         }
     )
     assert_files_generated(
@@ -223,7 +223,7 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
                 package dir1;
                 """
             ),
-            "src/protobuf/dir1/BUILD": "protobuf_library(python_source_root='notasourceroot')",
+            "src/protobuf/dir1/BUILD": "protobuf_sources(python_source_root='notasourceroot')",
         }
     )
     with engine_error(NoSourceRootError):
@@ -256,7 +256,7 @@ def test_mypy_plugin(rule_runner: RuleRunner, major_minor_interpreter: str) -> N
                 }
                 """
             ),
-            "src/protobuf/dir1/BUILD": "protobuf_library()",
+            "src/protobuf/dir1/BUILD": "protobuf_sources()",
         }
     )
     assert_files_generated(
@@ -275,7 +275,7 @@ def test_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
-            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+            "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
         }
     )
     assert_files_generated(
@@ -290,7 +290,7 @@ def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
-            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+            "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
         }
     )
     assert_files_generated(
@@ -311,7 +311,7 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
-            "src/protobuf/dir1/BUILD": "protobuf_library(grpc=True)",
+            "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
         }
     )
     assert_files_generated(

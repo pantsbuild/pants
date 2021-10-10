@@ -91,7 +91,7 @@ class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
 
 
 @rule
-async def generate_targets_from_protobuf_library(
+async def generate_targets_from_protobuf_sources(
     request: GenerateTargetsFromProtobufSources,
     protoc: Protoc,
     union_membership: UnionMembership,
