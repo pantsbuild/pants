@@ -46,6 +46,7 @@ DEFAULT_MODULE_MAPPING = {
     "pymupdf": ("fitz",),
     "pytest-runner": ("ptr",),
     "scikit-image": ("skimage",),
+    "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
 
