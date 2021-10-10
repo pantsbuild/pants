@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_sources(
   sources=[
     "*.py",
     "!*_test.py",
@@ -10,13 +10,13 @@ python_library(
   ],
 )
 
-python_library(
+python_sources(
   name="dependency_inference",
   sources=["dependency_inference.py"],
   dependencies=[":hcl2_parser", ":lockfile"],
 )
 
-python_library(
+python_sources(
   name="hcl2_parser",
   sources=["hcl2_parser.py"],
 )

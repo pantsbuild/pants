@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-shell_library(name="scripts", sources=["cargo", "pants"])
+shell_sources(name="scripts", sources=["cargo", "pants"])
 
 # We use `BUILD_ROOT` to establish the build root, rather than `./pants`, per
 # https://github.com/pantsbuild/pants/pull/8105.
