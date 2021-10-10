@@ -48,7 +48,7 @@ from pants.backend.python.target_types import (
     PythonRequirementTarget,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.target_types import FileTarget, Resources
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -67,7 +67,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
             PythonDistribution,
             PythonLibrary,
             PythonRequirementTarget,
-            Resources,
+            ResourceTarget,
             FileTarget,
         ],
         objects={"setup_py": PythonArtifact},
@@ -856,6 +856,7 @@ def test_owned_dependencies() -> None:
             """
         ),
     )
+    rule_runner.create_file("src/python/foo/bar/resource.txt")
     rule_runner.add_to_build_file(
         "src/python/foo/bar",
         textwrap.dedent(
@@ -877,7 +878,7 @@ def test_owned_dependencies() -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=[])
+            resources(name='bar-resources', sources=['resource.txt'])
             """
         ),
     )
@@ -976,6 +977,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
             """
         ),
     )
+    exporting_owner_rule_runner.create_file("src/python/foo/bar/resource.ext")
     exporting_owner_rule_runner.add_to_build_file(
         "src/python/foo/bar",
         textwrap.dedent(
@@ -990,7 +992,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=[])
+            resources(name='bar-resources', sources=['resource.ext'])
             """
         ),
     )
