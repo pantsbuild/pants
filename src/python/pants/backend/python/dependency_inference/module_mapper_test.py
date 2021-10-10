@@ -302,13 +302,15 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         tgt_name: str,
         req_str: str,
         *,
+        modules: list[str] | None = None,
+        stub_modules: list[str] | None = None,
         module_mapping: dict[str, list[str]] | None = None,
-        stubs_mapping: dict[str, list[str]] | None = None,
     ) -> str:
         return (
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
-            f"module_mapping={repr(module_mapping or {})},"
-            f"type_stubs_module_mapping={repr(stubs_mapping or {})})"
+            f"modules={modules or []},"
+            f"type_stub_modules={stub_modules or []},"
+            f"module_mapping={repr(module_mapping or {})})"
         )
 
     build_file = "\n\n".join(
@@ -317,7 +319,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("un_normalized", "Un-Normalized-Project>3"),
             req("file_dist", "file_dist@ file:///path/to/dist.whl"),
             req("vcs_dist", "vcs_dist@ git+https://github.com/vcs/dist.git"),
-            req("module_mapping", "foo==1", module_mapping={"foo": ["mapped_module"]}),
+            req("modules", "foo==1", modules=["mapped_module"]),
             req(
                 "module_mapping_un_normalized",
                 "DiFFerent-than_Mapping",
@@ -328,14 +330,14 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("typed-dep2", "types-typed-dep2"),
             req("typed-dep3", "typed-dep3-stubs"),
             req("typed-dep4", "stubs-typed-dep4"),
-            req("typed-dep5", "typed-dep5-foo", stubs_mapping={"typed-dep5-foo": ["typed_dep5"]}),
+            req("typed-dep5", "typed-dep5-foo", stub_modules=["typed_dep5"]),
             # A 3rd-party dependency can have both a type stub and implementation.
             req("req2", "req2==1"),
             req("req2_types", "types-req2==1"),
             req("req3", "req3==1"),
             req("req3_types", "req3-types==1"),
             req("req4", "req4==1"),
-            req("req4_types", "req4-stubs==1", stubs_mapping={"req4-stubs": ["req4"]}),
+            req("req4_types", "req4-stubs==1", stub_modules=["req4"]),
             # Ambiguous.
             req("ambiguous_t1", "ambiguous==1.2"),
             req("ambiguous_t2", "ambiguous==1.3"),
@@ -350,11 +352,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("ambiguous_again_stubby_t2", "types-ambiguous-again-stubby==1.3"),
             req("ambiguous_again_stubby_t3", "ambiguous-again-stubby==1.3"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
-            req(
-                "looks_like_stubs",
-                "looks-like-stubs-types",
-                module_mapping={"looks-like-stubs-types": ["looks_like_stubs"]},
-            ),
+            req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -364,7 +362,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             {
                 "file_dist": (Address("", target_name="file_dist"),),
                 "looks_like_stubs": (Address("", target_name="looks_like_stubs"),),
-                "mapped_module": (Address("", target_name="module_mapping"),),
+                "mapped_module": (Address("", target_name="modules"),),
                 "module_mapping_un_normalized": (
                     Address("", target_name="module_mapping_un_normalized"),
                 ),

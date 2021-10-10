@@ -82,7 +82,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "module_mapping": {"ansicolors": ["colors"]},
+                    "modules": ["colors"],
                 },
                 Address("", target_name="ansicolors"),
             ),
@@ -97,7 +97,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [Requirement.parse("Django-types")],
-                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                    "type_stub_modules": ["django"],
                 },
                 Address("", target_name="Django-types"),
             ),

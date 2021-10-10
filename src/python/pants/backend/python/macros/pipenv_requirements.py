@@ -79,24 +79,12 @@ class PipenvRequirements:
                 req_str += f";{info['markers']}"
 
             parsed_req = Requirement.parse(req_str)
-
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
-            req_module_mapping = (
-                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_module_mapping
-                else {}
-            )
-            req_stubs_mapping = (
-                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_type_stubs_module_mapping
-                else {}
-            )
-
             self._parse_context.create_object(
                 "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=req_stubs_mapping,
+                modules=normalized_module_mapping.get(normalized_proj_name),
+                type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
             )

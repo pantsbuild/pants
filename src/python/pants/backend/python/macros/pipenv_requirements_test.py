@@ -48,12 +48,12 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
 
     Edge cases:
     * Develop and Default requirements are used
-    * If a module_mapping is given, and the project is in the map, we copy over a subset of the
-        mapping to the created target. It works regardless of capitalization.
+    * If a module_mapping is given, and the project is in the map, we set `modules`. It
+      works regardless of capitalization.
     """
     assert_pipenv_requirements(
         rule_runner,
-        "pipenv_requirements(module_mapping={'ansicolors': ['colors']})",
+        "pipenv_requirements(module_mapping={'ANSIcolors': ['colors']})",
         {
             "default": {"ansicolors": {"version": ">=1.18.0"}},
             "develop": {"cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"}},
@@ -66,7 +66,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                 {
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
-                    "module_mapping": {"ansiCOLORS": ["colors"]},
+                    "modules": ["colors"],
                 },
                 Address("", target_name="ansicolors"),
             ),
