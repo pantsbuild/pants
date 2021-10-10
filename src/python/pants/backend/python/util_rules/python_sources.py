@@ -7,7 +7,7 @@ from typing import Iterable, List, Tuple, Type
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import ancestor_files
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
-from pants.core.target_types import FileSourcesField, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourceSourcesField
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -69,7 +69,7 @@ class PythonSourceFilesRequest:
     def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
         types: List[Type[Sources]] = [PythonSources]
         if self.include_resources:
-            types.append(ResourcesSources)
+            types.append(ResourceSourcesField)
         if self.include_files:
             types.append(FileSourcesField)
         return tuple(types)
@@ -105,11 +105,11 @@ async def prepare_python_sources(
     python_and_resources_targets = []
     codegen_targets = []
     for tgt in request.targets:
-        if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources):
+        if tgt.has_field(PythonSources) or tgt.has_field(ResourceSourcesField):
             python_and_resources_targets.append(tgt)
         elif tgt.get(Sources).can_generate(PythonSources, union_membership) or tgt.get(
             Sources
-        ).can_generate(ResourcesSources, union_membership):
+        ).can_generate(ResourceSourcesField, union_membership):
             codegen_targets.append(tgt)
     codegen_sources = await MultiGet(
         Get(

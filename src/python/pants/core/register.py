@@ -12,7 +12,7 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     GenericTarget,
     RelocatedFiles,
-    Resources,
+    ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -60,4 +60,10 @@ def rules():
 
 
 def target_types():
-    return [ArchiveTarget, FilesGeneratorTarget, GenericTarget, Resources, RelocatedFiles]
+    return [
+        ArchiveTarget,
+        FilesGeneratorTarget,
+        GenericTarget,
+        ResourcesGeneratorTarget,
+        RelocatedFiles,
+    ]

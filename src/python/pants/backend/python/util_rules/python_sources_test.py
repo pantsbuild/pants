@@ -22,7 +22,7 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.core.target_types import FileTarget, Resources
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
 from pants.engine.target import Sources, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -115,7 +115,7 @@ def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
     targets = [
         create_target(rule_runner, "src/python", ["p.py"], PythonTarget),
         create_target(rule_runner, "src/python", ["f.txt"], FileTarget),
-        create_target(rule_runner, "src/python", ["r.txt"], Resources),
+        create_target(rule_runner, "src/python", ["r.txt"], ResourceTarget),
         create_target(rule_runner, "src/python", ["j.java"], NonPythonTarget),
     ]
 
