@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
 from pants.backend.python.target_types import PythonLibrary
@@ -30,14 +30,15 @@ def rule_runner() -> RuleRunner:
             *local_dists.rules(),
             QueryRule(Process, (PexProcess,)),
         ],
-        target_types=[PythonLibrary, ProtobufLibrary],
+        target_types=[PythonLibrary, ProtobufSourceTarget],
     )
     rule_runner.write_files(
         {
             "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
             "src/python/BUILD": (
-                "protobuf_library(name='proto')\npython_library(dependencies=[':proto'])"
+                "protobuf_library(name='proto', sources=['foo.proto'])\n"
+                "python_library(dependencies=[':proto'])"
             ),
         }
     )
@@ -51,11 +52,7 @@ def run_repl(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
     with mock_console(rule_runner.options_bootstrapper):
         return rule_runner.run_goal_rule(
             Repl,
-            global_args=[
-                "--backend-packages=pants.backend.python",
-                "--backend-packages=pants.backend.codegen.protobuf.python",
-                *(extra_args or ()),
-            ],
+            global_args=extra_args or (),
             args=["src/python/lib.py"],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )

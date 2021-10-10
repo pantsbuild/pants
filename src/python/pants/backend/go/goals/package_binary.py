@@ -9,7 +9,7 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
 )
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageTargetRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.core.goals.package import (
@@ -36,7 +36,9 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 @rule
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
-    built_package = await Get(BuiltGoPackage, BuildGoPackageRequest(main_pkg.address, is_main=True))
+    built_package = await Get(
+        BuiltGoPackage, BuildGoPackageTargetRequest(main_pkg.address, is_main=True)
+    )
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_package.import_paths_to_pkg_a_files)

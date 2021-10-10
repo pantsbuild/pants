@@ -13,14 +13,17 @@ from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
-    compile,
     first_party_pkg,
     go_mod,
     import_analysis,
     sdk,
     third_party_pkg,
 )
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.build_pkg import (
+    BuildGoPackageRequest,
+    BuildGoPackageTargetRequest,
+    BuiltGoPackage,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.rules import QueryRule
@@ -35,13 +38,13 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *assembly.rules(),
             *build_pkg.rules(),
-            *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
+            QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -50,9 +53,9 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_built(
-    rule_runner: RuleRunner, addr: Address, *, expected_import_paths: list[str]
+    rule_runner: RuleRunner, request: BuildGoPackageRequest, *, expected_import_paths: list[str]
 ) -> None:
-    built_package = rule_runner.request(BuiltGoPackage, [BuildGoPackageRequest(addr)])
+    built_package = rule_runner.request(BuiltGoPackage, [request])
     result_files = rule_runner.request(Snapshot, [built_package.digest]).files
     expected = {
         import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
@@ -62,7 +65,125 @@ def assert_built(
     assert sorted(result_files) == sorted(expected.values())
 
 
-def test_build_internal_pkg(rule_runner: RuleRunner) -> None:
+def test_build_pkg(rule_runner: RuleRunner) -> None:
+    transitive_dep = BuildGoPackageRequest(
+        import_path="example.com/foo/dep/transitive",
+        subpath="dep/transitive",
+        go_file_names=("f.go",),
+        digest=rule_runner.make_snapshot(
+            {
+                "dep/transitive/f.go": dedent(
+                    """\
+                    package transitive
+
+                    import "fmt"
+
+                    func Quote(s string) string {
+                        return fmt.Sprintf(">> %s <<", s)
+                    }
+                    """
+                )
+            }
+        ).digest,
+        s_file_names=(),
+        direct_dependencies=(),
+    )
+    direct_dep = BuildGoPackageRequest(
+        import_path="example.com/foo/dep",
+        subpath="dep",
+        go_file_names=("f.go",),
+        digest=rule_runner.make_snapshot(
+            {
+                "dep/f.go": dedent(
+                    """\
+                    package dep
+
+                    import "example.com/foo/dep/transitive"
+
+                    func Quote(s string) string {
+                        return transitive.Quote(s)
+                    }
+                    """
+                )
+            }
+        ).digest,
+        s_file_names=(),
+        direct_dependencies=(transitive_dep,),
+    )
+    main = BuildGoPackageRequest(
+        import_path="example.com/foo",
+        subpath="",
+        go_file_names=("f.go",),
+        digest=rule_runner.make_snapshot(
+            {
+                "f.go": dedent(
+                    """\
+                    package foo
+
+                    import "example.com/foo/dep"
+                    import "fmt"
+
+                    func main() {
+                        fmt.Println(dep.Quote("Hello world!"))
+                    }
+                    """
+                )
+            }
+        ).digest,
+        s_file_names=(),
+        direct_dependencies=(direct_dep,),
+    )
+
+    assert_built(
+        rule_runner, transitive_dep, expected_import_paths=["example.com/foo/dep/transitive"]
+    )
+    assert_built(
+        rule_runner,
+        direct_dep,
+        expected_import_paths=["example.com/foo/dep", "example.com/foo/dep/transitive"],
+    )
+    assert_built(
+        rule_runner,
+        main,
+        expected_import_paths=[
+            "example.com/foo",
+            "example.com/foo/dep",
+            "example.com/foo/dep/transitive",
+        ],
+    )
+
+
+def assert_pkg_target_built(
+    rule_runner: RuleRunner,
+    addr: Address,
+    *,
+    expected_import_path: str,
+    expected_subpath: str,
+    expected_direct_dependency_import_paths: list[str],
+    expected_transitive_dependency_import_paths: list[str],
+    expected_go_file_names: list[str],
+) -> None:
+    build_request = rule_runner.request(BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr)])
+    assert build_request.import_path == expected_import_path
+    assert build_request.subpath == expected_subpath
+    print(build_request.go_file_names)
+    assert build_request.go_file_names == tuple(expected_go_file_names)
+    assert not build_request.s_file_names
+    assert [
+        dep.import_path for dep in build_request.direct_dependencies
+    ] == expected_direct_dependency_import_paths
+    assert_built(
+        rule_runner,
+        build_request,
+        expected_import_paths=[
+            expected_import_path,
+            *expected_direct_dependency_import_paths,
+            *expected_transitive_dependency_import_paths,
+        ],
+    )
+
+
+def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "go.mod": dedent(
@@ -85,14 +206,18 @@ def test_build_internal_pkg(rule_runner: RuleRunner) -> None:
             "BUILD": "go_mod(name='mod')",
         }
     )
-    assert_built(
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name="./"),
-        expected_import_paths=["example.com/greeter"],
+        expected_import_path="example.com/greeter",
+        expected_subpath="",
+        expected_go_file_names=["greeter.go"],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
     )
 
 
-def test_build_external_pkg(rule_runner: RuleRunner) -> None:
+def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "go.mod": dedent(
@@ -112,14 +237,32 @@ def test_build_external_pkg(rule_runner: RuleRunner) -> None:
         }
     )
     import_path = "github.com/google/uuid"
-    assert_built(
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name=import_path),
-        expected_import_paths=[import_path],
+        expected_import_path=import_path,
+        expected_subpath="",
+        expected_go_file_names=[
+            "dce.go",
+            "doc.go",
+            "hash.go",
+            "marshal.go",
+            "node.go",
+            "node_net.go",
+            "null.go",
+            "sql.go",
+            "time.go",
+            "util.go",
+            "uuid.go",
+            "version1.go",
+            "version4.go",
+        ],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
     )
 
 
-def test_build_dependencies(rule_runner: RuleRunner) -> None:
+def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     """Check that we properly include (transitive) dependencies."""
     rule_runner.write_files(
         {
@@ -183,39 +326,67 @@ def test_build_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     xerrors_internal_import_path = "golang.org/x/xerrors/internal"
-    assert_built(
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
-        expected_import_paths=[xerrors_internal_import_path],
+        expected_import_path=xerrors_internal_import_path,
+        expected_subpath="internal",
+        expected_go_file_names=["internal.go"],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
     )
 
-    xerrors_import_paths = ["golang.org/x/xerrors", xerrors_internal_import_path]
-    assert_built(
+    xerrors_import_path = "golang.org/x/xerrors"
+    assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="golang.org/x/xerrors"),
-        expected_import_paths=xerrors_import_paths,
+        Address("", target_name="mod", generated_name=xerrors_import_path),
+        expected_import_path=xerrors_import_path,
+        expected_subpath="",
+        expected_go_file_names=[
+            "adaptor.go",
+            "doc.go",
+            "errors.go",
+            "fmt.go",
+            "format.go",
+            "frame.go",
+            "wrap.go",
+        ],
+        expected_direct_dependency_import_paths=[xerrors_internal_import_path],
+        expected_transitive_dependency_import_paths=[],
     )
 
     quoter_import_path = "example.com/project/greeter/quoter"
-    assert_built(
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name="./greeter/quoter"),
-        expected_import_paths=[quoter_import_path],
+        expected_import_path=quoter_import_path,
+        expected_subpath="greeter/quoter",
+        expected_go_file_names=["lib.go"],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
     )
 
-    greeter_import_paths = [
-        "example.com/project/greeter",
-        quoter_import_path,
-        *xerrors_import_paths,
-    ]
-    assert_built(
+    greeter_import_path = "example.com/project/greeter"
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name="./greeter"),
-        expected_import_paths=greeter_import_paths,
+        expected_import_path=greeter_import_path,
+        expected_subpath="greeter",
+        expected_go_file_names=["lib.go"],
+        expected_direct_dependency_import_paths=[quoter_import_path, xerrors_import_path],
+        expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
     )
 
-    assert_built(
+    assert_pkg_target_built(
         rule_runner,
         Address("", target_name="mod", generated_name="./"),
-        expected_import_paths=["example.com/project", *greeter_import_paths],
+        expected_import_path="example.com/project",
+        expected_subpath="",
+        expected_go_file_names=["main.go"],
+        expected_direct_dependency_import_paths=[greeter_import_path],
+        expected_transitive_dependency_import_paths=[
+            quoter_import_path,
+            xerrors_import_path,
+            xerrors_internal_import_path,
+        ],
     )

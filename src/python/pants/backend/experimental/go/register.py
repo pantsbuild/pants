@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals import package_binary, run_binary, tailor
+from pants.backend.go.goals import package_binary, run_binary, tailor, test
 from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt import skip_field as gofmt_skip_field
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
@@ -16,7 +16,6 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
-    compile,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -35,7 +34,6 @@ def rules():
     return [
         *assembly.rules(),
         *build_pkg.rules(),
-        *compile.rules(),
         *third_party_pkg.rules(),
         *golang.rules(),
         *import_analysis.rules(),
@@ -46,6 +44,7 @@ def rules():
         *tests_analysis.rules(),
         *tailor.rules(),
         *target_type_rules.rules(),
+        *test.rules(),
         *run_binary.rules(),
         *package_binary.rules(),
         # Gofmt

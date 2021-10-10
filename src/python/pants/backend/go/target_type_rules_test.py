@@ -70,27 +70,6 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_go_package_dependency_injection(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "dir1/go.mod": "module foo",
-            "dir1/BUILD": "go_mod()",
-            "dir1/pkg/foo.go": "package pkg",
-            "dir2/bar/go.mod": "module bar",
-            "dir2/bar/src.go": "package bar",
-            "dir2/bar/BUILD": "go_mod()",
-        }
-    )
-
-    def assert_go_mod(pkg: Address, go_mod: Address) -> None:
-        tgt = rule_runner.get_target(pkg)
-        deps = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
-        assert set(deps) == {go_mod}
-
-    assert_go_mod(Address("dir1", generated_name="./pkg"), Address("dir1"))
-    assert_go_mod(Address("dir2/bar", generated_name="./"), Address("dir2/bar"))
-
-
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         (

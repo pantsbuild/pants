@@ -18,7 +18,7 @@ from pants.backend.python.subsystems.lambdex import rules as awslambda_python_su
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import Files, RelocatedFiles, Resources
+from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -37,7 +37,13 @@ def rule_runner() -> RuleRunner:
             *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
         ],
-        target_types=[PythonAWSLambda, PythonLibrary, Files, RelocatedFiles, Resources],
+        target_types=[
+            PythonAWSLambda,
+            PythonLibrary,
+            FilesGeneratorTarget,
+            RelocatedFiles,
+            Resources,
+        ],
     )
 
 
@@ -45,11 +51,7 @@ def create_python_awslambda(
     rule_runner: RuleRunner, addr: Address, *, extra_args: list[str] | None = None
 ) -> tuple[str, bytes]:
     rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.awslambda.python",
-            "--source-root-patterns=src/python",
-            *(extra_args or ()),
-        ],
+        ["--source-root-patterns=src/python", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
@@ -155,7 +157,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The python_awslambda target src/py/project:lambda transitively depends on" in caplog.text
+        "The `python_awslambda` target src/py/project:lambda transitively depends on" in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text

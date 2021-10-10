@@ -117,15 +117,13 @@ func checkTestFunc(fileSet *token.FileSet, fn *ast.FuncDecl, arg string) error {
 	return nil
 }
 
-func processFile(fileSet *token.FileSet, filename string) (*TestSourcesMetadata, error) {
+func processFile(fileSet *token.FileSet, pkgName string, filename string) (*TestSourcesMetadata, error) {
 	p, err := parser.ParseFile(fileSet, filename, nil, parser.ParseComments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse: %s", err)
 	}
 
 	var metadata TestSourcesMetadata
-
-	pkgName := p.Name.Name
 
 	for _, e := range doc.Examples(p) {
 		if e.Output == "" && !e.EmptyOutput {
@@ -203,9 +201,11 @@ func main() {
 
 	fileSet := token.NewFileSet()
 	for _, arg := range os.Args[1:] {
-		fileMetadata, err := processFile(fileSet, arg)
+		parts := strings.SplitN(arg, ":", 2)
+
+		fileMetadata, err := processFile(fileSet, parts[0], parts[1])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", arg, err)
+			fmt.Fprintf(os.Stderr, "%s: %s\n", parts[1], err)
 			os.Exit(1)
 		}
 

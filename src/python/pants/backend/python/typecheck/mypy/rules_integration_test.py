@@ -11,7 +11,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
@@ -651,7 +651,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     rule_runner = RuleRunner(
         rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
-        target_types=[*rule_runner.target_types, ProtobufLibrary],
+        target_types=[*rule_runner.target_types, ProtobufSourceTarget],
     )
     rule_runner.write_files(
         {
@@ -679,7 +679,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_library(dependencies=[':proto'])
-                protobuf_library(name='proto')
+                protobuf_library(name='proto', sources=['proto.proto'])
                 """
             ),
         }
@@ -688,10 +688,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=[
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            "--python-protobuf-mypy-plugin",
-        ],
+        extra_args=["--python-protobuf-mypy-plugin"],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout

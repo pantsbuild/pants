@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, Optional, TextIO
+from typing import Callable, TextIO
 
 from colors import blue, cyan, green, magenta, red, yellow
 
@@ -23,7 +23,7 @@ class Console:
         stdout: TextIO | None = None,
         stderr: TextIO | None = None,
         use_colors: bool = True,
-        session: Optional[SchedulerSession] = None,
+        session: SchedulerSession | None = None,
     ):
         """If a SchedulerSession is set, any running UI will be torn down before stdio is
         rendered."""

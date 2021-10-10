@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufSources
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesField
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
@@ -43,23 +43,24 @@ class ProtobufMapping:
 
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
 async def map_protobuf_files() -> ProtobufMapping:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(ProtobufSources))
+    targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourcesField))
     stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSources]))
+        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourcesField]))
         for tgt in protobuf_targets
     )
 
     stripped_files_to_addresses: dict[str, Address] = {}
     stripped_files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, stripped_sources in zip(protobuf_targets, stripped_sources_per_target):
-        for stripped_f in stripped_sources:
-            if stripped_f in stripped_files_to_addresses:
-                stripped_files_with_multiple_owners[stripped_f].update(
-                    {stripped_files_to_addresses[stripped_f], tgt.address}
-                )
-            else:
-                stripped_files_to_addresses[stripped_f] = tgt.address
+        assert len(stripped_sources) == 1
+        stripped_f = stripped_sources[0]
+        if stripped_f in stripped_files_to_addresses:
+            stripped_files_with_multiple_owners[stripped_f].update(
+                {stripped_files_to_addresses[stripped_f], tgt.address}
+            )
+        else:
+            stripped_files_to_addresses[stripped_f] = tgt.address
 
     # Remove files with ambiguous owners.
     for ambiguous_stripped_f in stripped_files_with_multiple_owners:
@@ -87,7 +88,7 @@ def parse_proto_imports(file_content: str) -> FrozenOrderedSet[str]:
 
 
 class InferProtobufDependencies(InferDependenciesRequest):
-    infer_from = ProtobufSources
+    infer_from = ProtobufSourcesField
 
 
 @rule(desc="Inferring Protobuf dependencies by analyzing imports")
@@ -104,27 +105,28 @@ async def infer_protobuf_dependencies(
         Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
     )
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    assert len(digest_contents) == 1
+    file_content = digest_contents[0]
 
     result: OrderedSet[Address] = OrderedSet()
-    for file_content in digest_contents:
-        for import_path in parse_proto_imports(file_content.content.decode()):
-            unambiguous = protobuf_mapping.mapping.get(import_path)
-            ambiguous = protobuf_mapping.ambiguous_modules.get(import_path)
-            if unambiguous:
-                result.add(unambiguous)
-            elif ambiguous:
-                explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-                    ambiguous,
-                    address,
-                    import_reference="file",
-                    context=(
-                        f"The target {address} imports `{import_path}` in the file "
-                        f"{file_content.path}"
-                    ),
-                )
-                maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
-                if maybe_disambiguated:
-                    result.add(maybe_disambiguated)
+    for import_path in parse_proto_imports(file_content.content.decode()):
+        unambiguous = protobuf_mapping.mapping.get(import_path)
+        ambiguous = protobuf_mapping.ambiguous_modules.get(import_path)
+        if unambiguous:
+            result.add(unambiguous)
+        elif ambiguous:
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                ambiguous,
+                address,
+                import_reference="file",
+                context=(
+                    f"The target {address} imports `{import_path}` in the file "
+                    f"{file_content.path}"
+                ),
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
+            if maybe_disambiguated:
+                result.add(maybe_disambiguated)
     return InferredDependencies(sorted(result))
 
 

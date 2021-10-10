@@ -38,6 +38,7 @@ class ShellSourcesField(Sources):
     # file extension, so we don't use this.
     uses_source_roots = False
     expected_num_files = 1
+    required = True
 
 
 class ShellGeneratingSources(Sources):
@@ -258,9 +259,27 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandSources(Sources):
+class ShellCommandSourcesField(Sources):
     # We solely register this field for codegen to work.
     alias = "_sources"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
+class ShellCommandTimeout(IntField):
+    alias = "timeout"
+    default = 30
+    help = "Command execution timeout (in seconds)."
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address)
+        if value is not None and value < 1:
+            raise InvalidFieldException(
+                f"The value for the `timeout` field in target {address} must be > 0, but was "
+                f"{value}."
+            )
+        return value
 
 
 class ShellCommandToolsField(StringSequenceField):
@@ -288,7 +307,8 @@ class ShellCommand(Target):
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
-        ShellCommandSources,
+        ShellCommandSourcesField,
+        ShellCommandTimeout,
         ShellCommandToolsField,
     )
     help = (

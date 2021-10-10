@@ -47,6 +47,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.dirutil import fast_relpath
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
@@ -829,7 +830,7 @@ def generate_file_level_targets(
 
     all_generated_addresses = []
     for fp in paths:
-        relativized_fp = str(PurePath(fp).relative_to(generator.address.spec_path))
+        relativized_fp = fast_relpath(fp, generator.address.spec_path)
         all_generated_addresses.append(
             generator.address.create_generated(relativized_fp)
             if use_generated_address_syntax
