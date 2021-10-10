@@ -48,8 +48,7 @@ from pants.backend.python.target_types import (
     PythonRequirementLibrary,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.target_types import FileTarget, ResourcesGeneratorTarget
-from pants.core.target_types import rules as core_target_type_rules
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -62,13 +61,13 @@ _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
     rule_runner = RuleRunner(
-        rules=(*rules, *core_target_type_rules()),
+        rules=rules,
         target_types=[
             PexBinary,
             PythonDistribution,
             PythonLibrary,
             PythonRequirementLibrary,
-            ResourcesGeneratorTarget,
+            ResourceTarget,
             FileTarget,
         ],
         objects={"setup_py": PythonArtifact},
@@ -875,6 +874,7 @@ def test_owned_dependencies() -> None:
             """
         ),
     )
+    rule_runner.create_file("src/python/foo/bar/resource.txt")
     rule_runner.add_to_build_file(
         "src/python/foo/bar",
         textwrap.dedent(
@@ -896,7 +896,7 @@ def test_owned_dependencies() -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=[])
+            resources(name='bar-resources', sources=['resource.txt'])
             """
         ),
     )
@@ -995,6 +995,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
             """
         ),
     )
+    exporting_owner_rule_runner.create_file("src/python/foo/bar/resource.ext")
     exporting_owner_rule_runner.add_to_build_file(
         "src/python/foo/bar",
         textwrap.dedent(
@@ -1009,7 +1010,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=[])
+            resources(name='bar-resources', sources=['resource.ext'])
             """
         ),
     )
