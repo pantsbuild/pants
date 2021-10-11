@@ -19,24 +19,17 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import pushd, temporary_dir
+from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture
 def known_scope_infos() -> list[ScopeInfo]:
     return [
-        ScopeInfo(scope, is_goal=True)
-        for scope in [
-            "compile",
-            "compile.java",
-            "compile.scala",
-            "jvm",
-            "jvm.test.junit",
-            "reporting",
-            "test",
-            "test.junit",
-        ]
-    ] + [ScopeInfo("hidden", is_goal=False)]
+        ScopeInfo("check", is_goal=True),
+        ScopeInfo("test", is_goal=True),
+        ScopeInfo("jvm", is_goal=False),
+        ScopeInfo("reporting", is_goal=False),
+    ]
 
 
 @pytest.fixture
@@ -97,28 +90,26 @@ def test_is_spec(splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> N
         "a/b.txt:tgt",
         "a/b.txt:../tgt",
         "!a/b.txt:tgt",
+        "dir#gen",
+        "//:tgt#gen",
+        "cache.java",
+        "cache.tmp.java",
     ]
 
     directories_vs_goals = ["foo", "a_b_c"]
-    # TODO: Once we properly ban scopes with dots in them, we can stop testing this case.
-    files_vs_dotted_scopes = ["cache.java", "cache.tmp.java"]
-    ambiguous_specs = [*directories_vs_goals, *files_vs_dotted_scopes]
 
-    # With no files/directories on disk to tiebreak.
-    for spec in ambiguous_specs:
+    # With no directories on disk to tiebreak.
+    for spec in directories_vs_goals:
         assert splitter.likely_a_spec(spec) is False
     for s in unambiguous_specs:
         assert splitter.likely_a_spec(s) is True
 
-    # With files/directories on disk to tiebreak.
+    # With directories on disk to tiebreak.
     with temporary_dir() as tmpdir:
         splitter = ArgSplitter(known_scope_infos, tmpdir)
-        for directory in directories_vs_goals:
-            Path(tmpdir, directory).mkdir()
-        for f in files_vs_dotted_scopes:
-            Path(tmpdir, f).touch()
-        for spec in ambiguous_specs:
-            assert splitter.likely_a_spec(spec) is True
+        for d in directories_vs_goals:
+            Path(tmpdir, d).mkdir()
+            assert splitter.likely_a_spec(d) is True
 
 
 def goal_split_test(command_line: str, **expected):
@@ -137,55 +128,53 @@ def goal_split_test(command_line: str, **expected):
     [
         # Basic arg splitting, various flag combos.
         (
-            "./pants --compile-java-long-flag -f compile -g compile.java -x test.junit -i "
+            "./pants --check-long-flag -g check -c test -i "
             "src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
-                expected_goals=["compile", "test"],
+                expected_goals=["check", "test"],
                 expected_scope_to_flags={
-                    "": ["-f"],
-                    "compile.java": ["--long-flag", "-x"],
-                    "compile": ["-g"],
-                    "test.junit": ["-i"],
+                    "": ["-g"],
+                    "check": ["--long-flag", "-c"],
+                    "test": ["-i"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
         (
-            "./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii "
-            "--compile-java-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
+            "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
+            "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
-                expected_goals=["compile", "test"],
+                expected_goals=["check", "test"],
                 expected_scope_to_flags={
                     "": ["-farg", "--fff=arg"],
-                    "compile": ["--gg-gg=arg-arg", "-g"],
-                    "test.junit": ["--iii"],
-                    "compile.java": ["--long-flag"],
+                    "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+                    "test": ["--iii"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
         # Distinguish goals from specs.
         (
-            "./pants compile test foo::",
+            "./pants check test foo::",
             dict(
-                expected_goals=["compile", "test"],
-                expected_scope_to_flags={"": [], "compile": [], "test": []},
+                expected_goals=["check", "test"],
+                expected_scope_to_flags={"": [], "check": [], "test": []},
                 expected_specs=["foo::"],
             ),
         ),
         (
-            "./pants compile test foo::",
+            "./pants check test foo::",
             dict(
-                expected_goals=["compile", "test"],
-                expected_scope_to_flags={"": [], "compile": [], "test": []},
+                expected_goals=["check", "test"],
+                expected_scope_to_flags={"": [], "check": [], "test": []},
                 expected_specs=["foo::"],
             ),
         ),
         (
-            "./pants compile test:test",
+            "./pants check test:test",
             dict(
-                expected_goals=["compile"],
-                expected_scope_to_flags={"": [], "compile": []},
+                expected_goals=["check"],
+                expected_scope_to_flags={"": [], "check": []},
                 expected_specs=["test:test"],
             ),
         ),
@@ -203,12 +192,11 @@ def goal_split_test(command_line: str, **expected):
         goal_split_test("./pants test !", expected_specs=["!"]),
         goal_split_test("./pants test !a/b", expected_specs=["!a/b"]),
         (
-            # An argument that looks like a file, but is a known scope, should be interpreted as a goal.
-            "./pants test compile.java",
+            "./pants test check.java",
             dict(
-                expected_goals=["test", "compile"],
-                expected_scope_to_flags={"": [], "test": [], "compile.java": []},
-                expected_specs=[],
+                expected_goals=["test"],
+                expected_scope_to_flags={"": [], "test": []},
+                expected_specs=["check.java"],
             ),
         ),
     ],
@@ -223,47 +211,20 @@ def test_valid_arg_splits(
     )
 
 
-def test_unknwon_goal_is_not_file(splitter: ArgSplitter) -> None:
-    # An argument that looks like a file, and is not a known scope nor exists on the file system,
-    # should be interpreted as an unknown goal.
-    assert_unknown_goal(splitter, "./pants test compile.haskell", ["compile.haskell"])
-
-
-def test_unknown_goal_is_file(splitter: ArgSplitter) -> None:
-    # An argument that looks like a file, and is not a known scope but _does_ exist on the file
-    # system, should be interpreted as a spec.
-    with temporary_dir() as tmpdir, pushd(tmpdir):
-        Path(tmpdir, "compile.haskell").touch()
-        splitter._buildroot = Path(tmpdir)
-        assert_valid_split(
-            splitter,
-            "./pants test compile.haskell",
-            expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": []},
-            expected_specs=["compile.haskell"],
-        )
-
-
 def test_descoping_qualified_flags(splitter: ArgSplitter) -> None:
     assert_valid_split(
         splitter,
-        "./pants compile test --compile-java-bar --no-test-junit-baz foo/bar",
-        expected_goals=["compile", "test"],
-        expected_scope_to_flags={
-            "": [],
-            "compile": [],
-            "compile.java": ["--bar"],
-            "test": [],
-            "test.junit": ["--no-baz"],
-        },
+        "./pants check test --check-bar --no-test-baz foo/bar",
+        expected_goals=["check", "test"],
+        expected_scope_to_flags={"": [], "check": ["--bar"], "test": ["--no-baz"]},
         expected_specs=["foo/bar"],
     )
     # Qualified flags don't count as explicit goals.
     assert_valid_split(
         splitter,
-        "./pants compile --test-junit-bar foo/bar",
-        expected_goals=["compile"],
-        expected_scope_to_flags={"": [], "compile": [], "test.junit": ["--bar"]},
+        "./pants check --test-bar foo/bar",
+        expected_goals=["check"],
+        expected_scope_to_flags={"": [], "check": [], "test": ["--bar"]},
         expected_specs=["foo/bar"],
     )
 
@@ -279,15 +240,14 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     )
     assert_valid_split(
         splitter,
-        "./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii "
-        "--compile-java-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
+        "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
+        "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
         "passthru1 passthru2",
-        expected_goals=["compile", "test"],
+        expected_goals=["check", "test"],
         expected_scope_to_flags={
             "": ["-farg", "--fff=arg"],
-            "compile": ["--gg-gg=arg-arg", "-g"],
-            "compile.java": ["--long-flag"],
-            "test.junit": ["--iii"],
+            "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+            "test": ["--iii"],
         },
         expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
         expected_passthru=["passthru1", "passthru2"],
@@ -303,39 +263,14 @@ def test_subsystem_flags(splitter: ArgSplitter) -> None:
         expected_scope_to_flags={"": [], "jvm": ["--options=-Dbar=baz"], "test": []},
         expected_specs=["foo:bar"],
     )
-    # Qualified task subsystem flag in global scope.
     assert_valid_split(
         splitter,
-        "./pants --jvm-test-junit-options=-Dbar=baz test foo:bar",
-        expected_goals=["test"],
-        expected_scope_to_flags={"": [], "jvm.test.junit": ["--options=-Dbar=baz"], "test": []},
-        expected_specs=["foo:bar"],
-    )
-    # Unqualified task subsystem flag in task scope.
-    # Note that this exposes a small problem: You can't set an option on the cmd-line if that
-    # option's name begins with any subsystem scope. For example, if test.junit has some option
-    # named --jvm-foo, then it cannot be set on the cmd-line, because the ArgSplitter will assume
-    # it's an option --foo on the jvm subsystem.
-    assert_valid_split(
-        splitter,
-        "./pants test.junit --jvm-options=-Dbar=baz foo:bar",
-        expected_goals=["test"],
-        expected_scope_to_flags={
-            "": [],
-            "jvm.test.junit": ["--options=-Dbar=baz"],
-            "test.junit": [],
-        },
-        expected_specs=["foo:bar"],
-    )
-    # Global-only flag in task scope.
-    assert_valid_split(
-        splitter,
-        "./pants test.junit --reporting-template-dir=path foo:bar",
+        "./pants test --reporting-template-dir=path foo:bar",
         expected_goals=["test"],
         expected_scope_to_flags={
             "": [],
             "reporting": ["--template-dir=path"],
-            "test.junit": [],
+            "test": [],
         },
         expected_specs=["foo:bar"],
     )
@@ -375,27 +310,27 @@ def help_no_arguments_test(command_line: str, **expected):
             expected_specs=[],
         ),
         help_test(
-            "./pants help compile -x",
-            expected_goals=["compile"],
-            expected_scope_to_flags={"": [], "compile": ["-x"]},
+            "./pants help check -x",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "check": ["-x"]},
             expected_specs=[],
         ),
         help_test(
-            "./pants help compile -x",
-            expected_goals=["compile"],
-            expected_scope_to_flags={"": [], "compile": ["-x"]},
+            "./pants help check -x",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "check": ["-x"]},
             expected_specs=[],
         ),
         help_test(
-            "./pants compile -h",
-            expected_goals=["compile"],
-            expected_scope_to_flags={"": [], "compile": []},
+            "./pants check -h",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "check": []},
             expected_specs=[],
         ),
         help_test(
-            "./pants compile --help test",
-            expected_goals=["compile", "test"],
-            expected_scope_to_flags={"": [], "compile": [], "test": []},
+            "./pants check --help test",
+            expected_goals=["check", "test"],
+            expected_scope_to_flags={"": [], "check": [], "test": []},
             expected_specs=[],
         ),
         help_test(
@@ -405,23 +340,23 @@ def help_no_arguments_test(command_line: str, **expected):
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
-            "./pants compile --help-advanced test",
-            expected_goals=["compile", "test"],
-            expected_scope_to_flags={"": [], "compile": [], "test": []},
+            "./pants check --help-advanced test",
+            expected_goals=["check", "test"],
+            expected_scope_to_flags={"": [], "check": [], "test": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
-            "./pants help-advanced compile",
-            expected_goals=["compile"],
-            expected_scope_to_flags={"": [], "compile": []},
+            "./pants help-advanced check",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "check": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
-            "./pants compile help-all test --help",
-            expected_goals=["compile", "test"],
-            expected_scope_to_flags={"": [], "compile": [], "test": []},
+            "./pants check help-all test --help",
+            expected_goals=["check", "test"],
+            expected_scope_to_flags={"": [], "check": [], "test": []},
             expected_specs=[],
             expected_help_all=True,
         ),
@@ -439,17 +374,18 @@ def test_version_request_detection(splitter: ArgSplitter) -> None:
     assert_version_request("./pants -v")
     assert_version_request("./pants -V")
     assert_version_request("./pants --version")
-    # A version request supercedes anything else.
-    assert_version_request("./pants --version compile --foo --bar path/to/target")
+    # A version request supersedes anything else.
+    assert_version_request("./pants --version check --foo --bar path/to:tgt")
 
 
 @pytest.mark.parametrize(
     "command_line, unknown_goals",
     [
         ("./pants foo", ["foo"]),
-        ("./pants compile foo", ["foo"]),
+        ("./pants check foo", ["foo"]),
         ("./pants foo bar baz:qux", ["foo", "bar"]),
-        ("./pants foo compile bar baz:qux", ["foo", "bar"]),
+        ("./pants foo bar f.ext", ["foo", "bar"]),
+        ("./pants foo check bar baz:qux", ["foo", "bar"]),
     ],
 )
 def test_unknown_goal_detection(
@@ -458,10 +394,11 @@ def test_unknown_goal_detection(
     assert_unknown_goal(splitter, command_line, unknown_goals)
 
 
-def test_no_goal_detection(splitter: ArgSplitter) -> None:
-    splitter.split_args(shlex.split("./pants foo/bar:baz"))
+@pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext"))
+def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
+    splitter.split_args(shlex.split(f"./pants {extra_args}"))
     assert isinstance(splitter.help_request, NoGoalHelp)
 
 
-def test_hidden_scope_is_unknown_goal(splitter: ArgSplitter) -> None:
-    assert_unknown_goal(splitter, "./pants hidden", ["hidden"])
+def test_subsystem_scope_is_unknown_goal(splitter: ArgSplitter) -> None:
+    assert_unknown_goal(splitter, "./pants jvm reporting", ["jvm", "reporting"])
