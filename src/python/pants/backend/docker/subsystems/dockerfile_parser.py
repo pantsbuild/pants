@@ -22,6 +22,7 @@ from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 _DOCKERFILE_SANDBOX_TOOL = "dockerfile_wrapper_script.py"
+_DOCKERFILE_PACKAGE = "pants.backend.docker.subsystems"
 
 
 class DockerfileParser(PythonToolRequirementsBase):
@@ -34,8 +35,10 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_interpreter_constraints = ["CPython>=3.7"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.docker", "dockerfile_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/docker/dockerfile_lockfile.txt"
+    default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile_lockfile.txt")
+    default_lockfile_path = (
+        f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile_lockfile.txt"
+    )
     default_lockfile_url = git_url(default_lockfile_path)
 
 
@@ -57,10 +60,10 @@ class ParserSetup:
 
 @rule
 async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
-    parser_script_content = pkgutil.get_data("pants.backend.docker", _DOCKERFILE_SANDBOX_TOOL)
+    parser_script_content = pkgutil.get_data(_DOCKERFILE_PACKAGE, _DOCKERFILE_SANDBOX_TOOL)
     if not parser_script_content:
         raise ValueError(
-            "Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in pants.backend.docker."
+            "Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
         )
 
     parser_content = FileContent(

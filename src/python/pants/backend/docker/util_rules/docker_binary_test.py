@@ -3,7 +3,7 @@
 
 from hashlib import sha256
 
-from pants.backend.docker.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.engine.fs import Digest
 from pants.engine.process import Process
 
