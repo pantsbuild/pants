@@ -1525,6 +1525,8 @@ class SourcesBaseField(AsyncFieldMixin, Field):
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        if not self.globs:
+            return PathGlobs([])
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match

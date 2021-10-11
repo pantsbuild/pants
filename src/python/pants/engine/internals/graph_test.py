@@ -1256,7 +1256,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
 
     sources_rule_runner.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
 
-    def hydrate(sources_cls: type[Sources], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [
