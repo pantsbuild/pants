@@ -68,7 +68,7 @@ class PyTest(PythonToolBase):
 
     # This should be kept in sync with `requirements.txt`.
     # TODO: To fix this, we should allow using a `target_option` referring to a
-    #  `python_requirement_library` to override the version.
+    #  `python_requirement` to override the version.
     default_version = "pytest>=6.2.4,<6.3"
     # N.B.: We avoid 2.12.1 since it switched from a `coverage[toml]` dependency introduced in
     # 2.12.0 to a direct dependency on `toml`. This is broken for newer versions of `coverage` where

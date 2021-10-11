@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_sources(
 	dependencies=[':java_src']
 )
 python_tests(name="tests", timeout=240)
@@ -17,7 +17,11 @@ resources(
 
 java_sources(
   name='javaparser',
-  dependencies=[":javaparser_lockfile"],
+  dependencies=[
+    ":javaparser_lockfile",
+    ":com.github.javaparser_javaparser-symbol-solver-core",
+    ":com.fasterxml.jackson.core_jackson-databind",
+  ],
 )
 
 jvm_artifact(
@@ -37,8 +41,4 @@ jvm_artifact(
 coursier_lockfile(
   name="javaparser_lockfile",
   sources=["coursier_resolve.lockfile"],
-  requirements = [
-    ":com.github.javaparser_javaparser-symbol-solver-core",
-    ":com.fasterxml.jackson.core_jackson-databind",
-  ],
 )

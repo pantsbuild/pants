@@ -33,7 +33,7 @@ from pants.engine.target import (
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     Tags,
@@ -102,7 +102,7 @@ def test_prelude_parsing_illegal_import() -> None:
         """\
         import os
         def make_target():
-            python_library()
+            python_sources()
         """
     )
     with pytest.raises(
@@ -114,17 +114,17 @@ def test_prelude_parsing_illegal_import() -> None:
 
 class MockTgt(Target):
     alias = "mock_tgt"
-    core_fields = (Dependencies, Sources, Tags)
+    core_fields = (Dependencies, MultipleSourcesField, Tags)
 
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (Dependencies, Sources, Tags)
+    core_fields = (Dependencies, MultipleSourcesField, Tags)
 
 
 class MockTargetGenerator(Target):
     alias = "generator"
-    core_fields = (Dependencies, Sources, Tags)
+    core_fields = (Dependencies, MultipleSourcesField, Tags)
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
@@ -133,7 +133,7 @@ class MockGenerateTargetsRequest(GenerateTargetsRequest):
 
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField]))
     # Generate using both "file address" and "generated target" syntax.
     return GeneratedTargets(
         request.generator,

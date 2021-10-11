@@ -23,7 +23,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
-from pants.engine.target import Sources
+from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -67,7 +67,6 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -112,7 +111,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         SourceFiles,
         [
             SourceFilesRequest(
-                (target.get(Sources),),
+                (target.get(SourcesField),),
                 for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
@@ -148,7 +147,6 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -175,7 +173,7 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
         SourceFiles,
         [
             SourceFilesRequest(
-                (target.get(Sources),),
+                (target.get(SourcesField),),
                 for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )
@@ -207,7 +205,6 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -240,7 +237,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
         SourceFiles,
         [
             SourceFilesRequest(
-                (target.get(Sources),),
+                (target.get(SourcesField),),
                 for_sources_types=(JavaSourceField,),
                 enable_codegen=True,
             )

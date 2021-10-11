@@ -1,7 +1,7 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::core::TypeId;
+use crate::python::TypeId;
 
 pub struct Types {
   pub directory_digest: TypeId,

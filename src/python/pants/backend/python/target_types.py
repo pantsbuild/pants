@@ -43,11 +43,11 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
+    MultipleSourcesField,
     NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
-    Sources,
     StringField,
     StringSequenceField,
     Target,
@@ -56,7 +56,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ if TYPE_CHECKING:
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonSources(Sources):
+class PythonSources(MultipleSourcesField):
     # Note that Python scripts often have no file ending.
     expected_file_extensions = ("", ".py", ".pyi")
 
@@ -623,13 +623,13 @@ class PythonTests(Target):
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
-        "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
+        "other than `conftest.py`, should go into a dedicated `python_sources()` target and then "
         f"be included in the `dependencies` field.\n\nSee {doc_url('python-test-goal')}."
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_library` target
+# `python_sources` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -638,7 +638,7 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
-    alias = "python_library"
+    alias = "python_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
@@ -646,14 +646,23 @@ class PythonLibrary(Target):
         PythonLibrarySources,
     )
     help = (
-        "Python source code.\n\nA `python_library` does not necessarily correspond to a "
+        "Python source code.\n\nA `python_sources` does not necessarily correspond to a "
         "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
-        "`python_library` targets may be packaged into a distribution or binary."
+        "`python_sources` targets may be packaged into a distribution or binary."
+    )
+
+    deprecated_alias = "python_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `python_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_requirement_library` target
+# `python_requirement` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -735,8 +744,47 @@ class PythonRequirementsField(_RequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
-        "A sequence of pip-style requirement strings, e.g. `['foo==1.8', "
-        "\"bar<=3 ; python_version<'3'\"]`."
+        'A pip-style requirement string, e.g. `["Django==3.2.8"]`.\n\n'
+        "You can specify multiple requirements for the same project in order to use environment "
+        'markers, such as `["foo>=1.2,<1.3 ; python_version>\'3.6\'", "foo==0.9 ; '
+        "python_version<'3'\"]`.\n\n"
+        "If the requirement depends on some other requirement to work, such as needing "
+        "`setuptools` to be built, use the `dependencies` field instead."
+    )
+
+
+_default_module_mapping_url = git_url(
+    "src/python/pants/backend/python/dependency_inference/default_module_mapping.py"
+)
+
+
+class PythonRequirementModulesField(StringSequenceField):
+    alias = "modules"
+    help = (
+        "The modules this requirement provides (used for dependency inference).\n\n"
+        'For example, the requirement `setuptools` provides `["setuptools", "pkg_resources", '
+        '"easy_install"]`.\n\n'
+        "Usually you can leave this field off. If unspecified, Pants will first look at the "
+        f"default module mapping ({_default_module_mapping_url}), and then will default to "
+        "the normalized project name. For example, the requirement `Django` would default to "
+        "the module `django`.\n\n"
+        "Mutually exclusive with the `type_stub_modules` field."
+    )
+
+
+class PythonRequirementTypeStubModulesField(StringSequenceField):
+    alias = "type_stub_modules"
+    help = (
+        "The modules this requirement provides if the requirement is a type stub (used for "
+        "dependency inference).\n\n"
+        'For example, the requirement `types-requests` provides `["requests"]`.\n\n'
+        "Usually you can leave this field off. If unspecified, Pants will first look at the "
+        f"default module mapping ({_default_module_mapping_url}). If not found _and_ the "
+        "requirement name starts with `types-` or `stubs-`, or ends with `-types` or `-stubs`, "
+        "will default to that requirement name without the prefix/suffix. For example, "
+        "`types-requests` would default to `requests`. Otherwise, will be treated like a normal "
+        "requirement (see the `modules` field).\n\n"
+        "Mutually exclusive with the `modules` field."
     )
 
 
@@ -757,6 +805,14 @@ class ModuleMappingField(DictStringToStringSequenceField):
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "Use the field `modules` instead, which takes a list of modules the `python_requirement` "
+        "target provides.\n\n"
+        "If this `python_requirement` target has multiple distinct 3rd-party "
+        "projects in its `requirements` field, you should split those up into one `"
+        "python_requirement` target per distinct project."
+    )
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -780,6 +836,14 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "Use the field `type_stub_modules` instead, which takes a list of modules the "
+        "`python_requirement` target provides type stubs for.\n\n"
+        "If this `python_requirement` target has multiple distinct 3rd-party "
+        "projects in its `requirements` field, you should split those up into one `"
+        "python_requirement` target per distinct project."
+    )
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -789,22 +853,48 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
         return normalize_module_mapping(value_or_default)
 
 
-class PythonRequirementLibrary(Target):
-    alias = "python_requirement_library"
+class PythonRequirementTarget(Target):
+    alias = "python_requirement"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         PythonRequirementsField,
+        PythonRequirementModulesField,
+        PythonRequirementTypeStubModulesField,
         ModuleMappingField,
         TypeStubsModuleMappingField,
     )
     help = (
-        "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
-        "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
-        "already, you can instead use the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{doc_url('python-third-party-dependencies')}."
+        "A Python requirement installable by pip.\n\n"
+        "This target is useful when you want to declare Python requirements inline in a "
+        "BUILD file. If you have a `requirements.txt` file already, you can instead use "
+        "the macro `python_requirements()` to convert each "
+        "requirement into a `python_requirement()` target automatically. For Poetry, use "
+        "`poetry_requirements()`."
+        "\n\n"
+        f"See {doc_url('python-third-party-dependencies')}."
     )
+
+    deprecated_alias = "python_requirement_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `python_requirement` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
+    )
+
+    def validate(self) -> None:
+        if (
+            self[PythonRequirementModulesField].value
+            and self[PythonRequirementTypeStubModulesField].value
+        ):
+            raise InvalidTargetException(
+                f"The `{self.alias}` target {self.address} cannot set both the "
+                f"`{self[PythonRequirementModulesField].alias}` and "
+                f"`{self[PythonRequirementTypeStubModulesField].alias}` fields at the same time. "
+                "To fix, please remove one."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -832,7 +922,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             )
 
 
-class PythonRequirementsFileSources(Sources):
+class PythonRequirementsFileSources(MultipleSourcesField):
     required = True
     uses_source_roots = False
 

@@ -101,7 +101,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": GOOD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": GOOD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     lint_results, fmt_result = run_shfmt(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -113,7 +113,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     lint_results, fmt_result = run_shfmt(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -126,7 +126,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.sh": GOOD_FILE, "bad.sh": BAD_FILE, "BUILD": "shell_library(name='t')"}
+        {"good.sh": GOOD_FILE, "bad.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sh")),
@@ -146,10 +146,10 @@ def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "a/f.sh": NEEDS_CONFIG_FILE,
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             "a/.editorconfig": "[*.sh]\nswitch_case_indent = true\n",
             "b/f.sh": NEEDS_CONFIG_FILE,
-            "b/BUILD": "shell_library()",
+            "b/BUILD": "shell_sources()",
         }
     )
     tgts = [
@@ -169,7 +169,7 @@ def test_config_files(rule_runner: RuleRunner) -> None:
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": NEEDS_CONFIG_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": NEEDS_CONFIG_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     lint_results, fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-args=-ci"])
     assert len(lint_results) == 1
@@ -181,7 +181,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     lint_results, fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-skip"])
     assert not lint_results

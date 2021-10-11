@@ -327,21 +327,14 @@ impl<N: Node> InnerGraph<N> {
 
     // And their transitive dependencies, which will be dirtied.
     //
-    // NB: We do not dirty "through" a running Uncacheable node and into its dependees: this is
-    // because all Uncacheable nodes are currently also implicitly "not restartable", and thus
-    // shouldn't be interrupted unless all dependees have gone away for other reasons (such as the
-    // Session having ended).
-    //
-    // TODO: As part of #9462, we'll likely want to split the "not restartable" property from the
-    // Uncacheable property, because #9462 will deal with nodes that are Uncacheable/per-Session, but
-    // also restartable.
+    // NB: We only dirty "through" a Node and into its dependees if it is Node::restartable.
     let transitive_ids: Vec<_> = self
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
         |&entry_id| {
           let entry = self.unsafe_entry_for_id(entry_id);
-          !entry.node().cacheable() && entry.is_running()
+          !entry.node().restartable() && entry.is_running()
         },
       )
       .filter(|eid| !root_ids.contains(eid))
@@ -527,9 +520,10 @@ impl<N: Node> Graph<N> {
         // edge as having equal weight.
         inner.pg.add_edge(src_id, dst_id, 1.0);
 
-        // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
-        // it only be allowed to run once, and so Node invalidation does not pass through it.
-        !inner.entry_for_id(src_id).unwrap().node().cacheable()
+        // We should retry the dst Node if the src Node is not restartable. If the src is not
+        // restartable, it is only allowed to run once, and so Node invalidation does not pass
+        // through it.
+        !inner.entry_for_id(src_id).unwrap().node().restartable()
       } else {
         // Otherwise, this is an external request: always retry.
         test_trace_log!(
@@ -574,11 +568,11 @@ impl<N: Node> Graph<N> {
   ///
   /// Request the given dst Node, optionally in the context of the given src Node.
   ///
-  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
+  /// If there is no src Node, or the src Node is not restartable, this method will retry for
   /// invalidation until the Node completes.
   ///
-  /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
-  /// to be retried here for up to `invalidation_timeout`.
+  /// Invalidation events in the graph (generally, filesystem changes) will cause restartable
+  /// Nodes to be retried here for up to `invalidation_timeout`.
   ///
   pub async fn get(
     &self,
@@ -821,7 +815,7 @@ impl<N: Node> Graph<N> {
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
         .map(|entry| {
           // If a dependency is itself uncacheable or has uncacheable deps, this Node should
-          // also complete as having uncacheable dpes, independent of matching Generation values.
+          // also complete as having uncacheable deps, independent of matching Generation values.
           // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
           // (marked as UncacheableDependencies) dependents, transitively.
           if entry.has_uncacheable_deps() {
@@ -935,7 +929,7 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
       // Visit this node and it neighbors if this node has not yet be visited and we aren't
       // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
-      // like uncacheable nodes, which shouldn't be dirtied.
+      // like !restartable nodes, which shouldn't be dirtied.
       if !self.walked.visit(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }

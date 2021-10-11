@@ -88,7 +88,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     all_major_minor_python_versions(Yapf.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_yapf(
         rule_runner,
@@ -103,7 +103,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_yapf(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -116,7 +116,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -146,7 +146,7 @@ def test_config_file(
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
-            "BUILD": "python_library(name='t', interpreter_constraints=['==3.9.*'])",
+            "BUILD": "python_sources(name='t', interpreter_constraints=['==3.9.*'])",
             path: f"[{section}]\nindent_width = 2\n",
         }
     )
@@ -160,7 +160,7 @@ def test_config_file(
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_yapf(
         rule_runner, [tgt], extra_args=["--yapf-args=--style='{indent_width: 4}'"]
@@ -173,7 +173,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_yapf(rule_runner, [tgt], extra_args=["--yapf-skip"])
     assert not lint_results

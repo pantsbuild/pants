@@ -46,7 +46,7 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
             foo
             / "BUILD": dedent(
                 """
-            python_library()
+            python_sources()
 
             python_distribution(
                 name = "dist",

@@ -49,7 +49,7 @@ def test_run_sample_script(
         ),
         "src_root1/project/BUILD": dedent(
             f"""\
-            python_library(name='lib')
+            python_sources(name='lib')
             pex_binary(
               entry_point={entry_point!r},
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
@@ -63,7 +63,7 @@ def test_run_sample_script(
                 return s.upper()
             """
         ),
-        "src_root2/utils/BUILD": "python_library()",
+        "src_root2/utils/BUILD": "python_sources()",
     }
 
     def run(*extra_args: str, **extra_env: str) -> PantsResult:
@@ -113,7 +113,7 @@ def test_no_strip_pex_env_issues_12057() -> None:
         ),
         "src/BUILD": dedent(
             """\
-            python_library(name="lib")
+            python_sources(name="lib")
             pex_binary(entry_point="app.py")
             """
         ),
@@ -145,7 +145,7 @@ def test_no_leak_pex_root_issues_12055() -> None:
         "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
             """\
-            python_library(name="lib")
+            python_sources(name="lib")
             pex_binary(entry_point="app.py")
             """
         ),
@@ -176,9 +176,9 @@ def test_local_dist() -> None:
         "foo/main.py": "from foo.bar import BAR; print(BAR)",
         "foo/BUILD": dedent(
             """\
-            python_library(name="lib", sources=["bar.py", "setup.py"])
+            python_sources(name="lib", sources=["bar.py", "setup.py"])
 
-            python_library(name="main_lib", sources=["main.py"])
+            python_sources(name="main_lib", sources=["main.py"])
 
             python_distribution(
                 name="dist",

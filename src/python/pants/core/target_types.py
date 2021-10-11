@@ -11,7 +11,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
-from pants.engine.addresses import AddressInput, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -25,32 +25,49 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    Sources,
+    MultipleSourcesField,
+    SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
     StringField,
     Target,
     Targets,
-    WrappedTarget,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
-# `files` target
+# `file` and`files` targets
 # -----------------------------------------------------------------------------------------------
 
 
-class FilesSources(Sources):
+class FileSourcesField(MultipleSourcesField):
+    required = True
+    uses_source_roots = False
+    expected_num_files = 1
+
+
+class FileTarget(Target):
+    alias = "files"  # TODO: update name to `file`
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourcesField)
+    help = (
+        "A single loose file that lives outside of code packages.\n\n"
+        "Files are placed directly in archives, outside of code artifacts such as Python wheels "
+        "or JVM JARs. The sources of a `file` target are accessed via filesystem APIs, such as "
+        "Python's `open()`, via paths relative to the repository root."
+    )
+
+
+class FilesGeneratingSourcesField(MultipleSourcesField):
     required = True
     uses_source_roots = False
 
 
-class Files(Target):
+class FilesGeneratorTarget(Target):
     alias = "files"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesSources)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesGeneratingSourcesField)
     help = (
         "Loose files that live outside code packages.\n\nFiles are placed directly in archives, "
         "outside of code artifacts such as Python wheels or JVM JARs. The sources of a `files` "
@@ -60,16 +77,18 @@ class Files(Target):
 
 
 class GenerateTargetsFromFiles(GenerateTargetsRequest):
-    generate_from = Files
+    generate_from = FilesGeneratorTarget
 
 
 @rule
 async def generate_targets_from_files(
     request: GenerateTargetsFromFiles, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[FilesSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[FilesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
-        Files,
+        FileTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -82,7 +101,7 @@ async def generate_targets_from_files(
 # -----------------------------------------------------------------------------------------------
 
 
-class RelocatedFilesSources(Sources):
+class RelocatedFilesSources(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
     expected_num_files = 0
@@ -139,7 +158,7 @@ class RelocatedFiles(Target):
 
             # Results in `data.json`.
             relocated_files(
-                file_targets=["src/resources/project1:target"],
+                files_targets=["src/resources/project1:target"],
                 src="src/resources/project1",
                 dest="",
             )
@@ -148,7 +167,7 @@ class RelocatedFiles(Target):
 
             # Results in `images/logo.svg`.
             relocated_files(
-                file_targets=["//:logo"],
+                files_targets=["//:logo"],
                 src="",
                 dest="images",
             )
@@ -157,7 +176,7 @@ class RelocatedFiles(Target):
 
             # Results in `new_prefix/project1/data.json`.
             relocated_files(
-                file_targets=["src/resources/project1:target"],
+                files_targets=["src/resources/project1:target"],
                 src="src/resources",
                 dest="new_prefix",
             )
@@ -167,29 +186,28 @@ class RelocatedFiles(Target):
 
 class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
     input = RelocatedFilesSources
-    output = FilesSources
+    output = FileSourcesField
 
 
 @rule(desc="Relocating loose files for `relocated_files` targets", level=LogLevel.DEBUG)
 async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
-    # TODO(#10915): using `await Get(Addresses, UnparsedAddressInputs)` causes a graph failure.
-    original_files_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            AddressInput,
-            AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
-        )
-        for v in (
-            request.protocol_target.get(RelocatedFilesOriginalTargets)
-            .to_unparsed_address_inputs()
-            .values
-        )
+    # TODO(#13086): Because we're using `Targets` instead of `UnexpandedTargets`, the
+    #  `files` target generator gets replaced by its generated `file` targets. That replacement is
+    #  necessary because we only hydrate sources for `FileSourcesField`, which is only for the
+    #  `file` target.  That's really subtle!
+    original_file_targets = await Get(
+        Targets,
+        UnparsedAddressInputs,
+        request.protocol_target.get(RelocatedFilesOriginalTargets).to_unparsed_address_inputs(),
     )
     original_files_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources)))
-        for wrapped_tgt in original_files_targets
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourcesField,)),
+        )
+        for tgt in original_file_targets
     )
     snapshot = await Get(
         Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
@@ -205,17 +223,34 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 
 
 # -----------------------------------------------------------------------------------------------
-# `resources` target
+# `resource` and `resources` target
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourcesSources(Sources):
+class ResourceSourcesField(MultipleSourcesField):
+    required = True
+    expected_num_files = 1
+
+
+class ResourceTarget(Target):
+    alias = "resources"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourcesField)
+    help = (
+        "A single resource file embedded in a code package and accessed in a "
+        "location-independent manner.\n\n"
+        "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
+        "of a `resources` target are accessed via language-specific resource APIs, such as "
+        "Python's `pkgutil` or JVM's ClassLoader, via paths relative to the target's source root."
+    )
+
+
+class ResourcesGeneratingSourcesField(MultipleSourcesField):
     required = True
 
 
-class Resources(Target):
+class ResourcesGeneratorTarget(Target):
     alias = "resources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesSources)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesGeneratingSourcesField)
     help = (
         "Data embedded in a code package and accessed in a location-independent manner.\n\n"
         "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
@@ -225,16 +260,18 @@ class Resources(Target):
 
 
 class GenerateTargetsFromResources(GenerateTargetsRequest):
-    generate_from = Resources
+    generate_from = ResourcesGeneratorTarget
 
 
 @rule
 async def generate_targets_from_resources(
     request: GenerateTargetsFromResources, union_membership: UnionMembership
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[ResourcesSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[ResourcesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
-        Resources,
+        ResourceTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -318,7 +355,11 @@ class ArchiveFieldSet(PackageFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
-    package_targets, files_targets = await MultiGet(
+    # TODO(#13086): Because we're using `Targets` instead of `UnexpandedTargets`, the
+    #  `files` target generator gets replaced by its generated `file` targets. That replacement is
+    #  necessary because we only hydrate sources for `FileSourcesField`, which is only for the
+    #  `file` target.  That's really subtle!
+    package_targets, file_targets = await MultiGet(
         Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
         Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
     )
@@ -331,14 +372,16 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    files_sources = await MultiGet(
+    file_sources = await MultiGet(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                tgt.get(Sources), for_sources_types=(FilesSources,), enable_codegen=True
+                tgt.get(SourcesField),
+                for_sources_types=(FileSourcesField,),
+                enable_codegen=True,
             ),
         )
-        for tgt in files_targets
+        for tgt in file_targets
     )
 
     input_snapshot = await Get(
@@ -346,7 +389,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         MergeDigests(
             (
                 *(package.digest for package in packages),
-                *(sources.snapshot.digest for sources in files_sources),
+                *(sources.snapshot.digest for sources in file_sources),
             )
         ),
     )

@@ -10,7 +10,10 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufGrpcToggleField,
+    ProtobufSourcesField,
+)
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
@@ -33,7 +36,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    Sources,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -43,7 +45,7 @@ from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
-    input = ProtobufSources
+    input = ProtobufSourcesField
     output = PythonSources
 
 
@@ -75,12 +77,13 @@ async def generate_python_from_protobuf(
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure),
-            for_sources_types=(ProtobufSources,),
+            tgt[ProtobufSourcesField]
+            for tgt in transitive_targets.closure
+            if tgt.has_field(ProtobufSourcesField)
         ),
     )
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]])
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourcesField]])
     )
 
     (
@@ -111,7 +114,7 @@ async def generate_python_from_protobuf(
             VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),
         )
 
-        if request.protocol_target.get(ProtobufGrpcToggle).value:
+        if request.protocol_target.get(ProtobufGrpcToggleField).value:
             mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
@@ -134,7 +137,7 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrpcToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggleField).value
         else None
     )
 
@@ -194,7 +197,7 @@ async def generate_python_from_protobuf(
         # Verify that the python source root specified by the target is in fact a source root.
         source_root_request = SourceRootRequest(PurePath(py_source_root))
     else:
-        # The target didn't specify a python source root, so use the protobuf_library's source root.
+        # The target didn't specify a python source root, so use the protobuf_source's source root.
         source_root_request = SourceRootRequest.for_target(request.protocol_target)
 
     normalized_digest, source_root = await MultiGet(

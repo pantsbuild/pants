@@ -12,7 +12,10 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     ProtobufMapping,
     parse_proto_imports,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourcesField,
+    ProtobufSourcesGeneratorTarget,
+)
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
@@ -82,7 +85,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProtobufMapping, []),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
         ],
-        target_types=[ProtobufLibrary],
+        target_types=[ProtobufSourcesGeneratorTarget],
     )
 
 
@@ -93,12 +96,12 @@ def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
             # Two proto files belonging to the same target. We should use two file addresses.
             "root1/protos/f1.proto": "",
             "root1/protos/f2.proto": "",
-            "root1/protos/BUILD": "protobuf_library()",
+            "root1/protos/BUILD": "protobuf_sources()",
             # These protos would result in the same stripped file name, so they are ambiguous.
             "root1/two_owners/f.proto": "",
-            "root1/two_owners/BUILD": "protobuf_library()",
+            "root1/two_owners/BUILD": "protobuf_sources()",
             "root2/two_owners/f.proto": "",
-            "root2/two_owners/BUILD": "protobuf_library()",
+            "root2/two_owners/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(ProtobufMapping, [])
@@ -131,9 +134,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "src/protos/project/f2.proto": "import 'project/f1.proto';",
-            "src/protos/project/BUILD": "protobuf_library()",
+            "src/protos/project/BUILD": "protobuf_sources()",
             "src/protos/tests/f.proto": "",
-            "src/protos/tests/BUILD": "protobuf_library()",
+            "src/protos/tests/BUILD": "protobuf_sources()",
             # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
             # not warn on the disambiguated one and should infer a dep.
             "src/protos/ambiguous/dep.proto": "",
@@ -146,9 +149,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             ),
             "src/protos/ambiguous/BUILD": dedent(
                 """\
-                protobuf_library(name='dep1', sources=['dep.proto', 'disambiguated.proto'])
-                protobuf_library(name='dep2', sources=['dep.proto', 'disambiguated.proto'])
-                protobuf_library(
+                protobuf_sources(name='dep1', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_sources(name='dep2', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_sources(
                     name='main',
                     sources=['main.proto'],
                     dependencies=['!./disambiguated.proto:dep2'],
@@ -161,25 +164,19 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSources])]
+            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSourcesField])]
         )
 
-    build_address = Address("src/protos/project")
-    assert run_dep_inference(build_address) == InferredDependencies(
-        [
-            Address("src/protos/tests", relative_file_path="f.proto"),
-            Address("src/protos/project", relative_file_path="f1.proto"),
-        ],
-    )
-
-    file_address = Address("src/protos/project", relative_file_path="f1.proto")
-    assert run_dep_inference(file_address) == InferredDependencies(
-        [Address("src/protos/tests", relative_file_path="f.proto")]
-    )
+    assert run_dep_inference(
+        Address("src/protos/project", relative_file_path="f1.proto")
+    ) == InferredDependencies([Address("src/protos/tests", relative_file_path="f.proto")])
+    assert run_dep_inference(
+        Address("src/protos/project", relative_file_path="f2.proto")
+    ) == InferredDependencies([Address("src/protos/project", relative_file_path="f1.proto")])
 
     caplog.clear()
     assert run_dep_inference(
-        Address("src/protos/ambiguous", target_name="main")
+        Address("src/protos/ambiguous", target_name="main", relative_file_path="main.proto")
     ) == InferredDependencies(
         [
             Address(
@@ -188,7 +185,10 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
         ]
     )
     assert len(caplog.records) == 1
-    assert "The target src/protos/ambiguous:main imports `ambiguous/dep.proto`" in caplog.text
+    assert (
+        "The target src/protos/ambiguous/main.proto:main imports `ambiguous/dep.proto`"
+        in caplog.text
+    )
     assert (
         "['src/protos/ambiguous/dep.proto:dep1', 'src/protos/ambiguous/dep.proto:dep2']"
         in caplog.text

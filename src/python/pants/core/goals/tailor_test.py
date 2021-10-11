@@ -33,7 +33,7 @@ from pants.core.goals.tailor import (
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
 from pants.engine.rules import QueryRule, rule
-from pants.engine.target import Sources, Target
+from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
@@ -44,7 +44,7 @@ class MockPutativeTargetsRequest:
         assert search_paths.dirs == ("",)
 
 
-class FortranSources(Sources):
+class FortranSources(MultipleSourcesField):
     expected_file_extensions = (".f90",)
 
 
@@ -394,7 +394,7 @@ def test_specs_to_dirs() -> None:
 
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        workspace = Workspace(rule_runner.scheduler)
+        workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
         union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
         specs = Specs(
             address_specs=AddressSpecs(tuple()), filesystem_specs=FilesystemSpecs(tuple())

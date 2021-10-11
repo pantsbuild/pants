@@ -53,6 +53,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -95,6 +96,9 @@ async def infer_go_dependencies(
     inferred_dependencies = []
     for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
         if import_path in std_lib_imports:
+            continue
+        # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
+        if import_path == pkg_info.import_path:
             continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
@@ -208,18 +212,7 @@ async def generate_targets_from_go_mod(
     matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
 
     def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
-        go_mod_spec_path = generator_addr.spec_path
-        assert dir.startswith(
-            go_mod_spec_path
-        ), f"the dir {dir} should start with {go_mod_spec_path}"
-
-        if not go_mod_spec_path:
-            subpath = dir
-        elif dir == go_mod_spec_path:
-            subpath = ""
-        else:
-            subpath = dir[len(go_mod_spec_path) + 1 :]
-
+        subpath = fast_relpath(dir, generator_addr.spec_path)
         import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
 
         return GoFirstPartyPackageTarget(

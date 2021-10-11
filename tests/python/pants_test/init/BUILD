@@ -6,8 +6,8 @@ python_tests(
   timeout = 360,
   dependencies=[
     # Used by `test_options_initializer`.
-    '//:build_root',
+    "//BUILD_ROOT:files",
   ],
 )
 
-python_library()
+python_sources()

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 
+from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
@@ -21,7 +22,14 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import InvalidTargetException, Sources, Target, Targets
+from pants.engine.target import (
+    InvalidTargetException,
+    SourcesField,
+    Target,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -29,6 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
+    JvmArtifactFieldSet,
     JvmArtifactGroupField,
     JvmArtifactVersionField,
     JvmLockfileSources,
@@ -57,37 +66,39 @@ class GatherArtifactRequirementsRequest:
 async def gather_artifact_requirements(
     request: GatherArtifactRequirementsRequest,
 ) -> ArtifactRequirements:
-    def from_target(tgt: Target) -> Coordinate:
-        group = tgt[JvmArtifactGroupField].value
-        if not group:
-            raise InvalidTargetException(
-                f"The `group` field of {tgt.alias} target {tgt.address} must be set."
-            )
-
-        artifact = tgt[JvmArtifactArtifactField].value
-        if not artifact:
-            raise InvalidTargetException(
-                f"The `artifact` field of {tgt.alias} target {tgt.address} must be set."
-            )
-
-        version = tgt[JvmArtifactVersionField].value
-        if not version:
-            raise InvalidTargetException(
-                f"The `version` field of {tgt.alias} target {tgt.address} must be set."
-            )
-
-        return Coordinate(
-            group=group,
-            artifact=artifact,
-            version=version,
-        )
 
     requirements_addresses = await Get(
         Addresses, UnparsedAddressInputs, request.requirements.to_unparsed_address_inputs()
     )
     requirements_targets = await Get(Targets, Addresses, requirements_addresses)
 
-    return ArtifactRequirements(from_target(tgt) for tgt in requirements_targets)
+    return ArtifactRequirements(_coordinate_from_target(tgt) for tgt in requirements_targets)
+
+
+def _coordinate_from_target(tgt: Target) -> Coordinate:
+    group = tgt[JvmArtifactGroupField].value
+    if not group:
+        raise InvalidTargetException(
+            f"The `group` field of {tgt.alias} target {tgt.address} must be set."
+        )
+
+    artifact = tgt[JvmArtifactArtifactField].value
+    if not artifact:
+        raise InvalidTargetException(
+            f"The `artifact` field of {tgt.alias} target {tgt.address} must be set."
+        )
+
+    version = tgt[JvmArtifactVersionField].value
+    if not version:
+        raise InvalidTargetException(
+            f"The `version` field of {tgt.alias} target {tgt.address} must be set."
+        )
+
+    return Coordinate(
+        group=group,
+        artifact=artifact,
+        version=version,
+    )
 
 
 @dataclass(frozen=True)
@@ -114,10 +125,31 @@ class CoursierGenerateLockfileResult:
 async def coursier_generate_lockfile(
     request: CoursierGenerateLockfileRequest,
 ) -> CoursierGenerateLockfileResult:
-    artifact_requirements = await Get(
-        ArtifactRequirements,
-        GatherArtifactRequirementsRequest(request.target[JvmRequirementsField]),
+
+    # This task finds all of the sources that depend on this lockfile, and then resolves
+    # a lockfile that satisfies all of their `jvm_artifact` dependencies.
+
+    # Find all targets that (directly or indirectly) depend on this lockfile
+    dependees = await Get(
+        Dependees,
+        DependeesRequest(
+            [request.target.address],
+            transitive=True,
+            include_roots=True,
+        ),
     )
+
+    # Find JVM artifacts in the dependency tree of the targets that depend on this lockfile.
+    # These artifacts constitute the requirements that will be resolved for this lockfile.
+    dependee_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(dependees))
+    resolvable_dependencies = [
+        tgt for tgt in dependee_targets.closure if JvmArtifactFieldSet.is_applicable(tgt)
+    ]
+
+    artifact_requirements = ArtifactRequirements(
+        [_coordinate_from_target(tgt) for tgt in resolvable_dependencies]
+    )
+
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
         ArtifactRequirements,
@@ -128,7 +160,7 @@ async def coursier_generate_lockfile(
     lockfile_sources = await Get(
         SourceFiles,
         SourceFilesRequest(
-            [request.target.get(Sources)],
+            [request.target.get(SourcesField)],
             for_sources_types=[JvmLockfileSources],
             enable_codegen=False,
         ),

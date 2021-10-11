@@ -13,7 +13,6 @@ from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
-    compile,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -39,7 +38,6 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *assembly.rules(),
             *build_pkg.rules(),
-            *compile.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
@@ -332,7 +330,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
         expected_import_path=xerrors_internal_import_path,
-        expected_subpath="/internal",  # TODO: Fix modeling of subpath, this seems wrong.
+        expected_subpath="internal",
         expected_go_file_names=["internal.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],

@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
@@ -10,12 +12,13 @@ from pkg_resources import Requirement
 
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import warn_or_error
 
 
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 class PipenvRequirements:
-    """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
+    """Translates a Pipenv.lock file into an equivalent set `python_requirement` targets.
 
     You may also use the parameter `module_mapping` to teach Pants what modules each of your
     requirements provide. For any requirement unspecified, Pants will default to the name of the
@@ -35,7 +38,9 @@ class PipenvRequirements:
 
     def __call__(
         self,
-        requirements_relpath: str = "Pipfile.lock",
+        requirements_relpath: str | None = None,
+        *,
+        source: str | None = None,
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
         type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
         pipfile_target: Optional[str] = None,
@@ -50,20 +55,37 @@ class PipenvRequirements:
         :param pipfile_target: a `_python_requirements_file` target to provide for cache invalidation
         if the requirements_relpath value is not in the current rel_path
         """
+        if requirements_relpath and source:
+            raise ValueError(
+                "Specified both `requirements_relpath` and `source` in the `pipenv_requirements` "
+                f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
+                "`source`."
+            )
+        if requirements_relpath is not None:
+            warn_or_error(
+                "2.9.0.dev0",
+                "the `requirements_relpath` argument for `pipenv_requirements()`",
+                (
+                    "Use the `source` argument instead of `requirements_relpath` for the "
+                    f"`pipenv_requirements` macro in the BUILD file at "
+                    f"{self._parse_context.rel_path}. `source` behaves the same."
+                ),
+            )
+            source = requirements_relpath
+        if source is None:
+            source = "Pipfile.lock"
 
-        requirements_path = Path(
-            get_buildroot(), self._parse_context.rel_path, requirements_relpath
-        )
+        requirements_path = Path(get_buildroot(), self._parse_context.rel_path, source)
         lock_info = json.loads(requirements_path.read_text())
 
         if pipfile_target:
             requirements_dep = pipfile_target
         else:
-            requirements_file_target_name = requirements_relpath
+            requirements_file_target_name = source
             self._parse_context.create_object(
                 "_python_requirements_file",
                 name=requirements_file_target_name,
-                sources=[requirements_relpath],
+                sources=[source],
             )
             requirements_dep = f":{requirements_file_target_name}"
 
@@ -79,24 +101,12 @@ class PipenvRequirements:
                 req_str += f";{info['markers']}"
 
             parsed_req = Requirement.parse(req_str)
-
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
-            req_module_mapping = (
-                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_module_mapping
-                else {}
-            )
-            req_stubs_mapping = (
-                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_type_stubs_module_mapping
-                else {}
-            )
-
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=req_stubs_mapping,
+                modules=normalized_module_mapping.get(normalized_proj_name),
+                type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
             )

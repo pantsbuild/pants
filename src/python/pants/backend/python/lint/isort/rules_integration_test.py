@@ -86,7 +86,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     all_major_minor_python_versions(Isort.default_interpreter_constraints),
 )
 def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(
         rule_runner,
@@ -102,7 +102,7 @@ def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -115,7 +115,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -140,7 +140,7 @@ def test_config_file(rule_runner: RuleRunner, path: str, extra_args: list[str]) 
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
-            "BUILD": "python_library(name='t', interpreter_constraints=['==3.9.*'])",
+            "BUILD": "python_sources(name='t', interpreter_constraints=['==3.9.*'])",
             path: "[isort]\ncombine_as_imports=True\n",
         }
     )
@@ -155,7 +155,7 @@ def test_config_file(rule_runner: RuleRunner, path: str, extra_args: list[str]) 
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(
         rule_runner, [tgt], extra_args=["--isort-args='--combine-as'"]
@@ -169,7 +169,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_isort(rule_runner, [tgt], extra_args=["--isort-skip"])
     assert not lint_results
@@ -184,7 +184,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
             "good.py": GOOD_FILE,
             "bad.pyi": BAD_FILE,
             "bad.py": BAD_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
         }
     )
 

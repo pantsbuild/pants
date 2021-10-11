@@ -7,7 +7,7 @@ import dataclasses
 import logging
 import sys
 from contextlib import contextmanager
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import pkg_resources
 
@@ -103,7 +103,7 @@ class OptionsInitializer:
 
     def build_config_and_options(
         self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment, *, raise_: bool
-    ) -> Tuple[BuildConfiguration, Options]:
+    ) -> tuple[BuildConfiguration, Options]:
         build_config = _initialize_build_configuration(
             self._plugin_resolver, options_bootstrapper, env
         )

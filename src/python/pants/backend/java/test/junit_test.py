@@ -129,7 +129,6 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -137,7 +136,10 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name='example-test',
-                    dependencies= [':lockfile'],
+                    dependencies= [
+                        ':lockfile',
+                        ':junit_junit',
+                    ],
                 )
                 """
             ),
@@ -180,7 +182,6 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -188,7 +189,10 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name='example-test',
-                    dependencies= [':lockfile'],
+                    dependencies= [
+                        ':lockfile',
+                        ':junit_junit',
+                    ],
                 )
                 """
             ),
@@ -240,7 +244,6 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [':junit_junit'],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -249,13 +252,15 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                 java_sources(
                     name='example-lib',
                     dependencies = [
-                        ':lockfile',                    ],
+                        ':lockfile',
+                    ],
                 )
 
                 junit_tests(
                     name = 'example-test',
                     dependencies = [
                         ':lockfile',
+                        ':junit_junit',
                         '//:example-lib',
                     ],
                 )
@@ -404,9 +409,6 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [
-                        ':org.junit.jupiter_junit-jupiter-api',
-                    ],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -414,7 +416,10 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name = 'example-test',
-                    dependencies = [':lockfile'],
+                    dependencies = [
+                        ':lockfile',
+                        ':org.junit.jupiter_junit-jupiter-api',
+                    ],
                 )
                 """
             ),
@@ -460,9 +465,6 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [
-                        ':org.junit.jupiter_junit-jupiter-api',
-                    ],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -470,7 +472,10 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name='example-test',
-                    dependencies= [':lockfile'],
+                    dependencies= [
+                        ':lockfile',
+                        ':org.junit.jupiter_junit-jupiter-api',
+                    ],
                 )
                 """
             ),
@@ -523,9 +528,6 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [
-                        ':org.junit.jupiter_junit-jupiter-api',
-                    ],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -542,6 +544,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                     name = 'example-test',
                     dependencies = [
                         ':lockfile',
+                        ':org.junit.jupiter_junit-jupiter-api',
                         '//:example-lib',
                     ],
                 )

@@ -23,7 +23,7 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_single_dependency,
     parse_str_version,
 )
-from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
+from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -385,7 +385,7 @@ def test_parse_multi_reqs() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(Targets, (Specs,))],
-        target_types=[PythonRequirementLibrary, PythonRequirementsFile],
+        target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"poetry_requirements": PoetryRequirements},
     )
 
@@ -396,7 +396,7 @@ def assert_poetry_requirements(
     pyproject_toml: str,
     *,
     expected_file_dep: PythonRequirementsFile,
-    expected_targets: Iterable[PythonRequirementLibrary],
+    expected_targets: Iterable[PythonRequirementTarget],
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
@@ -408,7 +408,7 @@ def assert_poetry_requirements(
 
 
 def test_pyproject_toml(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each entry in a
+    """This tests that we correctly create a new python_requirement for each entry in a
     pyproject.toml file.
 
     Note that this just ensures proper targets are created; see prior tests for specific parsing
@@ -440,30 +440,30 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             address=Address("", target_name="pyproject.toml"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "module_mapping": {"ansicolors": ["colors"]},
+                    "modules": ["colors"],
                 },
                 address=Address("", target_name="ansicolors"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Django==3.2 ; python_version == '3'")],
                 },
                 address=Address("", target_name="Django"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Django-types==2")],
-                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                    "type_stub_modules": ["django"],
                 },
                 address=Address("", target_name="Django-types"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Un_Normalized_PROJECT == 1.0.0")],
@@ -474,10 +474,11 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_relpath_override(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("source_arg", ("source", "pyproject_toml_relpath"))
+def test_source_override(source_arg: str, rule_runner: RuleRunner) -> None:
     assert_poetry_requirements(
         rule_runner,
-        "poetry_requirements(pyproject_toml_relpath='subdir/pyproject.toml')",
+        f"poetry_requirements({source_arg}='subdir/pyproject.toml')",
         dedent(
             """\
             [tool.poetry.dependencies]
@@ -491,7 +492,7 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
             address=Address("", target_name="subdir_pyproject.toml"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "dependencies": [":subdir_pyproject.toml"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],

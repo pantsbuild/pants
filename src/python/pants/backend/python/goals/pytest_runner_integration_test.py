@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
     PythonTests,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
@@ -72,7 +72,7 @@ def rule_runner() -> RuleRunner:
             PexBinary,
             PythonLibrary,
             PythonTests,
-            PythonRequirementLibrary,
+            PythonRequirementTarget,
             PythonDistribution,
         ],
         objects={"python_artifact": PythonArtifact},
@@ -108,7 +108,9 @@ def run_pytest(
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
         with mock_console(rule_runner.options_bootstrapper):
-            debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
+            debug_result = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False).run(
+                debug_request.process
+            )
             assert test_result.exit_code == debug_result.exit_code
     return test_result
 
@@ -194,8 +196,8 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests()
-                python_library(name="lib")
-                python_requirement_library(
+                python_sources(name="lib")
+                python_requirement(
                     name="reqs", requirements=["ansicolors==1.1.8", "ordered-set==3.1.1"]
                 )
                 """
@@ -494,7 +496,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(name='bin_lib', sources=['say_hello.py'])
+                python_sources(name='bin_lib', sources=['say_hello.py'])
                 pex_binary(name='bin', entry_point='say_hello.py', output_path="bin.pex")
                 python_tests(runtime_package_dependencies=[':bin'])
                 """
@@ -527,7 +529,7 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/foo/BUILD": dedent(
                 """\
-                python_library(name="lib")
+                python_sources(name="lib")
 
                 python_distribution(
                     name="dist",

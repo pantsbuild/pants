@@ -204,7 +204,7 @@ class PythonSetup(Subsystem):
             type=bool,
             default=True,
             advanced=True,
-            help="Don't tailor python_library targets for solitary `__init__.py` files, as "
+            help="Don't tailor `python_sources` targets for solitary `__init__.py` files, as "
             "those usually exist as import scaffolding rather than true library code.\n\n"
             "Set to False if you commonly have packages containing real code in "
             "`__init__.py` and there are no other .py files in the package.",

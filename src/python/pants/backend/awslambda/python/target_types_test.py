@@ -16,7 +16,7 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.target import InjectedDependencies, InvalidFieldException
@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
         ],
-        target_types=[PythonAWSLambda, PythonRequirementLibrary, PythonLibrary],
+        target_types=[PythonAWSLambda, PythonRequirementTarget, PythonLibrary],
     )
 
 
@@ -102,7 +102,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
+                python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
                     module_mapping={'ansicolors': ['colors']},
@@ -114,14 +114,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
             "project/ambiguous_in_another_root.py": "",
             "project/BUILD": dedent(
                 """\
-                python_library(sources=['app.py'])
+                python_sources(sources=['app.py'])
                 python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
                 python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
                 python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
                 python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
 
-                python_library(name="dep1", sources=["ambiguous.py"])
-                python_library(name="dep2", sources=["ambiguous.py"])
+                python_sources(name="dep1", sources=["ambiguous.py"])
+                python_sources(name="dep2", sources=["ambiguous.py"])
                 python_awslambda(
                     name="ambiguous",
                     handler='ambiguous.py:func',
@@ -134,7 +134,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                     dependencies=["!./ambiguous.py:dep2"],
                 )
 
-                python_library(
+                python_sources(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
                 python_awslambda(
@@ -150,7 +150,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "src/py/project/ambiguous_in_another_root.py": "",
-            "src/py/project/BUILD.py": "python_library()",
+            "src/py/project/BUILD.py": "python_sources()",
         }
     )
 

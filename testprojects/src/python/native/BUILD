@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_sources(
     name="lib",
     sources=["name.py", "setup.py"],
 )
@@ -20,7 +20,7 @@ python_distribution(
     wheel_config_settings = {"--global-option": ["--python-tag", "py36.py37"]}
 )
 
-python_library(
+python_sources(
     name="main_lib",
     sources=["main.py"],
 )

@@ -18,16 +18,18 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilation,
     AssemblyPreCompilationRequest,
 )
-from pants.backend.go.util_rules.compile import CompiledGoSources, CompileGoSourcesRequest
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import path_safe
 
@@ -47,6 +49,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
 
     # These dependencies themselves often have dependencies, such that we recursively build.
     direct_dependencies: tuple[BuildGoPackageRequest, ...]
+
+    for_tests: bool = False
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -96,21 +100,35 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
         assembly_digests = assembly_setup.assembly_digests
         symabis_path = "./symabis"
 
-    result = await Get(
-        CompiledGoSources,
-        CompileGoSourcesRequest(
-            digest=input_digest,
-            sources=tuple(
-                f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
-                for name in request.go_file_names
-            ),
-            import_path=request.import_path,
+    compile_args = [
+        "tool",
+        "compile",
+        "-o",
+        "__pkg__.a",
+        "-pack",
+        "-p",
+        request.import_path,
+        "-importcfg",
+        import_config.CONFIG_PATH,
+    ]
+    if symabis_path:
+        compile_args.extend(["-symabis", symabis_path])
+    relativized_sources = (
+        f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
+        for name in request.go_file_names
+    )
+    compile_args.extend(["--", *relativized_sources])
+    compile_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            input_digest=input_digest,
+            command=tuple(compile_args),
             description=f"Compile Go package: {request.import_path}",
-            import_config_path=import_config.CONFIG_PATH,
-            symabis_path=symabis_path,
+            output_files=("__pkg__.a",),
         ),
     )
-    compilation_digest = result.output_digest
+
+    compilation_digest = compile_result.output_digest
     if assembly_digests:
         assembly_result = await Get(
             AssemblyPostCompilation,
@@ -138,6 +156,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
     address: Address
     is_main: bool = False
+    for_tests: bool = False
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -160,11 +179,16 @@ async def setup_build_go_package_target_request(
             target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
         )
         go_file_names = _first_party_pkg_info.go_files
+        if request.for_tests:
+            # TODO: Build the test sources separately and link the two object files into the package archive?
+            # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
+            #   need to do something similar?
+            go_file_names += _first_party_pkg_info.test_files
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyModulePathField):
         _module_path = target[GoThirdPartyModulePathField].value
-        subpath = import_path[len(_module_path) :]
+        subpath = fast_relpath(import_path, _module_path)
 
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
@@ -208,6 +232,7 @@ async def setup_build_go_package_target_request(
         go_file_names=go_file_names,
         s_file_names=s_file_names,
         direct_dependencies=direct_dependencies,
+        for_tests=request.for_tests,
     )
 
 

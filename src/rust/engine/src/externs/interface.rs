@@ -120,6 +120,7 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, set_per_run_log_path(a: Option<String>)),
   )?;
 
+  m.add(py, "task_side_effected", py_fn!(py, task_side_effected()))?;
   m.add(
     py,
     "teardown_dynamic_ui",
@@ -286,14 +287,15 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(
       py,
       tasks_task_begin(
-        a: PyTasks,
-        b: PyObject,
-        c: PyType,
-        d: bool,
-        e: bool,
-        f: String,
-        g: String,
-        h: u64
+        tasks: PyTasks,
+        func: PyObject,
+        return_type: PyType,
+        side_effecting: bool,
+        engine_aware_return_type: bool,
+        cacheable: bool,
+        name: String,
+        desc: String,
+        level: u64
       )
     ),
   )?;
@@ -1237,6 +1239,7 @@ fn tasks_task_begin(
   tasks_ptr: PyTasks,
   func: PyObject,
   output_type: PyType,
+  side_effecting: bool,
   engine_aware_return_type: bool,
   cacheable: bool,
   name: String,
@@ -1252,6 +1255,7 @@ fn tasks_task_begin(
     tasks.task_begin(
       func,
       output_type,
+      side_effecting,
       engine_aware_return_type,
       cacheable,
       name,
@@ -1904,6 +1908,12 @@ fn write_log(py: Python, msg: String, level: u64, target: String) -> PyUnitResul
     Logger::log_from_python(&msg, level, &target).expect("Error logging message");
     Ok(None)
   })
+}
+
+fn task_side_effected(py: Python) -> PyUnitResult {
+  nodes::task_side_effected()
+    .map(|()| None)
+    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
 }
 
 fn teardown_dynamic_ui(

@@ -123,7 +123,7 @@ class Pylint(PythonToolBase):
             member_type=target_option,
             advanced=True,
             help=(
-                "An optional list of `python_library` target addresses to load first-party "
+                "An optional list of `python_sources` target addresses to load first-party "
                 "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
                 "example, if your plugin is at `build-support/pylint/custom_plugin.py`, add "
                 "'build-support/pylint' to `[source].root_patterns` in `pants.toml`. This is "

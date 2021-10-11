@@ -43,7 +43,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name="lib")
+            python_sources(name="lib")
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
@@ -56,7 +56,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name="lib", interpreter_constraints=["==2.7.*"])
+            python_sources(name="lib", interpreter_constraints=["==2.7.*"])
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
@@ -69,7 +69,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name="lib", interpreter_constraints=["==2.7.*", "==3.5.*"])
+            python_sources(name="lib", interpreter_constraints=["==2.7.*", "==3.5.*"])
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
@@ -81,21 +81,21 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     )
 
     # If no python_distribution targets in repo, fall back to global python-setup constraints.
-    assert_ics("python_library()", [global_constraint])
+    assert_ics("python_sources()", [global_constraint])
 
     # If there are multiple distinct ICs in the repo, we OR them. This is because setup_py.py will
     # build each Python distribution independently.
     assert_ics(
         dedent(
             """\
-            python_library(name="lib1", interpreter_constraints=["==2.7.*"])
+            python_sources(name="lib1", interpreter_constraints=["==2.7.*"])
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
                 provides=setup_py(name="dist"),
             )
 
-            python_library(name="lib2", interpreter_constraints=["==3.5.*"])
+            python_sources(name="lib2", interpreter_constraints=["==3.5.*"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
@@ -108,14 +108,14 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name="lib1", interpreter_constraints=["==2.7.*", "==3.5.*"])
+            python_sources(name="lib1", interpreter_constraints=["==2.7.*", "==3.5.*"])
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
                 provides=setup_py(name="dist"),
             )
 
-            python_library(name="lib2", interpreter_constraints=[">=3.5"])
+            python_sources(name="lib2", interpreter_constraints=[">=3.5"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
@@ -128,21 +128,21 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name="lib1")
+            python_sources(name="lib1")
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
                 provides=setup_py(name="dist"),
             )
 
-            python_library(name="lib2", interpreter_constraints=["==2.7.*"])
+            python_sources(name="lib2", interpreter_constraints=["==2.7.*"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
                 provides=setup_py(name="dist"),
             )
 
-            python_library(name="lib3", interpreter_constraints=[">=3.6"])
+            python_sources(name="lib3", interpreter_constraints=[">=3.6"])
             python_distribution(
                 name="dist3",
                 dependencies=[":lib3"],

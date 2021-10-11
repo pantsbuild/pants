@@ -11,10 +11,10 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementTarget],
     )
 
 
@@ -108,7 +108,7 @@ def assert_success(
     all_major_minor_python_versions(MyPy.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(
         rule_runner,
@@ -118,7 +118,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy(rule_runner, [tgt])
     assert len(result) == 1
@@ -132,7 +132,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {
             f"{PACKAGE}/good.py": GOOD_FILE,
             f"{PACKAGE}/bad.py": BAD_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgts = [
@@ -156,7 +156,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
             config_path: "[mypy]\ndisallow_any_expr = True\n",
         }
     )
@@ -169,7 +169,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE, f"{PACKAGE}/BUILD": "python_library()"}
+        {f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE, f"{PACKAGE}/BUILD": "python_sources()"}
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--disallow-any-expr'"])
@@ -179,14 +179,14 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-skip"])
     assert not result
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--linecount-report=reports'"])
     assert len(result) == 1
@@ -200,12 +200,8 @@ def test_report_file(rule_runner: RuleRunner) -> None:
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                python_requirement_library(
-                    name="more-itertools", requirements=["more-itertools==8.4.0"],
-                )
-                """
+            "BUILD": (
+                "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
             ),
             f"{PACKAGE}/f.py": dedent(
                 """\
@@ -214,7 +210,7 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
                 assert flatten(42) == [4, 2]
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -248,7 +244,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
                 assert "42" == text.slugify(42)
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
             "mypy.ini": dedent(
                 """\
                 [mypy]
@@ -287,7 +283,7 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
                     return v.capitalize()
                 """
             ),
-            f"{PACKAGE}/util/BUILD": "python_library()",
+            f"{PACKAGE}/util/BUILD": "python_sources()",
             f"{PACKAGE}/math/__init__.py": "",
             f"{PACKAGE}/math/add.py": dedent(
                 """\
@@ -298,7 +294,7 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
                     return capitalize(sum)  # This is the wrong type.
                 """
             ),
-            f"{PACKAGE}/math/BUILD": "python_library()",
+            f"{PACKAGE}/math/BUILD": "python_sources()",
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/app.py": dedent(
                 """\
@@ -307,7 +303,7 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
                 print(add(2, 4))
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
@@ -335,12 +331,12 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
                 # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
                 # both to be usable, even though libumi is not compatible with Py3.
 
-                python_requirement_library(
+                python_requirement(
                     name="libumi",
                     requirements=["libumi==0.0.2"],
                 )
 
-                python_requirement_library(
+                python_requirement(
                     name="x690",
                     requirements=["x690==0.2.0"],
                 )
@@ -355,7 +351,7 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
                 print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['==2.7.*'])",
+            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==2.7.*'])",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -387,7 +383,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
                     print("x is truthy and now assigned to y")
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['>=3.8'])",
+            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.8'])",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -407,7 +403,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
                     return "42" if x is True else "1/137"
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['>=3.9'])",
+            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.9'])",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -431,18 +427,18 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
                     return x + y
                 """
             ),
-            f"{PACKAGE}/py2/BUILD": "python_library(interpreter_constraints=['==2.7.*'])",
+            f"{PACKAGE}/py2/BUILD": "python_sources(interpreter_constraints=['==2.7.*'])",
             f"{PACKAGE}/py3/__init__.py": dedent(
                 """\
                 def add(x: int, y: int) -> int:
                     return x + y
                 """
             ),
-            f"{PACKAGE}/py3/BUILD": "python_library(interpreter_constraints=['>=3.6'])",
+            f"{PACKAGE}/py3/BUILD": "python_sources(interpreter_constraints=['>=3.6'])",
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
             f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
-            f"{PACKAGE}/BUILD": "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])",
+            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==2.7.*', '>=3.6'])",
         }
     )
     py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
@@ -468,8 +464,8 @@ def test_run_only_on_specified_files(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/bad.py": BAD_FILE,
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(name='good', sources=['good.py'], dependencies=[':bad'])
-                python_library(name='bad', sources=['bad.py'])
+                python_sources(name='good', sources=['good.py'], dependencies=[':bad'])
+                python_sources(name='bad', sources=['bad.py'])
                 """
             ),
         }
@@ -482,14 +478,14 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     """Test that first-party type stubs work for both first-party and third-party code."""
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='colors', requirements=['ansicolors'])",
+            "BUILD": "python_requirement(name='colors', requirements=['ansicolors'])",
             "mypy_stubs/__init__.py": "",
             "mypy_stubs/colors.pyi": "def red(s: str) -> str: ...",
-            "mypy_stubs/BUILD": "python_library()",
+            "mypy_stubs/BUILD": "python_sources()",
             f"{PACKAGE}/util/__init__.py": "",
             f"{PACKAGE}/util/untyped.py": "def add(x, y):\n    return x + y",
             f"{PACKAGE}/util/untyped.pyi": "def add(x: int, y: int) -> int: ...",
-            f"{PACKAGE}/util/BUILD": "python_library()",
+            f"{PACKAGE}/util/BUILD": "python_sources()",
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/app.py": dedent(
                 """\
@@ -500,7 +496,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
                 print(red(z))
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
@@ -521,9 +517,9 @@ def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "BUILD": "python_requirement_library(name='ta', requirements=['typed-ast==1.4.1'])",
+            "BUILD": "python_requirement(name='ta', requirements=['typed-ast==1.4.1'])",
             f"{PACKAGE}/f.py": "import typed_ast",
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -566,10 +562,8 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 f"""\
-                python_requirement_library(name='mypy', requirements=['{MyPy.default_version}'])
-                python_requirement_library(
-                    name="more-itertools", requirements=["more-itertools==8.4.0"]
-                )
+                python_requirement(name='mypy', requirements=['{MyPy.default_version}'])
+                python_requirement(name="more-itertools", requirements=["more-itertools==8.4.0"])
                 """
             ),
             "pants-plugins/plugins/subdir/__init__.py": "",
@@ -582,15 +576,15 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                     return name.endswith("__overridden_by_plugin")
                 """
             ),
-            "pants-plugins/plugins/subdir/BUILD": "python_library()",
+            "pants-plugins/plugins/subdir/BUILD": "python_sources()",
             # The plugin can depend on code located anywhere in the project; its dependencies need
             # not be in the same directory.
             f"{PACKAGE}/subdir/__init__.py": "",
             f"{PACKAGE}/subdir/util.py": "def noop() -> None:\n    pass\n",
-            f"{PACKAGE}/subdir/BUILD": "python_library()",
+            f"{PACKAGE}/subdir/BUILD": "python_sources()",
             "pants-plugins/plugins/__init__.py": "",
             "pants-plugins/plugins/change_return_type.py": plugin_file,
-            "pants-plugins/plugins/BUILD": "python_library()",
+            "pants-plugins/plugins/BUILD": "python_sources()",
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/f.py": dedent(
                 """\
@@ -604,7 +598,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 assert add(result, 2) == 4
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
             "mypy.ini": dedent(
                 """\
                 [mypy]
@@ -647,13 +641,11 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     rule_runner = RuleRunner(
         rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
-        target_types=[*rule_runner.target_types, ProtobufLibrary],
+        target_types=[*rule_runner.target_types, ProtobufSourceTarget],
     )
     rule_runner.write_files(
         {
-            "BUILD": (
-                "python_requirement_library(name='protobuf', requirements=['protobuf==3.13.0'])"
-            ),
+            "BUILD": ("python_requirement(name='protobuf', requirements=['protobuf==3.13.0'])"),
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/proto.proto": dedent(
                 """\
@@ -676,8 +668,8 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(dependencies=[':proto'])
-                protobuf_library(name='proto')
+                python_sources(dependencies=[':proto'])
+                protobuf_sources(name='proto', sources=['proto.proto'])
                 """
             ),
         }
@@ -686,10 +678,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=[
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            "--python-protobuf-mypy-plugin",
-        ],
+        extra_args=["--python-protobuf-mypy-plugin"],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout

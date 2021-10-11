@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_sources(
   sources=['*.py', '!*_test.py'],
 )
 
@@ -21,7 +21,7 @@ python_tests(
   timeout=180,
 )
 
-python_library(
+python_sources(
   name='native',
   sources=['native_engine.pyi', 'native_engine_pyo3.pyi'],
   dependencies=[':native_engine'],
