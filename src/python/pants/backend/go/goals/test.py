@@ -29,7 +29,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessCacheSco
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 MAIN_TEMPLATE = pystache.parse(
     """\
@@ -46,7 +46,7 @@ import (
     {{#needs_test_pkg}}_test{{/needs_test_pkg}}{{^needs_test_pkg}}_{{/needs_test_pkg}} "{{test_pkg_import_path}}"
 {{/import_test_pkg}}
 {{#import_xtest_pkg}}
-    {{#needs_xtest_pkg}}_test{{/needs_xtest_pkg}}{{^needs_xtest_pkg}}_{{/needs_xtest_pkg}} "{{xtest_pkg_import_path}}"
+    {{#needs_xtest_pkg}}_xtest{{/needs_xtest_pkg}}{{^needs_xtest_pkg}}_{{/needs_xtest_pkg}} "{{xtest_pkg_import_path}}"
 {{/import_xtest_pkg}}
 )
 var tests = []testing.InternalTest{
@@ -177,11 +177,33 @@ async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem)
     )
     main_direct_deps = [test_pkg_build_request]
 
-    # TODO: Generate a synthetic package for any xtest files.
     if analyzed_sources.has_at_least_one_xtest():
-        raise NotImplementedError(
-            'The Go plugin does not currently support external tests ("xtest"\'s).'
+        # Build a synthetic package for xtests where the import path is the same as the package under test
+        # but with "_test" appended.
+        #
+        # Subset the direct dependencies to only the dependencies used by the xtest code. (Dependency
+        # inference will have included all of the regular, test, and xtest dependencies of the package in
+        # the build graph.) Moreover, ensure that any import of the package under test is on the _test_
+        # version of the package that was just built.
+        dep_by_import_path = {
+            dep.import_path: dep for dep in test_pkg_build_request.direct_dependencies
+        }
+        direct_dependencies: OrderedSet[BuildGoPackageRequest] = OrderedSet()
+        for xtest_import in pkg_info.xtest_imports:
+            if xtest_import == pkg_info.import_path:
+                direct_dependencies.add(test_pkg_build_request)
+            elif xtest_import in dep_by_import_path:
+                direct_dependencies.add(dep_by_import_path[xtest_import])
+
+        xtest_pkg_build_request = BuildGoPackageRequest(
+            import_path=f"{import_path}_test",
+            digest=pkg_info.digest,
+            subpath=pkg_info.subpath,
+            go_file_names=pkg_info.xtest_files,
+            s_file_names=(),  # TODO: Are there .s files for xtest?
+            direct_dependencies=tuple(direct_dependencies),
         )
+        main_direct_deps.append(xtest_pkg_build_request)
 
     # Generate the synthetic main package which imports the test and/or xtest packages.
     main_content = FileContent(

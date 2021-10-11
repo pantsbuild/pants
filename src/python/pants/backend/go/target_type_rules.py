@@ -97,6 +97,9 @@ async def infer_go_dependencies(
     for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
         if import_path in std_lib_imports:
             continue
+        # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
+        if import_path == pkg_info.import_path:
+            continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
             # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
