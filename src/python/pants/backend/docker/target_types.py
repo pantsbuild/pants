@@ -4,6 +4,7 @@
 from textwrap import dedent
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.core.goals.run import RestartableField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -123,5 +124,6 @@ class DockerImage(Target):
         DockerRegistriesField,
         DockerRepository,
         DockerSkipPushField,
+        RestartableField,
     )
     help = "A Docker image."

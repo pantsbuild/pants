@@ -4,7 +4,7 @@
 
 import pytest
 
-from pants.backend.docker.dockerfile_wrapper_script import translate_to_address
+from pants.backend.docker.subsystems.dockerfile_wrapper_script import translate_to_address
 
 
 @pytest.mark.parametrize(

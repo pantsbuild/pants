@@ -284,13 +284,19 @@ class Workspace(SideEffecting):
     _scheduler: "SchedulerSession"
     _enforce_effects: bool = True
 
-    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: Optional[str] = None, side_effecting: bool = True
+    ) -> None:
         """Write a digest to disk, relative to the build root.
 
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
+
+        As an advanced usecase, if the digest is known to be written to a temporary or idempotent
+        location, side_effecting=False may be passed to avoid tracking this write as a side effect.
         """
-        self.side_effected()
+        if side_effecting:
+            self.side_effected()
         self._scheduler.write_digest(digest, path_prefix=path_prefix)
 
 

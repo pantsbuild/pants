@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    FieldSet,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -39,13 +40,24 @@ class JvmArtifactVersionField(StringField):
     )
 
 
+class JvmArtifactFieldSet(FieldSet):
+
+    group: JvmArtifactGroupField
+    artifact: JvmArtifactArtifactField
+    version: JvmArtifactVersionField
+
+    required_fields = (
+        JvmArtifactGroupField,
+        JvmArtifactArtifactField,
+        JvmArtifactVersionField,
+    )
+
+
 class JvmArtifact(Target):
     alias = "jvm_artifact"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JvmArtifactGroupField,
-        JvmArtifactArtifactField,
-        JvmArtifactVersionField,
+        *JvmArtifactFieldSet.required_fields,
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
@@ -79,5 +91,8 @@ class JvmLockfileSources(SingleSourceField):
 
 class JvmDependencyLockfile(Target):
     alias = "coursier_lockfile"
-    core_fields = (*COMMON_TARGET_FIELDS, JvmLockfileSources, JvmRequirementsField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmLockfileSources,
+    )
     help = "A Coursier lockfile along with references to the artifacts to use for the lockfile."

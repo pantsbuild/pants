@@ -437,6 +437,12 @@ impl fmt::Display for Failure {
   }
 }
 
+impl From<String> for Failure {
+  fn from(err: String) -> Self {
+    throw(&err)
+  }
+}
+
 pub fn throw(msg: &str) -> Failure {
   Failure::Throw {
     val: externs::create_exception(msg),

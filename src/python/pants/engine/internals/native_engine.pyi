@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.process import InteractiveProcessResult
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -40,9 +40,6 @@ def ensure_remote_has_recursive(scheduler: PyScheduler, digests: list[PyDigest])
 def single_file_digests_to_bytes(
     scheduler: PyScheduler, digests: list[PyDigest]
 ) -> list[bytes]: ...
-def run_local_interactive_process(
-    scheduler: PyScheduler, session: PySession, request: InteractiveProcess
-) -> InteractiveProcessResult: ...
 def write_digest(
     scheduler: PyScheduler, session: PySession, digest: PyDigest, path_prefix: str
 ) -> None: ...
@@ -118,6 +115,9 @@ def session_new_run_id(session: PySession) -> None: ...
 def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
+def session_run_interactive_process(
+    session: PySession, InteractiveProcess
+) -> InteractiveProcessResult: ...
 def session_get_observation_histograms(scheduler: PyScheduler, session: PySession) -> dict: ...
 def session_record_test_observation(
     scheduler: PyScheduler, session: PySession, value: int

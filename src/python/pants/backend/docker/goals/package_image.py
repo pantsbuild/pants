@@ -7,15 +7,8 @@ from dataclasses import dataclass
 from os import path
 from typing import cast
 
-from pants.backend.docker.docker_binary import DockerBinary
-from pants.backend.docker.docker_build_context import (
-    DockerBuildContext,
-    DockerBuildContextRequest,
-    DockerVersionContextError,
-    DockerVersionContextValue,
-)
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystem import DockerEnvironmentVars, DockerOptions
+from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageName,
     DockerImageNameTemplate,
@@ -24,6 +17,13 @@ from pants.backend.docker.target_types import (
     DockerImageVersion,
     DockerRegistriesField,
     DockerRepository,
+)
+from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_build_context import (
+    DockerBuildContext,
+    DockerBuildContextRequest,
+    DockerVersionContextError,
+    DockerVersionContextValue,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet

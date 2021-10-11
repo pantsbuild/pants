@@ -12,7 +12,7 @@ import logging
 import subprocess
 
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
-from pants.backend.docker.dockerfile_parser import DockerfileParser
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit

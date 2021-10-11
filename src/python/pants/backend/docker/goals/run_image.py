@@ -5,8 +5,8 @@ from __future__ import annotations
 import sys
 from typing import cast
 
-from pants.backend.docker.docker_binary import DockerBinary
-from pants.backend.docker.docker_build import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunRequest
 from pants.engine.rules import Get, collect_rules, rule
@@ -32,6 +32,4 @@ async def docker_image_run_request(field_set: DockerFieldSet, docker: DockerBina
 
 
 def rules():
-    return [
-        *collect_rules(),
-    ]
+    return collect_rules()

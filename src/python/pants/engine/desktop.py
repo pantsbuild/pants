@@ -57,6 +57,7 @@ async def find_open_program(
             InteractiveProcess(
                 argv=(open_program_paths.first_path.path, *(str(f) for f in request.files)),
                 run_in_workspace=True,
+                restartable=True,
             )
         ]
     else:
@@ -69,6 +70,7 @@ async def find_open_program(
                 # required. Instead of attempting to track all of these we just export the full user
                 # environment since this is not a cached process.
                 env=complete_env,
+                restartable=True,
             )
             for f in request.files
         ]

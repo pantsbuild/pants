@@ -7,14 +7,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.docker_build_context import (
+from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
+from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerVersionContextValue,
 )
-from pants.backend.docker.docker_build_context import rules as context_rules
-from pants.backend.docker.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
