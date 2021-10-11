@@ -15,7 +15,13 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    PexRequirements,
+    VenvPex,
+    VenvPexProcess,
+)
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -135,6 +141,15 @@ async def mypy_typecheck_partition(
             internal_only=True,
         ),
     )
+    extra_type_stubs_pex_get = Get(
+        Pex,
+        PexRequest(
+            output_filename="extra_type_stubs.pex",
+            internal_only=True,
+            requirements=PexRequirements(mypy.extra_type_stubs),
+            interpreter_constraints=partition.interpreter_constraints,
+        ),
+    )
 
     mypy_pex_get = Get(
         VenvPex,
@@ -149,8 +164,18 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    closure_sources, roots_sources, mypy_pex, requirements_pex = await MultiGet(
-        closure_sources_get, roots_sources_get, mypy_pex_get, requirements_pex_get
+    (
+        closure_sources,
+        roots_sources,
+        mypy_pex,
+        extra_type_stubs_pex,
+        requirements_pex,
+    ) = await MultiGet(
+        closure_sources_get,
+        roots_sources_get,
+        mypy_pex_get,
+        extra_type_stubs_pex_get,
+        requirements_pex_get,
     )
 
     python_files = determine_python_files(roots_sources.snapshot.files)
@@ -172,7 +197,7 @@ async def mypy_typecheck_partition(
         PexRequest(
             output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=[requirements_pex],
+            pex_path=[requirements_pex, extra_type_stubs_pex],
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
