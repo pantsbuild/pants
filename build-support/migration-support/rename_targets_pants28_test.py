@@ -26,6 +26,9 @@ def maybe_rewrite(content: str) -> list[str] | None:
         "python_requirement ( )",
         "python_requirement(foo)",
         "python_requirement(\n)",
+        "python_sources()",
+        "protobuf_sources()",
+        "shell_sources()",
     ],
 )
 def test_no_op_when_already_valid(line: str) -> None:
@@ -36,6 +39,9 @@ def test_no_op_when_already_valid(line: str) -> None:
     "input,out",
     [
         ("python_requirement_library()", "python_requirement()"),
+        ("python_library()", "python_sources()"),
+        ("protobuf_library()", "protobuf_sources()"),
+        ("shell_library()", "shell_sources()"),
     ],
 )
 def test_rewrites(input: str, out: str) -> None:

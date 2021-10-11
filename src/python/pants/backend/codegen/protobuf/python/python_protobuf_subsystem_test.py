@@ -29,7 +29,7 @@ def test_inject_dependencies() -> None:
     # Note that injected deps can be any target type for `--python-protobuf-runtime-dependencies`.
     rule_runner.write_files(
         {
-            "protos/BUILD": "protobuf_library()\ntarget(name='injected_dep')",
+            "protos/BUILD": "protobuf_sources()\ntarget(name='injected_dep')",
             "protos/f.proto": "",
         }
     )

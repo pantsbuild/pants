@@ -157,8 +157,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             python_requirement(name="bar", requirements=["bar==5.5.5"])
             python_requirement(name="baz", requirements=["baz"])
             python_requirement(name="foorl", requirements=["{url_req}"])
-            python_library(name="util", sources=[], dependencies=[":foo", ":bar"])
-            python_library(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
+            python_sources(name="util", sources=[], dependencies=[":foo", ":bar"])
+            python_sources(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
             """
         ),
     )
@@ -279,7 +279,7 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
                 """
                 python_requirement(name="foo",requirements=["foo"])
                 python_requirement(name="bar",requirements=["bar"])
-                python_library(name="lib",sources=[],dependencies=[":foo"])
+                python_sources(name="lib",sources=[],dependencies=[":foo"])
                 """
             ),
         }

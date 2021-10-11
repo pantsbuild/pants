@@ -10,4 +10,4 @@ python_tests(
   ],
 )
 
-python_library()
+python_sources()

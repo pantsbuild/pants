@@ -3,7 +3,7 @@
 
 python_tests(sources=['test_*.py'], dependencies=["//BUILD_ROOT:files"])
 
-python_library(
+python_sources(
   name = 'pantsd_integration_test_base',
   dependencies = [
     'testprojects/src/python:coordinated_runs_directory',

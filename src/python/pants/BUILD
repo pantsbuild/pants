@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
-python_library(
+python_sources(
   name='entry_point',
   sources=['__main__.py'],
   dependencies=['src/python/pants/bin:pants_loader'],
@@ -31,12 +31,12 @@ python_distribution(
   },
 )
 
-python_library(
+python_sources(
   name='conftest',
   sources=['conftest.py'],
 )
 
-python_library(
+python_sources(
   name='version',
   sources=['version.py'],
   dependencies=["./VERSION:resources"],

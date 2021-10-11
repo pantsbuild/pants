@@ -37,21 +37,21 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     # If all code is Py38+, use those constraints. Otherwise, use subsystem constraints.
-    assert_ics("python_library()", [global_constraint])
-    assert_ics("python_library(interpreter_constraints=['==3.10.*'])", ["==3.10.*"])
+    assert_ics("python_sources()", [global_constraint])
+    assert_ics("python_sources(interpreter_constraints=['==3.10.*'])", ["==3.10.*"])
     assert_ics(
-        "python_library(interpreter_constraints=['==3.8.*', '==3.10.*'])", ["==3.8.*", "==3.10.*"]
+        "python_sources(interpreter_constraints=['==3.8.*', '==3.10.*'])", ["==3.8.*", "==3.10.*"]
     )
 
     assert_ics(
-        "python_library(interpreter_constraints=['==3.6.*'])",
+        "python_sources(interpreter_constraints=['==3.6.*'])",
         Black.default_interpreter_constraints,
     )
     assert_ics(
         dedent(
             """\
-            python_library(name='t1', interpreter_constraints=['==3.6.*'])
-            python_library(name='t2', interpreter_constraints=['==3.8.*'])
+            python_sources(name='t1', interpreter_constraints=['==3.6.*'])
+            python_sources(name='t2', interpreter_constraints=['==3.8.*'])
             """
         ),
         Black.default_interpreter_constraints,
@@ -59,8 +59,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='t1', interpreter_constraints=['==3.6.*', '>=3.8'])
-            python_library(name='t2', interpreter_constraints=['==3.8.*'])
+            python_sources(name='t1', interpreter_constraints=['==3.6.*', '>=3.8'])
+            python_sources(name='t2', interpreter_constraints=['==3.8.*'])
             """
         ),
         Black.default_interpreter_constraints,
@@ -70,8 +70,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==3.6.*'], skip_black=True)
-            python_library(name='b', interpreter_constraints=['==3.8.*'])
+            python_sources(name='a', interpreter_constraints=['==3.6.*'], skip_black=True)
+            python_sources(name='b', interpreter_constraints=['==3.8.*'])
             """
         ),
         ["==3.8.*"],

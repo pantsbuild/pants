@@ -3,4 +3,4 @@
 
 python_tests(name='tests')
 
-python_library()
+python_sources()

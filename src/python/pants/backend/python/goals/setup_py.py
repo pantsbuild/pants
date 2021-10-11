@@ -105,7 +105,7 @@ class OwnershipError(SetupPyError):
     def __init__(self, msg: str):
         super().__init__(
             f"{msg} See {doc_url('python-distributions')} for "
-            f"how python_library targets are mapped to distributions."
+            f"how python_sources targets are mapped to distributions."
         )
 
 
@@ -904,7 +904,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         # Note that we check for a PythonProvides field so that a python_distribution
         # target can be owned (by itself). This is so that if there are any 3rdparty
         # requirements directly on the python_distribution target, we apply them to the dist.
-        # This isn't particularly useful (3rdparty requirements should be on the python_library
+        # This isn't particularly useful (3rdparty requirements should be on the python_sources
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
         or tgt.has_field(PythonSources)

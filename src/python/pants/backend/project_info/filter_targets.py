@@ -48,7 +48,7 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             "--target-type",
             type=list,
             metavar="[+-]type1,type2,...",
-            help="Filter on these target types, e.g. `resources` or `python_library`.",
+            help="Filter on these target types, e.g. `resources` or `python_sources`.",
         )
         register(
             "--granularity",

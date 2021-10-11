@@ -19,7 +19,7 @@ python_distribution(
   ),
 )
 
-python_library(
+python_sources(
   sources=[
     "*.py",
     "!rule_runner.py",
@@ -29,13 +29,13 @@ python_library(
   ],
 )
 
-python_library(
+python_sources(
   name="rule_runner",
   sources=["rule_runner.py", "test_base.py"],
   dependencies=["//BUILD_ROOT:files"],
 )
 
-python_library(
+python_sources(
   name = 'pants_integration_test',
   sources = ['pants_integration_test.py'],
   dependencies = [

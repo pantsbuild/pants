@@ -72,7 +72,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 
 
 def test_multiple_formatters_changing_the_same_file(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     results = run_black_and_isort(rule_runner, [tgt])
     assert results.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})
@@ -84,7 +84,7 @@ def test_multiple_formatters_changing_different_files(rule_runner: RuleRunner) -
         {
             "isort.py": "from animals import dog, cat\n",
             "black.py": "print('hello')\n",
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
         }
     )
     tgts = [
@@ -100,7 +100,7 @@ def test_multiple_formatters_changing_different_files(rule_runner: RuleRunner) -
 
 
 def test_skipped_formatter(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     results = run_black_and_isort(rule_runner, [tgt], extra_args=["--black-skip"])
     assert results.output == get_digest(
@@ -110,7 +110,7 @@ def test_skipped_formatter(rule_runner: RuleRunner) -> None:
 
 
 def test_no_changes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": FIXED_BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": FIXED_BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     results = run_black_and_isort(rule_runner, [tgt])
     assert results.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})

@@ -114,14 +114,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
             "project/ambiguous_in_another_root.py": "",
             "project/BUILD": dedent(
                 """\
-                python_library(sources=['app.py'])
+                python_sources(sources=['app.py'])
                 python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
                 python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
                 python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
                 python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
 
-                python_library(name="dep1", sources=["ambiguous.py"])
-                python_library(name="dep2", sources=["ambiguous.py"])
+                python_sources(name="dep1", sources=["ambiguous.py"])
+                python_sources(name="dep2", sources=["ambiguous.py"])
                 python_awslambda(
                     name="ambiguous",
                     handler='ambiguous.py:func',
@@ -134,7 +134,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                     dependencies=["!./ambiguous.py:dep2"],
                 )
 
-                python_library(
+                python_sources(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
                 python_awslambda(
@@ -150,7 +150,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "src/py/project/ambiguous_in_another_root.py": "",
-            "src/py/project/BUILD.py": "python_library()",
+            "src/py/project/BUILD.py": "python_sources()",
         }
     )
 

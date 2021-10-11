@@ -84,7 +84,7 @@ def test_noop(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 python_distribution(
                   name="dist",
                   provides=python_artifact(
@@ -112,7 +112,7 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 python_distribution(
                   name="dist",
                   provides=python_artifact(
@@ -143,7 +143,7 @@ def test_mocked_publish(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 python_distribution(
                   name="dist",
                   provides=python_artifact(

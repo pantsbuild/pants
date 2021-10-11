@@ -77,7 +77,7 @@ def assert_success(
     all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(
         rule_runner,
@@ -87,7 +87,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt])
     assert len(result) == 1
@@ -98,7 +98,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -118,8 +118,8 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             "f.py": "version: str = 'Py3 > Py2'\n",
             "BUILD": dedent(
                 """\
-                python_library(name='py2', interpreter_constraints=['==2.7.*'])
-                python_library(name='py3', interpreter_constraints=['>=3.6'])
+                python_sources(name='py2', interpreter_constraints=['==2.7.*'])
+                python_sources(name='py3', interpreter_constraints=['>=3.6'])
                 """
             ),
         }
@@ -162,7 +162,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
             config_path: "[flake8]\nignore = F401\n",
         }
     )
@@ -171,13 +171,13 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--flake8-args='--ignore=F401'"])
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt], extra_args=["--flake8-skip"])
     assert not result
@@ -185,7 +185,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"f.py": "'constant' and 'constant2'\n", "BUILD": "python_library(name='t')"}
+        {"f.py": "'constant' and 'constant2'\n", "BUILD": "python_sources(name='t')"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
@@ -202,7 +202,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
         rule_runner, [tgt], extra_args=["--flake8-args='--output-file=reports/foo.txt'"]
@@ -217,7 +217,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"f.pyi": BAD_FILE, "f.py": GOOD_FILE, "BUILD": "python_library(name='t')"}
+        {"f.pyi": BAD_FILE, "f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py")),

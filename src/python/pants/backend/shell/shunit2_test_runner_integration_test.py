@@ -164,8 +164,8 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 shunit2_tests(name="t", dependencies=[':direct'])
-                shell_library(name="direct", sources=['direct.sh'], dependencies=[':transitive'])
-                shell_library(name="transitive", sources=['transitive.sh'])
+                shell_sources(name="direct", sources=['direct.sh'], dependencies=[':transitive'])
+                shell_sources(name="transitive", sources=['transitive.sh'])
                 """
             ),
         }
@@ -243,7 +243,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
             "src/py/main.py": "",
             "src/py/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 pex_binary(name='main', entry_point='main.py')
                 """
             ),

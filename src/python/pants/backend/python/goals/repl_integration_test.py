@@ -37,8 +37,8 @@ def rule_runner() -> RuleRunner:
             "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
             "src/python/BUILD": (
-                "protobuf_library(name='proto', sources=['foo.proto'])\n"
-                "python_library(dependencies=[':proto'])"
+                "protobuf_sources(name='proto', sources=['foo.proto'])\n"
+                "python_sources(dependencies=[':proto'])"
             ),
         }
     )

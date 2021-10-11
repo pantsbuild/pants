@@ -36,16 +36,16 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         {
             "root1/protos/f1.proto": "",
             "root1/protos/f2.proto": "",
-            "root1/protos/BUILD": "protobuf_library()",
+            "root1/protos/BUILD": "protobuf_sources()",
             # These protos would result in the same module name, so neither should be used.
             "root1/two_owners/f.proto": "",
-            "root1/two_owners/BUILD": "protobuf_library()",
+            "root1/two_owners/BUILD": "protobuf_sources()",
             "root2/two_owners/f.proto": "",
-            "root2/two_owners/BUILD": "protobuf_library()",
+            "root2/two_owners/BUILD": "protobuf_sources()",
             # A file with grpc. This also uses the `python_source_root` mechanism, which should be
             # irrelevant to the module mapping because we strip source roots.
             "root1/tests/f.proto": "",
-            "root1/tests/BUILD": "protobuf_library(grpc=True, python_source_root='root3')",
+            "root1/tests/BUILD": "protobuf_sources(grpc=True, python_source_root='root3')",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])

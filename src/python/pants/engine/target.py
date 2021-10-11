@@ -601,7 +601,7 @@ class Targets(Collection[Target]):
 
 class UnexpandedTargets(Collection[Target]):
     """Like `Targets`, but will not replace target generators with their generated targets (e.g.
-    replace `python_library` "BUILD targets" with generated `python_library` "file targets")."""
+    replace `python_sources` "BUILD targets" with generated `python_source` "file targets")."""
 
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
@@ -1686,12 +1686,12 @@ class SecondaryOwnerMixin(ABC):
     Why use this? In a dependency inference world, multiple targets including the same file in the
     `sources` field causes issues due to ambiguity over which target to use. So, only one target
     should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_library` target
+    used when that file is included in file arguments. For example, a `python_source` target
     being the primary owner of the `.py` file, but a `pex_binary` still working with file
     arguments for that file. Secondary ownership means that the target won't be used for things like
     dependency inference and hydrating sources, but file arguments will still work.
 
-    There should be a primary owner of the file(s), e.g. the `python_library` in the above example.
+    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
     Typically, you will want to add a dependency injection rule to infer a dep on that primary
     owner.
 

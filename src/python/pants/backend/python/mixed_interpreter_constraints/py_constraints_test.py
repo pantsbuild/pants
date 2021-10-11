@@ -28,16 +28,16 @@ def rule_runner() -> RuleRunner:
 def write_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "lib1/BUILD": "python_library(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])",
+            "lib1/BUILD": "python_sources(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])",
             # We leave off `interpreter_constraints`, which results in using
             # `[python-setup].interpreter_constraints` instead. Also, we create files so that we
             # can test how generated file-level targets render.
             "lib2/a.py": "",
             "lib2/b.py": "",
-            "lib2/BUILD": "python_library()",
+            "lib2/BUILD": "python_sources()",
             "app/BUILD": dedent(
                 """\
-                python_library(
+                python_sources(
                     sources=[],
                     dependencies=['lib1', 'lib2/a.py', 'lib2/b.py'],
                     interpreter_constraints=['==3.7.*'],
@@ -64,7 +64,7 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
     assert len(caplog.records) == 1
     assert (
         "No Python files/targets matched for the `py-constraints` goal. All target types with "
-        "Python interpreter constraints: python_library, python_tests"
+        "Python interpreter constraints: python_sources, python_tests"
     ) in caplog.text
 
 

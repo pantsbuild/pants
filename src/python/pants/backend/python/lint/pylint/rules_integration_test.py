@@ -83,7 +83,7 @@ def assert_success(
     all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(
         rule_runner,
@@ -93,7 +93,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
@@ -106,7 +106,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {
             f"{PACKAGE}/good.py": GOOD_FILE,
             f"{PACKAGE}/bad.py": BAD_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgts = [
@@ -129,8 +129,8 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             # See https://github.com/pantsbuild/pants/issues/10547.
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(name='py2', interpreter_constraints=['==2.7.*'])
-                python_library(name='py3', interpreter_constraints=['CPython>=3.6,<3.8'])
+                python_sources(name='py2', interpreter_constraints=['==2.7.*'])
+                python_sources(name='py3', interpreter_constraints=['CPython>=3.6,<3.8'])
                 """
             ),
         }
@@ -176,7 +176,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": BAD_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
             config_path: "[pylint]\ndisable = C0103",
         }
     )
@@ -185,13 +185,13 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--pylint-args='--disable=C0103'"])
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt], extra_args=["--pylint-skip"])
     assert not result
@@ -227,13 +227,13 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_library(name='transitive_dep', sources=['transitive_dep.py'])
-                python_library(
+                python_sources(name='transitive_dep', sources=['transitive_dep.py'])
+                python_sources(
                     name='direct_dep',
                     sources=['direct_dep.py'],
                     dependencies=['//:transitive_req', ':transitive_dep']
                 )
-                python_library(sources=['f.py'], dependencies=['//:direct_req', ':direct_dep'])
+                python_sources(sources=['f.py'], dependencies=['//:direct_req', ':direct_dep'])
                 """
             ),
         }
@@ -246,7 +246,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": GOOD_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
             "tests/python/project/f2.py": dedent(
                 """\
                 '''Docstring.'''
@@ -256,7 +256,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
                 CONSTANT2 = UPPERCASE_CONSTANT
                 """
             ),
-            "tests/python/project/BUILD": f"python_library(dependencies=['{PACKAGE}'])",
+            "tests/python/project/BUILD": f"python_sources(dependencies=['{PACKAGE}'])",
         }
     )
     tgts = [
@@ -272,7 +272,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
 def test_type_stubs(rule_runner: RuleRunner) -> None:
     # If an implementation file shares the same name as a type stub, Pylint will only check the
     # implementation file. So, here, we only check running directly on a type stub.
-    rule_runner.write_files({f"{PACKAGE}/f.pyi": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    rule_runner.write_files({f"{PACKAGE}/f.pyi": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.pyi"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
@@ -297,7 +297,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
                         self.assertEqual(True, True)
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -336,7 +336,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                     return hasattr(node.func, "name") and node.func.name == "print"
                 """
             ),
-            "pants-plugins/plugins/subdir/BUILD": "python_library(dependencies=['//:colors'])",
+            "pants-plugins/plugins/subdir/BUILD": "python_sources(dependencies=['//:colors'])",
             "pants-plugins/plugins/print_plugin.py": dedent(
                 """\
                 '''Docstring.'''
@@ -367,7 +367,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 """
             ),
             "pants-plugins/plugins/BUILD": (
-                "python_library(dependencies=['//:pylint', 'pants-plugins/plugins/subdir'])"
+                "python_sources(dependencies=['//:pylint', 'pants-plugins/plugins/subdir'])"
             ),
             "pylintrc": dedent(
                 """\
@@ -376,7 +376,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 """
             ),
             f"{PACKAGE}/f.py": "'''Docstring.'''\nprint()\n",
-            f"{PACKAGE}/BUILD": "python_library()",
+            f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
 

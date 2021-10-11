@@ -1,9 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-shell_library(name="sh_scripts")
+shell_sources(name="sh_scripts")
 
-python_library(name="py_scripts")
+python_sources(name="py_scripts")
 python_tests(name="py_tests", timeout=90)  # reversion_test.py times out occasionally.
 resources(name="docs_templates", sources=["docs_templates/*.mustache"])
 resources(name="user_list_templates", sources=["user_list_templates/*.mustache"])

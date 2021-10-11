@@ -92,7 +92,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpre
             ),
             "src/python/foo/bar/BUILD": dedent(
                 """
-                python_library(name='lib')
+                python_sources(name='lib')
 
                 python_google_cloud_function(
                     name='lambda',
@@ -144,7 +144,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
             ),
             "src/py/project/BUILD": dedent(
                 """\
-                python_library(
+                python_sources(
                     name='lib',
                     dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
                 )

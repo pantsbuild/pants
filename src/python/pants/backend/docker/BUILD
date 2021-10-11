@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_sources(
   sources=[
       "*.py",
       "!*_test.py",
@@ -10,7 +10,7 @@ python_library(
   ],
 )
 
-python_library(
+python_sources(
   name="dockerfile_parser",
   sources=["dockerfile_parser.py"],
   dependencies=[":dockerfile_tool", ":lockfile"],
@@ -18,7 +18,7 @@ python_library(
 
 resources(name="lockfile", sources=["dockerfile_lockfile.txt"])
 
-python_library(
+python_sources(
   name="dockerfile_tool",
   sources=["dockerfile_wrapper_script.py"],
 )

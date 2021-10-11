@@ -623,13 +623,13 @@ class PythonTests(Target):
     )
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
-        "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
+        "other than `conftest.py`, should go into a dedicated `python_sources()` target and then "
         f"be included in the `dependencies` field.\n\nSee {doc_url('python-test-goal')}."
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_library` target
+# `python_sources` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -638,7 +638,7 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
-    alias = "python_library"
+    alias = "python_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
@@ -646,9 +646,18 @@ class PythonLibrary(Target):
         PythonLibrarySources,
     )
     help = (
-        "Python source code.\n\nA `python_library` does not necessarily correspond to a "
+        "Python source code.\n\nA `python_sources` does not necessarily correspond to a "
         "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
-        "`python_library` targets may be packaged into a distribution or binary."
+        "`python_sources` targets may be packaged into a distribution or binary."
+    )
+
+    deprecated_alias = "python_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `python_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
     )
 
 
