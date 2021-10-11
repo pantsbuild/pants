@@ -9,11 +9,7 @@ from typing import cast
 
 import pystache
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoImportPathField,
-    GoThirdPartyModulePathField,
-)
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuildGoPackageTargetRequest,
@@ -32,9 +28,9 @@ from pants.engine.fs import EMPTY_FILE_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
+from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 MAIN_TEMPLATE = pystache.parse(
     """\
@@ -185,25 +181,23 @@ async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem)
 
     # TODO: Generate a synthetic package for any xtest files.
     if analyzed_sources.has_at_least_one_xtest():
-        all_deps = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
-        direct_dependencies = await MultiGet(
-            Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
-            for tgt in all_deps
-            if (
-                tgt.has_field(GoFirstPartyPackageSourcesField)
-                or tgt.has_field(GoThirdPartyModulePathField)
-            )
-            and tgt.address != target.address
-        )
-        if pkg_info.import_path in pkg_info.xtest_imports:
-            direct_dependencies = (test_pkg_build_request,) + direct_dependencies
+        dep_by_import_path = {
+            dep.import_path: dep for dep in test_pkg_build_request.direct_dependencies
+        }
+        direct_dependencies: OrderedSet[BuildGoPackageRequest] = OrderedSet()
+        for xtest_import in pkg_info.xtest_imports:
+            if xtest_import == pkg_info.import_path:
+                direct_dependencies.add(test_pkg_build_request)
+            elif xtest_import in dep_by_import_path:
+                direct_dependencies.add(dep_by_import_path[xtest_import])
+
         xtest_pkg_build_request = BuildGoPackageRequest(
             import_path=f"{import_path}_test",
             digest=pkg_info.digest,
             subpath=pkg_info.subpath,
             go_file_names=pkg_info.xtest_files,
             s_file_names=(),  # TODO: Are there .s files for xtest?
-            direct_dependencies=direct_dependencies,
+            direct_dependencies=tuple(direct_dependencies),
         )
         main_direct_deps.append(xtest_pkg_build_request)
 
