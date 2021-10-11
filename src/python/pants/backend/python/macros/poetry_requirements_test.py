@@ -444,7 +444,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "module_mapping": {"ansicolors": ["colors"]},
+                    "modules": ["colors"],
                 },
                 address=Address("", target_name="ansicolors"),
             ),
@@ -459,7 +459,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "dependencies": [":pyproject.toml"],
                     "requirements": [Requirement.parse("Django-types==2")],
-                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                    "type_stub_modules": ["django"],
                 },
                 address=Address("", target_name="Django-types"),
             ),

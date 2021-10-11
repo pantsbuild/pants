@@ -63,5 +63,5 @@ class PantsRequirement:
             "python_requirement",
             name=name,
             requirements=[f"{dist}=={pants_version()}"],
-            module_mapping={dist: modules},
+            modules=modules,
         )

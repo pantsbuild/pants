@@ -753,6 +753,41 @@ class PythonRequirementsField(_RequirementSequenceField):
     )
 
 
+_default_module_mapping_url = git_url(
+    "src/python/pants/backend/python/dependency_inference/default_module_mapping.py"
+)
+
+
+class PythonRequirementModulesField(StringSequenceField):
+    alias = "modules"
+    help = (
+        "The modules this requirement provides (used for dependency inference).\n\n"
+        'For example, the requirement `setuptools` provides `["setuptools", "pkg_resources", '
+        '"easy_install"]`.\n\n'
+        "Usually you can leave this field off. If unspecified, Pants will first look at the "
+        f"default module mapping ({_default_module_mapping_url}), and then will default to "
+        "the normalized project name. For example, the requirement `Django` would default to "
+        "the module `django`.\n\n"
+        "Mutually exclusive with the `type_stub_modules` field."
+    )
+
+
+class PythonRequirementTypeStubModulesField(StringSequenceField):
+    alias = "type_stub_modules"
+    help = (
+        "The modules this requirement provides if the requirement is a type stub (used for "
+        "dependency inference).\n\n"
+        'For example, the requirement `types-requests` provides `["requests"]`.\n\n'
+        "Usually you can leave this field off. If unspecified, Pants will first look at the "
+        f"default module mapping ({_default_module_mapping_url}). If not found _and_ the "
+        "requirement name starts with `types-` or `stubs-`, or ends with `-types` or `-stubs`, "
+        "will default to that requirement name without the prefix/suffix. For example, "
+        "`types-requests` would default to `requests`. Otherwise, will be treated like a normal "
+        "requirement (see the `modules` field).\n\n"
+        "Mutually exclusive with the `modules` field."
+    )
+
+
 def normalize_module_mapping(
     mapping: Mapping[str, Iterable[str]] | None
 ) -> FrozenDict[str, tuple[str, ...]]:
@@ -770,6 +805,14 @@ class ModuleMappingField(DictStringToStringSequenceField):
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "Use the field `modules` instead, which takes a list of modules the `python_requirement` "
+        "target provides.\n\n"
+        "If this `python_requirement` target has multiple distinct 3rd-party "
+        "projects in its `requirements` field, you should split those up into one `"
+        "python_requirement` target per distinct project."
+    )
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -793,6 +836,14 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "Use the field `type_stub_modules` instead, which takes a list of modules the "
+        "`python_requirement` target provides type stubs for.\n\n"
+        "If this `python_requirement` target has multiple distinct 3rd-party "
+        "projects in its `requirements` field, you should split those up into one `"
+        "python_requirement` target per distinct project."
+    )
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -808,6 +859,8 @@ class PythonRequirementTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         PythonRequirementsField,
+        PythonRequirementModulesField,
+        PythonRequirementTypeStubModulesField,
         ModuleMappingField,
         TypeStubsModuleMappingField,
     )
@@ -830,6 +883,18 @@ class PythonRequirementTarget(Target):
         f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
         "`python3 rename_targets_pants28.py --help` for instructions."
     )
+
+    def validate(self) -> None:
+        if (
+            self[PythonRequirementModulesField].value
+            and self[PythonRequirementTypeStubModulesField].value
+        ):
+            raise InvalidTargetException(
+                f"The `{self.alias}` target {self.address} cannot set both the "
+                f"`{self[PythonRequirementModulesField].alias}` and "
+                f"`{self[PythonRequirementTypeStubModulesField].alias}` fields at the same time. "
+                "To fix, please remove one."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
