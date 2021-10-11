@@ -2166,7 +2166,8 @@ class OverridesField(Field):
         }
 
     def __hash__(self) -> int:
-        return hash(str(self))
+        # The value might have unhashable elements like `list`, so we stringify it.
+        return hash((self.__class_, repr(self.value)))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
