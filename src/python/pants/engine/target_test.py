@@ -1182,9 +1182,10 @@ def test_overrides_field_validation() -> None:
     assert OverridesField({}, addr).value == {}
 
     # Note that the `list_field` is not hashable. We have to override `__hash__` for this to work.
-    override_value = {("tgt1",): {"str_field": "value", "list_field": [0, 1, 3]}}
-    field = OverridesField(override_value, addr)
-    assert field.value == override_value
+    override = {"str_field": "value", "list_field": [0, 1, 3]}
+    # Convert a `str` key to `tuple[str, ...]`.
+    field = OverridesField({"tgt1": override, ("tgt1", "tgt2"): override}, addr)
+    assert field.value == {("tgt1",): override, ("tgt1", "tgt2"): override}
     with no_exception():
         hash(field)
 

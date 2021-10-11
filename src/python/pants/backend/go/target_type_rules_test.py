@@ -149,7 +149,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                             "github.com/google/go-cmp/cmp/cmpopts",
                             "github.com/google/go-cmp/cmp/internal/function",
                         ): {"tags": ["third_party_tag"]},
-                        ("./subdir",): {"tags": ["first_party_tag"]},
+                        "./subdir": {"tags": ["first_party_tag"]},
                         ("./subdir", "./"): {"description": "a first party pkg"},
                     },
                 )
@@ -287,7 +287,7 @@ def test_generate_targets_conflicting_overrides(rule_runner: RuleRunner) -> None
                 go_mod(
                     name="mod",
                     overrides={
-                        ("./",): {"tags": ["root"]},
+                        "./": {"tags": ["root"]},
                         ("./subdir", "./"): {"tags": ["pkg"]},
                     },
                 )

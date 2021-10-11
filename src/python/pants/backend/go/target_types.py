@@ -116,11 +116,12 @@ class GoModOverridesField(OverridesField):
     help = (
         "Override the field values for generated `go_first_party_packages` and "
         "`go_third_party_packages` targets.\n\n"
-        "Expects a dictionary of a tuple of generated target names to a dictionary for the "
-        "overrides. Each override is a dictionary of field names to the overridden value. For "
-        "example:\n\n"
+        "Expects a dictionary of generated target names to a dictionary for the "
+        "overrides. You may either use a string for a single target name, or a string tuple for "
+        "multiple targets. Each override is a dictionary of field names to the overridden value. "
+        "For example:\n\n"
         "  overrides={\n"
-        '    ("./subdir",): {"tags": ["overridden"]},\n'
+        '    "./subdir": {"tags": ["overridden"]},\n'
         '    ("./subdir", "github.com/google/uuid"): {"description": ["these are overridden"]},\n'
         "  }\n\n"
         "The generated target name for a `go_first_party_package` is the directory path relative "

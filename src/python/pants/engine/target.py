@@ -2129,7 +2129,7 @@ class OverridesField(Field):
 
     This is meant for target generators to reduce boilerplate. It's up to the corresponding target
     generator rule to determine how to implement the field, such as how users can specify the target
-    key: file globs, target names, etc. For example, `{["*.ext"]: {"tags": ['my_tag']}}`.
+    key: file globs, target names, etc. For example, `{"f.ext": {"tags": ['my_tag']}}`.
     """
 
     alias = "overrides"
@@ -2138,7 +2138,7 @@ class OverridesField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[Tuple[str, ...], Dict[str, Any]]], address: Address
+        cls, raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]], address: Address
     ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
@@ -2147,11 +2147,15 @@ class OverridesField(Field):
             address,
             cls.alias,
             raw_value,
-            expected_type="dict[tuple[str, ...], dict[str, Any]]",
+            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
         )
         if not isinstance(value_or_default, collections.abc.Mapping):
             raise invalid_type_exception
+
+        result: dict[tuple[str, ...], dict[str, Any]] = {}
         for outer_key, nested_value in value_or_default.items():
+            if isinstance(outer_key, str):
+                outer_key = (outer_key,)
             if not isinstance(outer_key, collections.abc.Sequence) or not all(
                 isinstance(elem, str) for elem in outer_key
             ):
@@ -2160,14 +2164,13 @@ class OverridesField(Field):
                 raise invalid_type_exception
             if not all(isinstance(inner_key, str) for inner_key in nested_value):
                 raise invalid_type_exception
-        return {
-            tuple(outer_k): {inner_k: inner_v for inner_k, inner_v in outer_v.items()}
-            for outer_k, outer_v in value_or_default.items()
-        }
+            result[tuple(outer_key)] = dict(nested_value)
+
+        return result
 
     def __hash__(self) -> int:
         # The value might have unhashable elements like `list`, so we stringify it.
-        return hash((self.__class_, repr(self.value)))
+        return hash((self.__class__, repr(self.value)))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
