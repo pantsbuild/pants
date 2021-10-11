@@ -96,12 +96,12 @@ def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
             # Two proto files belonging to the same target. We should use two file addresses.
             "root1/protos/f1.proto": "",
             "root1/protos/f2.proto": "",
-            "root1/protos/BUILD": "protobuf_library()",
+            "root1/protos/BUILD": "protobuf_sources()",
             # These protos would result in the same stripped file name, so they are ambiguous.
             "root1/two_owners/f.proto": "",
-            "root1/two_owners/BUILD": "protobuf_library()",
+            "root1/two_owners/BUILD": "protobuf_sources()",
             "root2/two_owners/f.proto": "",
-            "root2/two_owners/BUILD": "protobuf_library()",
+            "root2/two_owners/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(ProtobufMapping, [])
@@ -134,9 +134,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "src/protos/project/f2.proto": "import 'project/f1.proto';",
-            "src/protos/project/BUILD": "protobuf_library()",
+            "src/protos/project/BUILD": "protobuf_sources()",
             "src/protos/tests/f.proto": "",
-            "src/protos/tests/BUILD": "protobuf_library()",
+            "src/protos/tests/BUILD": "protobuf_sources()",
             # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
             # not warn on the disambiguated one and should infer a dep.
             "src/protos/ambiguous/dep.proto": "",
@@ -149,9 +149,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             ),
             "src/protos/ambiguous/BUILD": dedent(
                 """\
-                protobuf_library(name='dep1', sources=['dep.proto', 'disambiguated.proto'])
-                protobuf_library(name='dep2', sources=['dep.proto', 'disambiguated.proto'])
-                protobuf_library(
+                protobuf_sources(name='dep1', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_sources(name='dep2', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_sources(
                     name='main',
                     sources=['main.proto'],
                     dependencies=['!./disambiguated.proto:dep2'],

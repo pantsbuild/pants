@@ -57,7 +57,7 @@ def project_files(skip_twine: bool) -> dict[str, str]:
     return {
         "src/BUILD": dedent(
             f"""\
-            python_library()
+            python_sources()
             python_distribution(
               name="dist",
               provides=python_artifact(

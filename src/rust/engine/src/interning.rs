@@ -8,8 +8,8 @@ use std::sync::atomic;
 use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
 
-use crate::core::{Fnv, Key, Value};
 use crate::externs;
+use crate::python::{Fnv, Key, Value};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.

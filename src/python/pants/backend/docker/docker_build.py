@@ -26,7 +26,7 @@ from pants.backend.docker.target_types import (
     DockerRepository,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -199,21 +199,6 @@ async def build_docker_image(
     return BuiltPackage(
         result.output_digest,
         (BuiltDockerImage.create(tags),),
-    )
-
-
-@rule
-async def docker_image_run_request(field_set: DockerFieldSet, docker: DockerBinary) -> RunRequest:
-    image = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return RunRequest(
-        digest=image.digest,
-        args=(
-            docker.path,
-            "run",
-            "-it",
-            "--rm",
-            cast(BuiltDockerImage, image.artifacts[0]).tags[0],
-        ),
     )
 
 

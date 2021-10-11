@@ -10,7 +10,7 @@ from pants.engine.target import (
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -20,12 +20,12 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 
 
-class JavaSourceField(Sources):
+class JavaSourceField(MultipleSourcesField):
     expected_file_extensions = (".java",)
     expected_num_files = 1
 
 
-class JavaGeneratorSources(Sources):
+class JavaGeneratorSources(MultipleSourcesField):
     expected_file_extensions = (".java",)
 
 

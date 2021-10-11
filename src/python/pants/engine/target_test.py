@@ -25,12 +25,13 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
     InvalidTargetException,
+    MultipleSourcesField,
     NestedDictStringToStringField,
     OverridesField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
-    Sources,
+    SingleSourceField,
     StringField,
     StringSequenceField,
     Tags,
@@ -340,7 +341,7 @@ def test_override_preexisting_field_via_new_target() -> None:
 
     # Ensure that subclasses not defined on a target are not accepted. This allows us to, for
     # example, filter every target with `PythonSources` (or a subclass) and to ignore targets with
-    # only `Sources`.
+    # only `SourcesField`.
     normal_tgt = FortranTarget({}, Address("", target_name="normal"))
     assert normal_tgt.has_field(FortranExtensions) is True
     assert normal_tgt.has_field(CustomFortranExtensions) is False
@@ -438,11 +439,11 @@ def test_target_validate() -> None:
 def test_generate_file_level_targets() -> None:
     class MockGenerator(Target):
         alias = "generator"
-        core_fields = (Dependencies, Tags, Sources)
+        core_fields = (Dependencies, Tags, MultipleSourcesField)
 
     class MockGenerated(Target):
         alias = "generated"
-        core_fields = (Dependencies, Tags, Sources)
+        core_fields = (Dependencies, Tags, MultipleSourcesField)
 
     def generate(
         generator: Target,
@@ -460,16 +461,18 @@ def test_generate_file_level_targets() -> None:
             use_generated_address_syntax=use_generated_addr_syntax,
         )
 
-    tgt = MockGenerator({Sources.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo"))
+    tgt = MockGenerator(
+        {MultipleSourcesField.alias: ["f1.ext", "f2.ext"], Tags.alias: ["tag"]}, Address("demo")
+    )
     assert generate(tgt, ["demo/f1.ext", "demo/f2.ext"]) == GeneratedTargets(
         tgt,
         [
             MockGenerated(
-                {Sources.alias: ["f1.ext"], Tags.alias: ["tag"]},
+                {MultipleSourcesField.alias: ["f1.ext"], Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f1.ext"),
             ),
             MockGenerated(
-                {Sources.alias: ["f2.ext"], Tags.alias: ["tag"]},
+                {MultipleSourcesField.alias: ["f2.ext"], Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f2.ext"),
             ),
         ],
@@ -481,7 +484,7 @@ def test_generate_file_level_targets() -> None:
         [
             MockGenerated(
                 {
-                    Sources.alias: ["f1.ext"],
+                    MultipleSourcesField.alias: ["f1.ext"],
                     Dependencies.alias: ["demo/f2.ext"],
                     Tags.alias: ["tag"],
                 },
@@ -489,7 +492,7 @@ def test_generate_file_level_targets() -> None:
             ),
             MockGenerated(
                 {
-                    Sources.alias: ["f2.ext"],
+                    MultipleSourcesField.alias: ["f2.ext"],
                     Dependencies.alias: ["demo/f1.ext"],
                     Tags.alias: ["tag"],
                 },
@@ -499,13 +502,14 @@ def test_generate_file_level_targets() -> None:
     )
 
     subdir_tgt = MockGenerator(
-        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, Address("src/fortran", target_name="demo")
+        {MultipleSourcesField.alias: ["demo.f95", "subdir/demo.f95"]},
+        Address("src/fortran", target_name="demo"),
     )
     assert generate(subdir_tgt, ["src/fortran/subdir/demo.f95"]) == GeneratedTargets(
         subdir_tgt,
         [
             MockGenerated(
-                {Sources.alias: ["subdir/demo.f95"]},
+                {MultipleSourcesField.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
             )
         ],
@@ -516,13 +520,13 @@ def test_generate_file_level_targets() -> None:
         subdir_tgt,
         [
             MockGenerated(
-                {Sources.alias: ["subdir/demo.f95"]},
+                {MultipleSourcesField.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", generated_name="subdir/demo.f95"),
             )
         ],
     )
 
-    # The file path must match the filespec of the generator target's Sources field.
+    # The file path must match the filespec of the generator target's SourcesField.
     with pytest.raises(AssertionError) as exc:
         generate(tgt, ["demo/fake.ext"])
     assert "does not match a file demo/fake.ext" in str(exc.value)
@@ -898,18 +902,18 @@ def test_dict_string_to_string_sequence_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test `Sources` helper functions
+# Test `SourcesField` helper functions
 # -----------------------------------------------------------------------------------------------
 
 
 def test_targets_with_sources_types() -> None:
-    class Sources1(Sources):
+    class Sources1(MultipleSourcesField):
         pass
 
-    class Sources2(Sources):
+    class Sources2(SingleSourceField):
         pass
 
-    class CodegenSources(Sources):
+    class CodegenSources(MultipleSourcesField):
         pass
 
     class Tgt1(Target):
@@ -929,7 +933,7 @@ def test_targets_with_sources_types() -> None:
         output = Sources1
 
     tgt1 = Tgt1({}, Address("tgt1"))
-    tgt2 = Tgt2({}, Address("tgt2"))
+    tgt2 = Tgt2({SingleSourceField.alias: "foo.ext"}, Address("tgt2"))
     codegen_tgt = CodegenTgt({}, Address("codegen_tgt"))
     result = targets_with_sources_types(
         [Sources1],
@@ -937,6 +941,13 @@ def test_targets_with_sources_types() -> None:
         union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
     )
     assert set(result) == {tgt1, codegen_tgt}
+
+    result = targets_with_sources_types(
+        [Sources2],
+        [tgt1, tgt2, codegen_tgt],
+        union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
+    )
+    assert set(result) == {tgt2}
 
 
 # -----------------------------------------------------------------------------------------------

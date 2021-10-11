@@ -99,7 +99,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     all_major_minor_python_versions(Black.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     interpreter_constraint = (
         ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
@@ -118,7 +118,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -131,7 +131,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -156,7 +156,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
             config_path: "[tool.black]\nskip-string-normalization = 'true'\n",
         }
     )
@@ -171,7 +171,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(
         rule_runner, [tgt], extra_args=["--black-args='--skip-string-normalization'"]
@@ -185,7 +185,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(rule_runner, [tgt], extra_args=["--black-skip"])
     assert not lint_results
@@ -211,7 +211,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         """
     )
     rule_runner.write_files(
-        {"f.py": content, "BUILD": "python_library(name='t', interpreter_constraints=['>=3.8'])"}
+        {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.8'])"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(rule_runner, [tgt])
@@ -235,7 +235,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         """
     )
     rule_runner.write_files(
-        {"f.py": content, "BUILD": "python_library(name='t', interpreter_constraints=['>=3.9'])"}
+        {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.9'])"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_black(rule_runner, [tgt])
@@ -254,7 +254,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
             "good.py": GOOD_FILE,
             "bad.pyi": BAD_FILE,
             "bad.py": BAD_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
         }
     )
 

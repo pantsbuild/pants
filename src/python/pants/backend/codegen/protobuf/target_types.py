@@ -9,14 +9,14 @@ from pants.engine.target import (
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, git_url
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -36,14 +36,14 @@ class ProtobufGrpcToggleField(BoolField):
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesField(Sources):
+class ProtobufSourcesField(MultipleSourcesField):
     expected_file_extensions = (".proto",)
     expected_num_files = 1
     required = True
 
 
 class ProtobufSourceTarget(Target):
-    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
+    alias = "protobuf_sources"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
@@ -52,19 +52,22 @@ class ProtobufSourceTarget(Target):
     )
     help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."
 
+    deprecated_alias = "protobuf_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+
 
 # -----------------------------------------------------------------------------------------------
 # `protobuf_sources` target generator
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesGeneratingSourcesField(Sources):
+class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
 
 
 class ProtobufSourcesGeneratorTarget(Target):
-    alias = "protobuf_library"  # TODO(#12954): rename to `protobuf_sources` when ready. Update `help` too.
+    alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
@@ -73,13 +76,22 @@ class ProtobufSourcesGeneratorTarget(Target):
     )
     help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."
 
+    deprecated_alias = "protobuf_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `protobuf_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
+    )
+
 
 class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
     generate_from = ProtobufSourcesGeneratorTarget
 
 
 @rule
-async def generate_targets_from_protobuf_library(
+async def generate_targets_from_protobuf_sources(
     request: GenerateTargetsFromProtobufSources,
     protoc: Protoc,
     union_membership: UnionMembership,

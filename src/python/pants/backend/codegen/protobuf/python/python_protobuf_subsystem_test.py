@@ -10,7 +10,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourcesGeneratorTarget,
 )
-from pants.core.target_types import Files
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -23,18 +23,13 @@ def test_inject_dependencies() -> None:
             *target_types.rules(),
             QueryRule(InjectedDependencies, (InjectPythonProtobufDependencies,)),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget, Files],
+        target_types=[ProtobufSourcesGeneratorTarget, GenericTarget],
     )
-    rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            "--python-protobuf-runtime-dependencies=protos:injected_dep",
-        ]
-    )
+    rule_runner.set_options(["--python-protobuf-runtime-dependencies=protos:injected_dep"])
     # Note that injected deps can be any target type for `--python-protobuf-runtime-dependencies`.
     rule_runner.write_files(
         {
-            "protos/BUILD": ("protobuf_library()" "\nfiles(name='injected_dep', sources=[])"),
+            "protos/BUILD": "protobuf_sources()\ntarget(name='injected_dep')",
             "protos/f.proto": "",
         }
     )

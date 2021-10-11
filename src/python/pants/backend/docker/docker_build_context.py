@@ -10,7 +10,7 @@ from typing import Mapping
 from pants.backend.docker.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageSources
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.target_types import FilesSources
+from pants.core.target_types import FileSourcesField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
@@ -20,7 +20,7 @@ from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
-    Sources,
+    SourcesField,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -74,7 +74,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     dockerfiles_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(Sources) for t in transitive_targets.roots],
+            sources_fields=[t.get(SourcesField) for t in transitive_targets.roots],
             for_sources_types=(DockerImageSources,),
         ),
     )
@@ -89,8 +89,8 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(Sources) for t in chain(*root_dependencies)],
-            for_sources_types=(FilesSources,),
+            sources_fields=[t.get(SourcesField) for t in chain(*root_dependencies)],
+            for_sources_types=(FileSourcesField,),
         ),
     )
 

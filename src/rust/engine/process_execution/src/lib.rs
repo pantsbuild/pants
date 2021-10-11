@@ -342,7 +342,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 ///
 /// A container of platform constrained processes.
 ///
-#[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
 
 impl MultiPlatformProcess {

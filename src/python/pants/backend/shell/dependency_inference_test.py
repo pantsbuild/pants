@@ -44,10 +44,10 @@ def test_shell_mapping(rule_runner: RuleRunner) -> None:
             # Two Shell files belonging to the same target. We should use two file addresses.
             "a/f1.sh": "",
             "a/f2.sh": "",
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             # >1 target owns the same file, so it's ambiguous.
             "b/f.sh": "",
-            "b/BUILD": "shell_library(name='t1')\nshell_library(name='t2')",
+            "b/BUILD": "shell_sources(name='t1')\nshell_sources(name='t2')",
         }
     )
     result = rule_runner.request(ShellMapping, [])
@@ -101,9 +101,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "a/f2.sh": "source a/f1.sh",
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             "b/f.sh": "",
-            "b/BUILD": "shell_library()",
+            "b/BUILD": "shell_sources()",
             # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
             # not warn on the disambiguated one and should infer a dep.
             "ambiguous/dep.sh": "",
@@ -116,9 +116,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             ),
             "ambiguous/BUILD": dedent(
                 """\
-                shell_library(name='dep1', sources=['dep.sh', 'disambiguated.sh'])
-                shell_library(name='dep2', sources=['dep.sh', 'disambiguated.sh'])
-                shell_library(
+                shell_sources(name='dep1', sources=['dep.sh', 'disambiguated.sh'])
+                shell_sources(name='dep2', sources=['dep.sh', 'disambiguated.sh'])
+                shell_sources(
                     name='main',
                     sources=['main.sh'],
                     dependencies=['!./disambiguated.sh:dep2'],

@@ -22,7 +22,7 @@ from pants.backend.python.subsystems.lambdex import (
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import Files, RelocatedFiles, Resources
+from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -41,7 +41,13 @@ def rule_runner() -> RuleRunner:
             *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
         ],
-        target_types=[PythonGoogleCloudFunction, PythonLibrary, Files, RelocatedFiles, Resources],
+        target_types=[
+            PythonGoogleCloudFunction,
+            PythonLibrary,
+            FilesGeneratorTarget,
+            RelocatedFiles,
+            ResourcesGeneratorTarget,
+        ],
     )
 
 
@@ -50,7 +56,6 @@ def create_python_google_cloud_function(
 ) -> tuple[str, bytes]:
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.google_cloud_function.python",
             "--source-root-patterns=src/python",
             *(extra_args or ()),
         ],
@@ -87,7 +92,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpre
             ),
             "src/python/foo/bar/BUILD": dedent(
                 """
-                python_library(name='lib')
+                python_sources(name='lib')
 
                 python_google_cloud_function(
                     name='lambda',
@@ -139,7 +144,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
             ),
             "src/py/project/BUILD": dedent(
                 """\
-                python_library(
+                python_sources(
                     name='lib',
                     dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
                 )
@@ -163,7 +168,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The python_google_cloud_function target src/py/project:lambda transitively depends on"
+        "The `python_google_cloud_function` target src/py/project:lambda transitively depends on"
         in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text

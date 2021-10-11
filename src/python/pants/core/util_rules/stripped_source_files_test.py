@@ -13,13 +13,13 @@ from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames,
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Sources, SourcesPathsRequest, Target
+from pants.engine.target import MultipleSourcesField, SourcesPathsRequest, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 class TargetWithSources(Target):
     alias = "target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 @pytest.fixture
@@ -109,7 +109,9 @@ def test_strip_source_file_names(rule_runner: RuleRunner) -> None:
     ) -> None:
         rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
         tgt = rule_runner.get_target(address)
-        result = rule_runner.request(StrippedSourceFileNames, [SourcesPathsRequest(tgt[Sources])])
+        result = rule_runner.request(
+            StrippedSourceFileNames, [SourcesPathsRequest(tgt[MultipleSourcesField])]
+        )
         assert set(result) == set(expected)
 
     rule_runner.write_files(

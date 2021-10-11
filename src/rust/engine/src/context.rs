@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
+use crate::python::Failure;
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;

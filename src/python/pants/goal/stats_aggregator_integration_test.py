@@ -11,7 +11,7 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 def test_counters_and_histograms() -> None:
     # To get the cache read histogram, we must ensure the cache is populated, so we run twice.
     with setup_tmpdir(
-        {"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_library()"}
+        {"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_sources()"}
     ) as tmpdir:
         argv = [
             "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",

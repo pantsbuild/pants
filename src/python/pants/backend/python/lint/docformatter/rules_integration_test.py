@@ -78,7 +78,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     all_major_minor_python_versions(Docformatter.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_docformatter(
         rule_runner,
@@ -93,7 +93,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_docformatter(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -105,7 +105,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -123,7 +123,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     content = '"""\nOne line docstring acting like it\'s multiline.\n"""\n'
-    rule_runner.write_files({"f.py": content, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": content, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_docformatter(
         rule_runner,
@@ -138,7 +138,7 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     lint_results, fmt_result = run_docformatter(
         rule_runner, [tgt], extra_args=["--docformatter-skip"]
@@ -150,7 +150,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 def test_stub_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.pyi": GOOD_FILE, "bad.pyi": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.pyi": GOOD_FILE, "bad.pyi": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
 
     good_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi"))

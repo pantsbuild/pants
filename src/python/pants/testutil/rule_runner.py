@@ -308,8 +308,8 @@ class RuleRunner:
             Params(
                 specs,
                 console,
-                Workspace(self.scheduler),
-                InteractiveRunner(self.scheduler),
+                Workspace(self.scheduler, _enforce_effects=False),
+                InteractiveRunner(self.scheduler, _enforce_effects=False),
             ),
         )
 

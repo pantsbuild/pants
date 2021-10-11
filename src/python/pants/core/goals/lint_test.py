@@ -16,7 +16,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import Workspace
-from pants.engine.target import FieldSet, Sources, Target, Targets
+from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
@@ -25,11 +25,11 @@ from pants.util.logging import LogLevel
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 class MockLinterFieldSet(FieldSet):
-    required_fields = (Sources,)
+    required_fields = (MultipleSourcesField,)
 
 
 class MockLintRequest(LintRequest, metaclass=ABCMeta):
@@ -85,7 +85,7 @@ class SkippedRequest(MockLintRequest):
         return LintResults([], linter_name="SkippedLinter")
 
 
-class InvalidField(Sources):
+class InvalidField(MultipleSourcesField):
     pass
 
 
@@ -125,7 +125,7 @@ def run_lint_rule(
             lint,
             rule_args=[
                 console,
-                Workspace(rule_runner.scheduler),
+                Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
                 create_goal_subsystem(
                     LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False

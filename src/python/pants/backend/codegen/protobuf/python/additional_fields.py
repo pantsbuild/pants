@@ -17,7 +17,7 @@ class PythonSourceRootField(StringField):
     alias = "python_source_root"
     help = (
         "The source root to generate Python sources under.\n\nIf unspecified, the source root the "
-        "protobuf_library is under will be used."
+        "`protobuf_sources` is under will be used."
     )
 
 

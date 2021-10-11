@@ -932,7 +932,7 @@ def test_write_digest_scheduler(rule_runner: RuleRunner) -> None:
 
 
 def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
-    workspace = Workspace(rule_runner.scheduler)
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     digest = rule_runner.request(
         Digest,
         [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],

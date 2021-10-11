@@ -121,7 +121,7 @@ class MyPy(PythonToolBase):
             member_type=target_option,
             advanced=True,
             help=(
-                "An optional list of `python_library` target addresses to load first-party "
+                "An optional list of `python_sources` target addresses to load first-party "
                 "plugins.\n\nYou must also set `plugins = path.to.module` in your `mypy.ini`, and "
                 "set the `[mypy].config` option in your `pants.toml`.\n\nTo instead load "
                 "third-party plugins, set the option `[mypy].extra_requirements` and set the "

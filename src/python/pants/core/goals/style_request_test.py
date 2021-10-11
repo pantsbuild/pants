@@ -48,7 +48,7 @@ def test_write_reports() -> None:
             partition_results,
             partition_duplicate_results,
         ),
-        Workspace(rule_runner.scheduler),
+        Workspace(rule_runner.scheduler, _enforce_effects=False),
         DistDir(Path("dist")),
         goal_name="check",
         get_tool_name=get_tool_name,

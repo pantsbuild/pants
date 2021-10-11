@@ -28,8 +28,8 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonLibrary,
-    PythonRequirementLibrary,
     PythonRequirementsFile,
+    PythonRequirementTarget,
     PythonTests,
 )
 from pants.backend.python.util_rules import (
@@ -87,7 +87,7 @@ def target_types():
         PexBinary,
         PythonDistribution,
         PythonLibrary,
-        PythonRequirementLibrary,
+        PythonRequirementTarget,
         PythonRequirementsFile,
         PythonTests,
     ]

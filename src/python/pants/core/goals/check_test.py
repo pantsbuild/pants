@@ -14,7 +14,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import Workspace
-from pants.engine.target import FieldSet, Sources, Target, Targets
+from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
@@ -23,11 +23,11 @@ from pants.util.logging import LogLevel
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 class MockCheckFieldSet(FieldSet):
-    required_fields = (Sources,)
+    required_fields = (MultipleSourcesField,)
 
 
 class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
@@ -90,7 +90,7 @@ class SkippedRequest(MockCheckRequest):
         return CheckResults([], checker_name="SkippedChecker")
 
 
-class InvalidField(Sources):
+class InvalidField(MultipleSourcesField):
     pass
 
 
@@ -126,7 +126,7 @@ def run_typecheck_rule(
             check,
             rule_args=[
                 console,
-                Workspace(rule_runner.scheduler),
+                Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
                 DistDir(relpath=Path("dist")),
                 union_membership,

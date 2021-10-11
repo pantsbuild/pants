@@ -17,8 +17,8 @@ from pants.engine.target import (
     Dependencies,
     InvalidFieldException,
     InvalidTargetException,
+    MultipleSourcesField,
     OverridesField,
-    Sources,
     StringField,
     StringSequenceField,
     Target,
@@ -41,7 +41,7 @@ class GoImportPathField(StringField):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoModSourcesField(Sources):
+class GoModSourcesField(MultipleSourcesField):
     alias = "_sources"
     default = ("go.mod", "go.sum")
     expected_num_files = range(1, 3)  # i.e. 1 or 2.
@@ -159,7 +159,7 @@ class GoModTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoFirstPartyPackageSourcesField(Sources):
+class GoFirstPartyPackageSourcesField(MultipleSourcesField):
     expected_file_extensions = (".go", ".s")
 
 

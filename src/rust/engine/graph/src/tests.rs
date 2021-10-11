@@ -42,7 +42,7 @@ async fn invalidate_and_clean() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(|n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -77,7 +77,7 @@ async fn invalidate_and_rerun() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(|n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -107,7 +107,7 @@ async fn invalidate_with_changed_dependencies() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(|n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -125,7 +125,7 @@ async fn invalidate_with_changed_dependencies() {
   // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
   // longer depend on it.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 0),
+    graph.invalidate_from_roots(|n| n.id == 0),
     InvalidationResult {
       cleared: 1,
       dirtied: 0,
@@ -154,7 +154,7 @@ async fn invalidate_randomly() {
 
       // Invalidate a random node in the graph.
       let candidate = rng.gen_range(0..range);
-      graph2.invalidate_from_roots(|&TNode(n, _)| n == candidate);
+      graph2.invalidate_from_roots(|n: &TNode| n.id == candidate);
 
       thread::sleep(sleep_per_invalidation);
     }
@@ -229,7 +229,7 @@ async fn poll_cacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  graph.invalidate_from_roots(|n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token2), None, &context)
     .await
@@ -263,7 +263,7 @@ async fn poll_uncacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  graph.invalidate_from_roots(|n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token1), None, &context)
     .await
@@ -314,18 +314,18 @@ async fn uncacheable_dependents_of_uncacheable_node() {
 }
 
 #[tokio::test]
-async fn uncacheable_node_only_runs_once() {
+async fn non_restartable_node_only_runs_once() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
   let context = {
-    let mut uncacheable = HashSet::new();
-    uncacheable.insert(TNode::new(1));
+    let mut non_restartable = HashSet::new();
+    non_restartable.insert(TNode::new(1));
     let sleep_root = Duration::from_millis(1000);
     let mut delays = HashMap::new();
     delays.insert(TNode::new(0), sleep_root);
     TContext::new(graph.clone())
-      .with_uncacheable(uncacheable)
+      .with_non_restartable(non_restartable)
       .with_delays(delays)
   };
 
@@ -334,7 +334,7 @@ async fn uncacheable_node_only_runs_once() {
   let _join = thread::spawn(move || {
     recv.recv_timeout(Duration::from_secs(10)).unwrap();
     thread::sleep(Duration::from_millis(50));
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    graph2.invalidate_from_roots(|n| n.id == 0);
   });
 
   send.send(()).unwrap();
@@ -342,7 +342,7 @@ async fn uncacheable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) is cleared before completing, and so will run twice. But the uncacheable node and its
+  // TNode(0) is cleared before completing, and so will run twice. But the non_restartable node and its
   // dependee each run once.
   assert_eq!(
     context.runs(),
@@ -418,7 +418,7 @@ async fn dirtied_uncacheable_deps_node_re_runs() {
   };
 
   // Clear the middle node, which will dirty the top node, and then clean both of them.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 1);
+  graph.invalidate_from_roots(|n| n.id == 1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -463,7 +463,7 @@ async fn retries() {
   let graph2 = graph.clone();
   let join_handle = thread::spawn(move || loop {
     thread::sleep(sleep_per_invalidation);
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    graph2.invalidate_from_roots(|n| n.id == 0);
     if Instant::now() > invalidation_deadline {
       break;
     }
@@ -501,7 +501,7 @@ async fn canceled_on_invalidation() {
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
       thread::sleep(sleep_per_invalidation);
-      graph2.invalidate_from_roots(|&TNode(n, _)| n == 1);
+      graph2.invalidate_from_roots(|n| n.id == 1);
     }
   });
   assert_eq!(
@@ -697,7 +697,7 @@ async fn critical_path() {
   };
   let node_key = |node: &str| tnode(node);
   let node_entry = |node: &str| Entry::new(node_key(node));
-  let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
+  let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().id];
   let node_duration =
     |entry: &super::entry::Entry<TNode>| Duration::from_secs(node_and_duration_from_entry(entry).1);
 
@@ -767,21 +767,29 @@ struct T(usize, usize);
 /// to the result.
 ///
 #[derive(Clone, Debug)]
-struct TNode(usize, bool /*cacheability*/);
+struct TNode {
+  pub id: usize,
+  restartable: bool,
+  cacheable: bool,
+}
 impl TNode {
   fn new(id: usize) -> Self {
-    TNode(id, true)
+    TNode {
+      id,
+      restartable: true,
+      cacheable: true,
+    }
   }
 }
 impl PartialEq for TNode {
   fn eq(&self, other: &Self) -> bool {
-    self.0 == other.0
+    self.id == other.id
   }
 }
 impl Eq for TNode {}
 impl Hash for TNode {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
+    self.id.hash(state);
   }
 }
 #[async_trait]
@@ -793,7 +801,7 @@ impl Node for TNode {
   async fn run(self, context: TContext) -> Result<Vec<T>, TError> {
     let mut abort_guard = context.abort_guard(self.clone());
     context.ran(self.clone());
-    let token = T(self.0, context.salt());
+    let token = T(self.id, context.salt());
     context.maybe_delay(&self).await;
     let res = match context.dependencies_of(&self) {
       deps if !deps.is_empty() => {
@@ -815,8 +823,12 @@ impl Node for TNode {
     res
   }
 
+  fn restartable(&self) -> bool {
+    self.restartable
+  }
+
   fn cacheable(&self) -> bool {
-    self.1
+    self.cacheable
   }
 }
 
@@ -888,6 +900,7 @@ struct TContext {
   // the next smallest node.
   edges: Arc<HashMap<TNode, Vec<TNode>>>,
   delays: Arc<HashMap<TNode, Duration>>,
+  non_restartable: Arc<HashSet<TNode>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
   aborts: Arc<Mutex<Vec<TNode>>>,
@@ -909,6 +922,7 @@ impl NodeContext for TContext {
       salt: self.salt,
       edges: self.edges.clone(),
       delays: self.delays.clone(),
+      non_restartable: self.non_restartable.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
       aborts: self.aborts.clone(),
@@ -942,6 +956,7 @@ impl TContext {
       salt: 0,
       edges: Arc::default(),
       delays: Arc::default(),
+      non_restartable: Arc::default(),
       uncacheable: Arc::default(),
       graph,
       aborts: Arc::default(),
@@ -958,6 +973,11 @@ impl TContext {
 
   fn with_delays(mut self, delays: HashMap<TNode, Duration>) -> TContext {
     self.delays = Arc::new(delays);
+    self
+  }
+
+  fn with_non_restartable(mut self, non_restartable: HashSet<TNode>) -> TContext {
+    self.non_restartable = Arc::new(non_restartable);
     self
   }
 
@@ -1015,12 +1035,13 @@ impl TContext {
   fn dependencies_of(&self, node: &TNode) -> Vec<TNode> {
     match self.edges.get(node) {
       Some(deps) => deps.clone(),
-      None if node.0 > 0 => {
-        let new_node_id = node.0 - 1;
-        vec![TNode(
-          new_node_id,
-          !self.uncacheable.contains(&TNode::new(new_node_id)),
-        )]
+      None if node.id > 0 => {
+        let new_node_id = node.id - 1;
+        vec![TNode {
+          id: new_node_id,
+          restartable: !self.non_restartable.contains(&TNode::new(new_node_id)),
+          cacheable: !self.uncacheable.contains(&TNode::new(new_node_id)),
+        }]
       }
       None => vec![],
     }

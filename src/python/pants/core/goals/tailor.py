@@ -34,7 +34,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
-    Sources,
+    SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
@@ -65,7 +65,7 @@ class PutativeTargetsSearchPaths:
 @memoized
 def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     for field in tgt_type.core_fields:
-        if issubclass(field, Sources):
+        if issubclass(field, SourcesField):
             return field.default or tuple()
     return tuple()
 
@@ -328,7 +328,7 @@ class AllOwnedSources(DeduplicatedCollection[str]):
 async def determine_all_owned_sources() -> AllOwnedSources:
     all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
     all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
+        Get(SourcesPaths, SourcesPathsRequest(tgt.get(SourcesField))) for tgt in all_tgts
     )
     return AllOwnedSources(
         itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
@@ -382,7 +382,9 @@ class DisjointSourcePutativeTarget:
 async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePutativeTarget:
     source_paths = await Get(
         Paths,
-        PathGlobs(Sources.prefix_glob_with_dirpath(ptgt.path, glob) for glob in ptgt.owned_sources),
+        PathGlobs(
+            SourcesField.prefix_glob_with_dirpath(ptgt.path, glob) for glob in ptgt.owned_sources
+        ),
     )
     source_path_set = set(source_paths.files)
     source_dirs = {os.path.dirname(path) for path in source_path_set}
@@ -390,7 +392,7 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
         UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in source_dirs)
     )
     possible_owners_sources = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(t.get(Sources))) for t in possible_owners
+        Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
     )
     conflicting_targets = []
     for tgt, sources in zip(possible_owners, possible_owners_sources):

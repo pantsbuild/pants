@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Mapping, Type, TypeVar
+from typing import DefaultDict, Iterable, Mapping, TypeVar
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import decorated_type_checkable, frozen_after_init
@@ -42,8 +42,8 @@ class UnionRule:
     """Specify that an instance of `union_member` can be substituted wherever `union_base` is
     used."""
 
-    union_base: Type
-    union_member: Type
+    union_base: type
+    union_member: type
 
     def __post_init__(self) -> None:
         if not union.is_instance(self.union_base):
@@ -65,16 +65,16 @@ _T = TypeVar("_T", bound=type)
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class UnionMembership:
-    union_rules: FrozenDict[Type, FrozenOrderedSet[Type]]
+    union_rules: FrozenDict[type, FrozenOrderedSet[type]]
 
     @classmethod
     def from_rules(cls, rules: Iterable[UnionRule]) -> UnionMembership:
-        mapping: DefaultDict[Type, OrderedSet[Type]] = defaultdict(OrderedSet)
+        mapping: DefaultDict[type, OrderedSet[type]] = defaultdict(OrderedSet)
         for rule in rules:
             mapping[rule.union_base].add(rule.union_member)
         return cls(mapping)
 
-    def __init__(self, union_rules: Mapping[Type, Iterable[Type]]) -> None:
+    def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
         self.union_rules = FrozenDict(
             {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
         )
@@ -103,16 +103,16 @@ class UnionMembership:
         """
         return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
 
-    def is_member(self, union_type: Type, putative_member: Type) -> bool:
+    def is_member(self, union_type: type, putative_member: type) -> bool:
         members = self.union_rules.get(union_type)
         if members is None:
             raise TypeError(f"Not a registered union type: {union_type}")
         return type(putative_member) in members
 
-    def has_members(self, union_type: Type) -> bool:
+    def has_members(self, union_type: type) -> bool:
         """Check whether the union has an implementation or not."""
         return bool(self.union_rules.get(union_type))
 
-    def has_members_for_all(self, union_types: Iterable[Type]) -> bool:
+    def has_members_for_all(self, union_types: Iterable[type]) -> bool:
         """Check whether every union given has an implementation or not."""
         return all(self.has_members(union_type) for union_type in union_types)

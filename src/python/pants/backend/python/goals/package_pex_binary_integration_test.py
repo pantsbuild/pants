@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import Files, RelocatedFiles, Resources
+from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *core_target_types_rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
         ],
-        target_types=[PexBinary, Files, RelocatedFiles, Resources],
+        target_types=[PexBinary, FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget],
     )
 
 
@@ -70,7 +70,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert not caplog.records
     result = rule_runner.request(BuiltPackage, [field_set])
     assert caplog.records
-    assert f"The pex_binary target {tgt.address} transitively depends on" in caplog.text
+    assert f"The `pex_binary` target {tgt.address} transitively depends on" in caplog.text
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text

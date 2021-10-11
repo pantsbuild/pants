@@ -27,10 +27,10 @@ class PythonProtobufSubsystem(Subsystem):
             type=list,
             member_type=target_option,
             help=(
-                "A list of addresses to `python_requirement_library` targets for the runtime "
+                "A list of addresses to `python_requirement` targets for the runtime "
                 "dependencies needed for generated Python code to work. For example, "
                 "`['3rdparty/python:protobuf', '3rdparty/python:grpcio']`. These dependencies will "
-                "be automatically added to every `protobuf_library` target"
+                "be automatically added to every `protobuf_sources` target"
             ),
         )
         register(

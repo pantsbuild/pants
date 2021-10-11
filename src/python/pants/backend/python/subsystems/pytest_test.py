@@ -44,8 +44,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     # If no Python targets in repo, fall back to global python-setup constraints.
     assert_ics("target()", [global_constraint])
 
-    # Only care about `python_tests` and their transitive deps, not unused `python_library`s.
-    assert_ics("python_library(interpreter_constraints=['==2.7.*'])", [global_constraint])
+    # Only care about `python_tests` and their transitive deps, not unused `python_sources`s.
+    assert_ics("python_sources(interpreter_constraints=['==2.7.*'])", [global_constraint])
 
     # Ignore targets that are skipped.
     assert_ics(
@@ -94,7 +94,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='lib', interpreter_constraints=['==2.7.*', '==3.6.*'])
+            python_sources(name='lib', interpreter_constraints=['==2.7.*', '==3.6.*'])
             python_tests(name='tests', dependencies=[":lib"], interpreter_constraints=['==2.7.*'])
             """
         ),
@@ -103,10 +103,10 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='lib1', interpreter_constraints=['==2.7.*', '==3.6.*'])
+            python_sources(name='lib1', interpreter_constraints=['==2.7.*', '==3.6.*'])
             python_tests(name='tests1', dependencies=[":lib1"], interpreter_constraints=['==2.7.*'])
 
-            python_library(name='lib2', interpreter_constraints=['>=3.7'])
+            python_sources(name='lib2', interpreter_constraints=['>=3.7'])
             python_tests(name='tests2', dependencies=[":lib2"], interpreter_constraints=['==3.8.*'])
             """
         ),
