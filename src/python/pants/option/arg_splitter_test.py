@@ -24,8 +24,11 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.fixture
 def known_scope_infos() -> list[ScopeInfo]:
-    return [ScopeInfo(scope, is_goal=True) for scope in ["check", "jvm", "reporting", "test"]] + [
-        ScopeInfo("hidden", is_goal=False)
+    return [
+        ScopeInfo("check", is_goal=True),
+        ScopeInfo("test", is_goal=True),
+        ScopeInfo("jvm", is_goal=False),
+        ScopeInfo("reporting", is_goal=False),
     ]
 
 
@@ -397,5 +400,5 @@ def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
     assert isinstance(splitter.help_request, NoGoalHelp)
 
 
-def test_hidden_scope_is_unknown_goal(splitter: ArgSplitter) -> None:
-    assert_unknown_goal(splitter, "./pants hidden", ["hidden"])
+def test_subsystem_scope_is_unknown_goal(splitter: ArgSplitter) -> None:
+    assert_unknown_goal(splitter, "./pants jvm reporting", ["jvm", "reporting"])
