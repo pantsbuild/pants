@@ -51,7 +51,7 @@ import (
     {{#needs_test_pkg}}_test{{/needs_test_pkg}}{{^needs_test_pkg}}_{{/needs_test_pkg}} "{{test_pkg_import_path}}"
 {{/import_test_pkg}}
 {{#import_xtest_pkg}}
-    {{#needs_xtest_pkg}}_test{{/needs_xtest_pkg}}{{^needs_xtest_pkg}}_{{/needs_xtest_pkg}} "{{xtest_pkg_import_path}}"
+    {{#needs_xtest_pkg}}_xtest{{/needs_xtest_pkg}}{{^needs_xtest_pkg}}_{{/needs_xtest_pkg}} "{{xtest_pkg_import_path}}"
 {{/import_xtest_pkg}}
 )
 var tests = []testing.InternalTest{
@@ -195,6 +195,8 @@ async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem)
             )
             and tgt.address != target.address
         )
+        if pkg_info.import_path in pkg_info.xtest_imports:
+            direct_dependencies = (test_pkg_build_request,) + direct_dependencies
         xtest_pkg_build_request = BuildGoPackageRequest(
             import_path=f"{import_path}_test",
             digest=pkg_info.digest,

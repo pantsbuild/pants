@@ -62,20 +62,20 @@ class AnalyzedTestSources:
     TEST_PKG = "_test"
     XTEST_PKG = "_xtest"
 
-    def has_at_least_one_test(self):
+    def has_at_least_one_test(self) -> bool:
         return (
             any(t.package == self.TEST_PKG for t in self.tests)
             or any(b.package == self.TEST_PKG for b in self.benchmarks)
             or any(e.package == self.TEST_PKG for e in self.examples)
-            or (self.test_main and self.test_main.package == self.TEST_PKG)
+            or (self.test_main is not None and self.test_main.package == self.TEST_PKG)
         )
 
-    def has_at_least_one_xtest(self):
+    def has_at_least_one_xtest(self) -> bool:
         return (
             any(t.package == self.XTEST_PKG for t in self.tests)
             or any(b.package == self.XTEST_PKG for b in self.benchmarks)
             or any(e.package == self.XTEST_PKG for e in self.examples)
-            or (self.test_main and self.test_main.package == self.XTEST_PKG)
+            or (self.test_main is not None and self.test_main.package == self.XTEST_PKG)
         )
 
     @classmethod

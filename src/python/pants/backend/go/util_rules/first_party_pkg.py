@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
     GoFirstPartyPackageSubpathField,
+    GoImportPathField,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
@@ -34,6 +35,8 @@ class FirstPartyPkgInfo:
 
     digest: Digest
     subpath: str
+
+    import_path: str
 
     imports: tuple[str, ...]
     test_imports: tuple[str, ...]
@@ -64,6 +67,7 @@ async def compute_first_party_package_info(
         Get(GoModInfo, GoModInfoRequest(go_mod_address)),
     )
     target = wrapped_target.target
+    import_path = target[GoImportPathField].value
     subpath = target[GoFirstPartyPackageSubpathField].value
 
     pkg_sources = await Get(
@@ -95,6 +99,7 @@ async def compute_first_party_package_info(
     return FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
         subpath=os.path.join(target.address.spec_path, subpath),
+        import_path=import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
         xtest_imports=tuple(metadata.get("XTestImports", [])),
