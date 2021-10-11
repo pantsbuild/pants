@@ -129,7 +129,7 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
         dedent(
             """
             pipenv_requirements(
-                requirements_relpath='custom/pipfile/Pipfile.lock',
+                source='custom/pipfile/Pipfile.lock',
                 pipfile_target='//:custom_pipfile_target'
             )
 

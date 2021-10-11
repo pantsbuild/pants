@@ -17,6 +17,7 @@ from pkg_resources import Requirement
 from typing_extensions import TypedDict
 
 from pants.backend.python.target_types import normalize_module_mapping
+from pants.base.deprecated import warn_or_error
 from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
@@ -385,8 +386,9 @@ class PoetryRequirements:
 
     def __call__(
         self,
-        pyproject_toml_relpath: str = "pyproject.toml",
+        pyproject_toml_relpath: str | None = None,
         *,
+        source: str | None = None,
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
     ) -> None:
@@ -398,19 +400,37 @@ class PoetryRequirements:
             requirement name as the default module, e.g. "Django" will default to
             `modules=["django"]`.
         """
+        if pyproject_toml_relpath and source:
+            raise ValueError(
+                "Specified both `pyproject_toml_relpath` and `source` in the `poetry_requirements` "
+                f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
+                "`source`."
+            )
+        if pyproject_toml_relpath:
+            warn_or_error(
+                "2.9.0.dev0",
+                "the `pyproject_toml_relpath` argument for `poetry_requirements()`",
+                (
+                    "Use the `source` argument instead of `pyproject_toml_relpath` for the "
+                    f"`poetry_requirements` macro in the BUILD file at "
+                    f"{self._parse_context.rel_path}. `source` behaves the same."
+                ),
+            )
+            source = pyproject_toml_relpath
+        if not source:
+            source = "pyproject.toml"
+
         req_file_tgt = self._parse_context.create_object(
             "_python_requirements_file",
-            name=pyproject_toml_relpath.replace(os.path.sep, "_"),
-            sources=[pyproject_toml_relpath],
+            name=source.replace(os.path.sep, "_"),
+            sources=[source],
         )
         requirements_dep = f":{req_file_tgt.name}"
 
         normalized_module_mapping = normalize_module_mapping(module_mapping)
         normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
 
-        requirements = parse_pyproject_toml(
-            PyProjectToml.create(self._parse_context, pyproject_toml_relpath)
-        )
+        requirements = parse_pyproject_toml(PyProjectToml.create(self._parse_context, source))
         for parsed_req in requirements:
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             self._parse_context.create_object(
