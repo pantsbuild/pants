@@ -10,6 +10,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet
 from pants.backend.go.goals.test import rules as test_rules
+from pants.backend.go.goals.test import transform_test_args
 from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -46,6 +47,17 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def test_transform_test_args() -> None:
+    assert transform_test_args(["-v", "--", "-v"]) == ("-test.v", "--", "-v")
+    assert transform_test_args(["-run=TestFoo", "-v"]) == ("-test.run=TestFoo", "-test.v")
+    assert transform_test_args(["-run", "TestFoo", "-foo", "-v"]) == (
+        "-test.run",
+        "TestFoo",
+        "-foo",
+        "-test.v",
+    )
 
 
 def test_internal_test_success(rule_runner: RuleRunner) -> None:
