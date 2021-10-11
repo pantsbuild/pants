@@ -128,6 +128,21 @@ class MyPy(PythonToolBase):
                 "`plugins` option in `mypy.ini`."
             ),
         )
+        register(
+            "--extra-type-stubs",
+            type=list,
+            member_type=str,
+            advanced=True,
+            help=(
+                "Extra type stub requirements to install when running MyPy.\n\n"
+                "Normally, type stubs can be installed as typical requirements, such as putting "
+                "them in `requirements.txt` or using a `python_requirement_library` target."
+                "Alternatively, you can use this option so that the dependencies are solely "
+                "used when running MyPy and are not runtime dependencies.\n\n"
+                "Expects a list of pip-style requirement strings, like "
+                "`['types-requests==2.25.9']`."
+            ),
+        )
 
     @property
     def skip(self) -> bool:
@@ -136,6 +151,10 @@ class MyPy(PythonToolBase):
     @property
     def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
+
+    @property
+    def extra_type_stubs(self) -> tuple[str, ...]:
+        return tuple(self.options.extra_type_stubs)
 
     @property
     def config(self) -> str | None:
