@@ -140,10 +140,8 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
                     version = "1.3",
                 )
                 coursier_lockfile(
-                    name = 'example-lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='example-lockfile',
+                    source="coursier_resolve.lockfile",
                 )
                 """
             ),

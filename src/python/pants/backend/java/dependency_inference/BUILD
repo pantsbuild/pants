@@ -40,5 +40,5 @@ jvm_artifact(
 
 coursier_lockfile(
   name="javaparser_lockfile",
-  sources=["coursier_resolve.lockfile"],
+  source="coursier_resolve.lockfile",
 )

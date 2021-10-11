@@ -129,9 +129,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 junit_tests(
@@ -181,10 +179,8 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
                   version = '4.13.2',
                 )
                 coursier_lockfile(
-                    name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
                 )
 
                 junit_tests(
@@ -243,10 +239,8 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
                   version = '4.13.2',
                 )
                 coursier_lockfile(
-                    name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -409,9 +403,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 junit_tests(
@@ -465,9 +457,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 junit_tests(
@@ -528,9 +518,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
