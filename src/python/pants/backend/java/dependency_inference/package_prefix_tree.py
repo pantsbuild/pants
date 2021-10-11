@@ -21,29 +21,18 @@ class PackageRootedDependencyMap:
         * The set of Addresses that provide a given package
     """
 
-    class ConflictingTypeOwnershipError(Exception):
-        """Raised when a Java FQT appears to be provided by more than one Address."""
-
     def __init__(self):
-        self._type_map: dict[str, Address] = {}
+        self._type_map: dict[str, set[Address]] = defaultdict(set)
         self._package_map: dict[str, set[Address]] = defaultdict(set)
 
     def add_top_level_type(self, package: str, type_: str, address: Address):
-        """Declare a single Address as the provider of a top level type.
+        """Declare a single Address as a provider of a top level type.
 
-        Raises ConflictingTypeOwnershipError if another address is already the provider
-        of the passed FQT.
-
-        This method also associates the address with the type's package, and there can
-        be more than one address associated with a given package.
+        This method also associates the address with the type's package, and there can be more than
+        one address associated with a given package.
         """
         fqt = ".".join([package, type_])
-        if fqt in self._type_map and self._type_map[fqt] != address:
-            raise PackageRootedDependencyMap.ConflictingTypeOwnershipError(
-                f"Attempted register '{address}' as provider of fully qualified type"
-                f" '{fqt}', but it is already provided by '{self._type_map[fqt]}'"
-            )
-        self._type_map[fqt] = address
+        self._type_map[fqt].add(address)
         self._package_map[package].add(address)
 
     def add_package(self, package: str, address: Address):
@@ -70,7 +59,7 @@ class PackageRootedDependencyMap:
         for num_parts in range(len(parts), 0, -1):
             prefix = ".".join(parts[:num_parts])
             if prefix in self._type_map:
-                return frozenset([self._type_map[prefix]])
+                return frozenset(self._type_map[prefix])
             if prefix in self._package_map:
                 return frozenset(self._package_map[prefix])
         return frozenset()
@@ -80,32 +69,25 @@ class PackageRootedDependencyMap:
         return frozenset({result}) if result else frozenset()
 
     def merge(self, other: PackageRootedDependencyMap):
-        """Merge 'other' into this dependency map.
+        """Merge 'other' into this dependency map."""
 
-        Raises ConflictingTypeOwnershipError if 'other' has an FQT mapped to an address that
-        conflicts with this dep map.
-        """
-
-        for type_, address in other._type_map.items():
-            if type_ in self._type_map and self._type_map[type_] != address:
-                raise PackageRootedDependencyMap.ConflictingTypeOwnershipError(
-                    'Conflicting ownership of FQT "{type_}": both {self._type_map[type_]}'
-                    " and {address} appear to provide this type."
-                )
-            self._type_map[type_] = address
+        for type_, addresses in other._type_map.items():
+            self._type_map[type_] |= addresses
         for package, addresses in other._package_map.items():
             self._package_map[package] |= addresses
 
     def to_json_dict(self):
         return {
-            "type_map": {ty: str(addr) for ty, addr in self._type_map.items()},
+            "type_map": {ty: [str(addr) for addr in addrs] for ty, addrs in self._type_map.items()},
             "package_map": {
                 pkg: [str(addr) for addr in addrs] for pkg, addrs in self._package_map.items()
             },
         }
 
     def __repr__(self) -> str:
-        type_map = ", ".join(f"{ty}:{addr}" for ty, addr in self._type_map.items())
+        type_map = ", ".join(
+            f"{ty}:{', '.join(str(addr) for addr in addrs)}" for ty, addrs in self._type_map.items()
+        )
         package_map = ", ".join(
             f"{pkg}:{', '.join(str(addr) for addr in addrs)}"
             for pkg, addrs in self._package_map.items()

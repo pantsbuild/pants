@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pants.backend.java.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
 from pants.engine.addresses import Address
 
@@ -48,23 +46,3 @@ def test_package_rooted_dependency_map() -> None:
     # But if we know about org.pantsbuild.other.package, the above doesn't happen:
     dep_map.add_package("org.pantsbuild.other.package", d)
     assert dep_map.addresses_for_symbol("org.pantsbuild.other.package") == frozenset([d])
-
-
-def test_package_rooted_dependency_map_errors() -> None:
-    dep_map = PackageRootedDependencyMap()
-    a = Address("a")
-    b = Address("b")
-
-    dep_map.add_top_level_type(package="org.pantsbuild", type_="Foo", address=a)
-    # Adding this type again is fine as long as the address is the same
-    dep_map.add_top_level_type(package="org.pantsbuild", type_="Foo", address=a)
-    # But trying to associate it to a different address is an error:
-    with pytest.raises(PackageRootedDependencyMap.ConflictingTypeOwnershipError):
-        dep_map.add_top_level_type(package="org.pantsbuild", type_="Foo", address=b)
-
-    other_map = PackageRootedDependencyMap()
-    other_map.add_top_level_type(package="org.pantsbuild", type_="Foo", address=b)
-
-    # Trying to merge in a conflict causes the same error:
-    with pytest.raises(PackageRootedDependencyMap.ConflictingTypeOwnershipError):
-        dep_map.merge(other_map)
