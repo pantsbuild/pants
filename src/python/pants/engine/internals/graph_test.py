@@ -60,6 +60,7 @@ from pants.engine.target import (
     InjectedDependencies,
     NoApplicableTargetsBehavior,
     SecondaryOwnerMixin,
+    SingleSourcesField,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
@@ -76,7 +77,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -1090,7 +1091,7 @@ def test_no_applicable_targets_exception() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test the Sources field. Also see `engine/target_test.py`.
+# Test `SingleSourceField` and the `Sources` field. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
 
@@ -1115,9 +1116,17 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
+    single_source = SingleSourcesField("f1.f95", addr)
+    hydrated_single_source = sources_rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(single_source)]
+    )
+    assert hydrated_single_source.snapshot.files == ("src/fortran/f1.f95",)
+
     # Test that `SourcesPaths` works too.
     sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(sources)])
     assert sources_paths.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
+    sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(single_source)])
+    assert sources_paths.files == ("src/fortran/f1.f95",)
 
     # Also test that the Filespec is correct. This does not need the engine to be calculated.
     assert (
@@ -1128,10 +1137,18 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
         }
         == hydrated_sources.filespec
     )
+    assert (
+        single_source.filespec
+        == {"includes": ["src/fortran/f1.f95"]}
+        == hydrated_single_source.filespec
+    )
 
 
 def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     class SourcesSubclass(Sources):
+        pass
+
+    class SingleSourcesSubclass(SingleSourcesField):
         pass
 
     addr = Address("", target_name="lib")
@@ -1145,10 +1162,26 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
+    valid_single_sources = SingleSourcesSubclass("f1.f95", addr)
+    hydrated_valid_sources = sources_rule_runner.request(
+        HydratedSources,
+        [HydrateSourcesRequest(valid_single_sources, for_sources_types=[SingleSourcesSubclass])],
+    )
+    assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+    assert hydrated_valid_sources.sources_type == SingleSourcesSubclass
+
     invalid_sources = Sources(["*"], addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
+    )
+    assert hydrated_invalid_sources.snapshot.files == ()
+    assert hydrated_invalid_sources.sources_type is None
+
+    invalid_single_sources = SingleSourcesField("f1.f95", addr)
+    hydrated_invalid_sources = sources_rule_runner.request(
+        HydratedSources,
+        [HydrateSourcesRequest(invalid_single_sources, for_sources_types=[SingleSourcesSubclass])],
     )
     assert hydrated_invalid_sources.snapshot.files == ()
     assert hydrated_invalid_sources.sources_type is None
@@ -1158,11 +1191,12 @@ def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
     sources_rule_runner.create_files("", files=["f1.f95"])
     sources = Sources(["non_existent.f95"], Address("", target_name="lib"))
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
-    assert "Unmatched glob" in str(exc.value)
-    assert "//:lib" in str(exc.value)
-    assert "non_existent.f95" in str(exc.value)
+
+    single_sources = SingleSourcesField("non_existent.f95", Address("", target_name="lib"))
+    with engine_error(contains="non_existent.f95"):
+        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(single_sources)])
 
 
 def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
@@ -1187,22 +1221,29 @@ def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> No
     class ExpectedExtensionsSources(Sources):
         expected_file_extensions = (".f95", ".f03", "")
 
+    class ExpectedExtensionsSingleSource(SingleSourcesField):
+        expected_file_extensions = (".f95", ".f03", "")
+
     addr = Address("src/fortran", target_name="lib")
     sources_rule_runner.create_files("src/fortran", ["s.f95", "s.f03", "s.f08", "s"])
 
-    def get_sources(srcs: Iterable[str]) -> Tuple[str, ...]:
-        return sources_rule_runner.request(
-            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, addr))]
+    def get_source(src: str) -> str:
+        sources = sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources([src], addr))]
         ).snapshot.files
+        single_source = sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSingleSource(src, addr))]
+        ).snapshot.files
+        assert sources == single_source
+        assert len(sources) == 1
+        return sources[0]
 
-    with pytest.raises(ExecutionError) as exc:
-        get_sources(["s.f*"])
-    assert "['src/fortran/s.f08']" in str(exc.value)
-    assert str(addr) in str(exc.value)
+    with engine_error(contains="['src/fortran/s.f08']"):
+        get_source("s.f08")
 
     # Also check that we support valid sources
-    assert get_sources(["s.f95"]) == ("src/fortran/s.f95",)
-    assert get_sources(["s"]) == ("src/fortran/s",)
+    assert get_source("s.f95") == "src/fortran/s.f95"
+    assert get_source("s") == "src/fortran/s"
 
 
 def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
@@ -1215,7 +1256,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
 
     sources_rule_runner.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
 
-    def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: type[Sources], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [
@@ -1223,12 +1264,10 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
             ],
         )
 
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="must have 2 files"):
         hydrate(ExpectedNumber, [])
-    assert "must have 2 files" in str(exc.value)
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="must have 1 or 3 files"):
         hydrate(ExpectedRange, ["f1.txt", "f2.txt"])
-    assert "must have 1 or 3 files" in str(exc.value)
 
     # Also check that we support valid # files.
     assert hydrate(ExpectedNumber, ["f1.txt", "f2.txt"]).snapshot.files == ("f1.txt", "f2.txt")
@@ -1238,6 +1277,17 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f2.txt",
         "f3.txt",
     )
+
+    # `SingleSourceField` must have one file.
+    with engine_error(contains="must have 1 file"):
+        sources_rule_runner.request(
+            HydratedSources,
+            [
+                HydrateSourcesRequest(
+                    SingleSourcesField("*.txt", Address("", target_name="example"))
+                ),
+            ],
+        )
 
 
 # -----------------------------------------------------------------------------------------------

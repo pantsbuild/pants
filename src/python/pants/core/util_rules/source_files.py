@@ -6,8 +6,7 @@ from typing import Iterable, Set, Tuple, Type
 
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
-from pants.engine.target import Sources as SourcesField
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesBaseField
 from pants.util.meta import frozen_after_init
 
 
@@ -29,15 +28,15 @@ class SourceFiles:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SourceFilesRequest:
-    sources_fields: Tuple[SourcesField, ...]
-    for_sources_types: Tuple[Type[SourcesField], ...]
+    sources_fields: Tuple[SourcesBaseField, ...]
+    for_sources_types: Tuple[Type[SourcesBaseField], ...]
     enable_codegen: bool
 
     def __init__(
         self,
-        sources_fields: Iterable[SourcesField],
+        sources_fields: Iterable[SourcesBaseField],
         *,
-        for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        for_sources_types: Iterable[Type[SourcesBaseField]] = (SourcesBaseField,),
         enable_codegen: bool = False,
     ) -> None:
         self.sources_fields = tuple(sources_fields)
@@ -47,7 +46,7 @@ class SourceFilesRequest:
 
 @rule(desc="Get all relevant source files")
 async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
-    """Merge all `Sources` fields into one Snapshot."""
+    """Merge all `SourceBaseField`s into one Snapshot."""
     unrooted_files: Set[str] = set()
     all_hydrated_sources = await MultiGet(
         Get(

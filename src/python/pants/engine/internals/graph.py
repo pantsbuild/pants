@@ -62,7 +62,7 @@ from pants.engine.target import (
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
     SecondaryOwnerMixin,
-    Sources,
+    SourcesBaseField,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
@@ -502,11 +502,11 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
         for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
             matching_files = set(
-                matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+                matches_filespec(candidate_tgt.get(SourcesBaseField).filespec, paths=sources_set)
             )
-            # Also consider secondary ownership, meaning it's not a `Sources` field with primary
-            # ownership, but the target still should match the file. We can't use `tgt.get()`
-            # because this is a mixin, and there technically may be >1 field.
+            # Also consider secondary ownership, meaning it's not a `SourcesBaseField` field with
+            # primary ownership, but the target still should match the file. We can't use
+            # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
                 field  # type: ignore[misc]
                 for field in candidate_tgt.field_values.values()
@@ -637,14 +637,14 @@ async def resolve_specs_snapshot(
 ) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
-    Address specs will use their `Sources` field, and Filesystem specs will use whatever args were
-    given. Filesystem specs may safely refer to files with no owning target.
+    Address specs will use their `SourcesBaseField` field, and Filesystem specs will use whatever
+    args were given. Filesystem specs may safely refer to files with no owning target.
     """
     targets = await Get(Targets, AddressSpecs, specs.address_specs)
     all_hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[Sources]))
+        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesBaseField]))
         for tgt in targets
-        if tgt.has_field(Sources)
+        if tgt.has_field(SourcesBaseField)
     )
 
     filesystem_specs_digest = (
@@ -669,7 +669,7 @@ async def resolve_specs_snapshot(
 
 
 # -----------------------------------------------------------------------------------------------
-# Resolve the Sources field
+# Resolve SourcesBaseField
 # -----------------------------------------------------------------------------------------------
 
 
@@ -686,7 +686,7 @@ class AmbiguousCodegenImplementationsException(Exception):
         self,
         generators: Iterable[type[GenerateSourcesRequest]],
         *,
-        for_sources_types: Iterable[type[Sources]],
+        for_sources_types: Iterable[type[SourcesBaseField]],
     ) -> None:
         all_same_generator_paths = (
             len({(generator.input, generator.output) for generator in generators}) == 1
@@ -747,7 +747,7 @@ async def hydrate_sources(
 
     # Now, determine if any of the `for_sources_types` may be used, either because the
     # sources_field is a direct subclass or can be generated into one of the valid types.
-    def compatible_with_sources_field(valid_type: type[Sources]) -> bool:
+    def compatible_with_sources_field(valid_type: type[SourcesBaseField]) -> bool:
         is_instance = isinstance(sources_field, valid_type)
         can_be_generated = (
             request.enable_codegen
@@ -902,7 +902,7 @@ async def resolve_dependencies(
     )
     tgt = wrapped_tgt.target
 
-    # Inject any dependencies (based on `Dependencies` field rather than `Sources` field).
+    # Inject any dependencies (based on `Dependencies` field rather than `SourcesBaseField`).
     inject_request_types = union_membership.get(InjectDependenciesRequest)
     injected = await MultiGet(
         Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
@@ -910,11 +910,11 @@ async def resolve_dependencies(
         if isinstance(request.field, inject_request_type.inject_for)
     )
 
-    # Infer any dependencies (based on `Sources` field).
+    # Infer any dependencies (based on `SourcesBaseField` field).
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred: tuple[InferredDependencies, ...] = ()
     if inference_request_types:
-        sources_field = tgt.get(Sources)
+        sources_field = tgt.get(SourcesBaseField)
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
@@ -1045,13 +1045,14 @@ class NoApplicableTargetsException(Exception):
         # Add a remedy.
         #
         # We sometimes suggest using `./pants filedeps` to find applicable files. However, this
-        # command only works if at least one of the targets has a Sources field.
+        # command only works if at least one of the targets has a SourcesBaseField field.
         #
         # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
         # and `python_awslambda` to still work with file args - those targets will not show the
         # associated files when using filedeps.
         filedeps_goal_works = any(
-            tgt.class_has_field(Sources, union_membership) for tgt in applicable_target_types
+            tgt.class_has_field(SourcesBaseField, union_membership)
+            for tgt in applicable_target_types
         )
         pants_filter_command = (
             f"./pants filter --target-type={','.join(applicable_target_aliases)} ::"

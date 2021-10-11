@@ -7,16 +7,14 @@ from typing_extensions import Protocol
 
 from pants.engine.collection import Collection
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
-from pants.engine.target import Sources as SourcesField
-from pants.engine.target import Target
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesBaseField, Target
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
 class FieldSetWithSources(Protocol):
     @property
-    def sources(self) -> SourcesField:
+    def sources(self) -> SourcesBaseField:
         ...
 
 
@@ -57,7 +55,7 @@ class TargetsWithSourcesRequest(Collection[Target]):
 @rule
 async def determine_targets_with_sources(request: TargetsWithSourcesRequest) -> TargetsWithSources:
     all_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in request
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesBaseField))) for tgt in request
     )
     return TargetsWithSources(
         tgt for tgt, sources in zip(request, all_sources) if sources.snapshot.files

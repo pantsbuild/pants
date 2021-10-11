@@ -23,7 +23,13 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Sources, Targets
+from pants.engine.target import (
+    CoarsenedTarget,
+    CoarsenedTargets,
+    FieldSet,
+    SourcesBaseField,
+    Targets,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.jdk_rules import JdkSetup
@@ -79,7 +85,7 @@ async def compile_java_source(
 
     # Then collect the component's sources.
     component_members_with_sources = tuple(
-        t for t in request.component.members if t.has_field(Sources)
+        t for t in request.component.members if t.has_field(SourcesBaseField)
     )
     component_members_and_source_files = zip(
         component_members_with_sources,
@@ -87,7 +93,7 @@ async def compile_java_source(
             Get(
                 SourceFiles,
                 SourceFilesRequest(
-                    (t.get(Sources),),
+                    (t.get(SourcesBaseField),),
                     for_sources_types=(JavaSourceField,),
                     enable_codegen=True,
                 ),

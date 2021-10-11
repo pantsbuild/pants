@@ -26,6 +26,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     Sources,
+    SourcesBaseField,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
@@ -204,7 +205,7 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(Sources), for_sources_types=(FileSourcesField,)),
+            HydrateSourcesRequest(tgt.get(SourcesBaseField), for_sources_types=(FileSourcesField,)),
         )
         for tgt in original_file_targets
     )
@@ -375,7 +376,9 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                tgt.get(Sources), for_sources_types=(FileSourcesField,), enable_codegen=True
+                tgt.get(SourcesBaseField),
+                for_sources_types=(FileSourcesField,),
+                enable_codegen=True,
             ),
         )
         for tgt in file_targets

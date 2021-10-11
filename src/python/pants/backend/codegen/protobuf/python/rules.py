@@ -36,7 +36,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    Sources,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -78,8 +77,9 @@ async def generate_python_from_protobuf(
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure),
-            for_sources_types=(ProtobufSourcesField,),
+            tgt[ProtobufSourcesField]
+            for tgt in transitive_targets.closure
+            if tgt.has_field(ProtobufSourcesField)
         ),
     )
     target_stripped_sources_request = Get(

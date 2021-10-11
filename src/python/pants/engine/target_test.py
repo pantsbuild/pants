@@ -29,6 +29,7 @@ from pants.engine.target import (
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
+    SingleSourcesField,
     Sources,
     StringField,
     StringSequenceField,
@@ -904,7 +905,7 @@ def test_targets_with_sources_types() -> None:
     class Sources1(Sources):
         pass
 
-    class Sources2(Sources):
+    class Sources2(SingleSourcesField):
         pass
 
     class CodegenSources(Sources):
@@ -927,7 +928,7 @@ def test_targets_with_sources_types() -> None:
         output = Sources1
 
     tgt1 = Tgt1({}, Address("tgt1"))
-    tgt2 = Tgt2({}, Address("tgt2"))
+    tgt2 = Tgt2({SingleSourcesField.alias: "foo.ext"}, Address("tgt2"))
     codegen_tgt = CodegenTgt({}, Address("codegen_tgt"))
     result = targets_with_sources_types(
         [Sources1],
@@ -935,6 +936,13 @@ def test_targets_with_sources_types() -> None:
         union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
     )
     assert set(result) == {tgt1, codegen_tgt}
+
+    result = targets_with_sources_types(
+        [Sources2],
+        [tgt1, tgt2, codegen_tgt],
+        union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
+    )
+    assert set(result) == {tgt2}
 
 
 # -----------------------------------------------------------------------------------------------

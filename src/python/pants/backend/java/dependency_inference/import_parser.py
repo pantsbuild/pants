@@ -7,7 +7,7 @@ from pants.backend.java.dependency_inference.types import JavaSourceDependencyAn
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import Sources
+from pants.engine.target import SourcesBaseField
 
 
 class ParsedJavaImports(DeduplicatedCollection[str]):
@@ -18,7 +18,7 @@ class ParsedJavaImports(DeduplicatedCollection[str]):
 
 @dataclass(frozen=True)
 class ParseJavaImportsRequest:
-    sources: Sources
+    sources: SourcesBaseField
 
 
 @rule

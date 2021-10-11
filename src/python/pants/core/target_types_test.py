@@ -27,7 +27,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
 from pants.engine.target import (
     GeneratedSources,
-    Sources,
+    SourcesBaseField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -89,7 +89,7 @@ def test_relocated_files() -> None:
             SourceFiles,
             [
                 SourceFilesRequest(
-                    (tgt.get(Sources) for tgt in transitive_targets.closure),
+                    (tgt.get(SourcesBaseField) for tgt in transitive_targets.closure),
                     enable_codegen=True,
                     for_sources_types=(FileSourcesField,),
                 )

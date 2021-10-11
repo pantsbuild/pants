@@ -395,9 +395,10 @@ class Target:
         """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
-        `Sources`. For example, Python targets may want to have `PythonSources` to add extra
-        validation that every source file ends in `*.py`. At the same time, we still want to be able
-        to call `my_python_tgt.get(Sources)`, in addition to `my_python_tgt.get(PythonSources)`.
+        `SourcesBaseField`. For example, Python targets may want to have `PythonSources` to add
+        extra validation that every source file ends in `*.py`. At the same time, we still want to
+        be able to call `my_python_tgt.get(SourcesBaseField)`, in addition to
+        `my_python_tgt.get(PythonSources)`.
         """
         subclass = next(
             (
@@ -451,9 +452,9 @@ class Target:
         `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `Sources`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
-        custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
-        `python_tgt.get(Sources)` will return the same `PythonSources` instance.
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField`
+        to define a custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
+        `python_tgt.get(SourcesBaseField)` will return the same `PythonSources` instance.
 
         If the `Field` is not registered on this `Target` type, this will return an instance of
         the requested Field by using `default_raw_value` to create the instance. Alternatively,
@@ -486,9 +487,9 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
-        custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
-        `python_tgt.has_field(Sources)` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField` to
+        define a custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
+        `python_tgt.has_field(SourcesBaseField)` will return True.
         """
         return self.has_fields([field])
 
@@ -496,9 +497,9 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
-        custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
-        `python_tgt.has_fields([Sources])` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField` to
+        define a custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
+        `python_tgt.has_fields([SourcesBaseField])` will return True.
         """
         return self._has_fields(fields, registered_fields=self.field_types)
 
@@ -821,7 +822,7 @@ def generate_file_level_targets(
     Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
     finer-grained.
     """
-    if not generator.has_field(Dependencies) or not generator.has_field(Sources):
+    if not generator.has_field(Dependencies) or not generator.has_field(SourcesBaseField):
         raise AssertionError(
             f"The `{generator.alias}` target {generator.address.spec} does "
             "not have both a `dependencies` and `sources` field, and thus cannot generate a "
@@ -1400,29 +1401,39 @@ class DictStringToStringSequenceField(Field):
 # -----------------------------------------------------------------------------------------------
 
 
-class Sources(StringSequenceField, AsyncFieldMixin):
-    """The Sources field represents a collection of source files.
+class SourcesBaseField(AsyncFieldMixin, Field):
+    """A field for the sources that a target owns.
+
+    When registering a new sources field, you should usually subclass `Sources` or
+    `SingleSourcesField`, which set up the field's `alias` and data type / parsing. However, you
+    should use `tgt.get(SourcesBaseField)` when you need to operate on all sources types, such as
+    with `HydrateSourcesRequest`, so that both subclasses work.
 
     Subclasses may set the following class properties:
-    - `expected_file_extensions` -- A tuple of strings containing the expected file extensions for source
-       files. The default is no expected file extensions.
-    - `expected_num_files` -- An integer or range stating the expected total number of source files. The default
-      is no limit on the number of source files.
-    - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files referenced
-      by this field.
+
+    - `expected_file_extensions` -- A tuple of strings containing the expected file extensions for
+        source files. The default is no expected file extensions.
+    - `expected_num_files` -- An integer or range stating the expected total number of source
+        files. The default is no limit on the number of source files.
+    - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files
+        referenced by this field.
     """
 
-    alias = "sources"
-
-    expected_file_extensions: ClassVar[Tuple[str, ...] | None] = None
+    expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
     expected_num_files: ClassVar[int | range | None] = None
     uses_source_roots: ClassVar[bool] = True
 
-    help = (
-        "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
-        "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
-        "`sources=['example.py', 'test_*.py', '!test_ignore.py']`."
-    )
+    default: ClassVar[ImmutableValue] = None
+
+    @property
+    def globs(self) -> tuple[str, ...]:
+        """The raw globs, relative to the BUILD file."""
+
+        # NB: We give a default implementation because it's common to use
+        # `tgt.get(SourcesBaseField)`, and that must not error. But, subclasses need to
+        # implement this for the field to be useful (they should subclass `Sources` and
+        # `SingleSourcesField`).
+        return ()
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Perform any additional validation on the resulting source files, e.g. ensuring that
@@ -1483,50 +1494,11 @@ class Sources(StringSequenceField, AsyncFieldMixin):
         return self.prefix_glob_with_dirpath(self.address.spec_path, glob)
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
-        globs = self.value or ()
-        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
-        conjunction = (
-            GlobExpansionConjunction.all_match
-            if not self.default or (set(globs) != set(self.default))
-            else GlobExpansionConjunction.any_match
-        )
-        return PathGlobs(
-            (self._prefix_glob_with_address(glob) for glob in globs),
-            conjunction=conjunction,
-            glob_match_error_behavior=error_behavior,
-            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
-            # likely need to `await Get(BuildFileAddress, Address)`.
-            description_of_origin=(
-                f"{self.address}'s `{self.alias}` field"
-                if error_behavior != GlobMatchErrorBehavior.ignore
-                else None
-            ),
-        )
-
-    @final
-    @property
-    def filespec(self) -> Filespec:
-        """The original globs, returned in the Filespec dict format.
-
-        The globs will be relativized to the build root.
-        """
-        includes = []
-        excludes = []
-        for glob in self.value or ():
-            if glob.startswith("!"):
-                excludes.append(os.path.join(self.address.spec_path, glob[1:]))
-            else:
-                includes.append(os.path.join(self.address.spec_path, glob))
-        result: Filespec = {"includes": includes}
-        if excludes:
-            result["excludes"] = excludes
-        return result
-
-    @final
     @classmethod
-    def can_generate(cls, output_type: Type["Sources"], union_membership: UnionMembership) -> bool:
-        """Can this Sources field be used to generate the output_type?
+    def can_generate(
+        cls, output_type: type[SourcesBaseField], union_membership: UnionMembership
+    ) -> bool:
+        """Can this field be used to generate the output_type?
 
         Generally, this method does not need to be used. Most call sites can simply use the below,
         and the engine will generate the sources if possible or will return an instance of
@@ -1551,19 +1523,103 @@ class Sources(StringSequenceField, AsyncFieldMixin):
             for generate_request_type in generate_request_types
         )
 
+    @final
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
+        conjunction = (
+            GlobExpansionConjunction.all_match
+            if not self.default or (set(self.globs) != set(self.default))
+            else GlobExpansionConjunction.any_match
+        )
+        return PathGlobs(
+            (self._prefix_glob_with_address(glob) for glob in self.globs),
+            conjunction=conjunction,
+            glob_match_error_behavior=error_behavior,
+            description_of_origin=(
+                f"{self.address}'s `{self.alias}` field"
+                if error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        )
+
+    @property
+    def filespec(self) -> Filespec:
+        """The original globs, returned in the Filespec dict format.
+
+        The globs will be relativized to the build root.
+        """
+        includes = []
+        excludes = []
+        for glob in self.globs:
+            if glob.startswith("!"):
+                excludes.append(os.path.join(self.address.spec_path, glob[1:]))
+            else:
+                includes.append(os.path.join(self.address.spec_path, glob))
+        result: Filespec = {"includes": includes}
+        if excludes:
+            result["excludes"] = excludes
+        return result
+
+
+class Sources(SourcesBaseField, StringSequenceField):
+    """The `sources: list[str]` field.
+
+    See the docstring for `SourcesBaseField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use
+    `tgt.get(SourcesBaseField)` rather than `tgt.get(Sources)`.
+    """
+
+    alias = "sources"
+    help = (
+        "A list of files and globs that belong to this target.\n\n"
+        "Paths are relative to the BUILD file's directory. You can ignore files/globs by "
+        "prefixing them with `!`.\n\n"
+        "Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`."
+    )
+
+    @property
+    def globs(self) -> tuple[str, ...]:
+        return self.value or ()
+
+
+class SingleSourcesField(SourcesBaseField, StringField):
+    """The `source: str` field.
+
+    See the docstring for `SourcesBaseField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use
+    `tgt.get(SourcesBaseField)` rather than `tgt.get(SingleSourcesField)`.
+    """
+
+    alias = "source"
+    help = (
+        "A single file that belongs to this target.\n\n"
+        "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
+    )
+    required = True
+    value: str
+    expected_num_files: ClassVar[int] = 1
+
+    @property
+    def globs(self) -> tuple[str, ...]:
+        return (self.value,)
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest(EngineAwareParameter):
-    field: Sources
-    for_sources_types: Tuple[Type[Sources], ...]
+    field: SourcesBaseField
+    for_sources_types: tuple[type[SourcesBaseField], ...]
     enable_codegen: bool
 
     def __init__(
         self,
-        field: Sources,
+        field: SourcesBaseField,
         *,
-        for_sources_types: Iterable[Type[Sources]] = (Sources,),
+        for_sources_types: Iterable[type[SourcesBaseField]] = (SourcesBaseField,),
         enable_codegen: bool = False,
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
@@ -1581,7 +1637,7 @@ class HydrateSourcesRequest(EngineAwareParameter):
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if self.enable_codegen and self.for_sources_types == (Sources,):
+        if self.enable_codegen and self.for_sources_types == (SourcesBaseField,):
             raise ValueError(
                 "When setting `enable_codegen=True` on `HydrateSourcesRequest`, you must also "
                 "explicitly set `for_source_types`. Why? `for_source_types` is used to "
@@ -1609,7 +1665,7 @@ class HydratedSources:
 
     snapshot: Snapshot
     filespec: Filespec
-    sources_type: Optional[Type[Sources]]
+    sources_type: type[SourcesBaseField] | None
 
 
 @union
@@ -1644,8 +1700,8 @@ class GenerateSourcesRequest:
     protocol_sources: Snapshot
     protocol_target: Target
 
-    input: ClassVar[Type[Sources]]
-    output: ClassVar[Type[Sources]]
+    input: ClassVar[type[SourcesBaseField]]
+    output: ClassVar[type[SourcesBaseField]]
 
 
 @dataclass(frozen=True)
@@ -1654,26 +1710,26 @@ class GeneratedSources:
 
 
 class SourcesPaths(Paths):
-    """The resolved file names of the `sources` field.
+    """The resolved file names of the `source`/`sources` field.
 
-    This does not consider codegen, and only captures the files from the `sources` field.
+    This does not consider codegen, and only captures the files from the field.
     """
 
 
 @dataclass(frozen=True)
 class SourcesPathsRequest(EngineAwareParameter):
-    """A request to resolve the file names of the `sources` field.
+    """A request to resolve the file names of the `source`/`sources` field.
 
-    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(Sources))`.
+    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(SourcesBaseField))`.
 
     This is faster than `Get(HydratedSources, HydrateSourcesRequest)` because it does not snapshot
     the files and it only resolves the file names.
 
-    This does not consider codegen, and only captures the files from the `sources` field. Use
+    This does not consider codegen, and only captures the files from the field. Use
     `HydrateSourcesRequest` to use codegen.
     """
 
-    field: Sources
+    field: SourcesBaseField
 
     def debug_hint(self) -> str:
         return self.field.address.spec
@@ -1712,10 +1768,10 @@ class SecondaryOwnerMixin(ABC):
 
 
 def targets_with_sources_types(
-    sources_types: Iterable[Type[Sources]],
+    sources_types: Iterable[type[SourcesBaseField]],
     targets: Iterable[Target],
     union_membership: UnionMembership,
-) -> Tuple[Target, ...]:
+) -> tuple[Target, ...]:
     """Return all targets either with the specified sources subclass(es) or which can generate those
     sources."""
     return tuple(
@@ -1723,7 +1779,7 @@ def targets_with_sources_types(
         for tgt in targets
         if any(
             tgt.has_field(sources_type)
-            or tgt.get(Sources).can_generate(sources_type, union_membership)
+            or tgt.get(SourcesBaseField).can_generate(sources_type, union_membership)
             for sources_type in sources_types
         )
     )
@@ -1966,8 +2022,8 @@ class InferDependenciesRequest(EngineAwareParameter):
             ]
     """
 
-    sources_field: Sources
-    infer_from: ClassVar[Type[Sources]]
+    sources_field: SourcesBaseField
+    infer_from: ClassVar[type[SourcesBaseField]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec
