@@ -7,7 +7,7 @@ import re
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Set, Tuple, cast
+from typing import Any, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
@@ -77,12 +77,12 @@ class ContentPattern:
 
 @dataclass(frozen=True)
 class ValidationConfig:
-    path_patterns: Tuple[PathPattern, ...]
-    content_patterns: Tuple[ContentPattern, ...]
-    required_matches: FrozenDict[str, Tuple[str]]  # path pattern name -> content pattern names.
+    path_patterns: tuple[PathPattern, ...]
+    content_patterns: tuple[ContentPattern, ...]
+    required_matches: FrozenDict[str, tuple[str]]  # path pattern name -> content pattern names.
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> ValidationConfig:
+    def from_dict(cls, d: dict[str, Any]) -> ValidationConfig:
         return cls(
             path_patterns=tuple(PathPattern(**kwargs) for kwargs in d["path_patterns"]),
             content_patterns=tuple(ContentPattern(**kwargs) for kwargs in d["content_patterns"]),
@@ -142,8 +142,8 @@ class RegexMatchResult:
     """The result of running regex matches on a source file."""
 
     path: str
-    matching: Tuple
-    nonmatching: Tuple
+    matching: tuple
+    nonmatching: tuple
 
 
 class RegexMatchResults(Collection[RegexMatchResult]):
@@ -191,8 +191,8 @@ class MultiMatcher:
         :param dict config: Regex matching config (see above).
         """
         # Validate the pattern names mentioned in required_matches.
-        path_patterns_used: Set[str] = set()
-        content_patterns_used: Set[str] = set()
+        path_patterns_used: set[str] = set()
+        content_patterns_used: set[str] = set()
         for k, v in config.required_matches.items():
             path_patterns_used.add(k)
             if not isinstance(v, (tuple, list)):

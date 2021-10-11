@@ -72,36 +72,35 @@ def rule_runner() -> RuleRunner:
 
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        (
-            {
-                "foo/BUILD": "go_mod()",
-                "foo/go.mod": dedent(
-                    """\
+        {
+            "foo/BUILD": "go_mod()",
+            "foo/go.mod": dedent(
+                """\
                     module go.example.com/foo
                     go 1.17
 
                     require github.com/google/go-cmp v0.4.0
                     """
-                ),
-                "foo/go.sum": dedent(
-                    """\
+            ),
+            "foo/go.sum": dedent(
+                """\
                     github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
                     github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
                     golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
                     golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                     """
-                ),
-                "foo/pkg/foo.go": dedent(
-                    """\
+            ),
+            "foo/pkg/foo.go": dedent(
+                """\
                     package pkg
                     import "github.com/google/go-cmp/cmp"
                     func grok(left, right string) bool {
                         return cmp.Equal(left, right)
                     }
                     """
-                ),
-                "foo/cmd/main.go": dedent(
-                    """\
+            ),
+            "foo/cmd/main.go": dedent(
+                """\
                     package main
                     import (
                         "fmt"
@@ -110,9 +109,8 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     func main() {
                         fmt.Printf("%s\n", pkg.Grok())
                     }"""
-                ),
-            }
-        )
+            ),
+        }
     )
     tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
     inferred_deps1 = rule_runner.request(

@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 from enum import Enum
 from textwrap import dedent
-from typing import Optional
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
@@ -105,7 +104,7 @@ class Shunit2TestTimeoutField(IntField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+    def compute_value(cls, raw_value: int | None, address: Address) -> int | None:
         value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(
@@ -280,7 +279,7 @@ class ShellCommandTimeout(IntField):
     help = "Command execution timeout (in seconds)."
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+    def compute_value(cls, raw_value: int | None, address: Address) -> int | None:
         value = super().compute_value(raw_value, address)
         if value is not None and value < 1:
             raise InvalidFieldException(

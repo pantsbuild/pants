@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -41,9 +41,9 @@ class PipenvRequirements:
         requirements_relpath: str | None = None,
         *,
         source: str | None = None,
-        module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        pipfile_target: Optional[str] = None,
+        module_mapping: Mapping[str, Iterable[str]] | None = None,
+        type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
+        pipfile_target: str | None = None,
     ) -> None:
         """
         :param requirements_relpath: The relpath from this BUILD file to the requirements file.
