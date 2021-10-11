@@ -47,7 +47,7 @@ class _RuleVisitor(ast.NodeVisitor):
         super().__init__()
         self.source_file_name = source_file_name
         self.resolve_type = resolve_type
-        self.gets: List[AwaitableConstraints] = []
+        self.awaitables: List[AwaitableConstraints] = []
 
     def visit_Call(self, call_node: ast.Call) -> None:
         signature = AwaitableConstraints.signature_from_call_node(
@@ -55,10 +55,10 @@ class _RuleVisitor(ast.NodeVisitor):
         )
         if signature is not None:
             product_str, subject_str, effect = signature
-            get = AwaitableConstraints(
+            awaitable = AwaitableConstraints(
                 self.resolve_type(product_str), self.resolve_type(subject_str), effect
             )
-            self.gets.append(get)
+            self.awaitables.append(awaitable)
         # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
         self.generic_visit(call_node)
 
@@ -161,9 +161,9 @@ def _make_rule(
         rule_visitor = _RuleVisitor(source_file_name=source_file, resolve_type=resolve_type)
         rule_visitor.visit(rule_func_node)
 
-        gets = FrozenOrderedSet(rule_visitor.gets)
+        awaitables = FrozenOrderedSet(rule_visitor.awaitables)
 
-        validate_requirements(func_id, parameter_types, gets, cacheable)
+        validate_requirements(func_id, parameter_types, awaitables, cacheable)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -172,7 +172,7 @@ def _make_rule(
             return_type,
             parameter_types,
             func,
-            input_gets=gets,
+            input_gets=awaitables,
             canonical_name=canonical_name,
             desc=desc,
             level=level,
@@ -293,7 +293,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 def validate_requirements(
     func_id: str,
     parameter_types: Tuple[Type, ...],
-    gets: Tuple[AwaitableConstraints, ...],
+    awaitables: Tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
     if not cacheable:
@@ -306,19 +306,22 @@ def validate_requirements(
                 f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
                 f"a side-effecting parameter: {ty}."
             )
-    for get in gets:
-        input_type_side_effecting = issubclass(get.input_type, SideEffecting)
-        if input_type_side_effecting and not get.is_effect:
+    for awaitable in awaitables:
+        input_type_side_effecting = issubclass(awaitable.input_type, SideEffecting)
+        if input_type_side_effecting and not awaitable.is_effect:
             raise ValueError(
-                f"A `Get` may not request a side-effecting type ({get.input_type}). Use `Effect` instead: `{get}`."
+                f"A `Get` may not request a side-effecting type ({awaitable.input_type}). "
+                f"Use `Effect` instead: `{awaitable}`."
             )
-        if not input_type_side_effecting and get.is_effect:
+        if not input_type_side_effecting and awaitable.is_effect:
             raise ValueError(
-                f"An `Effect` should not be used with a pure type ({get.input_type}). Use `Get` instead: `{get}`."
+                f"An `Effect` should not be used with a pure type ({awaitable.input_type}). "
+                f"Use `Get` instead: `{awaitable}`."
             )
-        if cacheable and get.is_effect:
+        if cacheable and awaitable.is_effect:
             raise ValueError(
-                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an Effect: `{get}`."
+                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an "
+                f"Effect: `{awaitable}`."
             )
 
 

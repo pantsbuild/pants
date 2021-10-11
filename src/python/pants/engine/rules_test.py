@@ -94,7 +94,7 @@ class RuleVisitorTest(unittest.TestCase):
             resolve_type=lambda name: types[name], source_file_name="parse_rules.py"
         )
         rule_visitor.visit(ast.parse(rule_text))
-        return rule_visitor.gets
+        return rule_visitor.awaitables
 
     @classmethod
     def _parse_single_get(cls, rule_text: str, **types) -> AwaitableConstraints:

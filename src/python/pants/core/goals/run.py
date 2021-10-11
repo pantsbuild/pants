@@ -35,11 +35,11 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
 
 
-class Restartable(BoolField):
+class RestartableField(BoolField):
     alias = "restartable"
     default = False
     help = (
-        "If true, runs of this target may be interrupted and "
+        "If true, runs of this target with the `run` goal may be interrupted and "
         "restarted when its input files change."
     )
 
@@ -116,7 +116,7 @@ async def run(
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, RunFieldSet, field_set)
     wrapped_target = await Get(WrappedTarget, Address, field_set.address)
-    restartable = wrapped_target.target.get(Restartable).value
+    restartable = wrapped_target.target.get(RestartableField).value
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
         workspace.write_digest(

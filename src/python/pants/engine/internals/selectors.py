@@ -88,13 +88,13 @@ class AwaitableConstraints:
             input_constructor = input_args[0]
             if not isinstance(input_constructor, ast.Call):
                 raise parse_error(
-                    "Because you are using the shorthand form Get(OutputType, "
+                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
                     "InputType(constructor args), the second argument should be a constructor "
                     "call, like `MergeDigest(...)` or `Process(...)`."
                 )
             if not hasattr(input_constructor.func, "id"):
                 raise parse_error(
-                    "Because you are using the shorthand form Get(OutputType, "
+                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
                     "InputType(constructor args), the second argument should be a top-level "
                     "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
                     "than a method call."
@@ -104,8 +104,8 @@ class AwaitableConstraints:
         input_type, _ = input_args
         if not isinstance(input_type, ast.Name):
             raise parse_error(
-                "Because you are using the longhand form Get(OutputType, InputType, "
-                "input), the second argument should be a type, like `MergeDigests` or "
+                f"Because you are using the longhand form {call_node.func.id}(OutputType, "
+                "InputType, input), the second argument should be a type, like `MergeDigests` or "
                 "`Process`."
             )
         return output_type, input_type.id, is_effect
@@ -219,7 +219,10 @@ class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
 
 
 class Effect(Generic[_Output, _Input], Awaitable[_Output, _Input]):
-    """Asynchronous generator API for effectful types.
+    """Asynchronous generator API for types which are SideEffecting.
+
+    Unlike `Get`s, `Effect`s can cause side-effects (writing files to the workspace, publishing
+    things, printing to the console), and so they may only be used in `@goal_rule`s.
 
     See Get for more information on supported syntaxes.
     """
