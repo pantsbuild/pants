@@ -394,11 +394,10 @@ class Target:
     ) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
-        This is necessary to allow targets to override the functionality of common fields like
-        `SourcesField`. For example, Python targets may want to have `PythonSources` to add extra
-        validation that every source file ends in `*.py`. At the same time, we still want to be able
-        to call `my_python_tgt.get(SourcesField)`, in addition to
-        `my_python_tgt.get(PythonSources)`.
+        This is necessary to allow targets to override the functionality of common fields. For
+        example, you could subclass `Tags` to define `CustomTags` with a different default. At the
+        same time, we still want to be able to call `tgt.get(Tags)`, in addition to
+        `tgt.get(CustomTags)`.
         """
         subclass = next(
             (
@@ -452,9 +451,9 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField`
-        to define a custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
-        `python_tgt.get(SourcesField)` will return the same `PythonSources` instance.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
+        `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
         If the `Field` is not registered on this `Target` type, this will return an instance of
         the requested Field by using `default_raw_value` to create the instance. Alternatively,
@@ -487,9 +486,9 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
-        define a custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
-        `python_tgt.has_field(SourcesField)` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
+        `python_tgt.has_field(CustomTags)` will return True.
         """
         return self.has_fields([field])
 
@@ -497,9 +496,9 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
-        define a custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
-        `python_tgt.has_fields([SourcesField])` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
+        `python_tgt.has_fields([CustomTags])` will return True.
         """
         return self._has_fields(fields, registered_fields=self.field_types)
 
