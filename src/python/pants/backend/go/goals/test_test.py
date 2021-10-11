@@ -368,3 +368,48 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "foo_test.TestMain called" in result.stdout
+
+
+def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func Add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_int_test.go": textwrap.dedent(
+                """
+                package foo
+                import (
+                  "testing"
+                )
+                func TestAddInternal(t *testing.T) {
+                  t.Fail()
+                }
+                """
+            ),
+            "foo/add_ext_test.go": textwrap.dedent(
+                """
+                package foo_test
+                import (
+                  _ "foo"
+                  "testing"
+                )
+                func TestAddExternal(t *testing.T) {
+                  t.Fail()
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 1
+    assert "FAIL: TestAddInternal" in result.stdout
+    assert "FAIL: TestAddExternal" in result.stdout
