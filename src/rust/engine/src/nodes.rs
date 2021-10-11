@@ -1626,6 +1626,8 @@ impl Node for NodeKey {
   }
 
   fn restartable(&self) -> bool {
+    // A Task / @rule is only restartable if it has not had a side effect (as determined by the
+    // calls to the `task_side_effected` function).
     match self {
       &NodeKey::Task(ref s) => !s.side_effected.load(Ordering::SeqCst),
       _ => true,
