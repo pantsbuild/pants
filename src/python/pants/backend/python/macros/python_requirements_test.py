@@ -195,10 +195,11 @@ def test_invalid_req(rule_runner: RuleRunner) -> None:
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 
-def test_source_override(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("source_arg", ("source", "requirements_relpath"))
+def test_source_override(source_arg: str, rule_runner: RuleRunner) -> None:
     assert_python_requirements(
         rule_runner,
-        "python_requirements(source='subdir/requirements.txt')",
+        f"python_requirements({source_arg}='subdir/requirements.txt')",
         "ansicolors>=1.18.0",
         requirements_txt_relpath="subdir/requirements.txt",
         expected_file_dep=PythonRequirementsFile(

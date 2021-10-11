@@ -406,7 +406,7 @@ class PoetryRequirements:
                 f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
                 "`source`."
             )
-        if pyproject_toml_relpath:
+        if pyproject_toml_relpath is not None:
             warn_or_error(
                 "2.9.0.dev0",
                 "the `pyproject_toml_relpath` argument for `poetry_requirements()`",
@@ -417,7 +417,7 @@ class PoetryRequirements:
                 ),
             )
             source = pyproject_toml_relpath
-        if not source:
+        if source is None:
             source = "pyproject.toml"
 
         req_file_tgt = self._parse_context.create_object(

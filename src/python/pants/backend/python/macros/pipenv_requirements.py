@@ -61,7 +61,7 @@ class PipenvRequirements:
                 f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
                 "`source`."
             )
-        if requirements_relpath:
+        if requirements_relpath is not None:
             warn_or_error(
                 "2.9.0.dev0",
                 "the `requirements_relpath` argument for `pipenv_requirements()`",
@@ -72,7 +72,7 @@ class PipenvRequirements:
                 ),
             )
             source = requirements_relpath
-        if not source:
+        if source is None:
             source = "Pipfile.lock"
 
         requirements_path = Path(get_buildroot(), self._parse_context.rel_path, source)

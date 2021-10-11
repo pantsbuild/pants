@@ -72,7 +72,7 @@ class PythonRequirements:
                 f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
                 "`source`."
             )
-        if requirements_relpath:
+        if requirements_relpath is not None:
             warn_or_error(
                 "2.9.0.dev0",
                 "the `requirements_relpath` argument for `python_requirements()`",
@@ -83,7 +83,7 @@ class PythonRequirements:
                 ),
             )
             source = requirements_relpath
-        if not source:
+        if source is None:
             source = "requirements.txt"
 
         req_file_tgt = self._parse_context.create_object(

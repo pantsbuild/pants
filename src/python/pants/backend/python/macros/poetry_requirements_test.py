@@ -474,10 +474,11 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_source_override(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("source_arg", ("source", "pyproject_toml_relpath"))
+def test_source_override(source_arg: str, rule_runner: RuleRunner) -> None:
     assert_poetry_requirements(
         rule_runner,
-        "poetry_requirements(source='subdir/pyproject.toml')",
+        f"poetry_requirements({source_arg}='subdir/pyproject.toml')",
         dedent(
             """\
             [tool.poetry.dependencies]
