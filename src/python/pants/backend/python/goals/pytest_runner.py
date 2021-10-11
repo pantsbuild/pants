@@ -363,7 +363,9 @@ async def run_python_test(
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
-        InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 

@@ -3,6 +3,4 @@
 
 python_sources()
 
-pex_binary(name='creator', entry_point='creator.py')
-pex_binary(name='phaser', entry_point='phaser.py')
-pex_binary(name='waiter', entry_point='waiter.py')
+pex_binary(name='waiter', entry_point='waiter.py', restartable=True)

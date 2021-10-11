@@ -167,6 +167,7 @@ class Scheduler:
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
             session_values=SessionValues,
+            interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
         )
@@ -603,13 +604,6 @@ class SchedulerSession:
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
-
-    def run_local_interactive_process(
-        self, request: InteractiveProcess
-    ) -> InteractiveProcessResult:
-        return native_engine.run_local_interactive_process(
-            self.py_scheduler, self.py_session, request
-        )
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the build root."""
