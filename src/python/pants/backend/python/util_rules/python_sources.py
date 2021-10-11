@@ -13,7 +13,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesBaseField, Target
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -66,8 +66,8 @@ class PythonSourceFilesRequest:
         self.include_files = include_files
 
     @property
-    def valid_sources_types(self) -> Tuple[Type[SourcesBaseField], ...]:
-        types: List[Type[SourcesBaseField]] = [PythonSources]
+    def valid_sources_types(self) -> Tuple[Type[SourcesField], ...]:
+        types: List[Type[SourcesField]] = [PythonSources]
         if self.include_resources:
             types.append(ResourceSourcesField)
         if self.include_files:
@@ -82,7 +82,7 @@ async def prepare_python_sources(
     sources = await Get(
         SourceFiles,
         SourceFilesRequest(
-            (tgt.get(SourcesBaseField) for tgt in request.targets),
+            (tgt.get(SourcesField) for tgt in request.targets),
             for_sources_types=request.valid_sources_types,
             enable_codegen=True,
         ),
@@ -107,15 +107,15 @@ async def prepare_python_sources(
     for tgt in request.targets:
         if tgt.has_field(PythonSources) or tgt.has_field(ResourceSourcesField):
             python_and_resources_targets.append(tgt)
-        elif tgt.get(SourcesBaseField).can_generate(PythonSources, union_membership) or tgt.get(
-            SourcesBaseField
+        elif tgt.get(SourcesField).can_generate(PythonSources, union_membership) or tgt.get(
+            SourcesField
         ).can_generate(ResourceSourcesField, union_membership):
             codegen_targets.append(tgt)
     codegen_sources = await MultiGet(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                tgt.get(SourcesBaseField),
+                tgt.get(SourcesField),
                 for_sources_types=request.valid_sources_types,
                 enable_codegen=True,
             ),

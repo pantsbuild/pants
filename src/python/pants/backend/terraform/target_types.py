@@ -6,10 +6,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.engine.rules import collect_rules
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, FieldSet, Sources, Target
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    FieldSet,
+    MultipleSourcesField,
+    Target,
+)
 
 
-class TerraformModuleSourcesField(Sources):
+class TerraformModuleSourcesField(MultipleSourcesField):
     default = ("*.tf",)
     expected_file_extensions = (".tf",)
 
@@ -31,7 +37,7 @@ class TerraformModuleTarget(Target):
     )
 
 
-class TerraformModulesGeneratingSourcesField(Sources):
+class TerraformModulesGeneratingSourcesField(MultipleSourcesField):
     # TODO: This currently only globs .tf files but not non-.tf files referenced by Terraform config. This
     # should be updated to allow for the generated TerraformModule targets to capture all files in the diectory
     # other than BUILD files.

@@ -13,7 +13,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
-    SourcesBaseField,
+    SourcesField,
     Target,
     Targets,
     TransitiveTargets,
@@ -100,13 +100,12 @@ async def file_deps(
     if filedeps_subsystem.globs:
         unique_rel_paths.update(
             itertools.chain.from_iterable(
-                tgt.get(SourcesBaseField).filespec["includes"] for tgt in targets
+                tgt.get(SourcesField).filespec["includes"] for tgt in targets
             )
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesBaseField)))
-            for tgt in targets
+            Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

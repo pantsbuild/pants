@@ -12,7 +12,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
-    SourcesBaseField,
+    SourcesField,
     Targets,
 )
 from pants.engine.unions import UnionMembership
@@ -45,9 +45,9 @@ async def export_codegen(
     inputs_to_outputs = {req.input: req.output for req in all_generate_request_types}
     codegen_sources_fields_with_output = []
     for tgt in targets:
-        if not tgt.has_field(SourcesBaseField):
+        if not tgt.has_field(SourcesField):
             continue
-        sources = tgt[SourcesBaseField]
+        sources = tgt[SourcesField]
         for input_type in inputs_to_outputs:
             if isinstance(sources, input_type):
                 output_type = inputs_to_outputs[input_type]

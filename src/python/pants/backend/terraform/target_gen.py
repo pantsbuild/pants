@@ -16,7 +16,7 @@ from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
     ImmutableValue,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
 )
@@ -45,7 +45,7 @@ async def generate_terraform_module_targets(
         relpath_to_generator = fast_relpath(dir, generator.address.spec_path)
         for field in generator.field_values.values():
             value: ImmutableValue | None
-            if isinstance(field, Sources):
+            if isinstance(field, MultipleSourcesField):
                 value = tuple(
                     os.path.join(relpath_to_generator, f) for f in sorted(dir_to_filenames[dir])
                 )

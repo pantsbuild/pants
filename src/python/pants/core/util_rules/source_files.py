@@ -6,7 +6,7 @@ from typing import Iterable, Set, Tuple, Type
 
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesBaseField
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.util.meta import frozen_after_init
 
 
@@ -28,15 +28,15 @@ class SourceFiles:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SourceFilesRequest:
-    sources_fields: Tuple[SourcesBaseField, ...]
-    for_sources_types: Tuple[Type[SourcesBaseField], ...]
+    sources_fields: Tuple[SourcesField, ...]
+    for_sources_types: Tuple[Type[SourcesField], ...]
     enable_codegen: bool
 
     def __init__(
         self,
-        sources_fields: Iterable[SourcesBaseField],
+        sources_fields: Iterable[SourcesField],
         *,
-        for_sources_types: Iterable[Type[SourcesBaseField]] = (SourcesBaseField,),
+        for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         enable_codegen: bool = False,
     ) -> None:
         self.sources_fields = tuple(sources_fields)

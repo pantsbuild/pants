@@ -20,7 +20,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     InferredDependencies,
-    SourcesBaseField,
+    SourcesField,
 )
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import RuleRunner
@@ -82,7 +82,7 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/tf/resources/grok"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
-        [InferTerraformModuleDependenciesRequest(target.get(SourcesBaseField))],
+        [InferTerraformModuleDependenciesRequest(target.get(SourcesField))],
     )
     assert inferred_deps == InferredDependencies(
         FrozenOrderedSet(
@@ -126,9 +126,7 @@ def test_hcl_parser_wrapper_runs(rule_runner: RuleRunner, major_minor_interprete
         }
     )
     target = rule_runner.get_target(Address("foo", target_name="t"))
-    sources = rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(target[SourcesBaseField])]
-    )
+    sources = rule_runner.request(HydratedSources, [HydrateSourcesRequest(target[SourcesField])])
     result = rule_runner.request(
         ProcessResult,
         [

@@ -395,9 +395,9 @@ class Target:
         """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
-        `SourcesBaseField`. For example, Python targets may want to have `PythonSources` to add
-        extra validation that every source file ends in `*.py`. At the same time, we still want to
-        be able to call `my_python_tgt.get(SourcesBaseField)`, in addition to
+        `SourcesField`. For example, Python targets may want to have `PythonSources` to add extra
+        validation that every source file ends in `*.py`. At the same time, we still want to be able
+        to call `my_python_tgt.get(SourcesField)`, in addition to
         `my_python_tgt.get(PythonSources)`.
         """
         subclass = next(
@@ -448,13 +448,13 @@ class Target:
         """Get the requested `Field` instance belonging to this target.
 
         This will return an instance of the requested field type, e.g. an instance of
-        `InterpreterConstraints`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
-        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
-        `Sources`, you may need to hydrate the value.).
+        `InterpreterConstraints`, `SourcesField`, `EntryPoint`, etc. Usually, you will want to
+        grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField`
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesField`
         to define a custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
-        `python_tgt.get(SourcesBaseField)` will return the same `PythonSources` instance.
+        `python_tgt.get(SourcesField)` will return the same `PythonSources` instance.
 
         If the `Field` is not registered on this `Target` type, this will return an instance of
         the requested Field by using `default_raw_value` to create the instance. Alternatively,
@@ -487,9 +487,9 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField` to
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
         define a custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
-        `python_tgt.has_field(SourcesBaseField)` will return True.
+        `python_tgt.has_field(SourcesField)` will return True.
         """
         return self.has_fields([field])
 
@@ -497,9 +497,9 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesBaseField` to
+        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
         define a custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
-        `python_tgt.has_fields([SourcesBaseField])` will return True.
+        `python_tgt.has_fields([SourcesField])` will return True.
         """
         return self._has_fields(fields, registered_fields=self.field_types)
 
@@ -822,7 +822,7 @@ def generate_file_level_targets(
     Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
     finer-grained.
     """
-    if not generator.has_field(Dependencies) or not generator.has_field(SourcesBaseField):
+    if not generator.has_field(Dependencies) or not generator.has_field(SourcesField):
         raise AssertionError(
             f"The `{generator.alias}` target {generator.address.spec} does "
             "not have both a `dependencies` and `sources` field, and thus cannot generate a "
@@ -852,7 +852,7 @@ def generate_file_level_targets(
         generated_target_fields = {}
         for field in generator.field_values.values():
             value: Optional[ImmutableValue]
-            if isinstance(field, Sources):
+            if isinstance(field, MultipleSourcesField):
                 if not bool(matches_filespec(field.filespec, paths=[full_fp])):
                     raise AssertionError(
                         f"Target {generator.address.spec}'s `sources` field does not match a file "
@@ -1401,12 +1401,12 @@ class DictStringToStringSequenceField(Field):
 # -----------------------------------------------------------------------------------------------
 
 
-class SourcesBaseField(AsyncFieldMixin, Field):
+class SourcesField(AsyncFieldMixin, Field):
     """A field for the sources that a target owns.
 
-    When registering a new sources field, you should usually subclass `Sources` or
-    `SingleSourcesField`, which set up the field's `alias` and data type / parsing. However, you
-    should use `tgt.get(SourcesBaseField)` when you need to operate on all sources types, such as
+    When defining a new sources field, you should subclass `MultipleSourcesField` or
+    `SingleSourceField`, which set up the field's `alias` and data type / parsing. However, you
+    should use `tgt.get(SourcesField)` when you need to operate on all sources types, such as
     with `HydrateSourcesRequest`, so that both subclasses work.
 
     Subclasses may set the following class properties:
@@ -1430,9 +1430,9 @@ class SourcesBaseField(AsyncFieldMixin, Field):
         """The raw globs, relative to the BUILD file."""
 
         # NB: We give a default implementation because it's common to use
-        # `tgt.get(SourcesBaseField)`, and that must not error. But, subclasses need to
-        # implement this for the field to be useful (they should subclass `Sources` and
-        # `SingleSourcesField`).
+        # `tgt.get(SourcesField)`, and that must not error. But, subclasses need to
+        # implement this for the field to be useful (they should subclass `MultipleSourcesField`
+        # and `SingleSourceField`).
         return ()
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
@@ -1496,7 +1496,7 @@ class SourcesBaseField(AsyncFieldMixin, Field):
     @final
     @classmethod
     def can_generate(
-        cls, output_type: type[SourcesBaseField], union_membership: UnionMembership
+        cls, output_type: type[SourcesField], union_membership: UnionMembership
     ) -> bool:
         """Can this field be used to generate the output_type?
 
@@ -1563,14 +1563,14 @@ class SourcesBaseField(AsyncFieldMixin, Field):
         return result
 
 
-class Sources(SourcesBaseField, StringSequenceField):
+class MultipleSourcesField(SourcesField, StringSequenceField):
     """The `sources: list[str]` field.
 
-    See the docstring for `SourcesBaseField` for some class properties you can set, such as
+    See the docstring for `SourcesField` for some class properties you can set, such as
     `expected_file_extensions`.
 
-    When you need to get the sources for all targets, use
-    `tgt.get(SourcesBaseField)` rather than `tgt.get(Sources)`.
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(MultipleSourcesField)`.
     """
 
     alias = "sources"
@@ -1586,14 +1586,25 @@ class Sources(SourcesBaseField, StringSequenceField):
         return self.value or ()
 
 
-class SingleSourcesField(SourcesBaseField, StringField):
+class Sources(MultipleSourcesField):
+    removal_version = "2.9.0.dev0"
+    removal_hint = (
+        "The `Sources` type has been removed in favor of `SourcesField`, `SingleSourceField`, and "
+        "`MultipleSourcesField`. Update your field definitions to subclass either "
+        "`SingleSourceField` or `MultipleSourcesField`, depending on if you want the field "
+        "`source: str` or `sources: list[str]`. Update all rules to use `tgt.get(SourcesField)` "
+        "instead of `tgt.get(Sources)`."
+    )
+
+
+class SingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
-    See the docstring for `SourcesBaseField` for some class properties you can set, such as
+    See the docstring for `SourcesField` for some class properties you can set, such as
     `expected_file_extensions`.
 
-    When you need to get the sources for all targets, use
-    `tgt.get(SourcesBaseField)` rather than `tgt.get(SingleSourcesField)`.
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(SingleSourceField)`.
     """
 
     alias = "source"
@@ -1613,20 +1624,20 @@ class SingleSourcesField(SourcesBaseField, StringField):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest(EngineAwareParameter):
-    field: SourcesBaseField
-    for_sources_types: tuple[type[SourcesBaseField], ...]
+    field: SourcesField
+    for_sources_types: tuple[type[SourcesField], ...]
     enable_codegen: bool
 
     def __init__(
         self,
-        field: SourcesBaseField,
+        field: SourcesField,
         *,
-        for_sources_types: Iterable[type[SourcesBaseField]] = (SourcesBaseField,),
+        for_sources_types: Iterable[type[SourcesField]] = (SourcesField,),
         enable_codegen: bool = False,
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
 
-        If you only want to handle certain Sources fields, such as only PythonSources, set
+        If you only want to handle certain SourcesFields, such as only PythonSources, set
         `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
         empty snapshot and `sources_type = None`.
 
@@ -1639,7 +1650,7 @@ class HydrateSourcesRequest(EngineAwareParameter):
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if self.enable_codegen and self.for_sources_types == (SourcesBaseField,):
+        if self.enable_codegen and self.for_sources_types == (SourcesField,):
             raise ValueError(
                 "When setting `enable_codegen=True` on `HydrateSourcesRequest`, you must also "
                 "explicitly set `for_source_types`. Why? `for_source_types` is used to "
@@ -1659,15 +1670,15 @@ class HydratedSources:
 
     The `sources_type` will indicate which of the `HydrateSourcesRequest.for_sources_type` the
     result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
-    value is None, then the input `Sources` field was not one of the expected types; or, when
-    codegen was enabled in the request, there was no valid code generator to generate the requested
-    language from the original input. This property allows for switching on the result, e.g.
-    handling hydrated files() sources differently than hydrated Python sources.
+    value is None, then the input `SourcesField` was not one of the expected types; or, when codegen
+    was enabled in the request, there was no valid code generator to generate the requested language
+    from the original input. This property allows for switching on the result, e.g. handling
+    hydrated files() sources differently than hydrated Python sources.
     """
 
     snapshot: Snapshot
     filespec: Filespec
-    sources_type: type[SourcesBaseField] | None
+    sources_type: type[SourcesField] | None
 
 
 @union
@@ -1702,8 +1713,8 @@ class GenerateSourcesRequest:
     protocol_sources: Snapshot
     protocol_target: Target
 
-    input: ClassVar[type[SourcesBaseField]]
-    output: ClassVar[type[SourcesBaseField]]
+    input: ClassVar[type[SourcesField]]
+    output: ClassVar[type[SourcesField]]
 
 
 @dataclass(frozen=True)
@@ -1722,7 +1733,7 @@ class SourcesPaths(Paths):
 class SourcesPathsRequest(EngineAwareParameter):
     """A request to resolve the file names of the `source`/`sources` field.
 
-    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(SourcesBaseField))`.
+    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(SourcesField))`.
 
     This is faster than `Get(HydratedSources, HydrateSourcesRequest)` because it does not snapshot
     the files and it only resolves the file names.
@@ -1731,7 +1742,7 @@ class SourcesPathsRequest(EngineAwareParameter):
     `HydrateSourcesRequest` to use codegen.
     """
 
-    field: SourcesBaseField
+    field: SourcesField
 
     def debug_hint(self) -> str:
         return self.field.address.spec
@@ -1739,7 +1750,7 @@ class SourcesPathsRequest(EngineAwareParameter):
 
 class SecondaryOwnerMixin(ABC):
     """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `Sources` field.
+    needing a `SourcesField`.
 
     Why use this? In a dependency inference world, multiple targets including the same file in the
     `sources` field causes issues due to ambiguity over which target to use. So, only one target
@@ -1770,7 +1781,7 @@ class SecondaryOwnerMixin(ABC):
 
 
 def targets_with_sources_types(
-    sources_types: Iterable[type[SourcesBaseField]],
+    sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],
     union_membership: UnionMembership,
 ) -> tuple[Target, ...]:
@@ -1781,7 +1792,7 @@ def targets_with_sources_types(
         for tgt in targets
         if any(
             tgt.has_field(sources_type)
-            or tgt.get(SourcesBaseField).can_generate(sources_type, union_membership)
+            or tgt.get(SourcesField).can_generate(sources_type, union_membership)
             for sources_type in sources_types
         )
     )
@@ -1998,10 +2009,10 @@ class InferDependenciesRequest(EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
-    `infer_from` to the type of `Sources` field you are able to infer from, such as
+    `infer_from` to the type of `SourcesField` you are able to infer from, such as
     `FortranSources`. This will cause the class, and any subclass, to use your inference
     implementation. Note that there cannot be more than one implementation for a particular
-    `Sources` class. Register this subclass with
+    `SourcesField` class. Register this subclass with
     `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
 
     Then, create a rule that takes the subclass as a parameter and returns `InferredDependencies`.
@@ -2024,8 +2035,8 @@ class InferDependenciesRequest(EngineAwareParameter):
             ]
     """
 
-    sources_field: SourcesBaseField
-    infer_from: ClassVar[type[SourcesBaseField]]
+    sources_field: SourcesField
+    infer_from: ClassVar[type[SourcesField]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec

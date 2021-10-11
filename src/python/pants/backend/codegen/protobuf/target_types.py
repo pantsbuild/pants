@@ -9,7 +9,7 @@ from pants.engine.target import (
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
@@ -36,7 +36,7 @@ class ProtobufGrpcToggleField(BoolField):
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesField(Sources):
+class ProtobufSourcesField(MultipleSourcesField):
     expected_file_extensions = (".proto",)
     expected_num_files = 1
     required = True
@@ -61,7 +61,7 @@ class ProtobufSourceTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesGeneratingSourcesField(Sources):
+class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
 

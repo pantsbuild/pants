@@ -18,7 +18,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSet,
-    SourcesBaseField,
+    SourcesField,
     Target,
     Targets,
 )
@@ -65,11 +65,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
     dependency_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(
-            (
-                tgt.get(SourcesBaseField)
-                for dependencies in all_dependencies
-                for tgt in dependencies
-            ),
+            (tgt.get(SourcesField) for dependencies in all_dependencies for tgt in dependencies),
             for_sources_types=(ShellSourcesField,),
             enable_codegen=True,
         ),

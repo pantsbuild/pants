@@ -44,7 +44,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
-    SourcesBaseField,
+    SourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -118,10 +118,8 @@ async def run_shell_command(
         Get(
             SourceFiles,
             SourceFilesRequest(
-                sources_fields=[
-                    tgt.get(SourcesBaseField) for tgt in transitive_targets.dependencies
-                ],
-                for_sources_types=(SourcesBaseField, FileSourcesField),
+                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
+                for_sources_types=(SourcesField, FileSourcesField),
                 enable_codegen=True,
             ),
         ),

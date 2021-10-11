@@ -14,19 +14,19 @@ from pants.engine.rules import Get, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    SingleSourcesField,
-    Sources,
+    MultipleSourcesField,
+    SingleSourceField,
     Target,
 )
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
 
-class Gen1Sources(Sources):
+class Gen1Sources(MultipleSourcesField):
     pass
 
 
-class Gen2Sources(SingleSourcesField):
+class Gen2Sources(SingleSourceField):
     pass
 
 

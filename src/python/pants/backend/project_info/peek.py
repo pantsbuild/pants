@@ -23,7 +23,7 @@ from pants.engine.target import (
     DependenciesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    SourcesBaseField,
+    SourcesField,
     Target,
     Targets,
     UnexpandedTargets,
@@ -116,9 +116,7 @@ def _render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> s
 
     def to_json(td: TargetData) -> dict:
         fields = {
-            (
-                f"{k.alias}_raw" if issubclass(k, (SourcesBaseField, Dependencies)) else k.alias
-            ): v.value
+            (f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias): v.value
             for k, v in td.target.field_values.items()
             if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
         }
@@ -166,7 +164,7 @@ async def get_target_data(targets: UnexpandedTargets) -> TargetDatas:
     for tgt in sorted_targets:
         if tgt.has_field(Dependencies):
             targets_with_dependencies.append(tgt)
-        if tgt.has_field(SourcesBaseField):
+        if tgt.has_field(SourcesField):
             targets_with_sources.append(tgt)
 
     dependencies_per_target = await MultiGet(
@@ -177,7 +175,7 @@ async def get_target_data(targets: UnexpandedTargets) -> TargetDatas:
         for tgt in targets_with_dependencies
     )
     hydrated_sources_per_target = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesBaseField]))
+        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
         for tgt in targets_with_sources
     )
 

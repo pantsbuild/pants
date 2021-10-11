@@ -43,11 +43,11 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
+    MultipleSourcesField,
     NestedDictStringToStringField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
-    Sources,
     StringField,
     StringSequenceField,
     Target,
@@ -70,7 +70,7 @@ if TYPE_CHECKING:
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonSources(Sources):
+class PythonSources(MultipleSourcesField):
     # Note that Python scripts often have no file ending.
     expected_file_extensions = ("", ".py", ".pyi")
 
@@ -922,7 +922,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             )
 
 
-class PythonRequirementsFileSources(Sources):
+class PythonRequirementsFileSources(MultipleSourcesField):
     required = True
     uses_source_roots = False
 

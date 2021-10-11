@@ -7,11 +7,11 @@ import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.project_info import filedeps
-from pants.engine.target import Dependencies, SingleSourcesField, Sources, Target
+from pants.engine.target import Dependencies, MultipleSourcesField, SingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-class MockSources(Sources):
+class MockSources(MultipleSourcesField):
     default = ("*.ext",)
 
 
@@ -20,13 +20,13 @@ class MockTarget(Target):
     core_fields = (MockSources, Dependencies)
 
 
-class MockSingleSourcesField(SingleSourcesField):
+class MockSingleSourceField(SingleSourceField):
     pass
 
 
 class MockSingleSourceTarget(Target):
     alias = "single_source"
-    core_fields = (MockSingleSourcesField, Dependencies)
+    core_fields = (MockSingleSourceField, Dependencies)
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from pants.core.target_types import FileSourcesField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.target import Sources, SourcesBaseField
+from pants.engine.target import MultipleSourcesField, SourcesField
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -45,8 +45,8 @@ def mock_sources_field(
     sources: TargetSources,
     *,
     include_sources: bool = True,
-    sources_field_cls: Type[SourcesBaseField] = Sources,
-) -> SourcesBaseField:
+    sources_field_cls: Type[SourcesField] = MultipleSourcesField,
+) -> SourcesField:
     sources_field = sources_field_cls(
         sources.source_files if include_sources else [],
         Address(sources.source_root, target_name="lib"),
@@ -57,7 +57,7 @@ def mock_sources_field(
 
 def assert_sources_resolved(
     rule_runner: RuleRunner,
-    sources_fields: Iterable[SourcesBaseField],
+    sources_fields: Iterable[SourcesField],
     *,
     expected: Iterable[TargetSources],
     expected_unrooted: Iterable[str] = (),
@@ -91,7 +91,7 @@ def test_address_specs(rule_runner: RuleRunner) -> None:
 
 
 def test_unrooted_sources(rule_runner: RuleRunner) -> None:
-    """Any Sources field with `uses_source_roots=False`, such as `FilesSources`, should be marked as
+    """Any SourcesField with `uses_source_roots=False`, such as `FilesSources`, should be marked as
     unrooted sources."""
     sources = TargetSources("src/python", ["README.md"])
     field = mock_sources_field(rule_runner, sources, sources_field_cls=FileSourcesField)
@@ -99,7 +99,7 @@ def test_unrooted_sources(rule_runner: RuleRunner) -> None:
         rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
     )
 
-    class CustomSources(Sources):
+    class CustomSources(MultipleSourcesField):
         uses_source_roots = False
 
     field = mock_sources_field(rule_runner, sources, sources_field_cls=CustomSources)

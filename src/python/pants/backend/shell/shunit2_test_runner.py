@@ -47,7 +47,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesBaseField, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -171,7 +171,7 @@ async def setup_shunit2_for_target(
     dependencies_source_files_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            (tgt.get(SourcesBaseField) for tgt in transitive_targets.dependencies),
+            (tgt.get(SourcesField) for tgt in transitive_targets.dependencies),
             for_sources_types=(ShellSourcesField, FileSourcesField, ResourceSourcesField),
             enable_codegen=True,
         ),
