@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
@@ -288,5 +289,6 @@ class GoBinaryTarget(Target):
         OutputPathField,
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
+        RestartableField,
     )
     help = "A Go binary."
