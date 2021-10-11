@@ -67,7 +67,6 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -148,7 +147,6 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
@@ -207,7 +205,6 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
                     sources = [
                         "coursier_resolve.lockfile",
                     ],
