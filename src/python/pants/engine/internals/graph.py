@@ -16,7 +16,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
-    FilesystemLiteralSpec,
+    FileLiteralSpec,
     FilesystemSpecs,
     Specs,
 )
@@ -603,7 +603,7 @@ async def addresses_from_filesystem_specs(
     for spec, owners in zip(filesystem_specs.includes, owners_per_include):
         if (
             owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FilesystemLiteralSpec)
+            and isinstance(spec, FileLiteralSpec)
             and not owners
         ):
             _log_or_raise_unmatched_owners(

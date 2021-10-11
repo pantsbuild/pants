@@ -13,8 +13,8 @@ import pytest
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpecs,
-    FilesystemGlobSpec,
-    FilesystemLiteralSpec,
+    FileGlobSpec,
+    FileLiteralSpec,
     FilesystemSpec,
     FilesystemSpecs,
     Specs,
@@ -792,7 +792,7 @@ def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    assert resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("demo/f1.txt")]) == [
+    assert resolve_filesystem_specs(specs_rule_runner, [FileLiteralSpec("demo/f1.txt")]) == [
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
     ]
@@ -818,21 +818,20 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
     ]
 
     assert (
-        resolve_filesystem_specs(specs_rule_runner, [FilesystemGlobSpec("demo/*.txt")])
-        == all_addresses
+        resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("demo/*.txt")]) == all_addresses
     )
     # We should deduplicate between glob and literal specs.
     assert (
         resolve_filesystem_specs(
             specs_rule_runner,
-            [FilesystemGlobSpec("demo/*.txt"), FilesystemLiteralSpec("demo/f1.txt")],
+            [FileGlobSpec("demo/*.txt"), FileLiteralSpec("demo/f1.txt")],
         )
         == all_addresses
     )
 
 
 def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> None:
-    spec = FilesystemLiteralSpec("demo/fake.txt")
+    spec = FileLiteralSpec("demo/fake.txt")
     with pytest.raises(ExecutionError) as exc:
         resolve_filesystem_specs(specs_rule_runner, [spec])
     assert 'Unmatched glob from file arguments: "demo/fake.txt"' in str(exc.value)
@@ -845,11 +844,11 @@ def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.write_files({"no_owners/f.txt": ""})
     # Error for literal specs.
     with pytest.raises(ExecutionError) as exc:
-        resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("no_owners/f.txt")])
+        resolve_filesystem_specs(specs_rule_runner, [FileLiteralSpec("no_owners/f.txt")])
     assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
 
     # Do not error for glob specs.
-    assert not resolve_filesystem_specs(specs_rule_runner, [FilesystemGlobSpec("no_owners/*.txt")])
+    assert not resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("no_owners/*.txt")])
 
 
 def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
@@ -1041,7 +1040,7 @@ def test_no_applicable_targets_exception() -> None:
     invalid_tgt = Tgt3({}, Address("blah"))
     exc = NoApplicableTargetsException(
         [invalid_tgt],
-        Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("foo.ext")])),
+        Specs(AddressSpecs([]), FilesystemSpecs([FileLiteralSpec("foo.ext")])),
         UnionMembership({}),
         applicable_target_types=[Tgt1, Tgt2],
         goal_description="the `foo` goal",
@@ -1082,7 +1081,7 @@ def test_no_applicable_targets_exception() -> None:
         [invalid_tgt],
         Specs(
             AddressSpecs([AddressLiteralSpec("foo", "bar")]),
-            FilesystemSpecs([FilesystemLiteralSpec("foo.ext")]),
+            FilesystemSpecs([FileLiteralSpec("foo.ext")]),
         ),
         UnionMembership({}),
         applicable_target_types=[Tgt1],

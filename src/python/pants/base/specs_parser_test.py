@@ -12,9 +12,9 @@ from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpec,
     DescendantAddresses,
-    FilesystemGlobSpec,
-    FilesystemIgnoreSpec,
-    FilesystemLiteralSpec,
+    FileGlobSpec,
+    FileIgnoreSpec,
+    FileLiteralSpec,
     FilesystemSpec,
     SiblingAddresses,
 )
@@ -35,16 +35,16 @@ def sib(directory: str) -> SiblingAddresses:
     return SiblingAddresses(directory)
 
 
-def file_literal(file: str) -> FilesystemLiteralSpec:
-    return FilesystemLiteralSpec(file)
+def file_literal(file: str) -> FileLiteralSpec:
+    return FileLiteralSpec(file)
 
 
-def file_glob(val: str) -> FilesystemGlobSpec:
-    return FilesystemGlobSpec(val)
+def file_glob(val: str) -> FileGlobSpec:
+    return FileGlobSpec(val)
 
 
-def ignore(val: str) -> FilesystemIgnoreSpec:
-    return FilesystemIgnoreSpec(val)
+def ignore(val: str) -> FileIgnoreSpec:
+    return FileIgnoreSpec(val)
 
 
 def assert_address_spec_parsed(build_root: Path, spec_str: str, expected_spec: AddressSpec) -> None:

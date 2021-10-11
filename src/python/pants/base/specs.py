@@ -259,7 +259,7 @@ class FilesystemSpec(Spec, metaclass=ABCMeta):
 
 
 @dataclass(frozen=True)
-class FilesystemLiteralSpec(FilesystemSpec):
+class FileLiteralSpec(FilesystemSpec):
     """A literal file name, e.g. `foo.py`."""
 
     file: str
@@ -269,7 +269,7 @@ class FilesystemLiteralSpec(FilesystemSpec):
 
 
 @dataclass(frozen=True)
-class FilesystemGlobSpec(FilesystemSpec):
+class FileGlobSpec(FilesystemSpec):
     """A spec with a glob or globs, e.g. `*.py` and `**/*.java`."""
 
     glob: str
@@ -279,7 +279,7 @@ class FilesystemGlobSpec(FilesystemSpec):
 
 
 @dataclass(frozen=True)
-class FilesystemIgnoreSpec(FilesystemSpec):
+class FileIgnoreSpec(FilesystemSpec):
     """A spec to ignore certain files or globs."""
 
     glob: str
@@ -295,16 +295,16 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FilesystemSpecs:
-    includes: tuple[FilesystemLiteralSpec | FilesystemGlobSpec, ...]
-    ignores: tuple[FilesystemIgnoreSpec, ...]
+    includes: tuple[FileLiteralSpec | FileGlobSpec, ...]
+    ignores: tuple[FileIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         includes = []
         ignores = []
         for spec in specs:
-            if isinstance(spec, (FilesystemLiteralSpec, FilesystemGlobSpec)):
+            if isinstance(spec, (FileLiteralSpec, FileGlobSpec)):
                 includes.append(spec)
-            elif isinstance(spec, FilesystemIgnoreSpec):
+            elif isinstance(spec, FileIgnoreSpec):
                 ignores.append(spec)
             else:
                 raise ValueError(f"Unexpected type of FilesystemSpec: {repr(self)}")
@@ -333,7 +333,7 @@ class FilesystemSpecs:
 
     def path_globs_for_spec(
         self,
-        spec: FilesystemLiteralSpec | FilesystemGlobSpec,
+        spec: FileLiteralSpec | FileGlobSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's
