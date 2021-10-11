@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 class PipenvRequirements:
-    """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
+    """Translates a Pipenv.lock file into an equivalent set `python_requirement` targets.
 
     You may also use the parameter `module_mapping` to teach Pants what modules each of your
     requirements provide. For any requirement unspecified, Pants will default to the name of the
@@ -79,24 +79,12 @@ class PipenvRequirements:
                 req_str += f";{info['markers']}"
 
             parsed_req = Requirement.parse(req_str)
-
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
-            req_module_mapping = (
-                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_module_mapping
-                else {}
-            )
-            req_stubs_mapping = (
-                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_type_stubs_module_mapping
-                else {}
-            )
-
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[requirements_dep],
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=req_stubs_mapping,
+                modules=normalized_module_mapping.get(normalized_proj_name),
+                type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
             )

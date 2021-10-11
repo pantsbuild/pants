@@ -13,18 +13,17 @@ from pants.base.build_environment import get_buildroot
 
 
 class PythonRequirements:
-    """Translates a pip requirements file into an equivalent set of `python_requirement_library`
-    targets.
+    """Translates a pip requirements file into an equivalent set of `python_requirement` targets.
 
     If the `requirements.txt` file has lines `foo>=3.14` and `bar>=2.7`,
     then this will translate to:
 
-      python_requirement_library(
+      python_requirement(
         name="foo",
         requirements=["foo>=3.14"],
       )
 
-      python_requirement_library(
+      python_requirement(
         name="bar",
         requirements=["bar>=2.7"],
       )
@@ -82,21 +81,11 @@ class PythonRequirements:
 
         for project_name, parsed_reqs_ in grouped_requirements:
             normalized_proj_name = canonicalize_project_name(project_name)
-            req_module_mapping = (
-                {normalized_proj_name: normalized_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_module_mapping
-                else {}
-            )
-            req_stubs_mapping = (
-                {normalized_proj_name: normalized_type_stubs_module_mapping[normalized_proj_name]}
-                if normalized_proj_name in normalized_type_stubs_module_mapping
-                else {}
-            )
             self._parse_context.create_object(
-                "python_requirement_library",
+                "python_requirement",
                 name=project_name,
                 requirements=list(parsed_reqs_),
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=req_stubs_mapping,
+                modules=normalized_module_mapping.get(normalized_proj_name),
+                type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
                 dependencies=[requirements_dep],
             )

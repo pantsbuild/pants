@@ -32,7 +32,7 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
-    Sources,
+    SourcesField,
     SpecialCasedDependencies,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -153,7 +153,7 @@ class TestDebugRequest:
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
-    sources: Sources
+    sources: SourcesField
 
     __test__ = False
 

@@ -24,7 +24,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     InvalidTargetException,
-    Sources,
+    SourcesField,
     Target,
     Targets,
     TransitiveTargets,
@@ -160,7 +160,7 @@ async def coursier_generate_lockfile(
     lockfile_sources = await Get(
         SourceFiles,
         SourceFilesRequest(
-            [request.target.get(Sources)],
+            [request.target.get(SourcesField)],
             for_sources_types=[JvmLockfileSources],
             enable_codegen=False,
         ),

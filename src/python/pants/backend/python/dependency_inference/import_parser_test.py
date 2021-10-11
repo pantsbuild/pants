@@ -49,7 +49,7 @@ def assert_imports_parsed(
     string_imports_min_dots: int = 2,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    files = {"project/BUILD": "python_library(sources=['**/*.py'])"}
+    files = {"project/BUILD": "python_sources(sources=['**/*.py'])"}
     if content is not None:
         files[filename] = content
     rule_runner.write_files(files)  # type: ignore[arg-type]

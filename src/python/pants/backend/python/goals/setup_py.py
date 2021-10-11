@@ -42,7 +42,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourceSourcesField
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -61,12 +61,13 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    Sources,
+    SourcesField,
     SourcesPaths,
     Target,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
@@ -104,7 +105,7 @@ class OwnershipError(SetupPyError):
     def __init__(self, msg: str):
         super().__init__(
             f"{msg} See {doc_url('python-distributions')} for "
-            f"how python_library targets are mapped to distributions."
+            f"how python_sources targets are mapped to distributions."
         )
 
 
@@ -699,7 +700,9 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
 
 
 @rule
-async def get_sources(request: SetupPyChrootRequest) -> SetupPySources:
+async def get_sources(
+    request: SetupPyChrootRequest, union_membership: UnionMembership
+) -> SetupPySources:
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(request.exported_target)),
         Get(
@@ -710,8 +713,10 @@ async def get_sources(request: SetupPyChrootRequest) -> SetupPySources:
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
-    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
-    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
+    file_targets = targets_with_sources_types(
+        [FileSourcesField], transitive_targets.closure, union_membership
+    )
+    targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
 
     python_sources_request = PythonSourceFilesRequest(
         targets=targets, include_resources=False, include_files=False
@@ -899,12 +904,13 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         # Note that we check for a PythonProvides field so that a python_distribution
         # target can be owned (by itself). This is so that if there are any 3rdparty
         # requirements directly on the python_distribution target, we apply them to the dist.
-        # This isn't particularly useful (3rdparty requirements should be on the python_library
+        # This isn't particularly useful (3rdparty requirements should be on the python_sources
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
         or tgt.has_field(PythonSources)
-        or tgt.has_field(ResourcesSources)
-        or tgt.get(Sources).can_generate(PythonSources, union_membership)
+        or tgt.has_field(ResourceSourcesField)
+        or tgt.get(SourcesField).can_generate(PythonSources, union_membership)
+        or tgt.get(SourcesField).can_generate(ResourceSourcesField, union_membership)
     )
 
 

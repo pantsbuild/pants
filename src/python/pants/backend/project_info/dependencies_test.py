@@ -8,7 +8,7 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
@@ -27,24 +27,24 @@ class SpecialDepsTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=rules(), target_types=[PythonLibrary, PythonRequirementLibrary, SpecialDepsTarget]
+        rules=rules(), target_types=[PythonLibrary, PythonRequirementTarget, SpecialDepsTarget]
     )
 
 
-def create_python_library(
+def create_python_sources(
     rule_runner: RuleRunner, path: str, *, dependencies: Optional[List[str]] = None
 ) -> None:
     rule_runner.add_to_build_file(
-        path, f"python_library(name='target', sources=[], dependencies={dependencies or []})"
+        path, f"python_sources(name='target', sources=[], dependencies={dependencies or []})"
     )
 
 
-def create_python_requirement_library(rule_runner: RuleRunner, name: str) -> None:
+def create_python_requirement_tgt(rule_runner: RuleRunner, name: str) -> None:
     rule_runner.add_to_build_file(
         "3rdparty/python",
         dedent(
             f"""\
-            python_requirement_library(
+            python_requirement(
                 name='{name}',
                 requirements=['{name}==1.0.0'],
             )
@@ -77,7 +77,7 @@ def test_no_target(rule_runner: RuleRunner) -> None:
 
 
 def test_no_dependencies(rule_runner: RuleRunner) -> None:
-    create_python_library(rule_runner, path="some/target")
+    create_python_sources(rule_runner, path="some/target")
     assert_dependencies(rule_runner, specs=["some/target"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target"], expected=[], transitive=True)
     assert_dependencies(rule_runner, specs=["some/target"], expected=["some/target"], closed=True)
@@ -102,13 +102,13 @@ def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_python_dependencies(rule_runner: RuleRunner) -> None:
-    create_python_requirement_library(rule_runner, name="req1")
-    create_python_requirement_library(rule_runner, name="req2")
-    create_python_library(rule_runner, path="dep/target")
-    create_python_library(
+    create_python_requirement_tgt(rule_runner, name="req1")
+    create_python_requirement_tgt(rule_runner, name="req2")
+    create_python_sources(rule_runner, path="dep/target")
+    create_python_sources(
         rule_runner, path="some/target", dependencies=["dep/target", "3rdparty/python:req1"]
     )
-    create_python_library(
+    create_python_sources(
         rule_runner, path="some/other/target", dependencies=["some/target", "3rdparty/python:req2"]
     )
 

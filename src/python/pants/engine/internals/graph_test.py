@@ -58,9 +58,10 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    MultipleSourcesField,
     NoApplicableTargetsBehavior,
     SecondaryOwnerMixin,
-    Sources,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
@@ -76,7 +77,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -94,19 +95,19 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
 
 class MockTarget(Target):
     alias = "target"
-    core_fields = (MockDependencies, Sources, SpecialCasedDeps1, SpecialCasedDeps2)
+    core_fields = (MockDependencies, MultipleSourcesField, SpecialCasedDeps1, SpecialCasedDeps2)
     deprecated_alias = "deprecated_target"
     deprecated_alias_removal_version = "9.9.9.dev0"
 
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, Sources)
+    core_fields = (MockDependencies, MultipleSourcesField)
 
 
 class MockTargetGenerator(Target):
     alias = "generator"
-    core_fields = (Dependencies, Sources)
+    core_fields = (Dependencies, MultipleSourcesField)
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):
@@ -115,7 +116,7 @@ class MockGenerateTargetsRequest(GenerateTargetsRequest):
 
 @rule
 async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[Sources]))
+    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField]))
     return generate_file_level_targets(
         MockGeneratedTarget,
         request.generator,
@@ -560,7 +561,7 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
     generated_target_address = Address("", target_name="generator", relative_file_path="f1.txt")
     assert transitive_targets_rule_runner.get_target(
         generated_target_address
-    ) == MockGeneratedTarget({Sources.alias: ["f1.txt"]}, generated_target_address)
+    ) == MockGeneratedTarget({MultipleSourcesField.alias: ["f1.txt"]}, generated_target_address)
 
     # The target generator must actually generate the requested target.
     with pytest.raises(ExecutionError):
@@ -574,7 +575,8 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
         "", target_name="non-generator", relative_file_path="f1.txt"
     )
     assert transitive_targets_rule_runner.get_target(non_generator_file_address) == MockTarget(
-        {Sources.alias: ["f1.txt"]}, non_generator_file_address.maybe_convert_to_target_generator()
+        {MultipleSourcesField.alias: ["f1.txt"]},
+        non_generator_file_address.maybe_convert_to_target_generator(),
     )
 
 
@@ -885,7 +887,7 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
 
 # Must be defined here because `from __future__ import annotations` causes the FieldSet to not be
 # able to find the type..
-class FortranSources(Sources):
+class FortranSources(MultipleSourcesField):
     pass
 
 
@@ -1005,7 +1007,7 @@ def test_no_applicable_targets_exception() -> None:
 
     class Tgt2(Target):
         alias = "tgt2"
-        core_fields = (Sources,)
+        core_fields = (MultipleSourcesField,)
 
     class Tgt3(Target):
         alias = "tgt3"
@@ -1090,7 +1092,7 @@ def test_no_applicable_targets_exception() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test the Sources field. Also see `engine/target_test.py`.
+# Test `SourcesField`. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
 
@@ -1109,15 +1111,23 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
-    sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], addr)
+    sources = MultipleSourcesField(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], addr)
     hydrated_sources = sources_rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(sources)]
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
+    single_source = SingleSourceField("f1.f95", addr)
+    hydrated_single_source = sources_rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(single_source)]
+    )
+    assert hydrated_single_source.snapshot.files == ("src/fortran/f1.f95",)
+
     # Test that `SourcesPaths` works too.
     sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(sources)])
     assert sources_paths.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
+    sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(single_source)])
+    assert sources_paths.files == ("src/fortran/f1.f95",)
 
     # Also test that the Filespec is correct. This does not need the engine to be calculated.
     assert (
@@ -1128,10 +1138,18 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
         }
         == hydrated_sources.filespec
     )
+    assert (
+        single_source.filespec
+        == {"includes": ["src/fortran/f1.f95"]}
+        == hydrated_single_source.filespec
+    )
 
 
 def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
-    class SourcesSubclass(Sources):
+    class SourcesSubclass(MultipleSourcesField):
+        pass
+
+    class SingleSourceSubclass(SingleSourceField):
         pass
 
     addr = Address("", target_name="lib")
@@ -1145,10 +1163,26 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
-    invalid_sources = Sources(["*"], addr)
+    valid_single_sources = SingleSourceSubclass("f1.f95", addr)
+    hydrated_valid_sources = sources_rule_runner.request(
+        HydratedSources,
+        [HydrateSourcesRequest(valid_single_sources, for_sources_types=[SingleSourceSubclass])],
+    )
+    assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+    assert hydrated_valid_sources.sources_type == SingleSourceSubclass
+
+    invalid_sources = MultipleSourcesField(["*"], addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
+    )
+    assert hydrated_invalid_sources.snapshot.files == ()
+    assert hydrated_invalid_sources.sources_type is None
+
+    invalid_single_sources = SingleSourceField("f1.f95", addr)
+    hydrated_invalid_sources = sources_rule_runner.request(
+        HydratedSources,
+        [HydrateSourcesRequest(invalid_single_sources, for_sources_types=[SingleSourceSubclass])],
     )
     assert hydrated_invalid_sources.snapshot.files == ()
     assert hydrated_invalid_sources.sources_type is None
@@ -1157,16 +1191,17 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
     sources_rule_runner.create_files("", files=["f1.f95"])
-    sources = Sources(["non_existent.f95"], Address("", target_name="lib"))
-    with pytest.raises(ExecutionError) as exc:
+    sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
+    with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
-    assert "Unmatched glob" in str(exc.value)
-    assert "//:lib" in str(exc.value)
-    assert "non_existent.f95" in str(exc.value)
+
+    single_sources = SingleSourceField("non_existent.f95", Address("", target_name="lib"))
+    with engine_error(contains="non_existent.f95"):
+        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(single_sources)])
 
 
 def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
-    class DefaultSources(Sources):
+    class DefaultSources(MultipleSourcesField):
         default = ("default.f95", "default.f03", "*.f08", "!ignored.f08")
 
     addr = Address("src/fortran", target_name="lib")
@@ -1184,38 +1219,45 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
 
 
 def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> None:
-    class ExpectedExtensionsSources(Sources):
+    class ExpectedExtensionsSources(MultipleSourcesField):
+        expected_file_extensions = (".f95", ".f03", "")
+
+    class ExpectedExtensionsSingleSource(SingleSourceField):
         expected_file_extensions = (".f95", ".f03", "")
 
     addr = Address("src/fortran", target_name="lib")
     sources_rule_runner.create_files("src/fortran", ["s.f95", "s.f03", "s.f08", "s"])
 
-    def get_sources(srcs: Iterable[str]) -> Tuple[str, ...]:
-        return sources_rule_runner.request(
-            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources(srcs, addr))]
+    def get_source(src: str) -> str:
+        sources = sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSources([src], addr))]
         ).snapshot.files
+        single_source = sources_rule_runner.request(
+            HydratedSources, [HydrateSourcesRequest(ExpectedExtensionsSingleSource(src, addr))]
+        ).snapshot.files
+        assert sources == single_source
+        assert len(sources) == 1
+        return sources[0]
 
-    with pytest.raises(ExecutionError) as exc:
-        get_sources(["s.f*"])
-    assert "['src/fortran/s.f08']" in str(exc.value)
-    assert str(addr) in str(exc.value)
+    with engine_error(contains="['src/fortran/s.f08']"):
+        get_source("s.f08")
 
     # Also check that we support valid sources
-    assert get_sources(["s.f95"]) == ("src/fortran/s.f95",)
-    assert get_sources(["s"]) == ("src/fortran/s",)
+    assert get_source("s.f95") == "src/fortran/s.f95"
+    assert get_source("s") == "src/fortran/s"
 
 
 def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
-    class ExpectedNumber(Sources):
+    class ExpectedNumber(MultipleSourcesField):
         expected_num_files = 2
 
-    class ExpectedRange(Sources):
+    class ExpectedRange(MultipleSourcesField):
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
     sources_rule_runner.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
 
-    def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [
@@ -1223,12 +1265,10 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
             ],
         )
 
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="must have 2 files"):
         hydrate(ExpectedNumber, [])
-    assert "must have 2 files" in str(exc.value)
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="must have 1 or 3 files"):
         hydrate(ExpectedRange, ["f1.txt", "f2.txt"])
-    assert "must have 1 or 3 files" in str(exc.value)
 
     # Also check that we support valid # files.
     assert hydrate(ExpectedNumber, ["f1.txt", "f2.txt"]).snapshot.files == ("f1.txt", "f2.txt")
@@ -1239,17 +1279,28 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f3.txt",
     )
 
+    # `SingleSourceField` must have one file.
+    with engine_error(contains="must have 1 file"):
+        sources_rule_runner.request(
+            HydratedSources,
+            [
+                HydrateSourcesRequest(
+                    SingleSourceField("*.txt", Address("", target_name="example"))
+                ),
+            ],
+        )
+
 
 # -----------------------------------------------------------------------------------------------
 # Test codegen. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
 
-class SmalltalkSources(Sources):
+class SmalltalkSources(MultipleSourcesField):
     pass
 
 
-class AvroSources(Sources):
+class AvroSources(MultipleSourcesField):
     pass
 
 
@@ -1362,7 +1413,7 @@ def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> 
 def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
 
-    class AdaSources(Sources):
+    class AdaSources(MultipleSourcesField):
         pass
 
     protocol_sources = AvroSources(["*.avro"], addr)
@@ -1389,14 +1440,14 @@ def test_ambiguous_codegen_implementations_exception() -> None:
         input = AvroSources
         output = SmalltalkSources
 
-    class AdaSources(Sources):
+    class AdaSources(MultipleSourcesField):
         pass
 
     class AdaGenerator(GenerateSourcesRequest):
         input = AvroSources
         output = AdaSources
 
-    class IrrelevantSources(Sources):
+    class IrrelevantSources(MultipleSourcesField):
         pass
 
     # Test when all generators have the same input and output.

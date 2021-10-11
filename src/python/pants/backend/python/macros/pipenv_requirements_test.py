@@ -9,7 +9,7 @@ import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
-from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
+from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.target import Targets
@@ -20,7 +20,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[QueryRule(Targets, (Specs,))],
-        target_types=[PythonRequirementLibrary, PythonRequirementsFile],
+        target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
     )
 
@@ -31,7 +31,7 @@ def assert_pipenv_requirements(
     pipfile_lock: dict,
     *,
     expected_file_dep: PythonRequirementsFile,
-    expected_targets: Iterable[PythonRequirementLibrary],
+    expected_targets: Iterable[PythonRequirementTarget],
     pipfile_lock_relpath: str = "Pipfile.lock",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pipfile_lock_relpath: dumps(pipfile_lock)})
@@ -43,17 +43,17 @@ def assert_pipenv_requirements(
 
 
 def test_pipfile_lock(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each entry in a
+    """This tests that we correctly create a new `python_requirement` target for each entry in a
     Pipfile.lock file.
 
     Edge cases:
     * Develop and Default requirements are used
-    * If a module_mapping is given, and the project is in the map, we copy over a subset of the
-        mapping to the created target. It works regardless of capitalization.
+    * If a module_mapping is given, and the project is in the map, we set `modules`. It
+      works regardless of capitalization.
     """
     assert_pipenv_requirements(
         rule_runner,
-        "pipenv_requirements(module_mapping={'ansicolors': ['colors']})",
+        "pipenv_requirements(module_mapping={'ANSIcolors': ['colors']})",
         {
             "default": {"ansicolors": {"version": ">=1.18.0"}},
             "develop": {"cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"}},
@@ -62,15 +62,15 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
             {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
-                    "module_mapping": {"ansiCOLORS": ["colors"]},
+                    "modules": ["colors"],
                 },
                 Address("", target_name="ansicolors"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "requirements": [
                         Requirement.parse("cachetools==4.1.1;python_version ~= '3.5'")
@@ -102,14 +102,14 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
             {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "requirements": [Requirement.parse("ansicolors[neon]>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
                 },
                 Address("", target_name="ansicolors"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "requirements": [
                         Requirement.parse("cachetools[ring,mongo]==4.1.1;python_version ~= '3.5'")
@@ -145,7 +145,7 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
             Address("", target_name="custom_pipfile_target"),
         ),
         expected_targets=[
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                     "dependencies": ["//:custom_pipfile_target"],

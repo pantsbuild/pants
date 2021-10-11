@@ -20,8 +20,8 @@ use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;
 
-use crate::core::{Failure, Key, TypeId, Value};
 use crate::interning::Interns;
+use crate::python::{Failure, Key, TypeId, Value};
 
 use cpython::{
   py_class, CompareOp, FromPyObject, ObjectProtocol, PyBool, PyBytes, PyClone, PyDict, PyErr,

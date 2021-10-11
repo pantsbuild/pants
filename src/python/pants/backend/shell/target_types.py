@@ -21,7 +21,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     IntField,
     InvalidFieldException,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -30,17 +30,19 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.docutil import git_url
 from pants.util.enums import match
 
 
-class ShellSourcesField(Sources):
+class ShellSourcesField(MultipleSourcesField):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
     uses_source_roots = False
     expected_num_files = 1
+    required = True
 
 
-class ShellGeneratingSources(Sources):
+class ShellGeneratingSources(MultipleSourcesField):
     uses_source_roots = False
 
 
@@ -190,19 +192,17 @@ async def generate_targets_from_shunit2_tests(
 
 
 # -----------------------------------------------------------------------------------------------
-# `shell_source` target
+# `shell_source` and `shell_sources` targets
 # -----------------------------------------------------------------------------------------------
 
 
 class ShellSourceTarget(Target):
-    alias = "shell_library"  # TODO(#12954): rename to `shell_source` when ready.
+    alias = "shell_sources"  # TODO(#12954): rename to `shell_source` when ready.
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesField)
     help = "A Bourne-based shell script, e.g. a Bash script."
 
-
-# -----------------------------------------------------------------------------------------------
-# `shell_library` target generator
-# -----------------------------------------------------------------------------------------------
+    deprecated_alias = "shell_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
 
 
 class ShellSourcesGeneratingSourcesField(ShellGeneratingSources):
@@ -210,9 +210,18 @@ class ShellSourcesGeneratingSourcesField(ShellGeneratingSources):
 
 
 class ShellSourcesGeneratorTarget(Target):
-    alias = "shell_library"  # TODO(#12954): rename to `shell_sources` when ready.
+    alias = "shell_sources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesGeneratingSourcesField)
     help = "Bourne-based shell scripts, e.g. Bash scripts."
+
+    deprecated_alias = "shell_library"
+    deprecated_alias_removal_version = "2.9.0.dev0"
+    deprecated_alias_removal_hint = (
+        "Use `shell_sources` instead, which behaves the same.\n\n"
+        "To automate fixing this, download "
+        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
+        "`python3 rename_targets_pants28.py --help` for instructions."
+    )
 
 
 class GenerateTargetsFromShellSources(GenerateTargetsRequest):
@@ -258,9 +267,27 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandSources(Sources):
+class ShellCommandSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
+class ShellCommandTimeout(IntField):
+    alias = "timeout"
+    default = 30
+    help = "Command execution timeout (in seconds)."
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address)
+        if value is not None and value < 1:
+            raise InvalidFieldException(
+                f"The value for the `timeout` field in target {address} must be > 0, but was "
+                f"{value}."
+            )
+        return value
 
 
 class ShellCommandToolsField(StringSequenceField):
@@ -288,7 +315,8 @@ class ShellCommand(Target):
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
-        ShellCommandSources,
+        ShellCommandSourcesField,
+        ShellCommandTimeout,
         ShellCommandToolsField,
     )
     help = (
@@ -305,7 +333,7 @@ class ShellCommand(Target):
                   outputs=["results/", "logs/my-script.log"],
                 )
 
-                shell_library(name="scripts")
+                shell_sources(name="scripts")
 
             """
         )

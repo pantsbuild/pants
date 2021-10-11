@@ -3,7 +3,7 @@
 
 from typing import cast
 
-from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
+from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
@@ -27,10 +27,10 @@ class PythonProtobufSubsystem(Subsystem):
             type=list,
             member_type=target_option,
             help=(
-                "A list of addresses to `python_requirement_library` targets for the runtime "
+                "A list of addresses to `python_requirement` targets for the runtime "
                 "dependencies needed for generated Python code to work. For example, "
                 "`['3rdparty/python:protobuf', '3rdparty/python:grpcio']`. These dependencies will "
-                "be automatically added to every `protobuf_library` target"
+                "be automatically added to every `protobuf_sources` target"
             ),
         )
         register(
@@ -84,7 +84,7 @@ def setup_mypy_protobuf_lockfile(
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
+    inject_for = ProtobufDependenciesField
 
 
 @rule

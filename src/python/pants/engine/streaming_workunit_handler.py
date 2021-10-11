@@ -59,7 +59,7 @@ class StreamingWorkunitContext:
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
-    ) -> Tuple[DigestContents, ...]:
+    ) -> tuple[DigestContents, ...]:
         """Given a sequence of Snapshot objects, return a tuple of DigestContents representing the
         files contained in those `Snapshot`s in sequence."""
         return self._scheduler.snapshots_to_file_contents(snapshots)

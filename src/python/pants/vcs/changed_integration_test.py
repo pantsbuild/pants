@@ -160,7 +160,7 @@ def create_isolated_git_repo():
             )
 
             add_to_git(
-                'a python_library with resources=["filename"]',
+                'a python_sources with resources=["filename"]',
                 copy_into("testprojects/src/python/sources", "src/python/sources"),
             )
 
@@ -181,7 +181,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
 
     TEST_MAPPING = {
         # A `pex_binary` with `entry_point='file.name'` (secondary ownership), and a
-        # `python_library` with primary ownership of the file.
+        # `python_sources` with primary ownership of the file.
         "src/python/python_targets/test_binary.py": dict(
             none=[
                 "src/python/python_targets/test_binary.py:binary_file",
@@ -198,7 +198,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
                 "src/python/python_targets:binary_file",
             ],
         ),
-        # A `python_library` with `sources=['file.name']`.
+        # A `python_sources` with `sources=['file.name']`.
         "src/python/python_targets/test_library.py": dict(
             none=["src/python/python_targets/test_library.py:test_library"],
             direct=[
@@ -223,7 +223,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
                 "src/python/python_targets:test_library_transitive_dependee_4",
             ],
         ),
-        # A `python_library` with `sources=['file.name'] .
+        # A `python_sources` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources/sources.py"],
             direct=["src/python/sources", "src/python/sources/sources.py"],

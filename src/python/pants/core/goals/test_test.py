@@ -54,7 +54,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
-    Sources,
+    MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -73,7 +73,7 @@ from pants.util.logging import LogLevel
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class MockCoverageDataCollection(CoverageDataCollection):
 
 
 class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (Sources,)
+    required_fields = (MultipleSourcesField,)
 
     @staticmethod
     @abstractmethod
@@ -150,8 +150,8 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
     )
-    interactive_runner = InteractiveRunner(rule_runner.scheduler)
-    workspace = Workspace(rule_runner.scheduler)
+    interactive_runner = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False)
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
             TestFieldSet: [field_set],
@@ -432,7 +432,7 @@ def test_runtime_package_dependencies() -> None:
             "src/py/main.py": "",
             "src/py/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 pex_binary(name='main', entry_point='main.py')
                 """
             ),

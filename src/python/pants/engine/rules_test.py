@@ -414,10 +414,10 @@ class RuleTest(unittest.TestCase):
 
         error_str = str(cm.exception)
         assert (
-            "(@rule pants.engine.rules_test:invalid_rule) has a side-effecting parameter"
+            "(@rule pants.engine.rules_test:invalid_rule) has a `SideEffecting` parameter"
             in error_str
         )
-        assert "pants.util.meta.Console" in error_str
+        assert "pants.engine.console.Console" in error_str
 
 
 def test_rule_index_creation_fails_with_bad_declaration_type():

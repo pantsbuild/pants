@@ -7,9 +7,7 @@ from typing_extensions import Protocol
 
 from pants.engine.collection import Collection
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
-from pants.engine.target import Sources as SourcesField
-from pants.engine.target import Target
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See

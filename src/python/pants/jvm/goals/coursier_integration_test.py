@@ -8,7 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.target_types import Resources
+from pants.core.target_types import ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -49,7 +49,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *util_rules(),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact, Resources],
+        target_types=[JvmDependencyLockfile, JvmArtifact, ResourcesGeneratorTarget],
     )
 
 

@@ -17,7 +17,9 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
 )
 from pants.backend.python.target_types import (
     ModuleMappingField,
+    PythonRequirementModulesField,
     PythonRequirementsField,
+    PythonRequirementTypeStubModulesField,
     PythonSources,
     TypeStubsModuleMappingField,
 )
@@ -246,9 +248,42 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
     modules_to_addresses: dict[str, Address] = {}
     modules_to_stub_addresses: dict[str, Address] = {}
     modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
+
+    def add_modules(modules: tuple[str, ...], address: Address) -> None:
+        for module in modules:
+            if module in modules_with_multiple_owners:
+                modules_with_multiple_owners[module].add(address)
+            elif module in modules_to_addresses:
+                modules_with_multiple_owners[module].update({modules_to_addresses[module], address})
+            else:
+                modules_to_addresses[module] = address
+
+    def add_stub_modules(modules: tuple[str, ...], address: Address) -> None:
+        for module in modules:
+            if module in modules_with_multiple_owners:
+                modules_with_multiple_owners[module].add(address)
+            elif module in modules_to_stub_addresses:
+                modules_with_multiple_owners[module].update(
+                    {modules_to_stub_addresses[module], address}
+                )
+            else:
+                modules_to_stub_addresses[module] = address
+
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
+
+        explicit_modules = tgt.get(PythonRequirementModulesField).value
+        if explicit_modules:
+            add_modules(explicit_modules, tgt.address)
+            continue
+
+        explicit_stub_modules = tgt.get(PythonRequirementTypeStubModulesField).value
+        if explicit_stub_modules:
+            add_stub_modules(explicit_stub_modules, tgt.address)
+            continue
+
+        # Else, fall back to defaults.
         module_map = {**DEFAULT_MODULE_MAPPING, **tgt.get(ModuleMappingField).value}
         stubs_module_map = {
             **DEFAULT_TYPE_STUB_MODULE_MAPPING,
@@ -261,7 +296,6 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             proj_name = canonicalize_project_name(req.project_name)
             fallback_value = req.project_name.strip().lower().replace("-", "_")
 
-            # Handle if it's a type stub.
             in_stubs_map = proj_name in stubs_module_map
             starts_with_prefix = fallback_value.startswith(("types_", "stubs_"))
             ends_with_prefix = fallback_value.endswith(("_types", "_stubs"))
@@ -269,32 +303,14 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
                 in_stubs_map or starts_with_prefix or ends_with_prefix
             ):
                 if in_stubs_map:
-                    modules = stubs_module_map[proj_name]
+                    stub_modules = stubs_module_map[proj_name]
                 else:
-                    modules = (fallback_value[6:] if starts_with_prefix else fallback_value[:-6],)
-
-                for module in modules:
-                    if module in modules_with_multiple_owners:
-                        modules_with_multiple_owners[module].add(tgt.address)
-                    elif module in modules_to_stub_addresses:
-                        modules_with_multiple_owners[module].update(
-                            {modules_to_stub_addresses[module], tgt.address}
-                        )
-                    else:
-                        modules_to_stub_addresses[module] = tgt.address
-
-            # Else it's a normal requirement.
+                    stub_modules = (
+                        fallback_value[6:] if starts_with_prefix else fallback_value[:-6],
+                    )
+                add_stub_modules(stub_modules, tgt.address)
             else:
-                modules = module_map.get(proj_name, (fallback_value,))
-                for module in modules:
-                    if module in modules_with_multiple_owners:
-                        modules_with_multiple_owners[module].add(tgt.address)
-                    elif module in modules_to_addresses:
-                        modules_with_multiple_owners[module].update(
-                            {modules_to_addresses[module], tgt.address}
-                        )
-                    else:
-                        modules_to_addresses[module] = tgt.address
+                add_modules(module_map.get(proj_name, (fallback_value,)), tgt.address)
 
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:

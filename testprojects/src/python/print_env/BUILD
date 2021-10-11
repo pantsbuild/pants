@@ -6,4 +6,4 @@ pex_binary(
   dependencies = [':lib'],
 )
 
-python_library(name = 'lib')
+python_sources(name = 'lib')

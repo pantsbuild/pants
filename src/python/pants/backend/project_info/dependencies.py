@@ -56,7 +56,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             "will be a more robust way of querying and filtering dependencies.\nMeanwhile you "
             "can get the list of requirement strings for a set of targets using something like\n\n"
             "./pants dependencies :: \\\n"
-            "| xargs ./pants filter --target-type=python_requirement_library \\\n"
+            "| xargs ./pants filter --target-type=python_requirement \\\n"
             "| xargs ./pants peek | jq -r '.[][\"requirements\"][]'\n",
             help=(
                 "Which types of dependencies to list, where `source` means source code "

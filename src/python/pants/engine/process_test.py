@@ -266,7 +266,7 @@ def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
 def which_binary_path() -> str:
     path = shutil.which("which")
     if not path:
-        raise EnvironmentError("`which` not discoverable on your $PATH.")
+        raise OSError("`which` not discoverable on your $PATH.")
     return path
 
 

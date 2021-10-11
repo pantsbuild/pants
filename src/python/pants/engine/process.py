@@ -9,15 +9,15 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule, side_effecting
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -56,15 +56,15 @@ class ProcessCacheScope(Enum):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Process:
-    argv: Tuple[str, ...]
+    argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
     working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
-    output_files: Tuple[str, ...]
-    output_directories: Tuple[str, ...]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
     timeout_seconds: int | float
     jdk_home: str | None
     use_nailgun: Digest
@@ -138,7 +138,7 @@ class Process:
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
     platform_constraints: tuple[str | None, ...]
-    processes: Tuple[Process, ...]
+    processes: tuple[Process, ...]
 
     def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
         if len(request_dict) == 0:
@@ -296,7 +296,7 @@ class InteractiveProcessResult:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class InteractiveProcess:
-    argv: Tuple[str, ...]
+    argv: tuple[str, ...]
     env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
@@ -352,12 +352,15 @@ class InteractiveProcess:
         )
 
 
-@side_effecting
 @dataclass(frozen=True)
-class InteractiveRunner:
-    _scheduler: "SchedulerSession"
+class InteractiveRunner(SideEffecting):
+    _scheduler: SchedulerSession
+    # Used to disable enforcement of effects in tests.
+    _enforce_effects: bool = True
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
+        if self._enforce_effects:
+            self.side_effected()
         if request.forward_signals_to_process:
             with ExceptionSink.ignoring_sigint():
                 return self._scheduler.run_local_interactive_process(request)
@@ -368,7 +371,7 @@ class InteractiveRunner:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathTest:
-    args: Tuple[str, ...]
+    args: tuple[str, ...]
     fingerprint_stdout: bool
 
     def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
@@ -436,7 +439,7 @@ class BinaryPath:
 @dataclass(unsafe_hash=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
-    paths: Tuple[BinaryPath, ...]
+    paths: tuple[BinaryPath, ...]
 
     def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
         self.binary_name = binary_name

@@ -5,7 +5,7 @@ import pytest
 
 from pants.backend.codegen.protobuf.tailor import PutativeProtobufTargetsRequest
 from pants.backend.codegen.protobuf.tailor import rules as tailor_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -47,9 +47,17 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget.for_target_type(ProtobufLibrary, "protos/foo", "foo", ["f.proto"]),
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/bar", "bar", ["baz2.proto", "baz3.proto"]
+                    ProtobufSourcesGeneratorTarget,
+                    path="protos/foo",
+                    name="foo",
+                    triggering_sources=["f.proto"],
+                ),
+                PutativeTarget.for_target_type(
+                    ProtobufSourcesGeneratorTarget,
+                    path="protos/foo/bar",
+                    name="bar",
+                    triggering_sources=["baz2.proto", "baz3.proto"],
                 ),
             ]
         )
@@ -80,10 +88,16 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/bar", "bar", ["bar.proto"]
+                    ProtobufSourcesGeneratorTarget,
+                    path="protos/foo/bar",
+                    name="bar",
+                    triggering_sources=["bar.proto"],
                 ),
                 PutativeTarget.for_target_type(
-                    ProtobufLibrary, "protos/foo/qux", "qux", ["qux.proto"]
+                    ProtobufSourcesGeneratorTarget,
+                    path="protos/foo/qux",
+                    name="qux",
+                    triggering_sources=["qux.proto"],
                 ),
             ]
         )

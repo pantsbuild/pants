@@ -11,7 +11,7 @@ from pants.util.meta import classproperty
 
 
 class PantsRequirement:
-    """Exports a `python_requirement_library` pointing at the active Pants's corresponding dist.
+    """Exports a `python_requirement` pointing at the active Pants's corresponding dist.
 
     This requirement is useful for custom plugin authors who want to build and test their plugin with
     Pants itself. Using the resulting target as a dependency of their plugin target ensures the
@@ -60,8 +60,8 @@ class PantsRequirement:
         if not modules:
             modules = [dist.replace("pantsbuild.", "")]
         self._parse_context.create_object(
-            "python_requirement_library",
+            "python_requirement",
             name=name,
             requirements=[f"{dist}=={pants_version()}"],
-            module_mapping={dist: modules},
+            modules=modules,
         )

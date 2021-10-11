@@ -7,20 +7,26 @@ import pytest
 
 from pants.backend.codegen.export_codegen_goal import ExportCodegen
 from pants.backend.codegen.export_codegen_goal import rules as write_codegen_rules
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourcesField, ResourceSourcesField
 from pants.core.util_rules import distdir
 from pants.engine.fs import CreateDigest, FileContent, Snapshot
 from pants.engine.rules import Get, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, Target
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    MultipleSourcesField,
+    SingleSourceField,
+    Target,
+)
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
 
-class Gen1Sources(Sources):
+class Gen1Sources(MultipleSourcesField):
     pass
 
 
-class Gen2Sources(Sources):
+class Gen2Sources(SingleSourceField):
     pass
 
 
@@ -36,12 +42,12 @@ class Gen2Target(Target):
 
 class Gen1Request(GenerateSourcesRequest):
     input = Gen1Sources
-    output = FilesSources
+    output = FileSourcesField
 
 
 class Gen2Request(GenerateSourcesRequest):
     input = Gen2Sources
-    output = ResourcesSources
+    output = ResourceSourcesField
 
 
 @rule
@@ -79,7 +85,9 @@ def test_no_codegen_targets(rule_runner: RuleRunner, caplog) -> None:
 
 
 def test_export_codegen(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": "gen1(name='gen1')\ngen2(name='gen2')\n"})
+    rule_runner.write_files(
+        {"BUILD": "gen1(name='gen1')\ngen2(name='gen2', source='foo.ext')\n", "foo.ext": ""}
+    )
     result = rule_runner.run_goal_rule(ExportCodegen, args=["::"])
     assert result.exit_code == 0
     parent_dir = Path(rule_runner.build_root, "dist", "codegen")

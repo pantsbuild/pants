@@ -21,7 +21,7 @@ from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import Files
+from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -42,7 +42,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImage, Files, PexBinary],
+        target_types=[DockerImage, FilesGeneratorTarget, PexBinary],
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner

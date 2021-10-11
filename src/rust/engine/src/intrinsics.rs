@@ -1,10 +1,10 @@
 use crate::context::Context;
-use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{
   lift_directory_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot,
 };
+use crate::python::{throw, Value};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;

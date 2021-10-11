@@ -14,7 +14,7 @@ dir_layout = {
     ): "if __name__ == '__main__':\n    import sys¡",
     os.path.join(
         "exiter_integration_test_harness", "BUILD"
-    ): "python_library()\npex_binary(name='bin', entry_point='main.py')",
+    ): "python_sources()\npex_binary(name='bin', entry_point='main.py')",
 }
 
 
