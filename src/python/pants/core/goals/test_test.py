@@ -150,8 +150,8 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
     )
-    interactive_runner = InteractiveRunner(rule_runner.scheduler)
-    workspace = Workspace(rule_runner.scheduler)
+    interactive_runner = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False)
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
             TestFieldSet: [field_set],

@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::core::TypeId;
+use crate::python::TypeId;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialOrd, Hash, PartialEq)]
 pub struct Get {

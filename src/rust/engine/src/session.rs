@@ -7,8 +7,8 @@ use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::context::Core;
-use crate::core::{Failure, Value};
 use crate::nodes::{NodeKey, Select};
+use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable};

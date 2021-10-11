@@ -126,7 +126,7 @@ def run_typecheck_rule(
             check,
             rule_args=[
                 console,
-                Workspace(rule_runner.scheduler),
+                Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
                 DistDir(relpath=Path("dist")),
                 union_membership,

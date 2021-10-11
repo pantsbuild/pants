@@ -167,7 +167,7 @@ def run_fmt_rule(
                 create_goal_subsystem(
                     FmtSubsystem, per_file_caching=per_file_caching, per_target_caching=False
                 ),
-                Workspace(rule_runner.scheduler),
+                Workspace(rule_runner.scheduler, _enforce_effects=False),
                 union_membership,
             ],
             mock_gets=[

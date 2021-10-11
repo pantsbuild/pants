@@ -36,8 +36,8 @@ def single_target_run(
     *,
     program_text: bytes,
 ) -> Run:
-    workspace = Workspace(rule_runner.scheduler)
-    interactive_runner = InteractiveRunner(rule_runner.scheduler)
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
+    interactive_runner = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False)
 
     class TestRunFieldSet(RunFieldSet):
         required_fields = ()
@@ -91,7 +91,7 @@ def test_materialize_input_files(rule_runner: RuleRunner) -> None:
     program_text = b'#!/usr/bin/python\nprint("hello")'
     binary = create_mock_run_request(rule_runner, program_text)
     with mock_console(rule_runner.options_bootstrapper):
-        interactive_runner = InteractiveRunner(rule_runner.scheduler)
+        interactive_runner = InteractiveRunner(rule_runner.scheduler, _enforce_effects=False)
         process = InteractiveProcess(
             argv=("./program.py",),
             run_in_workspace=False,

@@ -25,11 +25,11 @@ from typing import (
     get_type_hints,
 )
 
+from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
-from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.collections import assert_single_element
@@ -298,11 +298,11 @@ def validate_parameter_types(
 ) -> None:
     if cacheable:
         for ty in parameter_types:
-            if side_effecting.is_instance(ty):
+            if issubclass(ty, SideEffecting):
                 # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't
                 #  expose those as part of the API, so it's OK for this error not to mention them.
                 raise ValueError(
-                    f"A `@rule` that was not a @goal_rule ({func_id}) has a side-effecting parameter: {ty}"
+                    f"A `@rule` that was not a @goal_rule ({func_id}) has a `SideEffecting` parameter: {ty}"
                 )
 
 
