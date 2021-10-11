@@ -20,7 +20,7 @@ from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
-    Sources,
+    SourcesField,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -74,7 +74,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     dockerfiles_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(Sources) for t in transitive_targets.roots],
+            sources_fields=[t.get(SourcesField) for t in transitive_targets.roots],
             for_sources_types=(DockerImageSources,),
         ),
     )
@@ -89,7 +89,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(Sources) for t in chain(*root_dependencies)],
+            sources_fields=[t.get(SourcesField) for t in chain(*root_dependencies)],
             for_sources_types=(FileSourcesField,),
         ),
     )

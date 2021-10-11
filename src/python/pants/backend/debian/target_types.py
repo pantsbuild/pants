@@ -5,7 +5,7 @@ from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     DictStringToStringField,
-    Sources,
+    MultipleSourcesField,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -13,7 +13,7 @@ from pants.engine.target import (
 from pants.util.docutil import doc_url
 
 
-class DebianControlFile(Sources):
+class DebianControlFile(MultipleSourcesField):
     required = True
     expected_num_files = 1
     help = (

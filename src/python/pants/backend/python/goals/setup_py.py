@@ -61,7 +61,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    Sources,
+    SourcesField,
     SourcesPaths,
     Target,
     Targets,
@@ -909,8 +909,8 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         tgt.has_field(PythonProvidesField)
         or tgt.has_field(PythonSources)
         or tgt.has_field(ResourceSourcesField)
-        or tgt.get(Sources).can_generate(PythonSources, union_membership)
-        or tgt.get(Sources).can_generate(ResourceSourcesField, union_membership)
+        or tgt.get(SourcesField).can_generate(PythonSources, union_membership)
+        or tgt.get(SourcesField).can_generate(ResourceSourcesField, union_membership)
     )
 
 

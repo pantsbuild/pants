@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
-from pants.engine.target import Sources, Target
+from pants.engine.target import MultipleSourcesField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -35,7 +35,7 @@ class PythonTarget(Target):
 
 class NonPythonTarget(Target):
     alias = "non_python_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def create_target(
 ) -> Target:
     rule_runner.write_files({os.path.join(parent_directory, f): "" for f in files})
     address = Address(parent_directory, target_name="target")
-    return target_cls({Sources.alias: files}, address)
+    return target_cls({MultipleSourcesField.alias: files}, address)
 
 
 def get_stripped_sources(

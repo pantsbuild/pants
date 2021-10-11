@@ -20,7 +20,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.target import (
     GeneratedSources,
-    Sources,
+    MultipleSourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -265,7 +265,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
         SourceFiles,
         [
             SourceFilesRequest(
-                (src_contents[Sources],),
+                (src_contents[MultipleSourcesField],),
                 enable_codegen=True,
                 for_sources_types=(FileSourcesField,),
             )

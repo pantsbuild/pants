@@ -11,7 +11,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Sources
+from pants.engine.target import SourcesField
 from pants.util.logging import LogLevel
 
 # NOTE: Must call .format(min_dots=X) on this string to use it.
@@ -143,7 +143,7 @@ class ParsedPythonImports(DeduplicatedCollection[str]):
 
 @dataclass(frozen=True)
 class ParsePythonImportsRequest:
-    sources: Sources
+    sources: SourcesField
     interpreter_constraints: InterpreterConstraints
     string_imports: bool
     string_imports_min_dots: int

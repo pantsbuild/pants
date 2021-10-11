@@ -25,7 +25,8 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    Sources,
+    MultipleSourcesField,
+    SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
@@ -42,7 +43,7 @@ from pants.util.logging import LogLevel
 # -----------------------------------------------------------------------------------------------
 
 
-class FileSourcesField(Sources):
+class FileSourcesField(MultipleSourcesField):
     required = True
     uses_source_roots = False
     expected_num_files = 1
@@ -59,7 +60,7 @@ class FileTarget(Target):
     )
 
 
-class FilesGeneratingSourcesField(Sources):
+class FilesGeneratingSourcesField(MultipleSourcesField):
     required = True
     uses_source_roots = False
 
@@ -100,7 +101,7 @@ async def generate_targets_from_files(
 # -----------------------------------------------------------------------------------------------
 
 
-class RelocatedFilesSources(Sources):
+class RelocatedFilesSources(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
     expected_num_files = 0
@@ -204,7 +205,7 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(Sources), for_sources_types=(FileSourcesField,)),
+            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourcesField,)),
         )
         for tgt in original_file_targets
     )
@@ -226,7 +227,7 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourceSourcesField(Sources):
+class ResourceSourcesField(MultipleSourcesField):
     required = True
     expected_num_files = 1
 
@@ -243,7 +244,7 @@ class ResourceTarget(Target):
     )
 
 
-class ResourcesGeneratingSourcesField(Sources):
+class ResourcesGeneratingSourcesField(MultipleSourcesField):
     required = True
 
 
@@ -375,7 +376,9 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                tgt.get(Sources), for_sources_types=(FileSourcesField,), enable_codegen=True
+                tgt.get(SourcesField),
+                for_sources_types=(FileSourcesField,),
+                enable_codegen=True,
             ),
         )
         for tgt in file_targets

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Sources,
+    MultipleSourcesField,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -62,7 +62,7 @@ class JvmRequirementsField(SpecialCasedDependencies):
     )
 
 
-class JvmLockfileSources(Sources):
+class JvmLockfileSources(MultipleSourcesField):
     expected_file_extensions = (".lockfile",)
     expected_num_files = range(
         2

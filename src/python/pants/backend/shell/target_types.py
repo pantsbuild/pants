@@ -21,7 +21,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     IntField,
     InvalidFieldException,
-    Sources,
+    MultipleSourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -34,7 +34,7 @@ from pants.util.docutil import git_url
 from pants.util.enums import match
 
 
-class ShellSourcesField(Sources):
+class ShellSourcesField(MultipleSourcesField):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
     uses_source_roots = False
@@ -42,7 +42,7 @@ class ShellSourcesField(Sources):
     required = True
 
 
-class ShellGeneratingSources(Sources):
+class ShellGeneratingSources(MultipleSourcesField):
     uses_source_roots = False
 
 
@@ -267,7 +267,7 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandSourcesField(Sources):
+class ShellCommandSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
     uses_source_roots = False

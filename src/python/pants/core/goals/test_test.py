@@ -54,7 +54,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
-    Sources,
+    MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -73,7 +73,7 @@ from pants.util.logging import LogLevel
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class MockCoverageDataCollection(CoverageDataCollection):
 
 
 class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (Sources,)
+    required_fields = (MultipleSourcesField,)
 
     @staticmethod
     @abstractmethod

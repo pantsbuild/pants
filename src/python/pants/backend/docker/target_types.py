@@ -8,14 +8,14 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    Sources,
+    MultipleSourcesField,
     StringField,
     StringSequenceField,
     Target,
 )
 
 
-class DockerImageSources(Sources):
+class DockerImageSources(MultipleSourcesField):
     default = ("Dockerfile",)
     expected_num_files = 1
     help = "The Dockerfile to use when building the Docker image."

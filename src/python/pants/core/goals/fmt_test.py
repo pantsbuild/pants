@@ -19,14 +19,14 @@ from pants.core.goals.fmt import (
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
-from pants.engine.target import Sources, Target, Targets
+from pants.engine.target import MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
-class FortranSources(Sources):
+class FortranSources(MultipleSourcesField):
     pass
 
 
@@ -35,7 +35,7 @@ class FortranTarget(Target):
     core_fields = (FortranSources,)
 
 
-class SmalltalkSources(Sources):
+class SmalltalkSources(MultipleSourcesField):
     pass
 
 
@@ -44,7 +44,7 @@ class SmalltalkTarget(Target):
     core_fields = (SmalltalkSources,)
 
 
-class InvalidSources(Sources):
+class InvalidSources(MultipleSourcesField):
     pass
 
 
