@@ -807,6 +807,7 @@ def generate_file_level_targets(
     *,
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
+    use_source_field: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -849,21 +850,26 @@ def generate_file_level_targets(
     )
 
     def gen_tgt(full_fp: str, address: Address) -> Target:
-        generated_target_fields = {}
+        generated_target_fields: dict[str, ImmutableValue] = {}
         for field in generator.field_values.values():
-            value: Optional[ImmutableValue]
+            value: ImmutableValue
             if isinstance(field, MultipleSourcesField):
                 if not bool(matches_filespec(field.filespec, paths=[full_fp])):
                     raise AssertionError(
                         f"Target {generator.address.spec}'s `sources` field does not match a file "
                         f"{full_fp}."
                     )
-                value = (address._relative_file_path or address.generated_name,)
+                value = address._relative_file_path or address.generated_name
+                if use_source_field:
+                    generated_target_fields[SingleSourceField.alias] = value
+                else:
+                    generated_target_fields[MultipleSourcesField.alias] = (value,)
             elif add_dependencies_on_all_siblings and isinstance(field, Dependencies):
-                value = (field.value or ()) + tuple(all_generated_address_specs - {address.spec})
+                generated_target_fields[Dependencies.alias] = (field.value or ()) + tuple(
+                    all_generated_address_specs - {address.spec}
+                )
             else:
-                value = field.value
-            generated_target_fields[field.alias] = value
+                generated_target_fields[field.alias] = field.value
 
         return generated_target_cls(generated_target_fields, address, union_membership)
 
@@ -1613,11 +1619,13 @@ class SingleSourceField(SourcesField, StringField):
         "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
     )
     required = True
-    value: str
-    expected_num_files: ClassVar[int] = 1
+    expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
 
     @property
     def globs(self) -> tuple[str, ...]:
+        # Subclasses might override `required = False`, so `self.value` could be `None`.
+        if self.value is None:
+            return ()
         return (self.value,)
 
 

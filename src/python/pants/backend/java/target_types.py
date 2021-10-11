@@ -11,6 +11,7 @@ from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -20,9 +21,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 
 
-class JavaSourceField(MultipleSourcesField):
+class JavaSourceField(SingleSourceField):
     expected_file_extensions = (".java",)
-    expected_num_files = 1
 
 
 class JavaGeneratorSources(MultipleSourcesField):
@@ -30,7 +30,7 @@ class JavaGeneratorSources(MultipleSourcesField):
 
 
 # -----------------------------------------------------------------------------------------------
-# `junit_test` target
+# `junit_test` and `junit_tests` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -46,11 +46,6 @@ class JunitTestTarget(Target):
         JavaTestSourceField,
     )
     help = "A single Java test, run with JUnit."
-
-
-# -----------------------------------------------------------------------------------------------
-# `junit_tests` target generator
-# -----------------------------------------------------------------------------------------------
 
 
 class JavaTestsGeneratorSourcesField(JavaGeneratorSources):
@@ -88,11 +83,12 @@ async def generate_targets_from_junit_tests(
         union_membership,
         # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=True,
+        use_source_field=True,
     )
 
 
 # -----------------------------------------------------------------------------------------------
-# `java_source` target
+# `java_source` and `java_sources` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -104,11 +100,6 @@ class JavaSourceTarget(Target):
         JavaSourceField,
     )
     help = "A single Java source file containing application or library code."
-
-
-# -----------------------------------------------------------------------------------------------
-# `java_sources` target generator
-# -----------------------------------------------------------------------------------------------
 
 
 class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
@@ -143,6 +134,7 @@ async def generate_targets_from_java_sources(
         union_membership,
         # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=True,
+        use_source_field=True,
     )
 
 

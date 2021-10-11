@@ -150,9 +150,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -207,9 +205,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -254,9 +250,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -335,9 +329,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
                 """
             ),
@@ -414,9 +406,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -505,9 +495,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -585,9 +573,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -639,9 +625,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -689,9 +673,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -747,9 +729,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [":joda-time_joda-time"],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(
@@ -796,9 +776,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 coursier_lockfile(
                     name = 'lockfile',
                     requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_sources(

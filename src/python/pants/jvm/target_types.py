@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    MultipleSourcesField,
+    SingleSourceField,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -62,11 +62,11 @@ class JvmRequirementsField(SpecialCasedDependencies):
     )
 
 
-class JvmLockfileSources(MultipleSourcesField):
+class JvmLockfileSources(SingleSourceField):
     expected_file_extensions = (".lockfile",)
-    expected_num_files = range(
-        2
-    )  # NOTE: This actually means 0 or 1 files; `range`'s end is noninclusive.
+    # Expect 0 or 1 files.
+    expected_num_files = range(0, 2)
+    required = False
     help = (
         "A single Pants Coursier Lockfile source.\n\n"
         "Use `./pants coursier-resolve ...` to generate (or regenerate) the Lockfile."
