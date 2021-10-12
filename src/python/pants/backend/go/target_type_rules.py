@@ -51,7 +51,7 @@ from pants.engine.target import (
     Targets,
     WrappedTarget,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
@@ -185,7 +185,9 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_go_mod(
-    request: GenerateTargetsFromGoModRequest, files_not_found_behavior: FilesNotFoundBehavior
+    request: GenerateTargetsFromGoModRequest,
+    files_not_found_behavior: FilesNotFoundBehavior,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_info, go_paths = await MultiGet(
@@ -225,6 +227,8 @@ async def generate_targets_from_go_mod(
             },
             # E.g. `src/go:mod#./subdir`.
             generator_addr.create_generated(f"./{subpath}"),
+            union_membership,
+            resident_dir=dir,
         )
 
     first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
@@ -238,6 +242,8 @@ async def generate_targets_from_go_mod(
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
+            union_membership,
+            resident_dir=generator_addr.spec_path,
         )
 
     third_party_pkgs = (

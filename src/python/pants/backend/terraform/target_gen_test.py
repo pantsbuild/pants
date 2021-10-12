@@ -53,10 +53,12 @@ def test_target_generation_at_build_root(rule_runner: RuleRunner) -> None:
             TerraformModuleTarget(
                 {TerraformModuleSourcesField.alias: ("src/tf/foo/versions.tf",)},
                 generator_addr.create_generated("src/tf/foo"),
+                resident_dir="src/tf/foo",
             ),
             TerraformModuleTarget(
                 {TerraformModuleSourcesField.alias: ("src/tf/outputs.tf", "src/tf/versions.tf")},
                 generator_addr.create_generated("src/tf"),
+                resident_dir="src/tf",
             ),
         ],
     )
@@ -82,10 +84,12 @@ def test_target_generation_at_subdir(rule_runner: RuleRunner) -> None:
             TerraformModuleTarget(
                 {TerraformModuleSourcesField.alias: ("foo/versions.tf",)},
                 generator_addr.create_generated("foo"),
+                resident_dir="src/tf/foo",
             ),
             TerraformModuleTarget(
                 {TerraformModuleSourcesField.alias: ("versions.tf",)},
                 generator_addr.create_generated("."),
+                resident_dir="src/tf",
             ),
         ],
     )

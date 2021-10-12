@@ -429,6 +429,14 @@ def test_target_validate() -> None:
         FortranTarget({FortranVersion.alias: "bad"}, Address("", target_name="t"))
 
 
+def test_target_resident_dir() -> None:
+    assert FortranTarget({}, Address("some_dir/subdir")).resident_dir == "some_dir/subdir"
+    assert (
+        FortranTarget({}, Address("some_dir/subdir"), resident_dir="another_dir").resident_dir
+        == "another_dir"
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test file-level target generation
 # -----------------------------------------------------------------------------------------------
@@ -468,10 +476,12 @@ def test_generate_file_level_targets() -> None:
             MockGenerated(
                 {MultipleSourcesField.alias: ["f1.ext"], Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f1.ext"),
+                resident_dir="demo",
             ),
             MockGenerated(
                 {MultipleSourcesField.alias: ["f2.ext"], Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f2.ext"),
+                resident_dir="demo",
             ),
         ],
     )
@@ -487,6 +497,7 @@ def test_generate_file_level_targets() -> None:
                     Tags.alias: ["tag"],
                 },
                 Address("demo", relative_file_path="f1.ext"),
+                resident_dir="demo",
             ),
             MockGenerated(
                 {
@@ -495,6 +506,7 @@ def test_generate_file_level_targets() -> None:
                     Tags.alias: ["tag"],
                 },
                 Address("demo", relative_file_path="f2.ext"),
+                resident_dir="demo",
             ),
         ],
     )
@@ -509,6 +521,7 @@ def test_generate_file_level_targets() -> None:
             MockGenerated(
                 {MultipleSourcesField.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+                resident_dir="src/fortran/subdir",
             )
         ],
     )
@@ -520,6 +533,7 @@ def test_generate_file_level_targets() -> None:
             MockGenerated(
                 {MultipleSourcesField.alias: ["subdir/demo.f95"]},
                 Address("src/fortran", target_name="demo", generated_name="subdir/demo.f95"),
+                resident_dir="src/fortran/subdir",
             )
         ],
     )

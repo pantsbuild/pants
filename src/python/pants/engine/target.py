@@ -266,7 +266,7 @@ _F = TypeVar("_F", bound=Field)
 
 @frozen_after_init
 class Target:
-    """A Target represents a combination of fields that are valid _together_.
+    """A Target represents an addressable set of metadata.
 
     Set the `help` class property with a description, which will be used in `./pants help`. For the
     best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
@@ -287,19 +287,39 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: Tuple[Type[Field], ...]
-    field_values: FrozenDict[Type[Field], Field]
+    plugin_fields: tuple[type[Field], ...]
+    field_values: FrozenDict[type[Field], Field]
+    resident_dir: str
 
     @final
     def __init__(
         self,
-        unhydrated_values: Dict[str, Any],
+        unhydrated_values: dict[str, Any],
         address: Address,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
+        *,
+        resident_dir: str | None = None,
     ) -> None:
+        """Create a target.
+
+        :param unhydrated_values: A mapping of field aliases to their raw values. Any left off
+            fields will either use their default or error if required=True.
+        :param address: How to uniquely identify this target.
+        :param union_membership: Used to determine plugin fields. This must be set in production!
+        :param resident_dir: Where this target "lives". If unspecified, will be the `spec_path`
+            of the `address`, i.e. where the target was either explicitly defined or where its
+            target generator was explicitly defined. Target generators can, however, set this to
+            the directory where the generated target provides metadata for. For example, a
+            file-based target like `python_source` should set this to the parent directory of
+            its file. A directory-based target like `go_first_party_package` should set it to the
+            directory. A subtree-based target might set it to the root of the subtree. A file-less
+            target like `go_third_party_package` should keep the default of `address.spec_path`.
+            This field impacts how command line specs work, so that globs like `dir:` know whether
+            to match the target or not.
+        """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
                 raise ValueError(
@@ -316,6 +336,8 @@ class Target:
 
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
+
+        self.resident_dir = resident_dir if resident_dir is not None else address.spec_path
 
         field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
@@ -362,6 +384,7 @@ class Target:
             f"{self.__class__}("
             f"address={self.address}, "
             f"alias={repr(self.alias)}, "
+            f"resident_dir={repr(self.resident_dir)}, "
             f"{fields})"
         )
 
@@ -371,20 +394,21 @@ class Target:
         return f"{self.alias}({address}{fields})"
 
     def __hash__(self) -> int:
-        return hash((self.__class__, self.address, self.field_values))
+        return hash((self.__class__, self.address, self.resident_dir, self.field_values))
 
     def __eq__(self, other: Union[Target, Any]) -> bool:
         if not isinstance(other, Target):
             return NotImplemented
-        return (self.__class__, self.address, self.field_values) == (
+        return (self.__class__, self.address, self.resident_dir, self.field_values) == (
             other.__class__,
             other.address,
+            other.resident_dir,
             other.field_values,
         )
 
     @final
     @classmethod
-    def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
         return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
 
     @final
@@ -870,7 +894,12 @@ def generate_file_level_targets(
             else:
                 generated_target_fields[field.alias] = field.value
 
-        return generated_target_cls(generated_target_fields, address, union_membership)
+        return generated_target_cls(
+            generated_target_fields,
+            address,
+            union_membership,
+            resident_dir=os.path.dirname(full_fp),
+        )
 
     return GeneratedTargets(
         generator, (gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
