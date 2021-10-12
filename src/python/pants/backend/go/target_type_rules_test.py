@@ -178,6 +178,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                 GoFirstPartyPackageSourcesField.alias: tuple(sources),
             },
             Address("src/go", generated_name=f"./{rel_dir}"),
+            residence_dir=os.path.join("src/go", rel_dir).rstrip("/"),
         )
 
     def gen_third_party_tgt(

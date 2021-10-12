@@ -20,7 +20,7 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.dirutil import fast_relpath
 
 
@@ -30,7 +30,7 @@ class GenerateTerraformModuleTargetsRequest(GenerateTargetsRequest):
 
 @rule
 async def generate_terraform_module_targets(
-    request: GenerateTerraformModuleTargetsRequest,
+    request: GenerateTerraformModuleTargetsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     generator = request.generator
     sources_paths = await Get(
@@ -53,7 +53,10 @@ async def generate_terraform_module_targets(
                 value = field.value
             generated_target_fields[field.alias] = value
         return TerraformModuleTarget(
-            generated_target_fields, generator.address.create_generated(relpath_to_generator or ".")
+            generated_target_fields,
+            generator.address.create_generated(relpath_to_generator or "."),
+            union_membership,
+            residence_dir=dir,
         )
 
     return GeneratedTargets(request.generator, [gen_target(dir) for dir in matched_dirs])
