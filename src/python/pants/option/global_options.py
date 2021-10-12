@@ -1357,11 +1357,8 @@ class GlobalOptions(Subsystem):
             type=OwnersNotFoundBehavior,
             default=OwnersNotFoundBehavior.error,
             help=(
-                "What to do when file/directory arguments do not have any owning target.\n\n"
-                "For file arguments, this happens when there are no targets whose `sources` fields "
-                "include the file. For directory arguments, this happens when there are no targets "
-                "defined in the directory and also no targets who include files in the directory "
-                "in their `sources` field."
+                "What to do when file arguments do not have any owning target. This happens when "
+                "there are no targets whose `sources` fields include the file argument."
             ),
         )
 

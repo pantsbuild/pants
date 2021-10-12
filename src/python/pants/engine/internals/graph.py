@@ -8,6 +8,7 @@ import itertools
 import logging
 import os.path
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
@@ -15,10 +16,8 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
-    DirLiteralSpec,
     FileLiteralSpec,
     FilesystemSpecs,
-    MaybeEmptySiblingAddresses,
     Specs,
 )
 from pants.engine.addresses import (
@@ -528,7 +527,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
     ):
         _log_or_raise_unmatched_owners(
-            list(unmatched_sources), [], owners_request.owners_not_found_behavior
+            [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
     return Owners(matching_addresses)
@@ -545,52 +544,27 @@ def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNo
 
 
 def _log_or_raise_unmatched_owners(
-    file_paths: Sequence[str],
-    dir_paths: Sequence[str],
+    file_paths: Sequence[PurePath],
     owners_not_found_behavior: OwnersNotFoundBehavior,
     ignore_option: str | None = None,
 ) -> None:
     option_msg = (
-        f"\n\nIf you would like to ignore un-owned files/directories, please pass `{ignore_option}`."
+        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
         if ignore_option
         else ""
     )
-    if dir_paths and file_paths:
+    if len(file_paths) == 1:
         prefix = (
-            f"No owning targets could be found for the files `{sorted(file_paths)}` and the "
-            f"directories `{sorted(dir_paths)}`.\n\n"
-            "Please check that there are targets defined in the directories or that there are "
-            "targets in ancestor directories whose `sources` field include the problematic "
-            "files/directories."
+            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
+            f"Please check that there is a BUILD file in the parent directory "
+            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
         )
-    elif not dir_paths:
-        if len(file_paths) == 1:
-            prefix = (
-                f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
-                "Please check that there is a BUILD file in the parent directory "
-                "or an ancestor directory with a target whose `sources` field includes the file."
-            )
-        else:
-            prefix = (
-                f"No owning targets could be found for the files `{sorted(file_paths)}`."
-                "\n\nPlease check that there are BUILD files in each file's parent directory or "
-                "ancestor directories with a target whose `sources` field includes the file."
-            )
     else:
-        if len(dir_paths) == 1:
-            prefix = (
-                f"No owning targets could be found for the directory `{dir_paths[0]}`.\n\n"
-                "Please check that there targets defined in the directory or that there are "
-                "targets in ancestor directories whose `sources` field includes files in the "
-                "directory."
-            )
-        else:
-            prefix = (
-                f"No owning targets could be found for the directories `{sorted(dir_paths)}`."
-                "\n\nPlease check that there are targets defined in the directories or that there "
-                "are targets in ancestor directories whose `sources` field includes files in the "
-                "directories."
-            )
+        prefix = (
+            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
+            f"Please check that there are BUILD files in each file's parent directory with a "
+            f"target whose `sources` field includes the file."
+        )
     msg = (
         f"{prefix} See {doc_url('targets')} for more information on target definitions."
         f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
@@ -608,8 +582,6 @@ async def addresses_from_filesystem_specs(
     filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
     """Find the owner(s) for each FilesystemSpec."""
-    all_includes = (*filesystem_specs.file_includes, *filesystem_specs.dir_includes)
-    ignore_missing_owners = owners_not_found_behavior == OwnersNotFoundBehavior.ignore
     paths_per_include = await MultiGet(
         Get(
             Paths,
@@ -618,31 +590,20 @@ async def addresses_from_filesystem_specs(
                 spec, owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
-        for spec in all_includes
+        for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
     )
-    # Additionally, include any targets defined in the directory. Note that we use MaybeEmpty
-    # because there might not be any targets in the directory, but there could still be
-    # ancestor targets that had matching files.
-    non_file_targets = await Get(
-        Addresses,
-        AddressSpecs(
-            MaybeEmptySiblingAddresses(dir_include.v)
-            for dir_include in filesystem_specs.dir_includes
-        ),
-    )
-    addresses: set[Address] = set(non_file_targets)
-    for spec, owners in zip(all_includes, owners_per_include):
+    addresses: set[Address] = set()
+    for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
         if (
-            not ignore_missing_owners
+            owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+            and isinstance(spec, FileLiteralSpec)
             and not owners
-            and isinstance(spec, (FileLiteralSpec, DirLiteralSpec))
         ):
             _log_or_raise_unmatched_owners(
-                [spec.file] if isinstance(spec, FileLiteralSpec) else [],
-                [spec.v] if isinstance(spec, DirLiteralSpec) else [],
+                [PurePath(str(spec))],
                 owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
