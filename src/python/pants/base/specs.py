@@ -255,7 +255,9 @@ class AddressSpecs:
 
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):
-    pass
+    @abstractmethod
+    def to_glob(self) -> str:
+        """Convert to a glob understood by `PathGlobs`."""
 
 
 @dataclass(frozen=True)
@@ -267,6 +269,9 @@ class FileLiteralSpec(FilesystemSpec):
     def __str__(self) -> str:
         return self.file
 
+    def to_glob(self) -> str:
+        return self.file
+
 
 @dataclass(frozen=True)
 class FileGlobSpec(FilesystemSpec):
@@ -275,6 +280,9 @@ class FileGlobSpec(FilesystemSpec):
     glob: str
 
     def __str__(self) -> str:
+        return self.glob
+
+    def to_glob(self) -> str:
         return self.glob
 
 
@@ -291,61 +299,91 @@ class FileIgnoreSpec(FilesystemSpec):
     def __str__(self) -> str:
         return f"!{self.glob}"
 
+    def to_glob(self) -> str:
+        return f"!{self.glob}"
+
+
+@dataclass(frozen=True)
+class DirLiteralSpec(FilesystemSpec):
+    """A literal dir path, e.g. `some/dir`.
+
+    The empty string represents the build root.
+    """
+
+    v: str
+
+    def __str__(self) -> str:
+        return self.v
+
+    def to_glob(self) -> str:
+        if not self.v:
+            return "*"
+        return f"{self.v}/*"
+
+    def to_address_literal(self) -> AddressLiteralSpec:
+        """For now, `dir` can also be shorthand for `dir:dir`."""
+        return AddressLiteralSpec(
+            path_component=self.v, target_component=None, generated_component=None
+        )
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FilesystemSpecs:
-    includes: tuple[FileLiteralSpec | FileGlobSpec, ...]
+    file_includes: tuple[FileLiteralSpec | FileGlobSpec, ...]
+    dir_includes: tuple[DirLiteralSpec, ...]
     ignores: tuple[FileIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
-        includes = []
+        file_includes = []
+        dir_includes = []
         ignores = []
         for spec in specs:
             if isinstance(spec, (FileLiteralSpec, FileGlobSpec)):
-                includes.append(spec)
+                file_includes.append(spec)
+            elif isinstance(spec, DirLiteralSpec):
+                dir_includes.append(spec)
             elif isinstance(spec, FileIgnoreSpec):
                 ignores.append(spec)
             else:
-                raise ValueError(f"Unexpected type of FilesystemSpec: {repr(self)}")
-        self.includes = tuple(includes)
+                raise AssertionError(f"Unexpected type of FilesystemSpec: {repr(self)}")
+        self.file_includes = tuple(file_includes)
+        self.dir_includes = tuple(dir_includes)
         self.ignores = tuple(ignores)
-
-    @property
-    def specs(self) -> tuple[FilesystemSpec, ...]:
-        return (*self.includes, *self.ignores)
 
     @staticmethod
     def _generate_path_globs(
         specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
     ) -> PathGlobs:
         return PathGlobs(
-            globs=(str(s) for s in specs),
+            globs=(s.to_glob() for s in specs),
             glob_match_error_behavior=glob_match_error_behavior,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,
             description_of_origin=(
                 None
                 if glob_match_error_behavior == GlobMatchErrorBehavior.ignore
-                else "file arguments"
+                else "file/directory arguments"
             ),
         )
 
     def path_globs_for_spec(
         self,
-        spec: FileLiteralSpec | FileGlobSpec,
+        spec: FileLiteralSpec | FileGlobSpec | DirLiteralSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's
-        FilesystemIgnoreSpecs."""
+        FileIgnoreSpecs."""
         return self._generate_path_globs((spec, *self.ignores), glob_match_error_behavior)
 
     def to_path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> PathGlobs:
         """Generate a single PathGlobs for the instance."""
-        return self._generate_path_globs((*self.includes, *self.ignores), glob_match_error_behavior)
+        return self._generate_path_globs(
+            (*self.file_includes, *self.dir_includes, *self.ignores), glob_match_error_behavior
+        )
 
     def __bool__(self) -> bool:
-        return bool(self.specs)
+        return bool(self.file_includes) or bool(self.dir_includes) or bool(self.ignores)
 
 
 @dataclass(frozen=True)

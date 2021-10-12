@@ -30,7 +30,7 @@ def calculate_specs(
     build_root: str,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
-    specs = SpecsParser(build_root).parse_specs(options.specs)
+    specs = SpecsParser(build_root).parse_specs(options.specs, dir_address_shorthand=True)
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
     logger.debug("specs are: %s", specs)
@@ -39,9 +39,9 @@ def calculate_specs(
     if specs.provided and changed_options.provided:
         changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
         if specs.filesystem_specs and specs.address_specs:
-            specs_description = "target and file arguments"
+            specs_description = "target and file/directory arguments"
         elif specs.filesystem_specs:
-            specs_description = "file arguments"
+            specs_description = "file/directory arguments"
         else:
             specs_description = "target arguments"
         raise InvalidSpecConstraint(

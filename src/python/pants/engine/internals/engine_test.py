@@ -888,7 +888,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     rule_runner.create_file("src/python/others/b.py", "print('')")
 
     specs = SpecsParser(get_buildroot()).parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"]
+        ["src/python/somefiles::", "src/python/others/b.py"], dir_address_shorthand=True
     )
 
     class Callback(WorkunitsCallback):

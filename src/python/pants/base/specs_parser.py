@@ -12,6 +12,7 @@ from pants.base.specs import (
     AddressSpec,
     AddressSpecs,
     DescendantAddresses,
+    DirLiteralSpec,
     FileGlobSpec,
     FileIgnoreSpec,
     FileLiteralSpec,
@@ -104,19 +105,22 @@ class SpecsParser:
         if PurePath(spec).suffix:
             return FileLiteralSpec(self._normalize_spec_path(spec))
         spec_path = self._normalize_spec_path(spec)
+        if spec_path == ".":
+            return DirLiteralSpec("")
+        # Some paths that look like dirs can actually be files without extensions.
         if Path(self._root_dir, spec_path).is_file():
             return FileLiteralSpec(spec_path)
-        # Else we apply address shorthand, i.e. `src/python/pants/util` ->
-        # `src/python/pants/util:util`
-        return AddressLiteralSpec(spec_path, None, None)
+        return DirLiteralSpec(spec_path)
 
-    def parse_specs(self, specs: Iterable[str]) -> Specs:
+    def parse_specs(self, specs: Iterable[str], *, dir_address_shorthand: bool) -> Specs:
         address_specs: OrderedSet[AddressSpec] = OrderedSet()
         filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
         for spec_str in specs:
             parsed_spec = self.parse_spec(spec_str)
             if isinstance(parsed_spec, AddressSpec):
                 address_specs.add(parsed_spec)
+            elif dir_address_shorthand and isinstance(parsed_spec, DirLiteralSpec):
+                address_specs.add(parsed_spec.to_address_literal())
             else:
                 filesystem_specs.add(parsed_spec)
 

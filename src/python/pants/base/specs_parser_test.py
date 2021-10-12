@@ -12,17 +12,19 @@ from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpec,
     DescendantAddresses,
+    DirLiteralSpec,
     FileGlobSpec,
     FileIgnoreSpec,
     FileLiteralSpec,
     FilesystemSpec,
     SiblingAddresses,
+    Spec,
 )
 from pants.base.specs_parser import SpecsParser
 
 
 def address_literal(
-    directory: str, name: str | None = None, generated: str | None = None
+    directory: str, name: str | None, generated: str | None = None
 ) -> AddressLiteralSpec:
     return AddressLiteralSpec(directory, name, generated)
 
@@ -33,6 +35,10 @@ def desc(directory: str) -> DescendantAddresses:
 
 def sib(directory: str) -> SiblingAddresses:
     return SiblingAddresses(directory)
+
+
+def dir_literal(v: str) -> DirLiteralSpec:
+    return DirLiteralSpec(v)
 
 
 def file_literal(file: str) -> FileLiteralSpec:
@@ -47,19 +53,10 @@ def ignore(val: str) -> FileIgnoreSpec:
     return FileIgnoreSpec(val)
 
 
-def assert_address_spec_parsed(build_root: Path, spec_str: str, expected_spec: AddressSpec) -> None:
+def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> None:
     parser = SpecsParser(str(build_root))
     spec = parser.parse_spec(spec_str)
-    assert isinstance(spec, AddressSpec)
-    assert spec == expected_spec
-
-
-def assert_filesystem_spec_parsed(
-    build_root: Path, spec_str: str, expected_spec: FilesystemSpec
-) -> None:
-    parser = SpecsParser(str(build_root))
-    spec = parser.parse_spec(spec_str)
-    assert isinstance(spec, FilesystemSpec)
+    assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec
 
 
@@ -68,9 +65,9 @@ def assert_filesystem_spec_parsed(
     [
         (":root", address_literal("", "root")),
         ("//:root", address_literal("", "root")),
-        ("a", address_literal("a")),
+        ("a", dir_literal("a")),
         ("a:a", address_literal("a", "a")),
-        ("a/b", address_literal("a/b")),
+        ("a/b", dir_literal("a/b")),
         ("a/b:b", address_literal("a/b", "b")),
         ("a/b:c", address_literal("a/b", "c")),
         ("//a/b:c", address_literal("a/b", "c")),
@@ -81,8 +78,10 @@ def assert_filesystem_spec_parsed(
         ("//dir:tgt#gen", address_literal("dir", "tgt", "gen")),
     ],
 )
-def test_address_literal_specs(tmp_path: Path, spec: str, expected: AddressLiteralSpec) -> None:
-    assert_address_spec_parsed(tmp_path, spec, expected)
+def test_address_literal_specs(
+    tmp_path: Path, spec: str, expected: AddressLiteralSpec | DirLiteralSpec
+) -> None:
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 @pytest.mark.parametrize(
@@ -97,7 +96,7 @@ def test_address_literal_specs(tmp_path: Path, spec: str, expected: AddressLiter
     ],
 )
 def test_sibling(tmp_path: Path, spec: str, expected: SiblingAddresses) -> None:
-    assert_address_spec_parsed(tmp_path, spec, expected)
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 @pytest.mark.parametrize(
@@ -112,25 +111,37 @@ def test_sibling(tmp_path: Path, spec: str, expected: SiblingAddresses) -> None:
     ],
 )
 def test_descendant(tmp_path: Path, spec: str, expected: DescendantAddresses) -> None:
-    assert_address_spec_parsed(tmp_path, spec, expected)
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 def test_files(tmp_path: Path) -> None:
     # We assume that specs with an extension are meant to be interpreted as filesystem specs.
     for f in ["a.txt", "a.tmp.cache.txt.bak", "a/b/c.txt", ".a.txt"]:
-        assert_filesystem_spec_parsed(tmp_path, f, file_literal(f))
-    assert_filesystem_spec_parsed(tmp_path, "./a.txt", file_literal("a.txt"))
-    assert_filesystem_spec_parsed(tmp_path, "//./a.txt", file_literal("a.txt"))
+        assert_spec_parsed(tmp_path, f, file_literal(f))
+    assert_spec_parsed(tmp_path, "./a.txt", file_literal("a.txt"))
+    assert_spec_parsed(tmp_path, "a.txt/", file_literal("a.txt"))
+    assert_spec_parsed(tmp_path, "//./a.txt", file_literal("a.txt"))
+    assert_spec_parsed(tmp_path, "//a.txt", file_literal("a.txt"))
 
 
 @pytest.mark.parametrize("spec", ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"])
-def test_globs(tmp_path: Path, spec: str) -> None:
-    assert_filesystem_spec_parsed(tmp_path, spec, file_glob(spec))
+def test_file_globs(tmp_path: Path, spec: str) -> None:
+    assert_spec_parsed(tmp_path, spec, file_glob(spec))
 
 
 @pytest.mark.parametrize("spec", ["!", "!a/b/", "!/a/b/*"])
 def test_excludes(tmp_path: Path, spec: str) -> None:
-    assert_filesystem_spec_parsed(tmp_path, spec, ignore(spec[1:]))
+    assert_spec_parsed(tmp_path, spec, ignore(spec[1:]))
+
+
+def test_dir_literals(tmp_path: Path) -> None:
+    for d in ["dir", "dir/subdir", ".dir"]:
+        assert_spec_parsed(tmp_path, d, dir_literal(d))
+    assert_spec_parsed(tmp_path, "./dir", dir_literal("dir"))
+    assert_spec_parsed(tmp_path, "//./dir", dir_literal("dir"))
+    assert_spec_parsed(tmp_path, "//dir", dir_literal("dir"))
+    assert_spec_parsed(tmp_path, "./", dir_literal(""))
+    assert_spec_parsed(tmp_path, ".", dir_literal(""))
 
 
 @pytest.mark.parametrize(
@@ -146,24 +157,24 @@ def test_excludes(tmp_path: Path, spec: str) -> None:
 def test_files_with_original_targets(
     tmp_path: Path, spec: str, expected: AddressLiteralSpec
 ) -> None:
-    assert_address_spec_parsed(tmp_path, spec, expected)
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 @pytest.mark.parametrize("spec", ["a", "b/c"])
 def test_ambiguous_files(tmp_path: Path, spec: str) -> None:
-    # These could either be files or the shorthand for address_literal addresses. We check if
-    # they exist on the file system to disambiguate.
-    assert_address_spec_parsed(tmp_path, spec, address_literal(spec))
+    # These could either be files or directories. We check if they exist on the file system to
+    # disambiguate.
+    assert_spec_parsed(tmp_path, spec, dir_literal(spec))
     path = tmp_path / spec
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
-    assert_filesystem_spec_parsed(tmp_path, spec, file_literal(spec))
+    assert_spec_parsed(tmp_path, spec, file_literal(spec))
 
 
 @pytest.mark.parametrize(
     "spec_suffix,expected",
     [
-        ("a", address_literal("a")),
+        ("a", dir_literal("a")),
         ("a:a", address_literal("a", "a")),
         ("a:", sib("a")),
         ("a::", desc("a")),
@@ -172,17 +183,14 @@ def test_ambiguous_files(tmp_path: Path, spec: str) -> None:
 )
 def test_absolute(tmp_path: Path, spec_suffix: str, expected: AddressSpec | FilesystemSpec) -> None:
     spec = os.path.join(tmp_path, spec_suffix)
-    if isinstance(expected, AddressSpec):
-        assert_address_spec_parsed(tmp_path, spec, expected)
-    else:
-        assert_filesystem_spec_parsed(tmp_path, spec, expected)
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 def test_invalid_absolute_path(tmp_path: Path) -> None:
     with pytest.raises(SpecsParser.BadSpecError):
-        assert_address_spec_parsed(tmp_path, "/not/the/buildroot/a", sib("a"))
+        assert_spec_parsed(tmp_path, "/not/the/buildroot/a", sib("a"))
     with pytest.raises(SpecsParser.BadSpecError):
-        assert_filesystem_spec_parsed(tmp_path, "/not/the/buildroot/a.txt", file_literal("a.txt"))
+        assert_spec_parsed(tmp_path, "/not/the/buildroot/a.txt", file_literal("a.txt"))
 
 
 def test_absolute_double_slashed(tmp_path: Path) -> None:
@@ -192,12 +200,10 @@ def test_absolute_double_slashed(tmp_path: Path) -> None:
     double_absolute_file = "/" + os.path.join(tmp_path, "a.txt")
     for spec in [double_absolute_address, double_absolute_file]:
         assert "//" == spec[:2]
-    assert_address_spec_parsed(
-        tmp_path, double_absolute_address, address_literal(double_absolute_address[2:])
+    assert_spec_parsed(
+        tmp_path, f"{double_absolute_address}:a", address_literal(double_absolute_address[2:], "a")
     )
-    assert_filesystem_spec_parsed(
-        tmp_path, double_absolute_file, file_literal(double_absolute_file[2:])
-    )
+    assert_spec_parsed(tmp_path, double_absolute_file, file_literal(double_absolute_file[2:]))
 
 
 @pytest.mark.parametrize(
@@ -206,26 +212,28 @@ def test_absolute_double_slashed(tmp_path: Path) -> None:
         ("./:root", address_literal("", "root")),
         ("//./:root", address_literal("", "root")),
         ("//./a/../:root", address_literal("", "root")),
-        ("a/", address_literal("a")),
-        ("./a/", address_literal("a")),
+        ("a/", dir_literal("a")),
+        ("./a/", dir_literal("a")),
         ("a/b/:b", address_literal("a/b", "b")),
         ("./a/b/:b", address_literal("a/b", "b")),
     ],
 )
-def test_cmd_line_affordances(tmp_path: Path, spec: str, expected: AddressLiteralSpec) -> None:
-    assert_address_spec_parsed(tmp_path, spec, expected)
+def test_cmd_line_affordances(
+    tmp_path: Path, spec: str, expected: AddressLiteralSpec | DirLiteralSpec
+) -> None:
+    assert_spec_parsed(tmp_path, spec, expected)
 
 
 @pytest.mark.parametrize(
     "spec_suffix,expected",
     [
         ("./a/../:root", address_literal("", "root")),
-        ("./a/", address_literal("a")),
+        ("./a/", dir_literal("a")),
         ("./a/b/:b", address_literal("a/b", "b")),
     ],
 )
 def test_cmd_line_affordances_absolute_path(
-    tmp_path: Path, spec_suffix: str, expected: AddressLiteralSpec
+    tmp_path: Path, spec_suffix: str, expected: AddressLiteralSpec | DirLiteralSpec
 ) -> None:
     spec = os.path.join(tmp_path, spec_suffix)
-    assert_address_spec_parsed(tmp_path, spec, expected)
+    assert_spec_parsed(tmp_path, spec, expected)
