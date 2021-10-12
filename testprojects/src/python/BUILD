@@ -50,3 +50,9 @@ files(
   name = 'sources_directory',
   sources = ['sources/**/*'],
 )
+
+experimental_shell_command(
+    name="cmd",
+    command='{{ tree {chroot}; echo "in: {chroot}"; }} | tee output.log',
+    dependencies=[":hello_directory"],
+)

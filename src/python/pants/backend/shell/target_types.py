@@ -292,7 +292,6 @@ class ShellCommandTimeout(IntField):
 
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
-    required = True
     help = (
         "Specify required executable tools that might be used.\n\n"
         "Only the tools explicitly provided will be available on the search PATH, "
