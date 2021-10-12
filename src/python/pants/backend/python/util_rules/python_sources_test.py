@@ -59,12 +59,19 @@ def create_target(
     files: str | list[str],
     target_cls: type[Target] = PythonTarget,
 ) -> Target:
-    rule_runner.write_files({os.path.join(parent_directory, f): "" for f in files})
+    rule_runner.write_files(
+        {
+            os.path.join(parent_directory, f): ""
+            for f in (files if isinstance(files, list) else (files,))
+        }
+    )
     address = Address(parent_directory, target_name="target")
     return target_cls(
-        {MultipleSourcesField.alias: files}
-        if isinstance(files, list)
-        else {SingleSourceField.alias: files},
+        (
+            {MultipleSourcesField.alias: files}
+            if isinstance(files, list)
+            else {SingleSourceField.alias: files}
+        ),
         address,
     )
 
