@@ -22,6 +22,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -34,15 +35,13 @@ from pants.util.docutil import git_url
 from pants.util.enums import match
 
 
-class ShellSourcesField(MultipleSourcesField):
+class ShellSourceField(SingleSourceField):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
     uses_source_roots = False
-    expected_num_files = 1
-    required = True
 
 
-class ShellGeneratingSources(MultipleSourcesField):
+class ShellGeneratingSourcesBases(MultipleSourcesField):
     uses_source_roots = False
 
 
@@ -115,7 +114,7 @@ class Shunit2TestTimeoutField(IntField):
         return value
 
 
-class Shunit2TestSourcesField(ShellSourcesField):
+class Shunit2TestSourceField(ShellSourceField):
     pass
 
 
@@ -129,7 +128,7 @@ class Shunit2TestTarget(Target):
     alias = "shunit2_tests"  # TODO(#12954): rename to `shunit_test` when ready. Update `help` too.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Shunit2TestSourcesField,
+        Shunit2TestSourceField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
         Shunit2ShellField,
@@ -143,7 +142,7 @@ class Shunit2TestTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class Shunit2TestsGeneratorSourcesField(ShellGeneratingSources):
+class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBases):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
 
 
@@ -198,14 +197,14 @@ async def generate_targets_from_shunit2_tests(
 
 class ShellSourceTarget(Target):
     alias = "shell_sources"  # TODO(#12954): rename to `shell_source` when ready.
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
     help = "A Bourne-based shell script, e.g. a Bash script."
 
     deprecated_alias = "shell_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
 
 
-class ShellSourcesGeneratingSourcesField(ShellGeneratingSources):
+class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
 
 

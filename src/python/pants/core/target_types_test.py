@@ -15,7 +15,7 @@ from pants.core.target_types import (
     ArchiveFieldSet,
     ArchiveTarget,
     FilesGeneratorTarget,
-    FileSourcesField,
+    FileSourceField,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
 )
@@ -91,7 +91,7 @@ def test_relocated_files() -> None:
                 SourceFilesRequest(
                     (tgt.get(SourcesField) for tgt in transitive_targets.closure),
                     enable_codegen=True,
-                    for_sources_types=(FileSourcesField,),
+                    for_sources_types=(FileSourceField,),
                 )
             ],
         )

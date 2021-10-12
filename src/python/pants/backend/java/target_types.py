@@ -83,7 +83,6 @@ async def generate_targets_from_junit_tests(
         union_membership,
         # TODO: This should be set to False once dependency inference can infer same-package dependencies.
         add_dependencies_on_all_siblings=True,
-        use_source_field=True,
     )
 
 
