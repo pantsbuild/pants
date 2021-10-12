@@ -198,7 +198,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_pants_help_all() -> Dict:
+def run_pants_help_all() -> dict[str, Any]:
     deactivated_backends = ["internal_plugins.releases", "pants.backend.experimental.java"]
     activated_backends = [
         "pants.backend.codegen.protobuf.python",
@@ -227,10 +227,10 @@ def run_pants_help_all() -> Dict:
             f"\n\nstderr:\n{run.stderr}"
         )
         raise
-    return cast(Dict, json.loads(run.stdout))
+    return cast(dict[str, Any], json.loads(run.stdout))
 
 
-def value_strs_iter(help_info: dict) -> Iterable[str]:
+def value_strs_iter(help_info: dict[str, Any]) -> Iterable[str]:
     def _recurse(val: Any) -> Iterable[str]:
         if isinstance(val, str):
             yield val
@@ -247,7 +247,7 @@ def value_strs_iter(help_info: dict) -> Iterable[str]:
         yield x
 
 
-def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
+def rewrite_value_strs(help_info: dict[str, Any], slug_to_title: dict[str, str]) -> dict[str, Any]:
     """Return a copy of the argument with rewritten docsite URLs."""
     rewriter = DocUrlRewriter(slug_to_title)
 
@@ -260,11 +260,11 @@ def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
             return [_recurse(x) for x in val]
         return val
 
-    return cast(dict, _recurse(help_info))
+    return cast(dict[str, Any], _recurse(help_info))
 
 
 class ReferenceGenerator:
-    def __init__(self, args: argparse.Namespace, version: str, help_info: dict) -> None:
+    def __init__(self, args: argparse.Namespace, version: str, help_info: dict[str, Any]) -> None:
         self._args = args
 
         self._readme_api = ReadmeAPI(api_key=self._args.api_key, version=version)
@@ -299,18 +299,19 @@ class ReferenceGenerator:
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
     @classmethod
-    def process_options_input(cls, help_info: dict, *, sync: bool) -> Dict:
+    def process_options_input(cls, help_info: dict[str, Any], *, sync: bool) -> dict:
         scope_to_help_info = help_info["scope_to_help_info"]
 
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option
         # info for the goal's scope, to make it easy to render in the goal's options page.
 
         for goal, goal_info in help_info["name_to_goal_info"].items():
+            assert isinstance(goal_info, dict)
             consumed_scopes = sorted(goal_info["consumed_scopes"])
             linked_consumed_scopes = [
                 f"[{cs}]({cls._link(cs, sync=sync)})"
                 for cs in consumed_scopes
-                if cs and cs != goal_info.name
+                if cs and cs != goal_info["name"]
             ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
@@ -345,7 +346,7 @@ class ReferenceGenerator:
         return help_info
 
     @classmethod
-    def process_targets_input(cls, help_info: Dict) -> Dict[str, Dict[str, Any]]:
+    def process_targets_input(cls, help_info: dict[str, Any]) -> dict[str, dict[str, Any]]:
         target_info = help_info["name_to_target_type_info"]
         for target in target_info.values():
             for field in target["fields"]:
