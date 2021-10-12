@@ -13,6 +13,7 @@ import pytest
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpecs,
+    DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
     FilesystemSpec,
@@ -830,22 +831,51 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_filesystem_specs_dir_literal(specs_rule_runner: RuleRunner) -> None:
+    specs_rule_runner.write_files(
+        {
+            "BUILD": "generator(name='generator', sources=['demo/*.txt'])",
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                target(name='not-generator', sources=['*.txt'])
+                target(name='no-files', sources=[])
+                """
+            ),
+            "another_dir/f.ext": "",
+            "another_dir/BUILD": "target(sources=['*.txt'])",
+        }
+    )
+    assert resolve_filesystem_specs(specs_rule_runner, [DirLiteralSpec("demo")]) == [
+        Address("", target_name="generator", relative_file_path="demo/f1.txt"),
+        Address("", target_name="generator", relative_file_path="demo/f2.txt"),
+        Address("demo", target_name="no-files"),
+        Address("demo", target_name="not-generator"),
+    ]
+
+
 def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> None:
-    spec = FileLiteralSpec("demo/fake.txt")
-    with pytest.raises(ExecutionError) as exc:
-        resolve_filesystem_specs(specs_rule_runner, [spec])
-    assert 'Unmatched glob from file arguments: "demo/fake.txt"' in str(exc.value)
+    file_spec = FileLiteralSpec("demo/fake.txt")
+    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
+        resolve_filesystem_specs(specs_rule_runner, [file_spec])
+
+    dir_spec = DirLiteralSpec("demo")
+    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/*"'):
+        resolve_filesystem_specs(specs_rule_runner, [dir_spec])
 
     specs_rule_runner.set_options(["--owners-not-found-behavior=ignore"])
-    assert not resolve_filesystem_specs(specs_rule_runner, [spec])
+    assert not resolve_filesystem_specs(specs_rule_runner, [file_spec, dir_spec])
 
 
 def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.write_files({"no_owners/f.txt": ""})
-    # Error for literal specs.
-    with pytest.raises(ExecutionError) as exc:
-        resolve_filesystem_specs(specs_rule_runner, [FileLiteralSpec("no_owners/f.txt")])
-    assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
+    file_spec = FileLiteralSpec("no_owners/f.txt")
+    dir_spec = DirLiteralSpec("no_owners")
+    with engine_error(contains="No owning targets could be found for the file `no_owners/f.txt`"):
+        resolve_filesystem_specs(specs_rule_runner, [file_spec])
+    with engine_error(contains="No owning targets could be found for the directory `no_owners`"):
+        resolve_filesystem_specs(specs_rule_runner, [dir_spec])
 
     # Do not error for glob specs.
     assert not resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("no_owners/*.txt")])
@@ -855,8 +885,14 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
     """This tests that we correctly handle resolving from both address and filesystem specs."""
     specs_rule_runner.write_files(
         {
-            "fs_spec/f.txt": "",
-            "fs_spec/BUILD": "generator(sources=['f.txt'])",
+            "file_spec/f1.txt": "",
+            "file_spec/f2.txt": "",
+            "file_spec/BUILD": "generator(sources=['f*.txt'])",
+            "dir_spec/f1.txt": "",
+            "dir_spec/f2.txt": "",
+            "dir_spec/BUILD": (
+                "generator(sources=['f*.txt'])\n" "target(name='no-files', sources=[])"
+            ),
             "address_spec/f.txt": "",
             "address_spec/BUILD": "generator(sources=['f.txt'])",
             "multiple_files/f1.txt": "",
@@ -865,15 +901,19 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
         }
     )
 
-    no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
+    no_interaction_specs = ["file_spec/f1.txt", "dir_spec", "address_spec:address_spec"]
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(specs_rule_runner.build_root).parse_specs(
-        [*no_interaction_specs, *multiple_files_specs], dir_address_shorthand=True
+        [*no_interaction_specs, *multiple_files_specs], dir_address_shorthand=False
     )
 
     result = specs_rule_runner.request(Addresses, [specs])
     assert set(result) == {
-        Address("fs_spec", relative_file_path="f.txt"),
+        Address("file_spec", relative_file_path="f1.txt"),
+        Address("dir_spec"),
+        Address("dir_spec", relative_file_path="f1.txt"),
+        Address("dir_spec", relative_file_path="f2.txt"),
+        Address("dir_spec", target_name="no-files"),
         Address("address_spec"),
         Address("multiple_files"),
         Address("multiple_files", relative_file_path="f2.txt"),
