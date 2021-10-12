@@ -35,7 +35,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.core.target_types import FileSourcesField
+from pants.core.target_types import FileSourceField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     TransitiveTargets,
@@ -108,7 +108,7 @@ async def package_pex_binary(
     # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
     # gotcha.
     file_tgts = targets_with_sources_types(
-        [FileSourcesField], transitive_targets.dependencies, union_membership
+        [FileSourceField], transitive_targets.dependencies, union_membership
     )
     if file_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)

@@ -27,7 +27,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.target_types import FileSourcesField
+from pants.core.target_types import FileSourceField
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -106,7 +106,7 @@ async def package_python_google_cloud_function(
     # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
     # gotcha.
     file_tgts = targets_with_sources_types(
-        [FileSourcesField], transitive_targets.dependencies, union_membership
+        [FileSourceField], transitive_targets.dependencies, union_membership
     )
     if file_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)

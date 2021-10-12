@@ -10,7 +10,7 @@ from typing import Iterable, NamedTuple, Type
 
 import pytest
 
-from pants.core.target_types import FileSourcesField
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -101,7 +101,7 @@ def test_unrooted_sources(rule_runner: RuleRunner) -> None:
     """Any SourcesField with `uses_source_roots=False`, such as `FilesSources`, should be marked as
     unrooted sources."""
     sources = TargetSources("src/python", "README.md")
-    field = mock_sources_field(rule_runner, sources, sources_field_cls=FileSourcesField)
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=FileSourceField)
     assert_sources_resolved(
         rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
     )

@@ -37,7 +37,7 @@ class ProtobufGrpcToggleField(BoolField):
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesField(SingleSourceField):
+class ProtobufSourceField(SingleSourceField):
     expected_file_extensions = (".proto",)
 
 
@@ -46,7 +46,7 @@ class ProtobufSourceTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
-        ProtobufSourcesField,
+        ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
     help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."

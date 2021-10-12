@@ -10,10 +10,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
-from pants.backend.codegen.protobuf.target_types import (
-    ProtobufGrpcToggleField,
-    ProtobufSourcesField,
-)
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
@@ -45,7 +42,7 @@ from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
-    input = ProtobufSourcesField
+    input = ProtobufSourceField
     output = PythonSources
 
 
@@ -77,13 +74,13 @@ async def generate_python_from_protobuf(
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            tgt[ProtobufSourcesField]
+            tgt[ProtobufSourceField]
             for tgt in transitive_targets.closure
-            if tgt.has_field(ProtobufSourcesField)
+            if tgt.has_field(ProtobufSourceField)
         ),
     )
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourcesField]])
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
     )
 
     (
