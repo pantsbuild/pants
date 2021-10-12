@@ -2131,12 +2131,15 @@ class DescriptionField(StringField):
 COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 
-class OverridesField(Field):
+class OverridesField(AsyncFieldMixin, Field):
     """A mapping of targets (or source globs) to field names with their overridden values.
 
     This is meant for target generators to reduce boilerplate. It's up to the corresponding target
     generator rule to determine how to implement the field, such as how users can specify the target
     key: file globs, target names, etc. For example, `{"f.ext": {"tags": ['my_tag']}}`.
+
+    If you do not support globbing and expect literal names as the keys, then you can use the
+    method `flatten()`.
     """
 
     alias = "overrides"
@@ -2145,7 +2148,9 @@ class OverridesField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]], address: Address
+        cls,
+        raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
+        address: Address,
     ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
@@ -2179,9 +2184,32 @@ class OverridesField(Field):
         # The value might have unhashable elements like `list`, so we stringify it.
         return hash((self.__class__, repr(self.value)))
 
+    def flatten(self) -> dict[str, dict[str, Any]]:
+        """Combine all overrides for a particular key into a single dictionary.
 
-# TODO: figure out what support looks like for this with the Target API. The expected value is an
-#  Artifact, there is no common Artifact interface.
+        This should not be used if the keys can be globs, such as `*.py` which will be hydrated into
+        file paths.
+        """
+        result: dict[str, dict[str, Any]] = {}
+        for keys, override in (self.value or {}).items():
+            for key in keys:
+                for field, value in override.items():
+                    if key in result:
+                        if field in result[key]:
+                            raise InvalidFieldException(
+                                f"Conflicting overrides in the `{self.alias}` field of "
+                                f"`{self.address}` for the key `{key}` for "
+                                f"the field `{field}`. You cannot specify the same field name "
+                                "multiple times for the same key.\n\n"
+                                f"(One override sets the field to `{repr(result[key][field])}` "
+                                f"but another sets to `{repr(value)}`.)"
+                            )
+                        result[key][field] = value
+                    else:
+                        result[key] = {field: value}
+        return result
+
+
 class ProvidesField(Field):
     """An `artifact` that describes how to represent this target to the outside world."""
 

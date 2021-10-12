@@ -1175,19 +1175,25 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
 # -----------------------------------------------------------------------------------------------
 
 
-def test_overrides_field_validation() -> None:
+def test_overrides_field() -> None:
     addr = Address("", target_name="example")
 
     assert OverridesField(None, addr).value is None
     assert OverridesField({}, addr).value == {}
 
     # Note that the `list_field` is not hashable. We have to override `__hash__` for this to work.
-    override = {"str_field": "value", "list_field": [0, 1, 3]}
+    tgt1_override = {"str_field": "value", "list_field": [0, 1, 3]}
+    tgt2_override = {"int_field": 0, "dict_field": {"a": 0}}
     # Convert a `str` key to `tuple[str, ...]`.
-    field = OverridesField({"tgt1": override, ("tgt1", "tgt2"): override}, addr)
-    assert field.value == {("tgt1",): override, ("tgt1", "tgt2"): override}
+    field = OverridesField({"tgt1": tgt1_override, ("tgt1", "tgt2"): tgt2_override}, addr)
+    assert field.value == {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    assert field.flatten() == {"tgt1": {**tgt1_override, **tgt2_override}, "tgt2": tgt2_override}
     with no_exception():
         hash(field)
+
+    # Error in `flatten` if the same field is specified for the same key multiple times.
+    with pytest.raises(InvalidFieldException):
+        OverridesField({"tgt1": {"field": 0}, ("tgt1", "tgt2"): {"field": 1}}, addr).flatten()
 
     def assert_invalid_type(raw_value: Any) -> None:
         with pytest.raises(InvalidFieldTypeException):

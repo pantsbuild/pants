@@ -7,7 +7,6 @@ import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
 
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
@@ -190,30 +189,8 @@ async def generate_targets_from_go_mod(
     request: GenerateTargetsFromGoModRequest, files_not_found_behavior: FilesNotFoundBehavior
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    _overrides_field = request.generator[GoModOverridesField]
-
-    def maybe_get_overrides(generated_name: str) -> dict[str, Any] | None:
-        relevant_overrides = [
-            overrides
-            for tgt_names, overrides in (_overrides_field.value or {}).items()
-            if generated_name in tgt_names
-        ]
-        if not relevant_overrides:
-            return None
-        merged_result: dict[str, Any] = {}
-        for overrides in relevant_overrides:
-            for k, v in overrides.items():
-                if k in merged_result:
-                    raise InvalidFieldException(
-                        f"Conflicting overrides in the `{_overrides_field.alias}` field of "
-                        f"`{generator_addr}` for the generated target name `{generated_name}` for "
-                        f"the field `{k}`. You cannot specify the same field name multiple times "
-                        "for the same generated target.\n\n"
-                        f"(One override sets the field to `{repr(merged_result[k])}` but another "
-                        f"sets to `{repr(v)}`.)"
-                    )
-                merged_result[k] = v
-        return merged_result
+    all_overrides = request.generator[GoModOverridesField].flatten()
+    used_overrides = set()
 
     go_mod_info, go_paths = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(generator_addr)),
@@ -243,7 +220,9 @@ async def generate_targets_from_go_mod(
         generated_tgt_name = f"./{subpath}"
         import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
 
-        overrides = maybe_get_overrides(generated_tgt_name) or {}
+        overrides = all_overrides.get(generated_tgt_name, {})
+        if overrides:
+            used_overrides.add(generated_tgt_name)
         return GoFirstPartyPackageTarget(
             {
                 GoImportPathField.alias: import_path,
@@ -260,7 +239,10 @@ async def generate_targets_from_go_mod(
     first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
 
     def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
-        overrides = maybe_get_overrides(pkg_info.import_path) or {}
+        overrides = all_overrides.get(pkg_info.import_path, {})
+        if overrides:
+            used_overrides.add(pkg_info.import_path)
+
         return GoThirdPartyPackageTarget(
             {
                 GoThirdPartyModulePathField.alias: pkg_info.module_path,
@@ -277,7 +259,18 @@ async def generate_targets_from_go_mod(
         for module_info in all_module_info
         for pkg_info in module_info.values()
     )
-    return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
+
+    all_tgts = (*first_party_pkgs, *third_party_pkgs)
+    unused_overrides = set(all_overrides.keys()) - used_overrides
+    if unused_overrides:
+        all_generated_names = sorted(tgt.address.generated_name for tgt in all_tgts)
+        raise InvalidFieldException(
+            f"Unused keys in the `overrides` field for {generator_addr}: {sorted(unused_overrides)}"
+            f"\n\nDid you mean one of these valid names?\n\n"
+            f"{all_generated_names}"
+        )
+
+    return GeneratedTargets(request.generator, all_tgts)
 
 
 # -----------------------------------------------------------------------------------------------

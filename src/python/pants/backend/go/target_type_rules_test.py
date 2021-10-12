@@ -306,6 +306,37 @@ def test_generate_targets_conflicting_overrides(rule_runner: RuleRunner) -> None
         rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
 
+def test_generate_targets_unused_keys(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                go_mod(
+                    name="mod",
+                    overrides={
+                        "./fake_dir": {"tags": ["bad"]},
+                        "./subdir": {"tags": ["good"]},
+                    },
+                )
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module example.com/overrides
+                go 1.17
+                """
+            ),
+            "subdir/f.go": "",
+        }
+    )
+    generator = rule_runner.get_target(Address("", target_name="mod"))
+    with engine_error(
+        InvalidFieldException,
+        contains="Unused keys in the `overrides` field for //:mod: ['./fake_dir']",
+    ):
+        rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
+
+
 def test_package_targets_cannot_be_manually_created() -> None:
     with pytest.raises(InvalidTargetException):
         GoFirstPartyPackageTarget(
