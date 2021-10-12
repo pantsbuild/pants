@@ -10,13 +10,11 @@ from typing import cast
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
-    DockerImageName,
-    DockerImageNameTemplate,
     DockerImageSources,
     DockerImageTags,
     DockerImageVersion,
     DockerRegistriesField,
-    DockerRepository,
+    DockerRepositoryNameField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
@@ -36,7 +34,7 @@ from pants.util.strutil import bullet_list, pluralize
 logger = logging.getLogger(__name__)
 
 
-class DockerNameTemplateError(ValueError):
+class DockerRepositoryNameError(ValueError):
     pass
 
 
@@ -60,10 +58,8 @@ class BuiltDockerImage(BuiltPackageArtifact):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
-    name: DockerImageName
-    name_template: DockerImageNameTemplate
     registries: DockerRegistriesField
-    repository: DockerRepository
+    repository: DockerRepositoryNameField
     sources: DockerImageSources
     tags: DockerImageTags
     version: DockerImageVersion
@@ -78,42 +74,47 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     def dockerfile_path(self) -> str:
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
-    def image_names(
+    def image_tags(
         self,
-        default_name_template: str,
+        default_repository_name: str,
         registries: DockerRegistries,
         version_context: FrozenDict[str, DockerVersionContextValue],
     ) -> tuple[str, ...]:
-        """This method will always return a non-empty tuple."""
-        default_parent = path.basename(path.dirname(self.address.spec_path))
-        default_repo = path.basename(self.address.spec_path)
-        repo = self.repository.value or default_repo
-        name_template = self.name_template.value or default_name_template
+        """This method will always return a non-empty tuple.
+
+        Returns all image tags to apply to the Docker image, on the form:
+
+            [<registry>/]<repository-name>[:<tag>]
+
+        Where the `<repository-name>` may have contain any number of separating slashes `/`,
+        depending on the `default_repository_name` from configuration or the `repository_name` field
+        on the target `docker_image`.
+        """
+        directory = path.basename(self.address.spec_path)
+        parent_directory = path.basename(path.dirname(self.address.spec_path))
+        repository_name = self.repository.value or default_repository_name
         try:
-            image_name = name_template.format(
-                name=self.name.value or self.address.target_name,
-                repository=repo,
-                sub_repository="/".join(
-                    [default_repo if self.repository.value else default_parent, repo]
-                ),
+            repository_name = repository_name.format(
+                name=self.address.target_name,
+                directory=directory,
+                parent_directory=parent_directory,
             )
         except KeyError as e:
-            if self.name_template.value:
+            if self.repository.value:
                 source = (
-                    "from the `image_name_template` field of the docker_image target "
-                    f"at {self.address}"
+                    "`repository_name` field of the `docker_image` target " f"at {self.address}"
                 )
             else:
-                source = "from the [docker].default_image_name_template configuration option"
+                source = "`[docker].default_repository_name` configuration option"
 
-            raise DockerNameTemplateError(
-                f"Invalid image name template {source}: {name_template!r}. Unknown key: {e}.\n\n"
-                f"Use any of 'name', 'repository' or 'sub_repository' in the template string."
+            raise DockerRepositoryNameError(
+                f"Invalid value for the {source}: {repository_name!r}. Unknown key: {e}.\n\n"
+                f"You may only reference any of `name`, `directory` or `parent_directory`."
             ) from e
 
         try:
             image_names = tuple(
-                ":".join(s for s in [image_name, tag] if s)
+                ":".join(s for s in [repository_name, tag] if s)
                 for tag in [
                     cast(str, self.version.value).format(**version_context),
                     *(self.tags.value or []),
@@ -121,7 +122,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             )
         except (KeyError, ValueError) as e:
             msg = (
-                "Invalid format string for the `version` field of the docker_image target at "
+                "Invalid format string for the `version` field of the `docker_image` target at "
                 f"{self.address}: {self.version.value!r}.\n\n"
             )
             if isinstance(e, KeyError):
@@ -172,8 +173,8 @@ async def build_docker_image(
 
     version_context = context.version_context.merge({"build_args": build_args_context})
 
-    tags = field_set.image_names(
-        default_name_template=options.default_image_name_template,
+    tags = field_set.image_tags(
+        default_repository_name=options.default_repository_name,
         registries=options.registries(),
         version_context=version_context,
     )

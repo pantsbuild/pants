@@ -28,23 +28,6 @@ class DockerImageVersion(StringField):
     help = "Image tag to apply to built images."
 
 
-class DockerImageName(StringField):
-    alias = "image_name"
-    help = (
-        "The Docker image name, defaults is to use the target name.\n\n"
-        "Note that the final image name(s) is made up of registries, repository, name and "
-        "tags, which involves several fields from this target."
-    )
-
-
-class DockerImageNameTemplate(StringField):
-    alias = "image_name_template"
-    help = (
-        "To override the default `[docker].default_image_name_template` configuration. See the "
-        "documentation for that configuration option for how to use this value."
-    )
-
-
 class DockerImageTags(StringSequenceField):
     alias = "image_tags"
     help = (
@@ -97,11 +80,13 @@ class DockerRegistriesField(StringSequenceField):
     )
 
 
-class DockerRepository(StringField):
-    alias = "repository"
+class DockerRepositoryNameField(StringField):
+    alias = "repository_name"
     help = (
-        "The repository part for the Docker image name.\n\n"
-        "By default, it uses the directory name of the BUILD file for this target."
+        'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
+        "It uses the `[docker].default_repository_name` by default."
+        "This field value is formatted, see the documentation for "
+        "`[docker].default_repository_name` for details."
     )
 
 
@@ -116,14 +101,16 @@ class DockerImage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerDependencies,
-        DockerImageName,
-        DockerImageNameTemplate,
         DockerImageSources,
         DockerImageTags,
         DockerImageVersion,
         DockerRegistriesField,
-        DockerRepository,
+        DockerRepositoryNameField,
         DockerSkipPushField,
         RestartableField,
     )
-    help = "A Docker image."
+    help = (
+        "The `docker_image` target describes how to build and tag a Docker image.\n\n"
+        "Any dependencies, as inferred or explicitly specified, will be included in the Docker "
+        "build context, after being packaged if applicable."
+    )
