@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Iterator, List, Mapping, Sequence, cast
+from typing import Any, Iterable, Iterator, Mapping, Sequence, cast
 
 import toml
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class PyprojectAttr(TypedDict, total=False):
-    extras: List[str]
+    extras: list[str]
     git: str
     rev: str
     branch: str

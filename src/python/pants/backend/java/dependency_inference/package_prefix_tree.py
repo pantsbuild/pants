@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import FrozenSet, Set
 
 from pants.engine.addresses import Address
 
@@ -27,7 +26,7 @@ class PackageRootedDependencyMap:
 
     def __init__(self):
         self._type_map: dict[str, Address] = {}
-        self._package_map: dict[str, Set[Address]] = defaultdict(set)
+        self._package_map: dict[str, set[Address]] = defaultdict(set)
 
     def add_top_level_type(self, package: str, type_: str, address: Address):
         """Declare a single Address as the provider of a top level type.
@@ -51,7 +50,7 @@ class PackageRootedDependencyMap:
         """Add an address as one of the providers of a package."""
         self._package_map[package].add(address)
 
-    def addresses_for_symbol(self, symbol: str) -> FrozenSet[Address]:
+    def addresses_for_symbol(self, symbol: str) -> frozenset[Address]:
         """Returns the set of addresses that provide the passed symbol.
 
         `symbol` should be a fully qualified Java type (FQT) (e.g. `foo.bar.Thing`),
