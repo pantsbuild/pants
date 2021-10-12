@@ -12,8 +12,8 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
@@ -51,12 +51,22 @@ class ReplSubsystem(GoalSubsystem):
             "--shell",
             type=str,
             default=None,
-            help="Override the automatically-detected REPL program for the target(s) specified. ",
+            help="Override the automatically-detected REPL program for the target(s) specified.",
+        )
+        register(
+            "--restartable",
+            type=bool,
+            default=False,
+            help="True if the REPL should be restarted if its inputs have changed.",
         )
 
     @property
     def shell(self) -> Optional[str]:
         return cast(Optional[str], self.options.shell)
+
+    @property
+    def restartable(self) -> bool:
+        return cast(bool, self.options.restartable)
 
 
 class Repl(Goal):
@@ -86,7 +96,6 @@ class ReplRequest:
 async def run_repl(
     console: Console,
     workspace: Workspace,
-    interactive_runner: InteractiveRunner,
     repl_subsystem: ReplSubsystem,
     all_specified_addresses: Addresses,
     build_root: BuildRoot,
@@ -118,11 +127,21 @@ async def run_repl(
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
         workspace.write_digest(
-            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+            request.digest,
+            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+            # We don't want to influence whether the InteractiveProcess is able to restart. Because
+            # we're writing into a temp directory, we can safely mark this side_effecting=False.
+            side_effecting=False,
         )
         env = {**complete_env, **request.extra_env}
-        result = interactive_runner.run(
-            InteractiveProcess(argv=request.args, env=env, run_in_workspace=True)
+        result = await Effect(
+            InteractiveProcessResult,
+            InteractiveProcess(
+                argv=request.args,
+                env=env,
+                run_in_workspace=True,
+                restartable=repl_subsystem.restartable,
+            ),
         )
     return Repl(result.exit_code)
 

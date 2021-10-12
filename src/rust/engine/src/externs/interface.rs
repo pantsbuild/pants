@@ -52,9 +52,9 @@ use workunit_store::{
 };
 
 use crate::{
-  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
-  Tasks, Types, Value,
+  externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
+  Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
+  Scheduler, Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -147,14 +147,6 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(
       py,
       capture_snapshots(a: PyScheduler, b: PySession, c: PyObject)
-    ),
-  )?;
-  m.add(
-    py,
-    "run_local_interactive_process",
-    py_fn!(
-      py,
-      run_local_interactive_process(a: PyScheduler, b: PySession, c: PyObject)
     ),
   )?;
 
@@ -257,6 +249,14 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(
       py,
       session_poll_workunits(a: PyScheduler, b: PySession, c: u64)
+    ),
+  )?;
+  m.add(
+    py,
+    "session_run_interactive_process",
+    py_fn!(
+      py,
+      session_run_interactive_process(a: PySession, b: PyObject)
     ),
   )?;
   m.add(
@@ -440,6 +440,7 @@ py_class!(class PyTypes |py| {
       process_result: PyType,
       coroutine: PyType,
       session_values: PyType,
+      interactive_process: PyType,
       interactive_process_result: PyType,
       engine_aware_parameter: PyType
   ) -> CPyResult<Self> {
@@ -467,6 +468,7 @@ py_class!(class PyTypes |py| {
         process_result: externs::type_for(process_result),
         coroutine: externs::type_for(coroutine),
         session_values: externs::type_for(session_values),
+        interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
         engine_aware_parameter: externs::type_for(engine_aware_parameter),
     })),
@@ -1152,6 +1154,38 @@ fn session_poll_workunits(
   })
 }
 
+fn session_run_interactive_process(
+  py: Python,
+  session_ptr: PySession,
+  interactive_process: PyObject,
+) -> CPyResult<PyObject> {
+  with_session(py, session_ptr, |session| {
+    let core = session.core().clone();
+    let context = Context::new(core.clone(), session.clone());
+    let interactive_process: Value = interactive_process.into();
+    py.allow_threads(|| {
+      context
+        .core
+        .executor
+        .clone()
+        .block_on(nodes::maybe_side_effecting(
+          true,
+          &Arc::new(std::sync::atomic::AtomicBool::new(true)),
+          core.intrinsics.run(
+            Intrinsic {
+              product: context.core.types.interactive_process_result,
+              inputs: vec![context.core.types.interactive_process],
+            },
+            context,
+            vec![interactive_process],
+          ),
+        ))
+    })
+    .map(|v| v.into())
+    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e.to_string(),)))
+  })
+}
+
 fn scheduler_metrics(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1732,47 +1766,6 @@ fn single_file_digests_to_bytes(
     let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
   })
-}
-
-fn run_local_interactive_process(
-  py: Python,
-  scheduler_ptr: PyScheduler,
-  session_ptr: PySession,
-  request: PyObject,
-) -> CPyResult<PyObject> {
-  with_scheduler(py, scheduler_ptr, |scheduler| {
-    with_session(py, session_ptr, |session| {
-      let types = &scheduler.core.types;
-      let interactive_process_result = types.interactive_process_result;
-
-      let value: Value = request.into();
-
-      let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
-      if argv.is_empty() {
-        return Err("Empty argv list not permitted".to_string());
-      }
-
-      let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
-      let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
-      let input_digest: Digest = nodes::lift_directory_digest(&input_digest_value)?;
-      let env = externs::getattr_from_frozendict(&value, "env");
-
-      let code = block_in_place_and_wait(py, || {
-        scheduler
-          .run_local_interactive_process(session, input_digest, argv, env, run_in_workspace)
-          .boxed_local()
-      })?;
-
-      Ok(
-        externs::unsafe_call(
-          interactive_process_result,
-          &[externs::store_i64(i64::from(code))],
-        )
-        .into(),
-      )
-    })
-  })
-  .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
 }
 
 fn write_digest(

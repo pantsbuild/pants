@@ -9,9 +9,8 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Iterable, Mapping
+from typing import Iterable, Mapping
 
-from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
@@ -24,10 +23,6 @@ from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize
-
-if TYPE_CHECKING:
-    from pants.engine.internals.scheduler import SchedulerSession
-
 
 logger = logging.getLogger(__name__)
 
@@ -295,12 +290,13 @@ class InteractiveProcessResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class InteractiveProcess:
+class InteractiveProcess(SideEffecting):
     argv: tuple[str, ...]
     env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
     forward_signals_to_process: bool
+    restartable: bool
 
     def __init__(
         self,
@@ -310,13 +306,14 @@ class InteractiveProcess:
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
+        restartable: bool = False,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, request `InteractiveRunner` in a `@goal_rule`, then use
-        `interactive_runner.run()`.
+        To run the process, use `await Effect(InteractiveProcessResult, InteractiveProcess(..))`
+        in a `@goal_rule`.
 
         `forward_signals_to_process` controls whether pants will allow a SIGINT signal
         sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
@@ -327,6 +324,7 @@ class InteractiveProcess:
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
+        self.restartable = restartable
 
         self.__post_init__()
 
@@ -343,29 +341,15 @@ class InteractiveProcess:
         process: Process,
         *,
         forward_signals_to_process: bool = True,
+        restartable: bool = False,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
+            restartable=restartable,
         )
-
-
-@dataclass(frozen=True)
-class InteractiveRunner(SideEffecting):
-    _scheduler: SchedulerSession
-    # Used to disable enforcement of effects in tests.
-    _enforce_effects: bool = True
-
-    def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        if self._enforce_effects:
-            self.side_effected()
-        if request.forward_signals_to_process:
-            with ExceptionSink.ignoring_sigint():
-                return self._scheduler.run_local_interactive_process(request)
-
-        return self._scheduler.run_local_interactive_process(request)
 
 
 @frozen_after_init

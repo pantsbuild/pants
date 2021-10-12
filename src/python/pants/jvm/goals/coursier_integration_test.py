@@ -8,6 +8,8 @@ from textwrap import dedent
 
 import pytest
 
+from pants.core.target_types import ResourcesGeneratorTarget
+from pants.core.target_types import rules as core_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
@@ -38,6 +40,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         preserve_tmpdirs=True,
         rules=[
+            *core_rules(),
             *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_goal_rules(),
@@ -46,7 +49,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *util_rules(),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact],
+        target_types=[JvmDependencyLockfile, JvmArtifact, ResourcesGeneratorTarget],
     )
 
 
@@ -56,6 +59,15 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
         {
             "BUILD": dedent(
                 """\
+                resources(
+                    name = 'here_to_provide_dependencies',
+                    dependencies = [
+                        ':example-lockfile',
+                        ':org.hamcrest_hamcrest-core',
+                    ],
+                    sources = ["*.txt"],
+                )
+
                 jvm_artifact(
                     name = 'org.hamcrest_hamcrest-core',
                     group = 'org.hamcrest',
@@ -64,9 +76,6 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
                 )
                 coursier_lockfile(
                     name = 'example-lockfile',
-                    requirements = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
                 )
                 """
             ),
@@ -115,6 +124,15 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
         {
             "BUILD": dedent(
                 """\
+                resources(
+                    name = 'here_to_provide_dependencies',
+                    dependencies = [
+                        ':example-lockfile',
+                        ':org.hamcrest_hamcrest-core',
+                    ],
+                    sources = ["*.txt"],
+                )
+
                 jvm_artifact(
                     name = 'org.hamcrest_hamcrest-core',
                     group = 'org.hamcrest',
@@ -122,13 +140,8 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
                     version = "1.3",
                 )
                 coursier_lockfile(
-                    name = 'example-lockfile',
-                    requirements = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='example-lockfile',
+                    source="coursier_resolve.lockfile",
                 )
                 """
             ),
@@ -146,6 +159,15 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
+                resources(
+                    name = 'here_to_provide_dependencies',
+                    dependencies = [
+                        ':example-lockfile',
+                        ':org.hamcrest_hamcrest-core',
+                    ],
+                    sources = ["*.txt"],
+                )
+
                 jvm_artifact(
                     name = 'org.hamcrest_hamcrest-core',
                     group = 'org.hamcrest',
@@ -154,9 +176,6 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'example-lockfile',
-                    requirements = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
                 )
                 """
             ),
@@ -192,6 +211,15 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
         {
             "BUILD": dedent(
                 """\
+                resources(
+                    name = 'here_to_provide_dependencies',
+                    dependencies = [
+                        ':example-lockfile',
+                        ':org.hamcrest_hamcrest-core',
+                    ],
+                    sources = ["*.txt"],
+                )
+
                 jvm_artifact(
                     name = 'org.hamcrest_hamcrest-core',
                     group = 'org.hamcrest',
@@ -200,9 +228,6 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
                 )
                 coursier_lockfile(
                     name = 'example-lockfile',
-                    requirements = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
                 )
                 """
             ),

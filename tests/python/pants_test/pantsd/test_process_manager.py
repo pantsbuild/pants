@@ -340,6 +340,9 @@ class TestProcessManager(unittest.TestCase):
 
 
 def test_process_name_setproctitle_integration(tmpdir_factory: TempdirFactory) -> None:
+    # NB: This test forks and then loads this module: we declare it so that it is inferred.
+    import setproctitle  # noqa: F401
+
     buildroot = tmpdir_factory.mktemp("buildroot")
     manager_name = "Bob"
     process_name = f"{manager_name} [{buildroot}]"

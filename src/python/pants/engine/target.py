@@ -394,11 +394,10 @@ class Target:
     ) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
-        This is necessary to allow targets to override the functionality of common fields like
-        `SourcesField`. For example, Python targets may want to have `PythonSources` to add extra
-        validation that every source file ends in `*.py`. At the same time, we still want to be able
-        to call `my_python_tgt.get(SourcesField)`, in addition to
-        `my_python_tgt.get(PythonSources)`.
+        This is necessary to allow targets to override the functionality of common fields. For
+        example, you could subclass `Tags` to define `CustomTags` with a different default. At the
+        same time, we still want to be able to call `tgt.get(Tags)`, in addition to
+        `tgt.get(CustomTags)`.
         """
         subclass = next(
             (
@@ -452,9 +451,9 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField`
-        to define a custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
-        `python_tgt.get(SourcesField)` will return the same `PythonSources` instance.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
+        `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
         If the `Field` is not registered on this `Target` type, this will return an instance of
         the requested Field by using `default_raw_value` to create the instance. Alternatively,
@@ -487,9 +486,9 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
-        define a custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
-        `python_tgt.has_field(SourcesField)` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
+        `python_tgt.has_field(CustomTags)` will return True.
         """
         return self.has_fields([field])
 
@@ -497,9 +496,9 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `SourcesField` to
-        define a custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
-        `python_tgt.has_fields([SourcesField])` will return True.
+        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
+        `python_tgt.has_fields([CustomTags])` will return True.
         """
         return self._has_fields(fields, registered_fields=self.field_types)
 
@@ -807,6 +806,7 @@ def generate_file_level_targets(
     *,
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
+    use_source_field: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -849,21 +849,26 @@ def generate_file_level_targets(
     )
 
     def gen_tgt(full_fp: str, address: Address) -> Target:
-        generated_target_fields = {}
+        generated_target_fields: dict[str, ImmutableValue] = {}
         for field in generator.field_values.values():
-            value: Optional[ImmutableValue]
+            value: ImmutableValue
             if isinstance(field, MultipleSourcesField):
                 if not bool(matches_filespec(field.filespec, paths=[full_fp])):
                     raise AssertionError(
                         f"Target {generator.address.spec}'s `sources` field does not match a file "
                         f"{full_fp}."
                     )
-                value = (address._relative_file_path or address.generated_name,)
+                value = address._relative_file_path or address.generated_name
+                if use_source_field:
+                    generated_target_fields[SingleSourceField.alias] = value
+                else:
+                    generated_target_fields[MultipleSourcesField.alias] = (value,)
             elif add_dependencies_on_all_siblings and isinstance(field, Dependencies):
-                value = (field.value or ()) + tuple(all_generated_address_specs - {address.spec})
+                generated_target_fields[Dependencies.alias] = (field.value or ()) + tuple(
+                    all_generated_address_specs - {address.spec}
+                )
             else:
-                value = field.value
-            generated_target_fields[field.alias] = value
+                generated_target_fields[field.alias] = field.value
 
         return generated_target_cls(generated_target_fields, address, union_membership)
 
@@ -1613,11 +1618,13 @@ class SingleSourceField(SourcesField, StringField):
         "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
     )
     required = True
-    value: str
-    expected_num_files: ClassVar[int] = 1
+    expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
 
     @property
     def globs(self) -> tuple[str, ...]:
+        # Subclasses might override `required = False`, so `self.value` could be `None`.
+        if self.value is None:
+            return ()
         return (self.value,)
 
 

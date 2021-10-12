@@ -204,6 +204,31 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
+    # A source file without a package declaration lives in the "unnamed package", and does not
+    # export any symbols.
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name = 'a')
+                """
+            ),
+            "Main.java": dedent(
+                """\
+                public class Main {}
+                """
+            ),
+        }
+    )
+    target_a = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.java"))
+
+    assert rule_runner.request(
+        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+    ) == InferredDependencies(dependencies=[])
+
+
+@maybe_skip_jdk_test
 def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

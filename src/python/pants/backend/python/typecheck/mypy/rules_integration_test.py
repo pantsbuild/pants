@@ -85,13 +85,9 @@ NEEDS_CONFIG_FILE = dedent(
 def run_mypy(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> tuple[CheckResult, ...]:
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python.typecheck.mypy", *(extra_args or ())],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
+    rule_runner.set_options(extra_args or (), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
-        CheckResults,
-        [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
+        CheckResults, [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)]
     )
     return result.results
 
@@ -225,18 +221,11 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
 
 
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
-    # NB: We install `django-stubs` both with `[mypy].extra_requirements` and a user requirement
-    # (`python_requirement`). This awkwardness is because its used both as a plugin and
+    # NB: We install `django-stubs` both with `[mypy].extra_requirements` and
+    # `[mypy].extra_type_stubs`. This awkwardness is because its used both as a plugin and
     # type stubs.
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                python_requirement(
-                    name='django', requirements=['Django==2.2.5', 'django-stubs==1.8.0'],
-                )
-                """
-            ),
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -274,6 +263,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
         [tgt],
         extra_args=[
             "--mypy-extra-requirements=django-stubs==1.8.0",
+            "--mypy-extra-type-stubs=django-stubs==1.8.0",
             "--mypy-version=mypy==0.812",
             "--mypy-lockfile=<none>",
         ],

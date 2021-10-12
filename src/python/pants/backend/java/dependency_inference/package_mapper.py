@@ -94,7 +94,12 @@ async def map_first_party_java_targets_to_symbols(
     dep_map = PackageRootedDependencyMap()
     for address, analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
-            package, type_ = top_level_type.rsplit(".", maxsplit=1)
+            components = top_level_type.rsplit(".", maxsplit=1)
+            if len(components) != 2:
+                # A package without a name cannot be imported, and so does not expose any symbols.
+                # https://docs.oracle.com/javase/specs/jls/se8/html/jls-7.html#jls-7.4.2
+                continue
+            package, type_ = components
             dep_map.add_top_level_type(package=package, type_=type_, address=address)
 
     return FirstPartyJavaMappingImpl(package_rooted_dependency_map=dep_map)

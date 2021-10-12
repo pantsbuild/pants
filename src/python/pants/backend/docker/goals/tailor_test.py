@@ -1,8 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.docker.tailor import PutativeDockerTargetsRequest
-from pants.backend.docker.tailor import rules as docker_tailor_rules
+from pants.backend.docker.goals.tailor import PutativeDockerTargetsRequest
+from pants.backend.docker.goals.tailor import rules as docker_tailor_rules
 from pants.backend.docker.target_types import DockerImage
 from pants.core.goals.tailor import (
     AllOwnedSources,

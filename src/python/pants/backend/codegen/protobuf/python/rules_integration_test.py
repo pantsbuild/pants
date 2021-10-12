@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import List
 
 import pytest
 
@@ -70,8 +69,8 @@ def assert_files_generated(
     rule_runner: RuleRunner,
     address: Address,
     *,
-    expected_files: List[str],
-    source_roots: List[str],
+    expected_files: list[str],
+    source_roots: list[str],
     mypy: bool = False,
     extra_args: list[str] | None = None,
 ) -> None:

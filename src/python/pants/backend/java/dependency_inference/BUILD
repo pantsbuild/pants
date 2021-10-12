@@ -17,7 +17,11 @@ resources(
 
 java_sources(
   name='javaparser',
-  dependencies=[":javaparser_lockfile"],
+  dependencies=[
+    ":javaparser_lockfile",
+    ":com.github.javaparser_javaparser-symbol-solver-core",
+    ":com.fasterxml.jackson.core_jackson-databind",
+  ],
 )
 
 jvm_artifact(
@@ -36,9 +40,5 @@ jvm_artifact(
 
 coursier_lockfile(
   name="javaparser_lockfile",
-  sources=["coursier_resolve.lockfile"],
-  requirements = [
-    ":com.github.javaparser_javaparser-symbol-solver-core",
-    ":com.fasterxml.jackson.core_jackson-databind",
-  ],
+  source="coursier_resolve.lockfile",
 )

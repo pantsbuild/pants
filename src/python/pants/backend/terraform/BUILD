@@ -27,7 +27,7 @@ python_tests(name='tests', sources=["*_test.py", "!dependency_inference_test.py"
 python_tests(
   name="dependency_inference_test",
   sources=["dependency_inference_test.py"],
-  timeout=240,
+  timeout=340,
   # We want to make sure the default lockfile works for both macOS and Linux.
   tags=["platform_specific_behavior"],
 )

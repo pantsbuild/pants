@@ -7,17 +7,20 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
+from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import (
+    BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    WrappedTarget,
 )
 from pants.engine.unions import union
 from pants.option.custom_types import shell_str
@@ -30,6 +33,15 @@ from pants.util.meta import frozen_after_init
 @union
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
+
+
+class RestartableField(BoolField):
+    alias = "restartable"
+    default = False
+    help = (
+        "If true, runs of this target with the `run` goal may be interrupted and "
+        "restarted when its input files change."
+    )
 
 
 @frozen_after_init
@@ -56,8 +68,12 @@ class RunRequest:
 class RunSubsystem(GoalSubsystem):
     name = "run"
     help = (
-        "Runs a binary target.\n\nThis goal propagates the return code of the underlying "
-        "executable. Run `echo $?` to inspect the resulting return code."
+        "Runs a binary target.\n\n"
+        "This goal propagates the return code of the underlying executable.\n\n"
+        "If your application can safely be restarted while it is running, you can pass "
+        "`restartable=True` on your binary target (for supported types), and the `run` goal "
+        "will automatically restart them as all relevant files change. This can be particularly "
+        "useful for server applications."
     )
 
     required_union_implementations = (RunFieldSet,)
@@ -88,7 +104,6 @@ async def run(
     run_subsystem: RunSubsystem,
     global_options: GlobalOptions,
     console: Console,
-    interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
@@ -104,26 +119,30 @@ async def run(
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, RunFieldSet, field_set)
+    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
+    restartable = wrapped_target.target.get(RestartableField).value
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
         workspace.write_digest(
-            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+            request.digest,
+            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+            # We don't want to influence whether the InteractiveProcess is able to restart. Because
+            # we're writing into a temp directory, we can safely mark this side_effecting=False.
+            side_effecting=False,
         )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
-        try:
-            result = interactive_runner.run(
-                InteractiveProcess(
-                    argv=(*args, *run_subsystem.args),
-                    env=env,
-                    run_in_workspace=True,
-                )
-            )
-            exit_code = result.exit_code
-        except Exception as e:
-            console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
-            exit_code = -1
+        result = await Effect(
+            InteractiveProcessResult,
+            InteractiveProcess(
+                argv=(*args, *run_subsystem.args),
+                env=env,
+                run_in_workspace=True,
+                restartable=restartable,
+            ),
+        )
+        exit_code = result.exit_code
 
     return Run(exit_code)
 

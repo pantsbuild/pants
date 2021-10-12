@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    MultipleSourcesField,
+    FieldSet,
+    SingleSourceField,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -39,13 +40,24 @@ class JvmArtifactVersionField(StringField):
     )
 
 
+class JvmArtifactFieldSet(FieldSet):
+
+    group: JvmArtifactGroupField
+    artifact: JvmArtifactArtifactField
+    version: JvmArtifactVersionField
+
+    required_fields = (
+        JvmArtifactGroupField,
+        JvmArtifactArtifactField,
+        JvmArtifactVersionField,
+    )
+
+
 class JvmArtifact(Target):
     alias = "jvm_artifact"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JvmArtifactGroupField,
-        JvmArtifactArtifactField,
-        JvmArtifactVersionField,
+        *JvmArtifactFieldSet.required_fields,
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
@@ -62,11 +74,11 @@ class JvmRequirementsField(SpecialCasedDependencies):
     )
 
 
-class JvmLockfileSources(MultipleSourcesField):
+class JvmLockfileSources(SingleSourceField):
     expected_file_extensions = (".lockfile",)
-    expected_num_files = range(
-        2
-    )  # NOTE: This actually means 0 or 1 files; `range`'s end is noninclusive.
+    # Expect 0 or 1 files.
+    expected_num_files = range(0, 2)
+    required = False
     help = (
         "A single Pants Coursier Lockfile source.\n\n"
         "Use `./pants coursier-resolve ...` to generate (or regenerate) the Lockfile."
@@ -79,5 +91,8 @@ class JvmLockfileSources(MultipleSourcesField):
 
 class JvmDependencyLockfile(Target):
     alias = "coursier_lockfile"
-    core_fields = (*COMMON_TARGET_FIELDS, JvmLockfileSources, JvmRequirementsField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmLockfileSources,
+    )
     help = "A Coursier lockfile along with references to the artifacts to use for the lockfile."

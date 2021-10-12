@@ -5,9 +5,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.dependencies import InjectDockerDependencies, inject_docker_dependencies
-from pants.backend.docker.dockerfile_parser import rules as parser_rules
+from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerDependencies, DockerImage
+from pants.backend.docker.util_rules.dependencies import (
+    InjectDockerDependencies,
+    inject_docker_dependencies,
+)
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address

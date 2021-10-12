@@ -66,17 +66,14 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 coursier_lockfile(
-                    name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_source(
                     name='simple-source',
-                    sources=['SimpleSource.java'],
-                    dependencies= [':lockfile'],
+                    source='SimpleSource.java',
+                    dependencies=[':lockfile'],
                 )
                 """
             ),
@@ -147,17 +144,14 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 coursier_lockfile(
-                    name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_source(
                     name='simple-source',
-                    sources=['SimpleSource.java'],
-                    dependencies= [':lockfile'],
+                    source='SimpleSource.java',
+                    dependencies=[':lockfile'],
                 )
                 """
             ),
@@ -206,17 +200,14 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 coursier_lockfile(
-                    name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
                 )
 
                 java_source(
                     name='simple-source',
-                    sources=['SimpleSource.java'],
-                    dependencies= [':lockfile'],
+                    source='SimpleSource.java',
+                    dependencies=[':lockfile'],
                 )
                 """
             ),

@@ -1,12 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import os.path
 from abc import ABC
+from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import DefaultDict, Iterable, List, Sequence, Tuple
 
 from pants.base.deprecated import warn_or_error
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -21,10 +23,10 @@ class ArgSplitterError(Exception):
 class SplitArgs:
     """The result of splitting args."""
 
-    goals: List[str]  # Explicitly requested goals.
-    scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
-    specs: List[str]  # The specifications for what to run against, e.g. the targets or files
-    passthru: List[str]  # Any remaining args specified after a -- separator.
+    goals: list[str]  # Explicitly requested goals.
+    scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
+    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs
+    passthru: list[str]  # Any remaining args specified after a -- separator.
 
 
 class HelpRequest(ABC):
@@ -36,7 +38,7 @@ class ThingHelp(HelpRequest):
     """The user requested help on one or more things: e.g., an options scope or a target type."""
 
     advanced: bool = False
-    things: Tuple[str, ...] = ()
+    things: tuple[str, ...] = ()
 
 
 class VersionHelp(HelpRequest):
@@ -63,10 +65,11 @@ class ArgSplitter:
 
     Recognizes, e.g.:
 
-    ./pants goal -x compile --foo compile.java -y target1 target2
-    ./pants -x compile --foo compile.java -y -- target1 target2
-    ./pants -x compile target1 target2 --compile-java-flag
-    ./pants -x --compile-java-flag compile target1 target2
+    ./pants check --foo lint -y target1: dir f.ext
+    ./pants check --foo lint -y target1: dir f.ext
+    ./pants --global-opt check target1: dir f.ext --check-flag
+    ./pants --check-flag check target1: dir f.ext
+    ./pants goal -- passthru foo
 
     Handles help and version args specially.
     """
@@ -83,7 +86,7 @@ class ArgSplitter:
     )
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
-        self._buildroot = Path(buildroot)
+        self._buildroot = buildroot
         self._known_scope_infos = known_scope_infos
         self._known_scopes = {si.scope for si in known_scope_infos} | {
             "version",
@@ -92,15 +95,13 @@ class ArgSplitter:
             "help-all",
         }
         self._known_goal_scopes = {si.scope: si for si in known_scope_infos if si.is_goal}
-        self._unconsumed_args: List[
+        self._unconsumed_args: list[
             str
         ] = []  # In reverse order, for efficient popping off the end.
-        self._help_request: Optional[
-            HelpRequest
-        ] = None  # Will be set if we encounter any help flags.
+        self._help_request: HelpRequest | None = None  # Will be set if we encounter any help flags.
 
-        # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
-        # cmd line, as an alternative to ... scope --flag-name.
+        # We allow --scope-flag-name anywhere on the cmd line, as an alternative to ...
+        # scope --flag-name.
 
         # We check for prefixes in reverse order, so we match the longest prefix first.
         sorted_scope_infos = sorted(
@@ -110,12 +111,10 @@ class ArgSplitter:
         )
 
         # List of pairs (prefix, ScopeInfo).
-        self._known_scoping_prefixes = [
-            (f"{si.scope.replace('.', '-')}-", si) for si in sorted_scope_infos
-        ]
+        self._known_scoping_prefixes = [(f"{si.scope}-", si) for si in sorted_scope_infos]
 
     @property
-    def help_request(self) -> Optional[HelpRequest]:
+    def help_request(self) -> HelpRequest | None:
         return self._help_request
 
     def _check_for_help_request(self, arg: str) -> bool:
@@ -143,7 +142,7 @@ class ArgSplitter:
         Returns a SplitArgs tuple.
         """
         goals: OrderedSet[str] = OrderedSet()
-        scope_to_flags: Dict[str, List[str]] = {}
+        scope_to_flags: DefaultDict[str, list[str]] = defaultdict(list)
 
         def add_scope(s: str) -> None:
             # Force the scope to appear, even if empty.
@@ -160,8 +159,6 @@ class ArgSplitter:
 
         def assign_flag_to_scope(flg: str, default_scope: str) -> None:
             flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)
-            if flag_scope not in scope_to_flags:
-                scope_to_flags[flag_scope] = []
             scope_to_flags[flag_scope].append(descoped_flag)
 
         global_flags = self._consume_flags()
@@ -174,7 +171,7 @@ class ArgSplitter:
             if not self._check_for_help_request(scope.lower()):
                 add_scope(scope)
                 if scope in self._known_goal_scopes:
-                    goals.add(scope.partition(".")[0])
+                    goals.add(scope)
                 else:
                     unknown_scopes.append(scope)
                 for flag in flags:
@@ -222,7 +219,7 @@ class ArgSplitter:
             )
         return SplitArgs(
             goals=list(goals),
-            scope_to_flags=scope_to_flags,
+            scope_to_flags=dict(scope_to_flags),
             specs=specs,
             passthru=passthru,
         )
@@ -230,26 +227,24 @@ class ArgSplitter:
     def likely_a_spec(self, arg: str) -> bool:
         """Return whether `arg` looks like a spec, rather than a goal name.
 
-        An arg is a spec if it looks like an AddressSpec or a FilesystemSpec. In the future we can
-        expand this heuristic to support other kinds of specs, such as URLs.
+        An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
         """
         return (
-            any(symbol in arg for symbol in (os.path.sep, ":", "*"))
-            or arg.startswith("!")
-            or (self._buildroot / arg).exists()
+            arg.startswith("!")
+            or any(c in arg for c in (os.path.sep, ".", ":", "*", "#"))
+            or os.path.exists(os.path.join(self._buildroot, arg))
         )
 
-    def _consume_scope(self) -> Tuple[Optional[str], List[str]]:
+    def _consume_scope(self) -> tuple[str | None, list[str]]:
         """Returns a pair (scope, list of flags encountered in that scope).
 
         Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
 
         For example, in:
 
-        ./pants --compile-java-partition-size-hint=100 compile <target>
+            ./pants --check-some-opt=100 check <target>
 
-        --compile-java-partition-size-hint should be treated as if it were --partition-size-hint=100
-        in the compile.java scope.
+        --check-some-opt should be treated as if it were --check-some-opt=100 in the check scope.
         """
         if not self._at_scope():
             return None, []
@@ -257,7 +252,7 @@ class ArgSplitter:
         flags = self._consume_flags()
         return scope, flags
 
-    def _consume_flags(self) -> List[str]:
+    def _consume_flags(self) -> list[str]:
         """Read flags until we encounter the first token that isn't a flag."""
         flags = []
         while self._at_flag():
@@ -266,30 +261,20 @@ class ArgSplitter:
                 flags.append(flag)
         return flags
 
-    def _descope_flag(self, flag: str, default_scope: str) -> Tuple[str, str]:
-        """If the flag is prefixed by its scope, in the old style, extract the scope.
+    def _descope_flag(self, flag: str, default_scope: str) -> tuple[str, str]:
+        """If the flag is prefixed by its scope, extract the scope.
 
         Otherwise assume it belongs to default_scope.
 
-        returns a pair (scope, flag).
+        Returns a pair (scope, flag).
         """
         for scope_prefix, scope_info in self._known_scoping_prefixes:
             for flag_prefix in ["--", "--no-"]:
                 prefix = flag_prefix + scope_prefix
-                if flag.startswith(prefix):
-                    scope = scope_info.scope
-                    if scope != GLOBAL_SCOPE and default_scope != GLOBAL_SCOPE:
-                        # We allow goal.task --subsystem-foo to refer to the task-level subsystem instance,
-                        # i.e., as if qualified by --subsystem-goal-task-foo.
-                        # Note that this means that we can't set a task option on the cmd-line if its
-                        # name happens to start with a subsystem scope.
-                        # TODO: Either fix this or at least detect such options and warn.
-                        task_subsystem_scope = f"{scope_info.scope}.{default_scope}"
-                        if (
-                            task_subsystem_scope in self._known_scopes
-                        ):  # Such a task subsystem actually exists.
-                            scope = task_subsystem_scope
-                    return scope, flag_prefix + flag[len(prefix) :]
+                if not flag.startswith(prefix):
+                    continue
+                return scope_info.scope, flag_prefix + flag[len(prefix) :]
+
         return default_scope, flag
 
     def _at_flag(self) -> bool:

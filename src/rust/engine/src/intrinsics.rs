@@ -1,8 +1,12 @@
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+
 use crate::context::Context;
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{
-  lift_directory_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, DownloadedFile, NodeResult, Paths, SessionValues,
+  Snapshot,
 };
 use crate::python::{throw, Value};
 use crate::tasks::Intrinsic;
@@ -11,10 +15,12 @@ use crate::Failure;
 
 use fs::RelativePath;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
+use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
+use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
-
-use std::path::PathBuf;
+use tempfile::TempDir;
+use tokio::process;
 
 type IntrinsicFn =
   Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -116,6 +122,13 @@ impl Intrinsics {
         inputs: vec![],
       },
       Box::new(session_values),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.interactive_process_result,
+        inputs: vec![types.interactive_process],
+      },
+      Box::new(interactive_process),
     );
     Intrinsics { intrinsics }
   }
@@ -435,4 +448,134 @@ fn digest_subset_to_digest(
 
 fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
   async move { context.get(SessionValues).await }.boxed()
+}
+
+fn interactive_process(
+  context: Context,
+  mut args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let types = &context.core.types;
+    let interactive_process_result = types.interactive_process_result;
+
+    let value: Value = args.pop().unwrap();
+
+    let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
+    if argv.is_empty() {
+      return Err("Empty argv list not permitted".to_owned().into());
+    }
+
+    let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
+    let restartable: bool = externs::getattr(&value, "restartable").unwrap();
+    let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
+    let input_digest: Digest = lift_directory_digest(&input_digest_value)?;
+    let env = externs::getattr_from_frozendict(&value, "env");
+    let session = context.session;
+
+    if !restartable {
+        task_side_effected()?;
+    }
+
+    let maybe_tempdir = if run_in_workspace {
+      None
+    } else {
+      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+    };
+
+    if input_digest != EMPTY_DIGEST {
+      if run_in_workspace {
+        return Err(
+          "Local interactive process should not attempt to materialize files when run in workspace.".to_owned().into()
+        );
+      }
+
+      let destination = match maybe_tempdir {
+        Some(ref dir) => dir.path().to_path_buf(),
+        None => unreachable!(),
+      };
+
+      context
+        .core
+        .store()
+        .materialize_directory(destination, input_digest)
+        .await?;
+    }
+
+    let p = Path::new(&argv[0]);
+    let program_name = match maybe_tempdir {
+      Some(ref tempdir) if p.is_relative() => {
+        let mut buf = PathBuf::new();
+        buf.push(tempdir);
+        buf.push(p);
+        buf
+      }
+      _ => p.to_path_buf(),
+    };
+
+    let mut command = process::Command::new(program_name);
+    for arg in argv[1..].iter() {
+      command.arg(arg);
+    }
+
+    if let Some(ref tempdir) = maybe_tempdir {
+      command.current_dir(tempdir.path());
+    }
+
+    command.env_clear();
+    command.envs(env);
+
+    command.kill_on_drop(true);
+
+    let exit_status = session.clone()
+      .with_console_ui_disabled(async move {
+        // Once any UI is torn down, grab exclusive access to the console.
+        let (term_stdin, term_stdout, term_stderr) =
+          stdio::get_destination().exclusive_start(Box::new(|_| {
+            // A stdio handler that will immediately trigger logging.
+            Err(())
+          }))?;
+        // NB: Command's stdio methods take ownership of a file-like to use, so we use
+        // `TryCloneAsFile` here to `dup` our thread-local stdio.
+        command
+          .stdin(Stdio::from(
+            term_stdin
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stdin: {}", e))?,
+          ))
+          .stdout(Stdio::from(
+            term_stdout
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stdout: {}", e))?,
+          ))
+          .stderr(Stdio::from(
+            term_stderr
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
+          ));
+        let mut subprocess = command
+          .spawn()
+          .map_err(|e| format!("Error executing interactive process: {}", e))?;
+        tokio::select! {
+          _ = session.cancelled() => {
+            // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
+            // zombies).
+            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+            subprocess.wait().await.map_err(|e| e.to_string())
+          }
+          exit_status = subprocess.wait() => {
+            // The process exited.
+            exit_status.map_err(|e| e.to_string())
+          }
+        }
+      })
+      .await?;
+
+    let code = exit_status.code().unwrap_or(-1);
+    Ok(
+      externs::unsafe_call(
+        interactive_process_result,
+        &[externs::store_i64(i64::from(code))],
+      ),
+    )
+  }.boxed()
 }

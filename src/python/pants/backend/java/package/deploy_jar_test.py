@@ -247,11 +247,8 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     )
 
                     coursier_lockfile(
-                        name = "lockfile",
-                        requirements = [],
-                        sources = [
-                            "coursier_resolve.lockfile",
-                        ],
+                        name="lockfile",
+                        source="coursier_resolve.lockfile",
                     )
 
                 """
@@ -290,11 +287,8 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     )
 
                     coursier_lockfile(
-                        name = "lockfile",
-                        requirements = [],
-                        sources = [
-                            "coursier_resolve.lockfile",
-                        ],
+                        name="lockfile",
+                        source="coursier_resolve.lockfile",
                     )
 
                 """
@@ -342,11 +336,8 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                     )
 
                     coursier_lockfile(
-                        name = "lockfile",
-                        requirements = [],
-                        sources = [
-                            "coursier_resolve.lockfile",
-                        ],
+                        name="lockfile",
+                        source="coursier_resolve.lockfile",
                     )
 
                 """
