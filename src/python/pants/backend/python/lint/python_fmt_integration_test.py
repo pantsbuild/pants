@@ -10,7 +10,7 @@ from pants.backend.python.lint.black.subsystem import rules as black_subsystem_r
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import rules as isort_subsystem_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import LanguageFmtResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             QueryRule(LanguageFmtResults, (PythonFmtTargets,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

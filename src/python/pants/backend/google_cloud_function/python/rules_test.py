@@ -19,7 +19,7 @@ from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.lambdex import (
     rules as python_google_cloud_function_subsystem_rules,
 )
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget
@@ -43,7 +43,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             PythonGoogleCloudFunction,
-            PythonLibrary,
+            PythonSourcesGeneratorTarget,
             FilesGeneratorTarget,
             RelocatedFiles,
             ResourcesGeneratorTarget,

@@ -17,8 +17,8 @@ from pants.backend.python.lint.pylint.subsystem import (
 from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
-    PythonLibrary,
     PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PylintFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, GenericTarget, PythonRequirementTarget],
     )
 
 

@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(MyPyFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [MyPyLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget, GenericTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, GenericTarget],
     )
 
 

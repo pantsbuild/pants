@@ -9,7 +9,7 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.bandit import skip_field
 from pants.backend.python.lint.bandit.subsystem import BanditLockfileSentinel
 from pants.backend.python.lint.bandit.subsystem import rules as subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -22,7 +22,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             *skip_field.rules(),
             QueryRule(PythonLockfileRequest, [BanditLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget],
+        target_types=[PythonSourcesGeneratorTarget, GenericTarget],
     )
 
     global_constraint = "==3.9.*"

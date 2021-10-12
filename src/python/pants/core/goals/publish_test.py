@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.register import rules as python_rules
-from pants.backend.python.target_types import PythonDistribution, PythonLibrary
+from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.core.goals.publish import (
     Publish,
     PublishFieldSet,
@@ -74,7 +74,7 @@ def rule_runner() -> RuleRunner:
             PythonDistribution.register_plugin_field(MockRepositoriesField),
             *PublishTestFieldSet.rules(),
         ],
-        target_types=[PythonLibrary, PythonDistribution],
+        target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
     )
 

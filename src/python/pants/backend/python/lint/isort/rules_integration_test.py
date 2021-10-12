@@ -10,7 +10,7 @@ from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.isort.subsystem import rules as isort_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (IsortRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

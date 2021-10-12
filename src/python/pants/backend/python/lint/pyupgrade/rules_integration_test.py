@@ -10,7 +10,7 @@ from pants.backend.python.lint.pyupgrade.rules import PyUpgradeFieldSet, PyUpgra
 from pants.backend.python.lint.pyupgrade.rules import rules as pyupgrade_rules
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.pyupgrade.subsystem import rules as pyupgrade_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (PyUpgradeRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

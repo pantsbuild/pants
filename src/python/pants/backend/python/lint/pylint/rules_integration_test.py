@@ -12,7 +12,7 @@ from pants.backend.python.lint.pylint import subsystem
 from pants.backend.python.lint.pylint.rules import PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LintResults, [PylintRequest]),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 

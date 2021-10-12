@@ -610,7 +610,7 @@ class SkipPythonTestsField(BoolField):
     help = "If true, don't run this target's tests."
 
 
-class PythonTests(Target):
+class PythonTestsGeneratorTarget(Target):
     alias = "python_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -639,7 +639,7 @@ class PythonLibrarySources(PythonSources):
     default = ("*.py", "*.pyi") + tuple(f"!{pat}" for pat in PythonTestsSources.default)
 
 
-class PythonLibrary(Target):
+class PythonSourcesGeneratorTarget(Target):
     alias = "python_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,

@@ -14,7 +14,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.goals.setup_py import rules as setup_py_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
-from pants.backend.python.target_types import PythonDistribution, PythonLibrary
+from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import local_dists
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LocalDistsPex, (LocalDistsPexRequest,)),
         ],
-        target_types=[PythonLibrary, PythonDistribution],
+        target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
     )
 

@@ -25,10 +25,10 @@ from pants.backend.python.target_types import (
     PythonDistributionDependencies,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
-    PythonLibrary,
     PythonLibrarySources,
     PythonProvidesField,
-    PythonTests,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
     PythonTestsSources,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
-    generate_from = PythonTests
+    generate_from = PythonTestsGeneratorTarget
 
 
 @rule
@@ -80,7 +80,7 @@ async def generate_targets_from_python_tests(
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
     return generate_file_level_targets(
-        PythonTests,
+        PythonTestsGeneratorTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -89,19 +89,19 @@ async def generate_targets_from_python_tests(
     )
 
 
-class GenerateTargetsFromPythonLibrary(GenerateTargetsRequest):
-    generate_from = PythonLibrary
+class GenerateTargetsFromPythonSources(GenerateTargetsRequest):
+    generate_from = PythonSourcesGeneratorTarget
 
 
 @rule
 async def generate_targets_from_python_sources(
-    request: GenerateTargetsFromPythonLibrary,
+    request: GenerateTargetsFromPythonSources,
     python_infer: PythonInferSubsystem,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
     return generate_file_level_targets(
-        PythonLibrary,
+        PythonSourcesGeneratorTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -416,7 +416,7 @@ def rules():
         *collect_rules(),
         *import_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonLibrary),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )

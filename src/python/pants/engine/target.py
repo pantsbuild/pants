@@ -583,7 +583,7 @@ class Targets(Collection[Target]):
     """A heterogeneous collection of instances of Target subclasses.
 
     While every element will be a subclass of `Target`, there may be many different `Target` types
-    in this collection, e.g. some `Files` targets and some `PythonLibrary` targets.
+    in this collection, e.g. some `FileTarget` and some `PythonTestTarget`.
 
     Often, you will want to filter out the relevant targets by looking at what fields they have
     registered, e.g.:
@@ -591,7 +591,8 @@ class Targets(Collection[Target]):
         valid_tgts = [tgt for tgt in tgts if tgt.has_fields([Compatibility, PythonSources])]
 
     You should not check the Target's actual type because this breaks custom target types;
-    for example, prefer `tgt.has_field(PythonTestsSources)` to `isinstance(tgt, PythonTests)`.
+    for example, prefer `tgt.has_field(PythonTestsSourcesField)` to
+    `isinstance(tgt, PythonTestsTarget)`.
     """
 
     def expect_single(self) -> Target:

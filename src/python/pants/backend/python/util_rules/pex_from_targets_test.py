@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, List, cast
 import pytest
 from _pytest.tmpdir import TempPathFactory
 
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 

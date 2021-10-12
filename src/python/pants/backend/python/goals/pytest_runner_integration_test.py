@@ -21,9 +21,9 @@ from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
-    PythonLibrary,
     PythonRequirementTarget,
-    PythonTests,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
@@ -69,8 +69,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             PexBinary,
-            PythonLibrary,
-            PythonTests,
+            PythonSourcesGeneratorTarget,
+            PythonTestsGeneratorTarget,
             PythonRequirementTarget,
             PythonDistribution,
         ],

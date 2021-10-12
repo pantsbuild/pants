@@ -10,7 +10,7 @@ from pants.backend.python.lint.yapf.rules import YapfFieldSet, YapfRequest
 from pants.backend.python.lint.yapf.rules import rules as yapf_rules
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.lint.yapf.subsystem import rules as yapf_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (YapfRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

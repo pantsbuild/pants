@@ -12,7 +12,7 @@ from pants.backend.python.dependency_inference.import_parser import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
 )
-from pants.backend.python.target_types import PythonLibrary, PythonSources
+from pants.backend.python.target_types import PythonSources, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             QueryRule(ParsedPythonImports, [ParsePythonImportsRequest]),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

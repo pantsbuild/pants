@@ -14,10 +14,10 @@ from pants.backend.python.dependency_inference.rules import (
     infer_python_init_dependencies,
 )
 from pants.backend.python.target_types import (
-    PythonLibrary,
     PythonRequirementTarget,
     PythonSources,
-    PythonTests,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
 from pants.engine.addresses import Address
@@ -33,7 +33,7 @@ def test_infer_python_imports(caplog) -> None:
             *target_types_rules.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
     rule_runner.add_to_build_file(
         "3rdparty/python",
@@ -163,7 +163,7 @@ def test_infer_python_inits() -> None:
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
     rule_runner.set_options(
         [
@@ -207,7 +207,7 @@ def test_infer_python_conftests() -> None:
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
-        target_types=[PythonTests],
+        target_types=[PythonTestsGeneratorTarget],
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"],
