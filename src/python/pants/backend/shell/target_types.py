@@ -22,6 +22,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
@@ -34,12 +35,10 @@ from pants.util.docutil import git_url
 from pants.util.enums import match
 
 
-class ShellSourcesField(MultipleSourcesField):
+class ShellSourcesField(SingleSourceField):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
     uses_source_roots = False
-    expected_num_files = 1
-    required = True
 
 
 class ShellGeneratingSources(MultipleSourcesField):

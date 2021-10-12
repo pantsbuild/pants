@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
-from pants.engine.target import MultipleSourcesField, Target
+from pants.engine.target import MultipleSourcesField, SingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -56,12 +56,17 @@ def rule_runner() -> RuleRunner:
 def create_target(
     rule_runner: RuleRunner,
     parent_directory: str,
-    files: list[str],
+    files: str | list[str],
     target_cls: type[Target] = PythonTarget,
 ) -> Target:
     rule_runner.write_files({os.path.join(parent_directory, f): "" for f in files})
     address = Address(parent_directory, target_name="target")
-    return target_cls({MultipleSourcesField.alias: files}, address)
+    return target_cls(
+        {MultipleSourcesField.alias: files}
+        if isinstance(files, list)
+        else {SingleSourceField.alias: files},
+        address,
+    )
 
 
 def get_stripped_sources(
@@ -114,8 +119,8 @@ def get_unstripped_sources(
 def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
     targets = [
         create_target(rule_runner, "src/python", ["p.py"], PythonTarget),
-        create_target(rule_runner, "src/python", ["f.txt"], FileTarget),
-        create_target(rule_runner, "src/python", ["r.txt"], ResourceTarget),
+        create_target(rule_runner, "src/python", "f.txt", FileTarget),
+        create_target(rule_runner, "src/python", "r.txt", ResourceTarget),
         create_target(rule_runner, "src/python", ["j.java"], NonPythonTarget),
     ]
 
@@ -188,7 +193,7 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
 def test_files_not_used_for_source_roots(rule_runner: RuleRunner) -> None:
     targets = [
         create_target(rule_runner, "src/py", ["f.py"], PythonTarget),
-        create_target(rule_runner, "src/files", ["f.txt"], FileTarget),
+        create_target(rule_runner, "src/files", "f.txt", FileTarget),
     ]
     assert get_unstripped_sources(
         rule_runner, targets, include_files=True, source_roots=["src/py", "src/files"]
@@ -205,7 +210,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 package dir;
                 """
             ),
-            "src/protobuf/dir/BUILD": "protobuf_sources(sources=['f.proto'])",
+            "src/protobuf/dir/BUILD": "protobuf_sources(source='f.proto')",
             "src/protobuf/other_dir/f.proto": dedent(
                 """\
                 syntax = "proto2";
@@ -214,7 +219,7 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
                 """
             ),
             "src/protobuf/other_dir/BUILD": (
-                "protobuf_sources(sources=['f.proto'], python_source_root='src/python')"
+                "protobuf_sources(source='f.proto', python_source_root='src/python')"
             ),
         }
     )

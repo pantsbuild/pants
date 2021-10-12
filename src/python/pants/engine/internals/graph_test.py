@@ -102,7 +102,7 @@ class MockTarget(Target):
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, MultipleSourcesField)
+    core_fields = (MockDependencies, SingleSourceField)
 
 
 class MockTargetGenerator(Target):
@@ -561,7 +561,7 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
     generated_target_address = Address("", target_name="generator", relative_file_path="f1.txt")
     assert transitive_targets_rule_runner.get_target(
         generated_target_address
-    ) == MockGeneratedTarget({MultipleSourcesField.alias: ["f1.txt"]}, generated_target_address)
+    ) == MockGeneratedTarget({SingleSourceField.alias: "f1.txt"}, generated_target_address)
 
     # The target generator must actually generate the requested target.
     with pytest.raises(ExecutionError):
@@ -1570,6 +1570,7 @@ async def generate_targets_from_smalltalk_library(
         paths.files,
         None,
         add_dependencies_on_all_siblings=False,
+        use_source_field=False,
     )
 
 

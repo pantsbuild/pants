@@ -85,6 +85,7 @@ async def generate_targets_from_python_tests(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
+        use_source_field=False,
     )
 
 
@@ -105,6 +106,7 @@ async def generate_targets_from_python_sources(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
+        use_source_field=False,
     )
 
 

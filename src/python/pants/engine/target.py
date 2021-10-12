@@ -806,7 +806,7 @@ def generate_file_level_targets(
     *,
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
-    use_source_field: bool = False,
+    use_source_field: bool = True,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.

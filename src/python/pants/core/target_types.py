@@ -26,6 +26,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -43,10 +44,8 @@ from pants.util.logging import LogLevel
 # -----------------------------------------------------------------------------------------------
 
 
-class FileSourcesField(MultipleSourcesField):
-    required = True
+class FileSourcesField(SingleSourceField):
     uses_source_roots = False
-    expected_num_files = 1
 
 
 class FileTarget(Target):
@@ -227,9 +226,8 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourceSourcesField(MultipleSourcesField):
-    required = True
-    expected_num_files = 1
+class ResourceSourcesField(SingleSourceField):
+    uses_source_roots = True
 
 
 class ResourceTarget(Target):
