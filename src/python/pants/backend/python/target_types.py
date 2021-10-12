@@ -542,7 +542,7 @@ class PexBinary(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_tests` target
+# `python_test` and `python_tests` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -610,19 +610,32 @@ class SkipPythonTestsField(BoolField):
     help = "If true, don't run this target's tests."
 
 
+_PYTHON_TEST_COMMON_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    InterpreterConstraintsField,
+    PythonResolveField,
+    PythonTestsDependencies,
+    PythonTestsTimeout,
+    RuntimePackageDependenciesField,
+    PythonTestsExtraEnvVars,
+    SkipPythonTestsField,
+)
+
+
+class PythonTestTarget(Target):
+    alias = "python_tests"  # TODO: rename to `python_test`
+    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestsSources)
+    help = (
+        "A single Python test file, written in either Pytest style or unittest style.\n\n"
+        "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
+        "target and then be included in the `dependencies` field.\n\n"
+        f"See {doc_url('python-test-goal')}"
+    )
+
+
 class PythonTestsGeneratorTarget(Target):
     alias = "python_tests"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
-        PythonResolveField,
-        PythonTestsSources,
-        PythonTestsDependencies,
-        PythonTestsTimeout,
-        RuntimePackageDependenciesField,
-        PythonTestsExtraEnvVars,
-        SkipPythonTestsField,
-    )
+    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestsSources)
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_sources()` target and then "
@@ -631,12 +644,23 @@ class PythonTestsGeneratorTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_sources` target
+# `python_source` and `python_sources` targets
 # -----------------------------------------------------------------------------------------------
 
 
 class PythonLibrarySources(PythonSources):
     default = ("*.py", "*.pyi") + tuple(f"!{pat}" for pat in PythonTestsSources.default)
+
+
+class PythonSourceTarget(Target):
+    alias = "python_sources"  # TODO: rename to `python_source`
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        PythonLibrarySources,
+    )
+    help = "A single Python source file."
 
 
 class PythonSourcesGeneratorTarget(Target):

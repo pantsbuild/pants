@@ -28,8 +28,10 @@ from pants.backend.python.target_types import (
     PythonLibrarySources,
     PythonProvidesField,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestsSources,
+    PythonTestTarget,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
@@ -80,7 +82,7 @@ async def generate_targets_from_python_tests(
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
     return generate_file_level_targets(
-        PythonTestsGeneratorTarget,
+        PythonTestTarget,
         request.generator,
         paths.files,
         union_membership,
@@ -101,7 +103,7 @@ async def generate_targets_from_python_sources(
 ) -> GeneratedTargets:
     paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
     return generate_file_level_targets(
-        PythonSourcesGeneratorTarget,
+        PythonSourceTarget,
         request.generator,
         paths.files,
         union_membership,
