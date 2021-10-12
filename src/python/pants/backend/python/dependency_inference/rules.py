@@ -151,7 +151,7 @@ async def infer_python_dependencies_via_imports(
         Get(
             ParsedPythonImports,
             ParsePythonImportsRequest(
-                request.sources_field,
+                cast(PythonSourceField, request.sources_field),
                 InterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
                 string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
