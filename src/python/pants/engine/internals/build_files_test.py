@@ -145,6 +145,7 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
                 None,
                 add_dependencies_on_all_siblings=True,
                 use_generated_address_syntax=False,
+                use_source_field=False,
             ).values(),
             *generate_file_level_targets(
                 MockGeneratedTarget,
@@ -153,6 +154,7 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
                 None,
                 add_dependencies_on_all_siblings=True,
                 use_generated_address_syntax=True,
+                use_source_field=False,
             ).values(),
         ],
     )
