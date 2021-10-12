@@ -7,6 +7,7 @@ import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
@@ -263,7 +264,7 @@ async def generate_targets_from_go_mod(
     all_tgts = (*first_party_pkgs, *third_party_pkgs)
     unused_overrides = set(all_overrides.keys()) - used_overrides
     if unused_overrides:
-        all_generated_names = sorted(tgt.address.generated_name for tgt in all_tgts)
+        all_generated_names = sorted(cast(str, tgt.address.generated_name) for tgt in all_tgts)
         raise InvalidFieldException(
             f"Unused keys in the `overrides` field for {generator_addr}: {sorted(unused_overrides)}"
             f"\n\nDid you mean one of these valid names?\n\n"
