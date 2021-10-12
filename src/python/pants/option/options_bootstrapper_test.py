@@ -407,3 +407,38 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             logdir = ob.get_bootstrap_options().for_global_scope().logdir
             self.assertEqual("logdir1", logdir)
+
+    def test_alias_pyupgrade(self) -> None:
+        with temporary_dir() as tmpdir:
+            config = os.path.join(tmpdir, "config")
+            with open(config, "w") as out:
+                out.write(
+                    dedent(
+                        """\
+                        [GLOBAL.alias]
+                        pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+                        """
+                    )
+                )
+
+            config_arg = f"--pants-config-files=['{config}']"
+            ob = OptionsBootstrapper.create(
+                env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False
+            )
+
+            self.assertEqual(
+                (
+                    config_arg,
+                    "--backend-packages=pants.backend.python.lint.pyupgrade",
+                    "fmt",
+                ),
+                ob.args,
+            )
+            self.assertEqual(
+                (
+                    "./pants",
+                    config_arg,
+                    "--backend-packages=pants.backend.python.lint.pyupgrade",
+                ),
+                ob.bootstrap_args,
+            )

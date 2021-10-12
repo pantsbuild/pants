@@ -504,6 +504,11 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
     assert not caplog.records
 
 
+# ----------------------------------------------------------------------------------------
+# Legacy Unittest TestCase.
+# ----------------------------------------------------------------------------------------
+
+
 class OptionsTest(unittest.TestCase):
     @staticmethod
     def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
@@ -1125,7 +1130,7 @@ class OptionsTest(unittest.TestCase):
         with pytest.raises(Options.AmbiguousPassthroughError) as exc:
             Options.create(
                 env={},
-                config={},
+                config=self._create_config(),
                 known_scope_infos=[global_scope(), task("test"), task("fmt")],
                 args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
             )

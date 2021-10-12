@@ -13,6 +13,7 @@ from typing import Iterable, Mapping, Sequence
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.option.alias import OptionAlias
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
@@ -114,12 +115,6 @@ class OptionsBootstrapper:
           decision of whether to respect pantsrc files.
         """
         with warnings.catch_warnings(record=True):
-            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
-            args = tuple(args)
-
-            flags = set()
-            short_flags = set()
-
             # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
             @dataclass(frozen=True)
             class FileContent:
@@ -132,31 +127,8 @@ class OptionsBootstrapper:
                     read_file(path, binary_mode=True),
                 )
 
-            def capture_the_flags(*args: str, **kwargs) -> None:
-                for arg in args:
-                    flags.add(arg)
-                    if len(arg) == 2:
-                        short_flags.add(arg)
-                    elif kwargs.get("type") == bool:
-                        flags.add(f"--no-{arg[2:]}")
-
-            GlobalOptions.register_bootstrap_options(capture_the_flags)
-
-            def is_bootstrap_option(arg: str) -> bool:
-                components = arg.split("=", 1)
-                if components[0] in flags:
-                    return True
-                for flag in short_flags:
-                    if arg.startswith(flag):
-                        return True
-                return False
-
-            # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-            # Stop before '--' since args after that are pass-through and may have duplicate names to our
-            # bootstrap options.
-            bargs = ("./pants",) + tuple(
-                filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
-            )
+            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
+            bargs = cls._get_bootstrap_args(args)
 
             config_file_paths = cls.get_config_file_paths(env=env, args=args)
             config_files_products = [filecontent_for(p) for p in config_file_paths]
@@ -185,9 +157,48 @@ class OptionsBootstrapper:
             )
 
             env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
+
+            # Finally, we expand any aliases and re-populates the bootstrap args, in case there was
+            # any from an alias.
+            alias = OptionAlias.from_dict(post_bootstrap_config.get("GLOBAL", "alias", dict, {}))
+            args = alias.expand_args(tuple(args))
+            bargs = cls._get_bootstrap_args(args)
+
             return cls(
                 env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
             )
+
+    @classmethod
+    def _get_bootstrap_args(cls, args: Sequence[str]) -> tuple[str, ...]:
+        flags = set()
+        short_flags = set()
+
+        def capture_the_flags(*args: str, **kwargs) -> None:
+            for arg in args:
+                flags.add(arg)
+                if len(arg) == 2:
+                    short_flags.add(arg)
+                elif kwargs.get("type") == bool:
+                    flags.add(f"--no-{arg[2:]}")
+
+        GlobalOptions.register_bootstrap_options(capture_the_flags)
+
+        def is_bootstrap_option(arg: str) -> bool:
+            components = arg.split("=", 1)
+            if components[0] in flags:
+                return True
+            for flag in short_flags:
+                if arg.startswith(flag):
+                    return True
+            return False
+
+        # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
+        # Stop before '--' since args after that are pass-through and may have duplicate names to our
+        # bootstrap options.
+        bargs = ("./pants",) + tuple(
+            filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
+        )
+        return bargs
 
     @memoized_property
     def env(self) -> dict[str, str]:
