@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -15,7 +15,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 
 @dataclass(frozen=True)
 class PythonFmtTargets(LanguageFmtTargets):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
 
 @union
@@ -29,7 +29,7 @@ async def format_python_target(
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[PythonSources] for target in python_fmt_targets.targets),
+        SourceFilesRequest(target[PythonSourceField] for target in python_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 

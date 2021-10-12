@@ -14,8 +14,8 @@ from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
     PythonSourcesGeneratorTarget,
+    PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
-    PythonTestsSources,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -45,7 +45,7 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsSources.default))
+    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
     test_filenames = set(
         matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
     )

@@ -15,7 +15,7 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
     PythonRequirementsField,
-    PythonSources,
+    PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
@@ -47,9 +47,9 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 @dataclass(frozen=True)
 class PylintFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
     dependencies: Dependencies
 
     @classmethod

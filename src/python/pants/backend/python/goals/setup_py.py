@@ -19,9 +19,10 @@ from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSe
 from pants.backend.python.target_types import (
     GenerateSetupField,
     PythonDistributionEntryPointsField,
+    PythonGeneratingSourcesBase,
     PythonProvidesField,
     PythonRequirementsField,
-    PythonSources,
+    PythonSourceField,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
     SDistConfigSettingsField,
@@ -907,10 +908,14 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         # This isn't particularly useful (3rdparty requirements should be on the python_sources
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
-        or tgt.has_field(PythonSources)
+        or tgt.has_field(PythonSourceField)
         or tgt.has_field(ResourceSourceField)
-        or tgt.get(SourcesField).can_generate(PythonSources, union_membership)
+        or tgt.get(SourcesField).can_generate(PythonSourceField, union_membership)
         or tgt.get(SourcesField).can_generate(ResourceSourceField, union_membership)
+        # We also check for generating sources so that dependencies on `python_sources(sources=[])`
+        # is included. Those won't generate any `python_source` targets, but still can be
+        # dependended upon.
+        or tgt.has_field(PythonGeneratingSourcesBase)
     )
 
 

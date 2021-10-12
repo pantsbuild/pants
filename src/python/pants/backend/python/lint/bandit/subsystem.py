@@ -13,7 +13,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
-    PythonSources,
+    PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
@@ -29,9 +29,9 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class BanditFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod

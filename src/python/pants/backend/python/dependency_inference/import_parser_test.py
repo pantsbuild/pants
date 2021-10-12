@@ -12,7 +12,7 @@ from pants.backend.python.dependency_inference.import_parser import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
 )
-from pants.backend.python.target_types import PythonSources, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
@@ -34,13 +34,13 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             QueryRule(ParsedPythonImports, [ParsePythonImportsRequest]),
         ],
-        target_types=[PythonSourcesGeneratorTarget],
+        target_types=[PythonSourceTarget],
     )
 
 
 def assert_imports_parsed(
     rule_runner: RuleRunner,
-    content: str | None,
+    content: str,
     *,
     expected: list[str],
     filename: str = "project/foo.py",
@@ -49,16 +49,18 @@ def assert_imports_parsed(
     string_imports_min_dots: int = 2,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    files = {"project/BUILD": "python_sources(sources=['**/*.py'])"}
-    if content is not None:
-        files[filename] = content
-    rule_runner.write_files(files)  # type: ignore[arg-type]
-    tgt = rule_runner.get_target(Address("project"))
+    rule_runner.write_files(
+        {
+            "BUILD": f"python_sources(name='t', source={repr(filename)})",
+            filename: content,
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t"))
     imports = rule_runner.request(
         ParsedPythonImports,
         [
             ParsePythonImportsRequest(
-                tgt[PythonSources],
+                tgt[PythonSourceField],
                 InterpreterConstraints([constraints]),
                 string_imports=string_imports,
                 string_imports_min_dots=string_imports_min_dots,
@@ -94,9 +96,6 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         __import__("pkg_resources")
         """
     )
-    # We create a second file, in addition to what `assert_imports_parsed` does, to ensure we can
-    # handle multiple files belonging to the same target.
-    rule_runner.write_files({"project/f2.py": "import second_import"})
     assert_imports_parsed(
         rule_runner,
         content,
@@ -110,7 +109,6 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "project.demo.Demo",
             "project.demo.OriginalName",
             "project.circular_dep.CircularDep",
-            "second_import",
             "subprocess",
             "subprocess23",
             "pkg_resources",
@@ -195,15 +193,11 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
 
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, content="x =", expected=[])
+    assert_imports_parsed(rule_runner, "x =", expected=[])
 
 
 def test_handle_unicode(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, content="x = 'äbç'", expected=[])
-
-
-def test_gracefully_handle_no_sources(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, content=None, expected=[])
+    assert_imports_parsed(rule_runner, "x = 'äbç'", expected=[])
 
 
 @skip_unless_python27_present

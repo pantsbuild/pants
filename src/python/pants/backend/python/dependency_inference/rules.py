@@ -11,7 +11,7 @@ from pants.backend.python.dependency_inference.import_parser import (
     ParsePythonImportsRequest,
 )
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
-from pants.backend.python.target_types import PythonSources, PythonTestsSources
+from pants.backend.python.target_types import PythonSourceField, PythonTestSourceField
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -133,7 +133,7 @@ class PythonInferSubsystem(Subsystem):
 
 
 class InferPythonImportDependencies(InferDependenciesRequest):
-    infer_from = PythonSources
+    infer_from = PythonSourceField
 
 
 @rule(desc="Inferring Python dependencies by analyzing imports")
@@ -181,7 +181,7 @@ async def infer_python_dependencies_via_imports(
 
 
 class InferInitDependencies(InferDependenciesRequest):
-    infer_from = PythonSources
+    infer_from = PythonSourceField
 
 
 @rule(desc="Inferring dependencies on `__init__.py` files")
@@ -209,7 +209,7 @@ async def infer_python_init_dependencies(
 
 
 class InferConftestDependencies(InferDependenciesRequest):
-    infer_from = PythonTestsSources
+    infer_from = PythonTestSourceField
 
 
 @rule(desc="Inferring dependencies on `conftest.py` files")

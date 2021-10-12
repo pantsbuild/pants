@@ -10,7 +10,11 @@ from typing import Iterable, cast
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript, PythonRequirementsField, PythonSources
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    PythonRequirementsField,
+    PythonSourceField,
+)
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
@@ -42,13 +46,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class MyPyFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipMyPyField).value and not tgt.address.is_file_target
+        return tgt.get(SkipMyPyField).value
 
 
 # --------------------------------------------------------------------------------------

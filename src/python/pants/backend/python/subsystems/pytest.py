@@ -18,7 +18,7 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     PythonResolveField,
     PythonTestsExtraEnvVars,
-    PythonTestsSources,
+    PythonTestSourceField,
     PythonTestsTimeout,
     SkipPythonTestsField,
     format_invalid_requirement_string_error,
@@ -44,9 +44,9 @@ from pants.util.memo import memoized_method
 
 @dataclass(frozen=True)
 class PythonTestFieldSet(TestFieldSet):
-    required_fields = (PythonTestsSources,)
+    required_fields = (PythonTestSourceField,)
 
-    sources: PythonTestsSources
+    sources: PythonTestSourceField
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars
@@ -56,8 +56,8 @@ class PythonTestFieldSet(TestFieldSet):
     def opt_out(cls, tgt: Target) -> bool:
         if tgt.get(SkipPythonTestsField).value:
             return True
-        if not tgt.address.is_file_target:
-            return False
+        # TODO: Replace this by having `python_tests` generate `python_source` targets for these
+        #  files.
         file_name = PurePath(tgt.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 

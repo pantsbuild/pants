@@ -25,12 +25,12 @@ from pants.backend.python.target_types import (
     PythonDistributionDependencies,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
-    PythonLibrarySources,
     PythonProvidesField,
+    PythonSourcesGeneratingSourcesField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
+    PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
-    PythonTestsSources,
     PythonTestTarget,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
@@ -80,14 +80,15 @@ async def generate_targets_from_python_tests(
     python_infer: PythonInferSubsystem,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsSources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsGeneratingSourcesField])
+    )
     return generate_file_level_targets(
         PythonTestTarget,
         request.generator,
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
-        use_source_field=False,
     )
 
 
@@ -101,14 +102,15 @@ async def generate_targets_from_python_sources(
     python_infer: PythonInferSubsystem,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[PythonLibrarySources]))
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[PythonSourcesGeneratingSourcesField])
+    )
     return generate_file_level_targets(
         PythonSourceTarget,
         request.generator,
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
-        use_source_field=False,
     )
 
 

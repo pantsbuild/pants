@@ -15,7 +15,7 @@ from pants.backend.python.dependency_inference.rules import (
 )
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
-    PythonSources,
+    PythonSourceField,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
 )
@@ -91,23 +91,23 @@ def test_infer_python_imports(caplog) -> None:
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferPythonImportDependencies(target[PythonSources])]
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
         )
 
-    build_address = Address("src/python")
-    assert run_dep_inference(build_address) == InferredDependencies(
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="app.py")
+    ) == InferredDependencies(
         [
             Address("3rdparty/python", target_name="Django"),
-            Address("src/python", relative_file_path="app.py"),
             Address("src/python/util", relative_file_path="dep.py"),
         ],
     )
 
-    file_address = Address("src/python", relative_file_path="f2.py")
-    assert run_dep_inference(file_address) == InferredDependencies(
+    addr = Address("src/python", relative_file_path="f2.py")
+    assert run_dep_inference(addr) == InferredDependencies(
         [Address("src/python", relative_file_path="app.py")]
     )
-    assert run_dep_inference(file_address, enable_string_imports=True) == InferredDependencies(
+    assert run_dep_inference(addr, enable_string_imports=True) == InferredDependencies(
         [
             Address("src/python", relative_file_path="app.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
@@ -138,7 +138,7 @@ def test_infer_python_imports(caplog) -> None:
         ),
     )
     assert run_dep_inference(
-        Address("src/python/ambiguous", target_name="main")
+        Address("src/python/ambiguous", target_name="main", relative_file_path="main.py")
     ) == InferredDependencies(
         [
             Address(
@@ -149,7 +149,7 @@ def test_infer_python_imports(caplog) -> None:
         ],
     )
     assert len(caplog.records) == 1
-    assert "The target src/python/ambiguous:main imports `ambiguous.dep`" in caplog.text
+    assert "The target src/python/ambiguous/main.py:main imports `ambiguous.dep`" in caplog.text
     assert "['src/python/ambiguous/dep.py:dep1', 'src/python/ambiguous/dep.py:dep2']" in caplog.text
     assert "disambiguated_via_ignores.py" not in caplog.text
 
@@ -181,19 +181,23 @@ def test_infer_python_inits() -> None:
     rule_runner.add_to_build_file("src/python/root/mid", "python_sources()")
 
     rule_runner.create_file("src/python/root/mid/leaf/__init__.py")
+    rule_runner.create_file("src/python/root/mid/leaf/f.py")
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_sources()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferInitDependencies(target[PythonSources])],
+            [InferInitDependencies(target[PythonSourceField])],
         )
 
-    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(
+        Address("src/python/root/mid/leaf", relative_file_path="f.py")
+    ) == InferredDependencies(
         [
-            Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
-            Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
+            Address("src/python/root", relative_file_path="__init__.py"),
+            Address("src/python/root/mid", relative_file_path="__init__.py"),
+            Address("src/python/root/mid/leaf", relative_file_path="__init__.py"),
         ],
     )
 
@@ -228,12 +232,15 @@ def test_infer_python_conftests() -> None:
         target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferConftestDependencies(target[PythonSources])],
+            [InferConftestDependencies(target[PythonSourceField])],
         )
 
-    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(
+        Address("src/python/root/mid/leaf", relative_file_path="this_is_a_test.py")
+    ) == InferredDependencies(
         [
-            Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
-            Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
+            Address("src/python/root", relative_file_path="conftest.py"),
+            Address("src/python/root/mid", relative_file_path="conftest.py"),
+            Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
         ],
     )

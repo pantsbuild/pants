@@ -11,7 +11,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufSubsystem,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
@@ -43,7 +43,7 @@ from pants.util.logging import LogLevel
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
-    output = PythonSources
+    output = PythonSourceField
 
 
 @rule(desc="Generate Python from Protobuf", level=LogLevel.DEBUG)
