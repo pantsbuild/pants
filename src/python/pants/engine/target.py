@@ -289,7 +289,7 @@ class Target:
     address: Address
     plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
-    resident_dir: str
+    residence_dir: str
 
     @final
     def __init__(
@@ -301,7 +301,7 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
-        resident_dir: str | None = None,
+        residence_dir: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -309,7 +309,7 @@ class Target:
             fields will either use their default or error if required=True.
         :param address: How to uniquely identify this target.
         :param union_membership: Used to determine plugin fields. This must be set in production!
-        :param resident_dir: Where this target "lives". If unspecified, will be the `spec_path`
+        :param residence_dir: Where this target "lives". If unspecified, will be the `spec_path`
             of the `address`, i.e. where the target was either explicitly defined or where its
             target generator was explicitly defined. Target generators can, however, set this to
             the directory where the generated target provides metadata for. For example, a
@@ -337,7 +337,7 @@ class Target:
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
-        self.resident_dir = resident_dir if resident_dir is not None else address.spec_path
+        self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
 
         field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
@@ -384,7 +384,7 @@ class Target:
             f"{self.__class__}("
             f"address={self.address}, "
             f"alias={repr(self.alias)}, "
-            f"resident_dir={repr(self.resident_dir)}, "
+            f"residence_dir={repr(self.residence_dir)}, "
             f"{fields})"
         )
 
@@ -394,15 +394,15 @@ class Target:
         return f"{self.alias}({address}{fields})"
 
     def __hash__(self) -> int:
-        return hash((self.__class__, self.address, self.resident_dir, self.field_values))
+        return hash((self.__class__, self.address, self.residence_dir, self.field_values))
 
     def __eq__(self, other: Union[Target, Any]) -> bool:
         if not isinstance(other, Target):
             return NotImplemented
-        return (self.__class__, self.address, self.resident_dir, self.field_values) == (
+        return (self.__class__, self.address, self.residence_dir, self.field_values) == (
             other.__class__,
             other.address,
-            other.resident_dir,
+            other.residence_dir,
             other.field_values,
         )
 
@@ -898,7 +898,7 @@ def generate_file_level_targets(
             generated_target_fields,
             address,
             union_membership,
-            resident_dir=os.path.dirname(full_fp),
+            residence_dir=os.path.dirname(full_fp),
         )
 
     return GeneratedTargets(

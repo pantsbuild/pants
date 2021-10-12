@@ -228,7 +228,7 @@ async def generate_targets_from_go_mod(
             # E.g. `src/go:mod#./subdir`.
             generator_addr.create_generated(f"./{subpath}"),
             union_membership,
-            resident_dir=dir,
+            residence_dir=dir,
         )
 
     first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
@@ -243,7 +243,7 @@ async def generate_targets_from_go_mod(
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
             union_membership,
-            resident_dir=generator_addr.spec_path,
+            residence_dir=generator_addr.spec_path,
         )
 
     third_party_pkgs = (

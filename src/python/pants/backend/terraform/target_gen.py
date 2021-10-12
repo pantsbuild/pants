@@ -56,7 +56,7 @@ async def generate_terraform_module_targets(
             generated_target_fields,
             generator.address.create_generated(relpath_to_generator or "."),
             union_membership,
-            resident_dir=dir,
+            residence_dir=dir,
         )
 
     return GeneratedTargets(request.generator, [gen_target(dir) for dir in matched_dirs])
