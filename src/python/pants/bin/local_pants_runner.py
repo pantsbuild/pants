@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -120,7 +121,8 @@ class LocalPantsRunner:
         build_config, options = options_initializer.build_config_and_options(
             options_bootstrapper, env, raise_=True
         )
-        stdio_destination_use_color(options.for_global_scope().colors)
+        global_options = options.for_global_scope()
+        stdio_destination_use_color(global_options.colors)
 
         run_tracker = RunTracker(options_bootstrapper.args, options)
         union_membership = UnionMembership.from_rules(build_config.union_rules)
@@ -132,8 +134,7 @@ class LocalPantsRunner:
                 options.for_scope(scope)
 
         # Verify configs.
-        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        if global_bootstrap_options.verify_config:
+        if global_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
@@ -149,11 +150,28 @@ class LocalPantsRunner:
             cancellation_latch,
         )
 
+        if not global_options.dir_arguments:
+            warn_or_error(
+                "2.9.0.dev0",
+                "the global option `dir_arguments` defaulting to false",
+                (
+                    "Directory arguments will soon default to matching all targets defined in the "
+                    "directory or that own files in the directory. For example, `./pants test dir` "
+                    "will run all tests in the `dir` folder.\n\n"
+                    "Currently, a directory argument like `dir` is instead a shorthand for the "
+                    "target `dir:dir`, i.e. the target defined in `dir` with the `name` left "
+                    "off.\n\n"
+                    "To fix this deprecation, explicitly set `dir_arguments` to either `true` or "
+                    "`false` in the `[GLOBAL]` section of `pants.toml`."
+                ),
+            )
+
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
             build_root=get_buildroot(),
             session=graph_session.scheduler_session,
+            dir_address_shorthand=not global_options.dir_arguments,
         )
 
         profile_path = env.get("PANTS_PROFILE")

@@ -53,6 +53,8 @@ build_ignore.add = [
   "/testprojects/src/go/**",
 ]
 
+dir_arguments = true
+
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"

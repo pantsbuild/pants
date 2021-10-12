@@ -1312,6 +1312,20 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--dir-arguments",
+            type=bool,
+            default=False,
+            help=(
+                "If true, treat directory paths in command-line arguments as specifying all "
+                "targets that are defined in the directory or that own files in the directory. For "
+                "example, `./pants test dir` will run all tests in the `dir` folder.\n\n"
+                "If false, will use the deprecated shorthand of `dir` being the address "
+                "`dir:dir, i.e. the target defined `dir` with the `name` field left off.\n\n"
+                "Default will change to `true` in Pants 2.9."
+            ),
+        )
+
+        register(
             "--tag",
             type=list,
             metavar="[+-]tag1,tag2,...",

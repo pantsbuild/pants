@@ -28,9 +28,12 @@ def calculate_specs(
     session: SchedulerSession,
     *,
     build_root: str,
+    dir_address_shorthand: bool,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
-    specs = SpecsParser(build_root).parse_specs(options.specs, dir_address_shorthand=True)
+    specs = SpecsParser(build_root).parse_specs(
+        options.specs, dir_address_shorthand=dir_address_shorthand
+    )
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
     logger.debug("specs are: %s", specs)
