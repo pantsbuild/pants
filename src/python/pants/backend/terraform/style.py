@@ -6,27 +6,32 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Iterable, TypeVar
 
 from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
-from pants.core.goals import style_request
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
-
-class StyleRequest(style_request.StyleRequest):
-    field_set_type = TerraformFieldSet
+_FS = TypeVar("_FS", bound=TerraformFieldSet)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class StyleSetupRequest:
-    request: StyleRequest
+    request: StyleRequest[TerraformFieldSet]
     args: tuple[str, ...]
+
+    def __init__(self, request: StyleRequest[TerraformFieldSet], args: Iterable[str]):
+        self.request = request
+        self.args = tuple(args)
 
 
 @dataclass(frozen=True)
@@ -51,7 +56,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         else setup_request.request.prior_formatter_result
     )
 
-    # `terraform fmt` operates on a directory-by-directory basis. First determine the directories in
+    # `terraform` operates on a directory-by-directory basis. First determine the directories in
     # the snapshot. This does not use `source_files_snapshot.dirs` because that will be empty if the files
     # are in a single directory.
     directories = defaultdict(list)
