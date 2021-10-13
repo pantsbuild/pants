@@ -10,7 +10,7 @@ from pathlib import PurePath
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 
@@ -18,7 +18,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 class AssemblyPreCompilation:
     merged_compilation_input_digest: Digest
     assembly_digests: tuple[Digest, ...]
-    EXTRA_COMPILATION_ARGS = ("-symabis", "./symabis")
 
 
 @dataclass(frozen=True)
@@ -35,7 +34,8 @@ class AssemblyPreCompilationRequest:
 
 @dataclass(frozen=True)
 class AssemblyPostCompilation:
-    merged_output_digest: Digest
+    result: FallibleProcessResult
+    merged_output_digest: Digest | None
 
 
 @dataclass(frozen=True)
@@ -122,7 +122,7 @@ async def link_assembly_post_compilation(
         Digest, MergeDigests([request.compilation_result, *request.assembly_digests])
     )
     pack_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=merged_digest,
             command=(
@@ -139,7 +139,9 @@ async def link_assembly_post_compilation(
             output_files=("__pkg__.a",),
         ),
     )
-    return AssemblyPostCompilation(pack_result.output_digest)
+    return AssemblyPostCompilation(
+        pack_result, pack_result.output_digest if pack_result.exit_code == 0 else None
+    )
 
 
 def rules():
