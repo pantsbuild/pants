@@ -60,6 +60,7 @@ class CoursierBinary(TemplatedExternalTool):
 
     default_version = "v2.0.13"
     default_known_versions = [
+        "v2.0.13|linux_arm64 |8d428bede2d9d0e48ffad8360d49de48bd0c2c3b0e54e82e3a7665019b65e4d0|58622664",
         "v2.0.13|linux_x86_64|1ae089789cc4b0a4d296d6852b760d7f8bf72805267a6b7571e99b681d5e13b4|59652208",
         "v2.0.13|macos_arm64 |d74b8fe4ffc2f4e9011d7151722fc8b5ffca8a72b3bc4188c61df3326228c4ef|57625024",
         "v2.0.13|macos_x86_64|d74b8fe4ffc2f4e9011d7151722fc8b5ffca8a72b3bc4188c61df3326228c4ef|57625024",
@@ -70,6 +71,7 @@ class CoursierBinary(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "x86_64-apple-darwin",
         "macos_x86_64": "x86_64-apple-darwin",
+        "linux_arm64": "aarch64-pc-linux",
         "linux_x86_64": "x86_64-pc-linux",
     }
 
