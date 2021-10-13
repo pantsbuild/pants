@@ -73,7 +73,7 @@ class ProtobufSourcesGeneratorTarget(Target):
         ProtobufSourcesGeneratingSourcesField,
         ProtobufGrpcToggleField,
     )
-    help = "Generates a `protobuf_source` target for each file in the `sources` field."
+    help = "Generate a `protobuf_source` target for each file in the `sources` field."
 
     deprecated_alias = "protobuf_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
