@@ -26,6 +26,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -43,15 +44,13 @@ from pants.util.logging import LogLevel
 # -----------------------------------------------------------------------------------------------
 
 
-class FileSourcesField(MultipleSourcesField):
-    required = True
+class FileSourceField(SingleSourceField):
     uses_source_roots = False
-    expected_num_files = 1
 
 
 class FileTarget(Target):
     alias = "files"  # TODO: update name to `file`
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourcesField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
     help = (
         "A single loose file that lives outside of code packages.\n\n"
         "Files are placed directly in archives, outside of code artifacts such as Python wheels "
@@ -186,7 +185,7 @@ class RelocatedFiles(Target):
 
 class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
     input = RelocatedFilesSources
-    output = FileSourcesField
+    output = FileSourceField
 
 
 @rule(desc="Relocating loose files for `relocated_files` targets", level=LogLevel.DEBUG)
@@ -205,7 +204,7 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourcesField,)),
+            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
         )
         for tgt in original_file_targets
     )
@@ -227,14 +226,13 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourceSourcesField(MultipleSourcesField):
-    required = True
-    expected_num_files = 1
+class ResourceSourceField(SingleSourceField):
+    uses_source_roots = True
 
 
 class ResourceTarget(Target):
     alias = "resources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourcesField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
     help = (
         "A single resource file embedded in a code package and accessed in a "
         "location-independent manner.\n\n"
@@ -377,7 +375,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
             HydratedSources,
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
-                for_sources_types=(FileSourcesField,),
+                for_sources_types=(FileSourceField,),
                 enable_codegen=True,
             ),
         )

@@ -457,6 +457,7 @@ def test_generate_file_level_targets() -> None:
             None,
             add_dependencies_on_all_siblings=add_dependencies_on_all_siblings,
             use_generated_address_syntax=use_generated_addr_syntax,
+            use_source_field=False,
         )
 
     tgt = MockGenerator(

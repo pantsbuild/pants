@@ -11,7 +11,7 @@ import pytest
 from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest
 from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
-from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourcesField
+from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -267,7 +267,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
             SourceFilesRequest(
                 (src_contents[MultipleSourcesField],),
                 enable_codegen=True,
-                for_sources_types=(FileSourcesField,),
+                for_sources_types=(FileSourceField,),
             )
         ],
     )

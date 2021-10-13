@@ -15,7 +15,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufSourcesField,
+    ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
@@ -80,7 +80,7 @@ def assert_files_generated(
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
     protocol_sources = rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourcesField])]
+        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourceField])]
     )
     generated_sources = rule_runner.request(
         GeneratedSources,

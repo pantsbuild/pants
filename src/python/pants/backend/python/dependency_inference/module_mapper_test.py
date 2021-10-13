@@ -24,7 +24,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ThirdPartyPythonModuleMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -174,7 +174,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(ThirdPartyPythonModuleMapping, []),
             QueryRule(PythonModuleOwners, [PythonModule]),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget, ProtobufSourcesGeneratorTarget],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            ProtobufSourcesGeneratorTarget,
+        ],
     )
 
 

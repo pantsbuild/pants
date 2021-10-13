@@ -9,7 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary, PythonLibrary
+from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell import shunit2_test_runner
@@ -58,7 +58,7 @@ def rule_runner() -> RuleRunner:
         target_types=[
             ShellSourcesGeneratorTarget,
             Shunit2TestsGeneratorTarget,
-            PythonLibrary,
+            PythonSourcesGeneratorTarget,
             PexBinary,
         ],
     )

@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -871,7 +871,7 @@ def test_context_object_on_streaming_workunits(
 
 def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     rule_runner = RuleRunner(
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
         rules=[
             QueryRule(ProcessResult, (Process,)),
         ],

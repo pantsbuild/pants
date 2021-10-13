@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.python.goals.publish import PublishToPyPiFieldSet, PublishToPyPiRequest, rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.target_types import PythonDistribution, PythonLibrary
+from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
 from pants.core.goals.publish import PublishPackages, PublishProcesses
@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *rules(),
             QueryRule(PublishProcesses, [PublishToPyPiRequest]),
         ],
-        target_types=[PythonLibrary, PythonDistribution],
+        target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
     )
     rule_runner.set_options(

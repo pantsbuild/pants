@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufSourcesField
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
@@ -44,9 +44,9 @@ class ProtobufMapping:
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
 async def map_protobuf_files() -> ProtobufMapping:
     targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourcesField))
+    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
     stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourcesField]))
+        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
         for tgt in protobuf_targets
     )
 
@@ -88,7 +88,7 @@ def parse_proto_imports(file_content: str) -> FrozenOrderedSet[str]:
 
 
 class InferProtobufDependencies(InferDependenciesRequest):
-    infer_from = ProtobufSourcesField
+    infer_from = ProtobufSourceField
 
 
 @rule(desc="Inferring Protobuf dependencies by analyzing imports")

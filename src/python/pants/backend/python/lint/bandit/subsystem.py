@@ -13,13 +13,13 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
-    PythonSources,
+    PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, Target, UnexpandedTargets
+from pants.engine.target import FieldSet, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
 from pants.python.python_setup import PythonSetup
@@ -29,9 +29,9 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class BanditFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
@@ -132,10 +132,10 @@ async def setup_bandit_lockfile(
     #
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
     # interpreter used will be covered.
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     unique_constraints = {
         InterpreterConstraints.create_from_targets([tgt], python_setup)
-        for tgt in all_build_targets
+        for tgt in all_tgts
         if BanditFieldSet.is_applicable(tgt)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))

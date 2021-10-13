@@ -583,7 +583,7 @@ class Targets(Collection[Target]):
     """A heterogeneous collection of instances of Target subclasses.
 
     While every element will be a subclass of `Target`, there may be many different `Target` types
-    in this collection, e.g. some `Files` targets and some `PythonLibrary` targets.
+    in this collection, e.g. some `FileTarget` and some `PythonTestTarget`.
 
     Often, you will want to filter out the relevant targets by looking at what fields they have
     registered, e.g.:
@@ -591,7 +591,8 @@ class Targets(Collection[Target]):
         valid_tgts = [tgt for tgt in tgts if tgt.has_fields([Compatibility, PythonSources])]
 
     You should not check the Target's actual type because this breaks custom target types;
-    for example, prefer `tgt.has_field(PythonTestsSources)` to `isinstance(tgt, PythonTests)`.
+    for example, prefer `tgt.has_field(PythonTestsSourcesField)` to
+    `isinstance(tgt, PythonTestsTarget)`.
     """
 
     def expect_single(self) -> Target:
@@ -806,7 +807,7 @@ def generate_file_level_targets(
     *,
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
-    use_source_field: bool = False,
+    use_source_field: bool = True,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.

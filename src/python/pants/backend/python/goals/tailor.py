@@ -13,9 +13,9 @@ from pants.backend.python.dependency_inference.module_mapper import PythonModule
 from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
-    PythonLibrary,
-    PythonTests,
-    PythonTestsSources,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratingSourcesField,
+    PythonTestsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -45,13 +45,13 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsSources.default))
+    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
     test_filenames = set(
         matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
     )
     test_files = {path for path in paths if os.path.basename(path) in test_filenames}
     library_files = set(paths) - test_files
-    return {PythonTests: test_files, PythonLibrary: library_files}
+    return {PythonTestsGeneratorTarget: test_files, PythonSourcesGeneratorTarget: library_files}
 
 
 # The order "__main__" == __name__ would also technically work, but is very
@@ -83,11 +83,11 @@ async def find_putative_targets(
     pts = []
     for tgt_type, paths in classified_unowned_py_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == PythonTests else {}
+            name = "tests" if tgt_type == PythonTestsGeneratorTarget else os.path.basename(dirname)
+            kwargs = {"name": name} if tgt_type == PythonTestsGeneratorTarget else {}
             if (
                 python_setup.tailor_ignore_solitary_init_files
-                and tgt_type == PythonLibrary
+                and tgt_type == PythonSourcesGeneratorTarget
                 and filenames == {"__init__.py"}
             ):
                 continue

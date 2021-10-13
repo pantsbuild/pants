@@ -20,7 +20,7 @@ from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
-    PythonSources,
+    PythonSourceField,
     TypeStubsModuleMappingField,
 )
 from pants.base.specs import AddressSpecs, DescendantAddresses
@@ -174,32 +174,37 @@ async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
+    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSourceField))
     stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSources]))
+        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSourceField]))
         for tgt in python_targets
     )
 
     modules_to_addresses: DefaultDict[str, list[Address]] = defaultdict(list)
     modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, stripped_sources in zip(python_targets, stripped_sources_per_target):
-        for stripped_f in stripped_sources:
-            module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
-            if module in modules_to_addresses:
-                # We check if one of the targets is an implementation (.py file) and the other is
-                # a type stub (.pyi file), which we allow. Otherwise, we have ambiguity.
-                prior_is_type_stub = len(
-                    modules_to_addresses[module]
-                ) == 1 and modules_to_addresses[module][0].filename.endswith(".pyi")
-                current_is_type_stub = tgt.address.filename.endswith(".pyi")
-                if prior_is_type_stub ^ current_is_type_stub:
-                    modules_to_addresses[module].append(tgt.address)
-                else:
-                    modules_with_multiple_implementations[module].update(
-                        {*modules_to_addresses[module], tgt.address}
-                    )
-            else:
-                modules_to_addresses[module].append(tgt.address)
+        # `PythonSourceFile` validates that each target has exactly one file.
+        assert len(stripped_sources) == 1
+        stripped_f = stripped_sources[0]
+
+        module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
+        if module not in modules_to_addresses:
+            modules_to_addresses[module].append(tgt.address)
+            continue
+
+        # Else, possible ambiguity. Check if one of the targets is an implementation
+        # (.py file) and the other is a type stub (.pyi file), which we allow. Otherwise, it's
+        # ambiguous.
+        prior_is_type_stub = len(modules_to_addresses[module]) == 1 and modules_to_addresses[
+            module
+        ][0].filename.endswith(".pyi")
+        current_is_type_stub = tgt.address.filename.endswith(".pyi")
+        if prior_is_type_stub ^ current_is_type_stub:
+            modules_to_addresses[module].append(tgt.address)
+        else:
+            modules_with_multiple_implementations[module].update(
+                {*modules_to_addresses[module], tgt.address}
+            )
 
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_implementations:

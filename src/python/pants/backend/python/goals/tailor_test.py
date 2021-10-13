@@ -11,7 +11,11 @@ from pants.backend.python.goals.tailor import (
     classify_source_files,
     is_entry_point,
 )
-from pants.backend.python.target_types import PexBinary, PythonLibrary, PythonTests
+from pants.backend.python.target_types import (
+    PexBinary,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -34,9 +38,10 @@ def test_classify_source_files() -> None:
     }
     lib_files = {"foo/bar/baz.py", "foo/bar_baz.py", "foo.pyi"}
 
-    assert {PythonTests: test_files, PythonLibrary: lib_files} == classify_source_files(
-        test_files | lib_files
-    )
+    assert {
+        PythonTestsGeneratorTarget: test_files,
+        PythonSourcesGeneratorTarget: lib_files,
+    } == classify_source_files(test_files | lib_files)
 
 
 @pytest.fixture
@@ -97,13 +102,16 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     kwargs={"requirements_relpath": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo", "foo", ["__init__.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo", "foo", ["__init__.py"]
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/bar", "bar", ["baz2.py", "baz3.py"]
+                    PythonSourcesGeneratorTarget,
+                    "src/python/foo/bar",
+                    "bar",
+                    ["baz2.py", "baz3.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonTests,
+                    PythonTestsGeneratorTarget,
                     "src/python/foo/bar",
                     "tests",
                     ["baz1_test.py", "baz2_test.py"],
@@ -143,14 +151,14 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    PythonTests,
+                    PythonTestsGeneratorTarget,
                     "src/python/foo/bar",
                     "tests",
                     ["bar_test.py"],
                     kwargs={"name": "tests"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "qux", ["qux.py"]
                 ),
             ]
         )
@@ -223,10 +231,13 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/bar", "bar", ["__init__.py", "bar.py"]
+                    PythonSourcesGeneratorTarget,
+                    "src/python/foo/bar",
+                    "bar",
+                    ["__init__.py", "bar.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonLibrary, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "qux", ["qux.py"]
                 ),
             ]
         )
