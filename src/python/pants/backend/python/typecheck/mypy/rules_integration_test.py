@@ -257,10 +257,12 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE))
     result = run_mypy(
         rule_runner,
-        [tgt],
+        [
+            rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py")),
+            rule_runner.get_target(Address(PACKAGE, relative_file_path="settings.py")),
+        ],
         extra_args=[
             "--mypy-extra-requirements=django-stubs==1.8.0",
             "--mypy-extra-type-stubs=django-stubs==1.8.0",

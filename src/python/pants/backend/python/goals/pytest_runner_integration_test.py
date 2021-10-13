@@ -542,7 +542,9 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(os.path.join(PACKAGE, "foo"), target_name="tests"))
+    tgt = rule_runner.get_target(
+        Address(os.path.join(PACKAGE, "foo"), target_name="tests", relative_file_path="bar_test.py")
+    )
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
 
