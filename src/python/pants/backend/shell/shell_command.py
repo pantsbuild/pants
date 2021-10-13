@@ -77,7 +77,7 @@ class RunShellCommand(RunFieldSet):
     )
 
 
-@rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
+@rule(desc="Running shell command", level=LogLevel.DEBUG)
 async def run_shell_command(
     request: GenerateFilesFromShellCommandRequest,
 ) -> GeneratedSources:
@@ -107,12 +107,12 @@ async def prepare_shell_command_process(
         working_directory = shell_command.address.spec_path
     command = shell_command[ShellCommandCommandField].value
     timeout = shell_command.get(ShellCommandTimeoutField).value
-    tools = shell_command.get(ShellCommandToolsField).value
+    tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value
     outputs = shell_command.get(ShellCommandOutputsField).value or ()
 
     if not command:
         raise ValueError(
-            f"Missing `command` line in `shell_command` target {shell_command.address}."
+            f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
         )
 
     if interactive:
@@ -122,7 +122,7 @@ async def prepare_shell_command_process(
     else:
         if not tools:
             raise ValueError(
-                f"Must provide any `tools` used by the `shell_command` {shell_command.address}."
+                f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
 
         env = await Get(Environment, EnvironmentRequest(["PATH"]))
@@ -149,7 +149,7 @@ async def prepare_shell_command_process(
             else:
                 raise BinaryNotFoundError.from_request(
                     tool_request,
-                    rationale=f"execute experimental_shell_command {shell_command.address}",
+                    rationale=f"execute `{shell_command.alias}` {shell_command.address}",
                 )
 
     transitive_targets = await Get(
