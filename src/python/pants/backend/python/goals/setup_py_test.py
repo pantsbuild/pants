@@ -44,8 +44,8 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
-    PythonLibrary,
     PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import FileTarget, ResourceTarget
@@ -65,7 +65,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
         target_types=[
             PexBinary,
             PythonDistribution,
-            PythonLibrary,
+            PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             ResourceTarget,
             FileTarget,
@@ -155,10 +155,10 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
     # Add a `.pyi` stub file to ensure we include it in the final result.
     chroot_rule_runner.create_file("src/python/foo/bar/bar.pyi")
     chroot_rule_runner.add_to_build_file(
-        "src/python/foo/resources", 'resources(sources=["js/code.js"])'
+        "src/python/foo/resources", 'resources(source="js/code.js")'
     )
     chroot_rule_runner.create_file("src/python/foo/resources/js/code.js")
-    chroot_rule_runner.add_to_build_file("files", 'files(sources=["README.txt"])')
+    chroot_rule_runner.add_to_build_file("files", 'files(source="README.txt")')
     chroot_rule_runner.create_file("files/README.txt")
     chroot_rule_runner.add_to_build_file(
         "src/python/",
@@ -297,10 +297,10 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     # Add a `.pyi` stub file to ensure we include it in the final result.
     chroot_rule_runner.create_file("src/python/foo/qux/qux.pyi")
     chroot_rule_runner.add_to_build_file(
-        "src/python/foo/resources", 'resources(sources=["js/code.js"])'
+        "src/python/foo/resources", 'resources(source="js/code.js")'
     )
     chroot_rule_runner.create_file("src/python/foo/resources/js/code.js")
-    chroot_rule_runner.add_to_build_file("files", 'files(sources=["README.txt"])')
+    chroot_rule_runner.add_to_build_file("files", 'files(source="README.txt")')
     chroot_rule_runner.create_file("files/README.txt")
     chroot_rule_runner.add_to_build_file(
         "src/python/foo",
@@ -556,6 +556,7 @@ def test_get_sources() -> None:
             get_sources,
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             *python_sources.rules(),
             QueryRule(OwnedDependencies, (DependencyOwner,)),
             QueryRule(SetupPySources, (SetupPyChrootRequest,)),
@@ -577,7 +578,7 @@ def test_get_sources() -> None:
     rule_runner.add_to_build_file("src/python/foo/qux", "python_sources()")
     rule_runner.create_file("src/python/foo/qux/__init__.py")
     rule_runner.create_file("src/python/foo/qux/qux.py")
-    rule_runner.add_to_build_file("src/python/foo/resources", 'resources(sources=["js/code.js"])')
+    rule_runner.add_to_build_file("src/python/foo/resources", 'resources(source="js/code.js")')
     rule_runner.create_file("src/python/foo/resources/js/code.js")
     rule_runner.create_file("src/python/foo/__init__.py")
 
@@ -878,7 +879,7 @@ def test_owned_dependencies() -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=['resource.txt'])
+            resources(name='bar-resources', source='resource.txt')
             """
         ),
     )
@@ -992,7 +993,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 sources=[],
                 dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
             )
-            resources(name='bar-resources', sources=['resource.ext'])
+            resources(name='bar-resources', source='resource.ext')
             """
         ),
     )

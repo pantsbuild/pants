@@ -13,7 +13,7 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     parse_proto_imports,
 )
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufSourcesField,
+    ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
@@ -164,7 +164,7 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSourcesField])]
+            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSourceField])]
         )
 
     assert run_dep_inference(

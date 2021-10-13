@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult
@@ -24,9 +24,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class PyUpgradeFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

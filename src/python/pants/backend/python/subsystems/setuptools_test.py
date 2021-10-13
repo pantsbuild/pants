@@ -9,7 +9,7 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setuptools import SetuptoolsLockfileSentinel
-from pants.backend.python.target_types import PythonDistribution, PythonLibrary
+from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -20,7 +20,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             *setuptools.rules(),
             QueryRule(PythonLockfileRequest, [SetuptoolsLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, PythonDistribution],
+        target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"setup_py": PythonArtifact},
     )
 

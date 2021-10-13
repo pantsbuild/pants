@@ -19,9 +19,10 @@ from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSe
 from pants.backend.python.target_types import (
     GenerateSetupField,
     PythonDistributionEntryPointsField,
+    PythonGeneratingSourcesBase,
     PythonProvidesField,
     PythonRequirementsField,
-    PythonSources,
+    PythonSourceField,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
     SDistConfigSettingsField,
@@ -42,7 +43,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.target_types import FileSourcesField, ResourceSourcesField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -714,7 +715,7 @@ async def get_sources(
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
     file_targets = targets_with_sources_types(
-        [FileSourcesField], transitive_targets.closure, union_membership
+        [FileSourceField], transitive_targets.closure, union_membership
     )
     targets = Targets(itertools.chain((od.target for od in owned_deps), file_targets))
 
@@ -907,10 +908,14 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         # This isn't particularly useful (3rdparty requirements should be on the python_sources
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
-        or tgt.has_field(PythonSources)
-        or tgt.has_field(ResourceSourcesField)
-        or tgt.get(SourcesField).can_generate(PythonSources, union_membership)
-        or tgt.get(SourcesField).can_generate(ResourceSourcesField, union_membership)
+        or tgt.has_field(PythonSourceField)
+        or tgt.has_field(ResourceSourceField)
+        or tgt.get(SourcesField).can_generate(PythonSourceField, union_membership)
+        or tgt.get(SourcesField).can_generate(ResourceSourceField, union_membership)
+        # We also check for generating sources so that dependencies on `python_sources(sources=[])`
+        # is included. Those won't generate any `python_source` targets, but still can be
+        # dependended upon.
+        or tgt.has_field(PythonGeneratingSourcesBase)
     )
 
 

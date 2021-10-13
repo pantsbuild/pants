@@ -204,7 +204,6 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             direct=[
                 "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
-                "src/python/python_targets:binary_file",
                 "src/python/python_targets:test_library",
                 # NB: 'src/python/python_targets:test_binary' does not show up here because it is
                 # not a direct dependee of `test_library.py:test_library`; instead, it depends on

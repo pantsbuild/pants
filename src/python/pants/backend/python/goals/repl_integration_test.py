@@ -8,7 +8,7 @@ import pytest
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
@@ -30,14 +30,14 @@ def rule_runner() -> RuleRunner:
             *local_dists.rules(),
             QueryRule(Process, (PexProcess,)),
         ],
-        target_types=[PythonLibrary, ProtobufSourceTarget],
+        target_types=[PythonSourcesGeneratorTarget, ProtobufSourceTarget],
     )
     rule_runner.write_files(
         {
             "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
             "src/python/BUILD": (
-                "protobuf_sources(name='proto', sources=['foo.proto'])\n"
+                "protobuf_sources(name='proto', source='foo.proto')\n"
                 "python_sources(dependencies=[':proto'])"
             ),
         }

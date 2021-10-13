@@ -12,7 +12,10 @@ from pants.backend.python.mixed_interpreter_constraints.py_constraints import Py
 from pants.backend.python.mixed_interpreter_constraints.py_constraints import (
     rules as py_constraints_rules,
 )
-from pants.backend.python.target_types import PythonLibrary, PythonTests
+from pants.backend.python.target_types import (
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
+)
 from pants.core.target_types import FileTarget
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
@@ -21,7 +24,7 @@ from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(*py_constraints_rules(), *target_types_rules.rules()),
-        target_types=[FileTarget, PythonLibrary, PythonTests],
+        target_types=[FileTarget, PythonSourcesGeneratorTarget, PythonTestsGeneratorTarget],
     )
 
 
@@ -58,7 +61,7 @@ def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
 
 
 def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.write_files({"f.txt": "", "BUILD": "files(name='tgt', sources=['f.txt'])"})
+    rule_runner.write_files({"f.txt": "", "BUILD": "files(name='tgt', source='f.txt')"})
     result = run_goal(rule_runner, ["f.txt"])
     assert result.exit_code == 0
     assert len(caplog.records) == 1

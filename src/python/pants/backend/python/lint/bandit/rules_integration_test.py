@@ -13,7 +13,7 @@ from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LintResults, (BanditRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

@@ -10,6 +10,7 @@ from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
     MultipleSourcesField,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
@@ -36,10 +37,8 @@ class ProtobufGrpcToggleField(BoolField):
 # -----------------------------------------------------------------------------------------------
 
 
-class ProtobufSourcesField(MultipleSourcesField):
+class ProtobufSourceField(SingleSourceField):
     expected_file_extensions = (".proto",)
-    expected_num_files = 1
-    required = True
 
 
 class ProtobufSourceTarget(Target):
@@ -47,7 +46,7 @@ class ProtobufSourceTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
-        ProtobufSourcesField,
+        ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
     help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."
