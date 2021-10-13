@@ -26,6 +26,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileForTargetRequest,
@@ -230,15 +231,6 @@ async def compile_java_source(
     )
 
 
-@rule
-def required_classfiles(fallible_result: FallibleCompiledClassfiles) -> CompiledClassfiles:
-    if fallible_result.result == CompileResult.SUCCEEDED:
-        assert fallible_result.output
-        return fallible_result.output
-    # NB: The compile outputs will already have been streamed as FallibleCompiledClassfiles finish.
-    raise Exception("Compile failed.")
-
-
 @rule(desc="Check compilation for javac", level=LogLevel.DEBUG)
 async def javac_check(request: JavacCheckRequest) -> CheckResults:
     coarsened_targets = await Get(
@@ -269,5 +261,6 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
 def rules():
     return [
         *collect_rules(),
+        *jvm_compile_rules(),
         UnionRule(CheckRequest, JavacCheckRequest),
     ]
