@@ -49,7 +49,7 @@ class FileSourceField(SingleSourceField):
 
 
 class FileTarget(Target):
-    alias = "files"  # TODO: update name to `file`
+    alias = "file"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
     help = (
         "A single loose file that lives outside of code packages.\n\n"
@@ -67,12 +67,7 @@ class FilesGeneratingSourcesField(MultipleSourcesField):
 class FilesGeneratorTarget(Target):
     alias = "files"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesGeneratingSourcesField)
-    help = (
-        "Loose files that live outside code packages.\n\nFiles are placed directly in archives, "
-        "outside of code artifacts such as Python wheels or JVM JARs. The sources of a `files` "
-        "target are accessed via filesystem APIs, such as Python's `open()`, via paths relative to "
-        "the repo root."
-    )
+    help = "Generate a `file` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromFiles(GenerateTargetsRequest):
@@ -110,7 +105,7 @@ class RelocatedFilesOriginalTargets(SpecialCasedDependencies):
     alias = "files_targets"
     required = True
     help = (
-        "Addresses to the original `files()` targets that you want to relocate, such as "
+        "Addresses to the original `file` and `files` targets that you want to relocate, such as "
         "`['//:json_files']`.\n\nEvery target will be relocated using the same mapping. This means "
         "that every target must include the value from the `src` field in their original path."
     )
@@ -231,7 +226,7 @@ class ResourceSourceField(SingleSourceField):
 
 
 class ResourceTarget(Target):
-    alias = "resources"
+    alias = "resource"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
     help = (
         "A single resource file embedded in a code package and accessed in a "
@@ -249,12 +244,7 @@ class ResourcesGeneratingSourcesField(MultipleSourcesField):
 class ResourcesGeneratorTarget(Target):
     alias = "resources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesGeneratingSourcesField)
-    help = (
-        "Data embedded in a code package and accessed in a location-independent manner.\n\n"
-        "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
-        "of a `resources` target are accessed via language-specific resource APIs, such as "
-        "Python's pkgutil or JVM's ClassLoader, via paths relative to the target's source root."
-    )
+    help = "Generate a `resource` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromResources(GenerateTargetsRequest):
@@ -312,12 +302,15 @@ class ArchivePackages(SpecialCasedDependencies):
 class ArchiveFiles(SpecialCasedDependencies):
     alias = "files"
     help = (
-        "Addresses to any `files` or `relocated_files` targets to include in the archive, e.g. "
-        '`["resources:logo"]`.\n\nThis is useful to include any loose files, like data files, '
-        "image assets, or config files.\n\nThis will ignore any targets that are not `files` or "
-        "`relocated_files` targets. If you instead want those files included in any packages "
-        "specified in the `packages` field for this target, then use a `resources` target and have "
-        "the original package depend on the resources."
+        "Addresses to any `file`, `files`, or `relocated_files` targets to include in the "
+        'archive, e.g. `["resources:logo"]`.\n\n'
+        "This is useful to include any loose files, like data files, "
+        "image assets, or config files.\n\n"
+        "This will ignore any targets that are not `file`, `files`, or "
+        "`relocated_files` targets.\n\n"
+        "If you instead want those files included in any packages specified in the `packages` "
+        "field for this target, then use a `resource` or `resources` target and have the original "
+        "package depend on the resources."
     )
 
 

@@ -6,13 +6,22 @@ from pants.backend.shell.target_types import (
     ShellCommand,
     ShellCommandRun,
     ShellSourcesGeneratorTarget,
+    ShellSourceTarget,
     Shunit2TestsGeneratorTarget,
+    Shunit2TestTarget,
 )
 from pants.backend.shell.target_types import rules as target_types_rules
 
 
 def target_types():
-    return [ShellCommand, ShellCommandRun, ShellSourcesGeneratorTarget, Shunit2TestsGeneratorTarget]
+    return [
+        ShellCommand,
+        ShellCommandRun,
+        ShellSourcesGeneratorTarget,
+        Shunit2TestsGeneratorTarget,
+        ShellSourceTarget,
+        Shunit2TestTarget,
+    ]
 
 
 def rules():

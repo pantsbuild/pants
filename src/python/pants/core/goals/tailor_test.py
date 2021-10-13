@@ -9,7 +9,8 @@ import pytest
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpecs,
-    FilesystemLiteralSpec,
+    DirLiteralSpec,
+    FileLiteralSpec,
     FilesystemSpecs,
     Specs,
 )
@@ -355,6 +356,9 @@ def test_specs_to_dirs() -> None:
     assert specs_to_dirs(
         Specs(AddressSpecs([AddressLiteralSpec("src/python/foo")]), FilesystemSpecs([]))
     ) == ("src/python/foo",)
+    assert specs_to_dirs(
+        Specs(AddressSpecs([]), FilesystemSpecs([DirLiteralSpec("src/python/foo")]))
+    ) == ("src/python/foo",)
     assert (
         specs_to_dirs(
             Specs(
@@ -369,7 +373,7 @@ def test_specs_to_dirs() -> None:
 
     with pytest.raises(ValueError):
         specs_to_dirs(
-            Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("src/python/foo.py")]))
+            Specs(AddressSpecs([]), FilesystemSpecs([FileLiteralSpec("src/python/foo.py")]))
         )
 
     with pytest.raises(ValueError):

@@ -24,8 +24,8 @@ from pants.util.meta import frozen_after_init
 class PythonSourceFiles:
     """Sources that can be introspected by Python, relative to a set of source roots.
 
-    Specifically, this will filter out to only have Python, and, optionally, resources() and
-    files() targets; and will add any missing `__init__.py` files to ensure that modules are
+    Specifically, this will filter out to only have Python, and, optionally, resource and
+    file targets; and will add any missing `__init__.py` files to ensure that modules are
     recognized correctly.
 
     Use-cases that introspect Python source code (e.g., the `test, `lint`, `fmt` goals) can

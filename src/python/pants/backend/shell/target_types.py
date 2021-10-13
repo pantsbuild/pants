@@ -125,7 +125,7 @@ class Shunit2ShellField(StringField):
 
 
 class Shunit2TestTarget(Target):
-    alias = "shunit2_tests"  # TODO(#12954): rename to `shunit_test` when ready. Update `help` too.
+    alias = "shunit2_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Shunit2TestSourceField,
@@ -134,7 +134,16 @@ class Shunit2TestTarget(Target):
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
-    help = "A test file for Bourne-based shell scripts using the shunit2 test framework."
+    help = (
+        "A single test file for Bourne-based shell scripts using the shunit2 test framework.\n\n"
+        "To use, add tests to your file per https://github.com/kward/shunit2/. Specify the shell "
+        f"to run with by either setting the field `{Shunit2ShellField.alias}` or including a "
+        f"shebang. To test the same file with multiple shells, create multiple `shunit2_tests` "
+        f"targets, one for each shell.\n\n"
+        f"Pants will automatically download the `shunit2` bash script and add "
+        f"`source ./shunit2` to your test for you. If you already have `source ./shunit2`, "
+        f"Pants will overwrite it to use the correct relative path."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -156,16 +165,7 @@ class Shunit2TestsGeneratorTarget(Target):
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
-    help = (
-        "Tests of Bourne-based shell scripts using the shUnit2 test framework.\n\n"
-        "To use, add tests to your file per https://github.com/kward/shunit2/. Specify the shell "
-        f"to run with by either setting the field `{Shunit2ShellField.alias}` or including a "
-        f"shebang. To test the same file with multiple shells, create multiple `shunit2_tests` "
-        f"targets, one for each shell.\n\n"
-        f"Pants will automatically download the `shunit2` bash script and add "
-        f"`source ./shunit2` to your test for you. If you already have `source ./shunit2`, "
-        f"Pants will overwrite it to use the correct relative path."
-    )
+    help = "Generate a `shunit2_test` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
@@ -196,12 +196,9 @@ async def generate_targets_from_shunit2_tests(
 
 
 class ShellSourceTarget(Target):
-    alias = "shell_sources"  # TODO(#12954): rename to `shell_source` when ready.
+    alias = "shell_source"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
-    help = "A Bourne-based shell script, e.g. a Bash script."
-
-    deprecated_alias = "shell_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
+    help = "A single Bourne-based shell script, e.g. a Bash script."
 
 
 class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
@@ -211,7 +208,7 @@ class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
 class ShellSourcesGeneratorTarget(Target):
     alias = "shell_sources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesGeneratingSourcesField)
-    help = "Bourne-based shell scripts, e.g. Bash scripts."
+    help = "Generate a `shell_source` target for each file in the `sources` field."
 
     deprecated_alias = "shell_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
