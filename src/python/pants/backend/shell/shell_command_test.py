@@ -8,9 +8,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest
+from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest, RunShellCommand
 from pants.backend.shell.shell_command import rules as shell_command_rules
-from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import (
+    ShellCommand,
+    ShellCommandRun,
+    ShellSourcesGeneratorTarget,
+)
+from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
@@ -36,11 +41,13 @@ def rule_runner() -> RuleRunner:
             *source_files_rules(),
             *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
-            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
+            QueryRule(RunRequest, [RunShellCommand]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[
             ShellCommand,
+            ShellCommandRun,
             ShellSourcesGeneratorTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
@@ -325,3 +332,34 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
             (logging.INFO, "msg-archive.zip\n"),
         ],
     )
+
+
+def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_run_shell_command(
+                  name="test",
+                  command="some cmd string",
+                )
+
+                experimental_run_shell_command(
+                  name="cd-test",
+                  command="some cmd string",
+                  workdir="src/with space'n quote",
+                )
+                """
+            ),
+        }
+    )
+
+    def assert_run_args(target: str, args: tuple[str, ...]) -> None:
+        tgt = rule_runner.get_target(Address("src", target_name=target))
+        run = RunShellCommand.create(tgt)
+        request = rule_runner.request(RunRequest, [run])
+        assert args[0] in request.args[0]
+        assert request.args[1:] == args[1:]
+
+    assert_run_args("test", ("bash", "-c", "some cmd string"))
+    assert_run_args("cd-test", ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string"))
