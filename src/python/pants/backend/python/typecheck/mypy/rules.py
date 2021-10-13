@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -42,9 +42,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class MyPyFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -123,7 +123,8 @@ async def mypy_typecheck_partition(
 
     closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     roots_sources_get = Get(
-        SourceFiles, SourceFilesRequest(tgt.get(PythonSources) for tgt in partition.root_targets)
+        SourceFiles,
+        SourceFilesRequest(tgt.get(PythonSourceField) for tgt in partition.root_targets),
     )
 
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.

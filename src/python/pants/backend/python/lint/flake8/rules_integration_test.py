@@ -12,7 +12,7 @@ from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LintResults, [Flake8Request]),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

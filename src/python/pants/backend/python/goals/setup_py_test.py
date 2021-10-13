@@ -44,8 +44,8 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
-    PythonLibrary,
     PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import FileTarget, ResourceTarget
@@ -65,7 +65,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
         target_types=[
             PexBinary,
             PythonDistribution,
-            PythonLibrary,
+            PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             ResourceTarget,
             FileTarget,
@@ -556,6 +556,7 @@ def test_get_sources() -> None:
             get_sources,
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             *python_sources.rules(),
             QueryRule(OwnedDependencies, (DependencyOwner,)),
             QueryRule(SetupPySources, (SetupPyChrootRequest,)),

@@ -12,7 +12,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary, PythonLibrary
+from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import (
@@ -421,7 +421,7 @@ def test_runtime_package_dependencies() -> None:
             *python_target_type_rules(),
             QueryRule(BuiltPackageDependencies, [BuildPackageDependenciesRequest]),
         ],
-        target_types=[PythonLibrary, PexBinary],
+        target_types=[PythonSourcesGeneratorTarget, PexBinary],
     )
     rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 

@@ -25,9 +25,9 @@ from pants.backend.python.target_types import (
     PexScriptField,
     PythonDistribution,
     PythonDistributionDependencies,
-    PythonLibrary,
     PythonRequirementsField,
     PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -195,7 +195,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
             *import_rules(),
             QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
         ],
-        target_types=[PexBinary, PythonRequirementTarget, PythonLibrary],
+        target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
     )
     rule_runner.write_files(
         {
@@ -391,7 +391,12 @@ def test_inject_python_distribution_dependencies() -> None:
             *python_sources.rules(),
             QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
         ],
-        target_types=[PythonDistribution, PythonRequirementTarget, PythonLibrary, PexBinary],
+        target_types=[
+            PythonDistribution,
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+            PexBinary,
+        ],
         objects={"setup_py": PythonArtifact},
     )
     rule_runner.add_to_build_file(

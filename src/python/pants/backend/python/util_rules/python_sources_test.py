@@ -15,7 +15,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -24,18 +24,18 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
-from pants.engine.target import MultipleSourcesField, SingleSourceField, Target
+from pants.engine.target import SingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 class PythonTarget(Target):
     alias = "python_target"
-    core_fields = (PythonSources,)
+    core_fields = (PythonSourceField,)
 
 
 class NonPythonTarget(Target):
     alias = "non_python_target"
-    core_fields = (MultipleSourcesField,)
+    core_fields = (SingleSourceField,)
 
 
 @pytest.fixture
@@ -56,24 +56,12 @@ def rule_runner() -> RuleRunner:
 def create_target(
     rule_runner: RuleRunner,
     parent_directory: str,
-    files: str | list[str],
+    file: str,
     target_cls: type[Target] = PythonTarget,
 ) -> Target:
-    rule_runner.write_files(
-        {
-            os.path.join(parent_directory, f): ""
-            for f in (files if isinstance(files, list) else (files,))
-        }
-    )
+    rule_runner.write_files({os.path.join(parent_directory, file): ""})
     address = Address(parent_directory, target_name="target")
-    return target_cls(
-        (
-            {MultipleSourcesField.alias: files}
-            if isinstance(files, list)
-            else {SingleSourceField.alias: files}
-        ),
-        address,
-    )
+    return target_cls({SingleSourceField.alias: file}, address)
 
 
 def get_stripped_sources(
@@ -125,10 +113,10 @@ def get_unstripped_sources(
 
 def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
     targets = [
-        create_target(rule_runner, "src/python", ["p.py"], PythonTarget),
+        create_target(rule_runner, "src/python", "p.py", PythonTarget),
         create_target(rule_runner, "src/python", "f.txt", FileTarget),
         create_target(rule_runner, "src/python", "r.txt", ResourceTarget),
-        create_target(rule_runner, "src/python", ["j.java"], NonPythonTarget),
+        create_target(rule_runner, "src/python", "j.java", NonPythonTarget),
     ]
 
     def assert_stripped(
@@ -187,19 +175,19 @@ def test_filters_out_irrelevant_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_top_level_source_root(rule_runner: RuleRunner) -> None:
-    targets = [create_target(rule_runner, "", ["f1.py", "f2.py"])]
+    targets = [create_target(rule_runner, "", "f.py")]
 
     stripped_result = get_stripped_sources(rule_runner, targets, source_roots=["/"])
-    assert stripped_result.stripped_source_files.snapshot.files == ("f1.py", "f2.py")
+    assert stripped_result.stripped_source_files.snapshot.files == ("f.py",)
 
     unstripped_result = get_unstripped_sources(rule_runner, targets, source_roots=["/"])
-    assert unstripped_result.source_files.snapshot.files == ("f1.py", "f2.py")
+    assert unstripped_result.source_files.snapshot.files == ("f.py",)
     assert unstripped_result.source_roots == (".",)
 
 
 def test_files_not_used_for_source_roots(rule_runner: RuleRunner) -> None:
     targets = [
-        create_target(rule_runner, "src/py", ["f.py"], PythonTarget),
+        create_target(rule_runner, "src/py", "f.py", PythonTarget),
         create_target(rule_runner, "src/files", "f.txt", FileTarget),
     ]
     assert get_unstripped_sources(
