@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.lint.pylint.subsystem import (
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *subsystem_rules(),
             *skip_field.rules(),
             *python_sources.rules(),
+            *target_types_rules.rules(),
             QueryRule(PylintFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
         ],
@@ -76,7 +78,8 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         [
             "--source-root-patterns=pylint-plugins",
             "--pylint-source-plugins=pylint-plugins/plugin.py",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     first_party_plugins = rule_runner.request(PylintFirstPartyPlugins, [])
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
@@ -110,10 +113,11 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         extra_expected_requirements: list[str] | None = None,
         extra_args: list[str] | None = None,
     ) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         rule_runner.set_options(
             ["--pylint-lockfile=lockfile.txt", *(extra_args or [])],
             env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [PylintLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)

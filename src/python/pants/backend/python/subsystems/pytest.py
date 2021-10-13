@@ -28,12 +28,7 @@ from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    UnexpandedTargets,
-)
+from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
@@ -241,14 +236,14 @@ async def setup_pytest_lockfile(
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
     #
-    # This first computes the constraints for each individual `python_tests` target
+    # This first computes the constraints for each individual `python_test` target
     # (which will AND across each target in the closure). Then, it ORs all unique resulting
     # interpreter constraints. The net effect is that every possible Python interpreter used will
     # be covered.
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     transitive_targets_per_test = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_build_targets
+        for tgt in all_tgts
         if PythonTestFieldSet.is_applicable(tgt)
     )
     unique_constraints = {

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.bandit import skip_field
 from pants.backend.python.lint.bandit.subsystem import BanditLockfileSentinel
@@ -20,6 +21,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
+            *target_types_rules.rules(),
             QueryRule(PythonLockfileRequest, [BanditLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget],
@@ -32,7 +34,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         lockfile_request = rule_runner.request(PythonLockfileRequest, [BanditLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 

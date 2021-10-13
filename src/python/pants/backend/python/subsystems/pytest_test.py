@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.pytest import PyTest, PytestLockfileSentinel
 from pants.backend.python.subsystems.pytest import rules as subsystem_rules
@@ -23,7 +24,11 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_setup_lockfile_interpreter_constraints() -> None:
     rule_runner = RuleRunner(
-        rules=[*subsystem_rules(), QueryRule(PythonLockfileRequest, [PytestLockfileSentinel])],
+        rules=[
+            *subsystem_rules(),
+            *target_types_rules.rules(),
+            QueryRule(PythonLockfileRequest, [PytestLockfileSentinel]),
+        ],
         target_types=[PythonSourcesGeneratorTarget, PythonTestsGeneratorTarget, GenericTarget],
     )
 
@@ -31,17 +36,18 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     rule_runner.set_options(
         ["--pytest-lockfile=lockfile.txt"],
         env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f_test.py": ""})
         lockfile_request = rule_runner.request(PythonLockfileRequest, [PytestLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     assert_ics("python_tests()", [global_constraint])
     assert_ics("python_tests(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
     assert_ics(
-        "python_tests(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
+        "python_tests(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
     )
 
     # If no Python targets in repo, fall back to global python-setup constraints.
@@ -55,7 +61,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         dedent(
             """\
             python_tests(name='a', interpreter_constraints=['==2.7.*'])
-            python_tests(name='b', interpreter_constraints=['==3.5.*'], skip_tests=True)
+            python_tests(name='b', interpreter_constraints=['==3.8.*'], skip_tests=True)
             """
         ),
         ["==2.7.*"],
@@ -67,19 +73,19 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         dedent(
             """\
             python_tests(name='a', interpreter_constraints=['==2.7.*'])
-            python_tests(name='b', interpreter_constraints=['==3.5.*'])
+            python_tests(name='b', interpreter_constraints=['==3.8.*'])
             """
         ),
-        ["==2.7.*", "==3.5.*"],
+        ["==2.7.*", "==3.8.*"],
     )
     assert_ics(
         dedent(
             """\
-            python_tests(name='a', interpreter_constraints=['==2.7.*', '==3.5.*'])
-            python_tests(name='b', interpreter_constraints=['>=3.5'])
+            python_tests(name='a', interpreter_constraints=['==2.7.*', '==3.8.*'])
+            python_tests(name='b', interpreter_constraints=['>=3.8'])
             """
         ),
-        ["==2.7.*", "==3.5.*", ">=3.5"],
+        ["==2.7.*", "==3.8.*", ">=3.8"],
     )
     assert_ics(
         dedent(

@@ -30,9 +30,9 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSet,
     Target,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
@@ -295,10 +295,10 @@ async def setup_mypy_lockfile(
 
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
-        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
         all_transitive_targets = await MultiGet(
             Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-            for tgt in all_build_targets
+            for tgt in all_tgts
             if MyPyFieldSet.is_applicable(tgt)
         )
         unique_constraints = {
