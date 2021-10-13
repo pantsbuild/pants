@@ -355,7 +355,7 @@ class ShellCommandRun(Target):
         ShellCommandRunWorkdirField,
     )
     help = (
-        "Run any tool in the workspace, with all dependencies packaged/copied into a CHROOT.\n"
+        "Run a script in the workspace, with all dependencies packaged/copied into a CHROOT.\n"
         + dedent(
             """\
 
