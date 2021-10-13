@@ -12,7 +12,7 @@ from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (BlackRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

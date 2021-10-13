@@ -20,7 +20,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunRequest
-from pants.core.target_types import FileSourcesField
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
     input = ShellCommandSourcesField
-    output = FileSourcesField
+    output = FileSourceField
 
 
 @dataclass(frozen=True)
@@ -153,7 +153,7 @@ async def prepare_shell_command_process(
             SourceFiles,
             SourceFilesRequest(
                 sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
-                for_sources_types=(SourcesField, FileSourcesField),
+                for_sources_types=(SourcesField, FileSourceField),
                 enable_codegen=True,
             ),
         ),

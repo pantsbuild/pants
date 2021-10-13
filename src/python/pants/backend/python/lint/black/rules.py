@@ -7,7 +7,7 @@ from typing import Tuple
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -27,9 +27,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class BlackFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod

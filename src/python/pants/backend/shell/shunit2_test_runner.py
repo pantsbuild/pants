@@ -6,11 +6,11 @@ from dataclasses import dataclass
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
-    ShellSourcesField,
+    ShellSourceField,
     Shunit2Shell,
     Shunit2ShellField,
     Shunit2TestsGeneratorTarget,
-    Shunit2TestSourcesField,
+    Shunit2TestSourceField,
     Shunit2TestTimeoutField,
 )
 from pants.core.goals.test import (
@@ -23,7 +23,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.core.target_types import FileSourcesField, ResourceSourcesField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
@@ -56,9 +56,9 @@ from pants.util.strutil import create_path_env_var
 
 @dataclass(frozen=True)
 class Shunit2FieldSet(TestFieldSet):
-    required_fields = (Shunit2TestSourcesField,)
+    required_fields = (Shunit2TestSourceField,)
 
-    sources: Shunit2TestSourcesField
+    sources: Shunit2TestSourceField
     timeout: Shunit2TestTimeoutField
     shell: Shunit2ShellField
     runtime_package_dependencies: RuntimePackageDependenciesField
@@ -172,7 +172,7 @@ async def setup_shunit2_for_target(
         SourceFiles,
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_targets.dependencies),
-            for_sources_types=(ShellSourcesField, FileSourcesField, ResourceSourcesField),
+            for_sources_types=(ShellSourceField, FileSourceField, ResourceSourceField),
             enable_codegen=True,
         ),
     )

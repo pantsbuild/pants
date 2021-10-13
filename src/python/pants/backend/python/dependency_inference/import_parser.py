@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -11,7 +12,6 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField
 from pants.util.logging import LogLevel
 
 # NOTE: Must call .format(min_dots=X) on this string to use it.
@@ -113,24 +113,23 @@ def parse_file(filename):
         return None
 
 
-if __name__ == "__main__":
-    imports = set()
+def main(filename):
+    tree = parse_file(filename)
+    if not tree:
+        return
 
-    for filename in sys.argv[1:]:
-        tree = parse_file(filename)
-        if not tree:
-            continue
-
-        package_parts = os.path.dirname(filename).split(os.path.sep)
-        visitor = AstVisitor(package_parts)
-
-        visitor.visit(tree)
-        imports.update(visitor.imports)
+    package_parts = os.path.dirname(filename).split(os.path.sep)
+    visitor = AstVisitor(package_parts)
+    visitor.visit(tree)
 
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
     # See below for where we explicitly decode.
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
-    buffer.write("\\n".join(sorted(imports)).encode("utf8"))
+    buffer.write("\\n".join(sorted(visitor.imports)).encode("utf8"))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
 """
 
 
@@ -143,7 +142,7 @@ class ParsedPythonImports(DeduplicatedCollection[str]):
 
 @dataclass(frozen=True)
 class ParsePythonImportsRequest:
-    sources: SourcesField
+    sources: PythonSourceField
     interpreter_constraints: InterpreterConstraints
     string_imports: bool
     string_imports_min_dots: int
@@ -157,6 +156,11 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
         Get(Digest, CreateDigest([FileContent("__parse_python_imports.py", script)])),
         Get(StrippedSourceFiles, SourceFilesRequest([request.sources])),
     )
+
+    # We operate on PythonSourceField, which should be one file.
+    assert len(stripped_sources.snapshot.files) == 1
+    file = stripped_sources.snapshot.files[0]
+
     input_digest = await Get(
         Digest, MergeDigests([script_digest, stripped_sources.snapshot.digest])
     )
@@ -166,7 +170,7 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
             argv=[
                 python_interpreter.path,
                 "./__parse_python_imports.py",
-                *stripped_sources.snapshot.files,
+                file,
             ],
             input_digest=input_digest,
             description=f"Determine Python imports for {request.sources.address}",

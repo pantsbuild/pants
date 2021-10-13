@@ -27,10 +27,10 @@ from pants.backend.python.subsystems import ipython, pytest, python_native_code,
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
-    PythonLibrary,
     PythonRequirementsFile,
     PythonRequirementTarget,
-    PythonTests,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratorTarget,
 )
 from pants.backend.python.util_rules import (
     ancestor_files,
@@ -86,8 +86,8 @@ def target_types():
     return [
         PexBinary,
         PythonDistribution,
-        PythonLibrary,
+        PythonSourcesGeneratorTarget,
         PythonRequirementTarget,
         PythonRequirementsFile,
-        PythonTests,
+        PythonTestsGeneratorTarget,
     ]

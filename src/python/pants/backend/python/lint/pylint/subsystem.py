@@ -15,7 +15,7 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
     PythonRequirementsField,
-    PythonSources,
+    PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
@@ -33,9 +33,9 @@ from pants.engine.target import (
     DependenciesRequest,
     FieldSet,
     Target,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
@@ -47,9 +47,9 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 @dataclass(frozen=True)
 class PylintFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    sources: PythonSourceField
     dependencies: Dependencies
 
     @classmethod
@@ -257,11 +257,10 @@ async def setup_pylint_lockfile(
     # dependencies (which will AND across each target in the closure). Then, it ORs all unique
     # resulting interpreter constraints. The net effect is that every possible Python interpreter
     # used will be covered.
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
-    relevant_targets = tuple(tgt for tgt in all_build_targets if PylintFieldSet.is_applicable(tgt))
+    all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    relevant_targets = tuple(tgt for tgt in all_tgts if PylintFieldSet.is_applicable(tgt))
     direct_deps_per_target = await MultiGet(
-        Get(UnexpandedTargets, DependenciesRequest(tgt.get(Dependencies)))
-        for tgt in relevant_targets
+        Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in relevant_targets
     )
 
     unique_constraints = set()

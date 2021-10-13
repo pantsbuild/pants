@@ -14,7 +14,7 @@ from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 
@@ -257,10 +257,12 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE))
     result = run_mypy(
         rule_runner,
-        [tgt],
+        [
+            rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py")),
+            rule_runner.get_target(Address(PACKAGE, relative_file_path="settings.py")),
+        ],
         extra_args=[
             "--mypy-extra-requirements=django-stubs==1.8.0",
             "--mypy-extra-type-stubs=django-stubs==1.8.0",
@@ -669,7 +671,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_sources(dependencies=[':proto'])
-                protobuf_sources(name='proto', sources=['proto.proto'])
+                protobuf_sources(name='proto', source='proto.proto')
                 """
             ),
         }

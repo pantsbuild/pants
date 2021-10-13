@@ -15,7 +15,7 @@ from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.lambdex import rules as awslambda_python_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget
@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             PythonAWSLambda,
-            PythonLibrary,
+            PythonSourcesGeneratorTarget,
             FilesGeneratorTarget,
             RelocatedFiles,
             ResourcesGeneratorTarget,

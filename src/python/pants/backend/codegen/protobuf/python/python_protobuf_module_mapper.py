@@ -4,10 +4,7 @@
 from collections import defaultdict
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.target_types import (
-    ProtobufGrpcToggleField,
-    ProtobufSourcesField,
-)
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
@@ -36,9 +33,9 @@ async def map_protobuf_to_python_modules(
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
     targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourcesField))
+    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
     stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourcesField]))
+        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
         for tgt in protobuf_targets
     )
 

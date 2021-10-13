@@ -10,7 +10,7 @@ from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, D
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.docformatter.subsystem import rules as docformatter_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import source_files
@@ -34,7 +34,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (DocformatterRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 

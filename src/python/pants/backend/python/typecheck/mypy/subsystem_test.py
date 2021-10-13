@@ -7,8 +7,9 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -33,11 +34,12 @@ def rule_runner() -> RuleRunner:
             *skip_field.rules(),
             *config_files.rules(),
             *python_sources.rules(),
+            *target_types_rules.rules(),
             QueryRule(MyPyConfigFile, []),
             QueryRule(MyPyFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [MyPyLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, PythonRequirementTarget, GenericTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, GenericTarget],
     )
 
 
@@ -48,7 +50,8 @@ def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> N
 
     def maybe_assert_configured(*, has_config: bool, args: list[str], warning: str = "") -> None:
         rule_runner.set_options(
-            [f"--mypy-args={repr(args)}", f"--mypy-config-discovery={has_config}"]
+            [f"--mypy-args={repr(args)}", f"--mypy-config-discovery={has_config}"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         result = rule_runner.request(MyPyConfigFile, [])
 
@@ -121,7 +124,8 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         [
             "--source-root-patterns=mypy-plugins",
             "--mypy-source-plugins=mypy-plugins/plugin.py",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     first_party_plugins = rule_runner.request(MyPyFirstPartyPlugins, [])
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(["ansicolors", "mypy==0.81"])
@@ -148,10 +152,11 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         extra_expected_requirements: list[str] | None = None,
         extra_args: list[str] | None = None,
     ) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         rule_runner.set_options(
             ["--mypy-lockfile=lockfile.txt", *(extra_args or [])],
             env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [MyPyLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
@@ -165,28 +170,19 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
 
     # If all code is Py38+, use those constraints. Otherwise, use subsystem constraints.
     assert_lockfile_request("python_sources()", [global_constraint])
-    assert_lockfile_request("python_sources(interpreter_constraints=['==3.10.*'])", ["==3.10.*"])
+    assert_lockfile_request("python_sources(interpreter_constraints=['==3.9.*'])", ["==3.9.*"])
     assert_lockfile_request(
-        "python_sources(interpreter_constraints=['==3.8.*', '==3.10.*'])", ["==3.8.*", "==3.10.*"]
+        "python_sources(interpreter_constraints=['==3.8.*', '==3.9.*'])", ["==3.8.*", "==3.9.*"]
     )
 
     assert_lockfile_request(
-        "python_sources(interpreter_constraints=['==3.6.*'])",
+        "python_sources(interpreter_constraints=['>=3.6'])",
         MyPy.default_interpreter_constraints,
     )
     assert_lockfile_request(
         dedent(
             """\
-            python_sources(name='t1', interpreter_constraints=['==3.6.*'])
-            python_sources(name='t2', interpreter_constraints=['==3.8.*'])
-            """
-        ),
-        MyPy.default_interpreter_constraints,
-    )
-    assert_lockfile_request(
-        dedent(
-            """\
-            python_sources(name='t1', interpreter_constraints=['==3.6.*', '>=3.8'])
+            python_sources(name='t1', interpreter_constraints=['>=3.6'])
             python_sources(name='t2', interpreter_constraints=['==3.8.*'])
             """
         ),
@@ -201,7 +197,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         dedent(
             """\
             python_sources(name='a', interpreter_constraints=['==3.8.*'])
-            python_sources(name='b', interpreter_constraints=['==3.5.*'], skip_mypy=True)
+            python_sources(name='b', interpreter_constraints=['>=3.6.*'], skip_mypy=True)
             """
         ),
         ["==3.8.*"],
@@ -221,7 +217,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
     assert_lockfile_request(
         dedent(
             """\
-            python_sources(name='lib1', interpreter_constraints=['==2.7.*', '==3.6.*'], skip_mypy=True)
+            python_sources(name='lib1', interpreter_constraints=['==2.7.*', '>=3.6'], skip_mypy=True)
             python_sources(name='lib2', dependencies=[":lib1"], interpreter_constraints=['==2.7.*'])
 
             python_sources(name='lib3', interpreter_constraints=['>=3.8'], skip_mypy=True)
