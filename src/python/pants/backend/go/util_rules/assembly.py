@@ -10,8 +10,17 @@ from pathlib import PurePath
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+
+
+@dataclass(frozen=True)
+class FallibleAssemblyPreCompilation:
+    results: tuple[FallibleProcessResult, ...]
+    output: AssemblyPreCompilation | None
+
+    def has_failures(self) -> bool:
+        return any(result.exit_code != 0 for result in self.results)
 
 
 @dataclass(frozen=True)
@@ -52,7 +61,7 @@ class AssemblyPostCompilationRequest:
 async def setup_assembly_pre_compilation(
     request: AssemblyPreCompilationRequest,
     goroot: GoRoot,
-) -> AssemblyPreCompilation:
+) -> FallibleAssemblyPreCompilation:
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
@@ -64,7 +73,7 @@ async def setup_assembly_pre_compilation(
         Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
     symabis_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=symabis_input_digest,
             command=(
@@ -82,6 +91,8 @@ async def setup_assembly_pre_compilation(
             output_files=("symabis",),
         ),
     )
+    if symabis_result.exit_code != 0:
+        return FallibleAssemblyPreCompilation((symabis_result,), None)
     merged = await Get(
         Digest,
         MergeDigests([request.compilation_input, symabis_result.output_digest]),
@@ -89,7 +100,7 @@ async def setup_assembly_pre_compilation(
 
     assembly_results = await MultiGet(
         Get(
-            ProcessResult,
+            FallibleProcessResult,
             GoSdkProcess(
                 input_digest=request.compilation_input,
                 command=(
@@ -109,8 +120,9 @@ async def setup_assembly_pre_compilation(
         )
         for s_file in request.s_files
     )
-    return AssemblyPreCompilation(
-        merged, tuple(result.output_digest for result in assembly_results)
+    return FallibleAssemblyPreCompilation(
+        tuple(assembly_results),
+        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results)),
     )
 
 

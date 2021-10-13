@@ -15,8 +15,8 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
-    AssemblyPreCompilation,
     AssemblyPreCompilationRequest,
+    FallibleAssemblyPreCompilation,
 )
 from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
@@ -78,6 +78,23 @@ class FallibleBuiltGoPackage:
             stderr=process_result.stderr.decode("utf-8"),
         )
 
+    @classmethod
+    def from_fallible_process_results(
+        cls,
+        process_results: tuple[FallibleProcessResult, ...],
+        output: BuiltGoPackage | None,
+    ) -> FallibleBuiltGoPackage:
+        return cls(
+            output=output,
+            exit_code=max(process_result.exit_code for process_result in process_results),
+            stdout="\n".join(
+                process_result.stdout.decode("utf-8") for process_result in process_results
+            ),
+            stderr="\n".join(
+                process_result.stderr.decode("utf-8") for process_result in process_results
+            ),
+        )
+
 
 @dataclass(frozen=True)
 class BuiltGoPackage:
@@ -116,11 +133,16 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
     symabis_path = None
     if request.s_file_names:
         assembly_setup = await Get(
-            AssemblyPreCompilation,
+            FallibleAssemblyPreCompilation,
             AssemblyPreCompilationRequest(input_digest, request.s_file_names, request.subpath),
         )
-        input_digest = assembly_setup.merged_compilation_input_digest
-        assembly_digests = assembly_setup.assembly_digests
+        if assembly_setup.has_failures():
+            return FallibleBuiltGoPackage.from_fallible_process_results(
+                assembly_setup.results, None
+            )
+        assert assembly_setup.output
+        input_digest = assembly_setup.output.merged_compilation_input_digest
+        assembly_digests = assembly_setup.output.assembly_digests
         symabis_path = "./symabis"
 
     compile_args = [
