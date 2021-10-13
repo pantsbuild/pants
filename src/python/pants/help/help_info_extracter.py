@@ -269,7 +269,11 @@ class HelpInfoExtracter:
         name_to_target_type_info = {
             alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
             for alias, target_type in registered_target_types.aliases_to_types.items()
-            if not alias.startswith("_") and target_type.removal_version is None
+            if (
+                not alias.startswith("_")
+                and target_type.removal_version is None
+                and alias != target_type.deprecated_alias
+            )
         }
 
         return AllHelpInfo(
