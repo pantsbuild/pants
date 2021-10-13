@@ -832,9 +832,8 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
 
 def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> None:
     spec = FileLiteralSpec("demo/fake.txt")
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
         resolve_filesystem_specs(specs_rule_runner, [spec])
-    assert 'Unmatched glob from file arguments: "demo/fake.txt"' in str(exc.value)
 
     specs_rule_runner.set_options(["--owners-not-found-behavior=ignore"])
     assert not resolve_filesystem_specs(specs_rule_runner, [spec])
