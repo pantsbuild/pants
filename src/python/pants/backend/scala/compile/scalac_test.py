@@ -104,10 +104,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 scala_sources(
@@ -127,6 +124,8 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     coarsened_target = expect_single_expanded_coarsened_target(
         rule_runner, Address(spec_path="", target_name="lib")
     )
+
+    print(coarsened_target)
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
@@ -162,10 +161,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 scala_sources(
@@ -219,10 +215,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 scala_sources(
@@ -281,10 +274,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [":joda-time_joda-time"],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 scala_sources(
@@ -332,10 +322,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 coursier_lockfile(
                     name = 'lockfile',
-                    requirements = [],
-                    sources = [
-                        "coursier_resolve.lockfile",
-                    ],
+                    source="coursier_resolve.lockfile",
                 )
 
                 scala_sources(
