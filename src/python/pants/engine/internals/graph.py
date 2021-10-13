@@ -16,7 +16,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
-    FilesystemLiteralSpec,
+    FileLiteralSpec,
     FilesystemSpecs,
     Specs,
 )
@@ -581,11 +581,7 @@ def _log_or_raise_unmatched_owners(
 async def addresses_from_filesystem_specs(
     filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
-    """Find the owner(s) for each FilesystemSpec.
-
-    Every returned address will be a generated subtarget, meaning that each address will have
-    exactly one file in its `sources` field.
-    """
+    """Find the owner(s) for each FilesystemSpec."""
     paths_per_include = await MultiGet(
         Get(
             Paths,
@@ -594,16 +590,16 @@ async def addresses_from_filesystem_specs(
                 spec, owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
-        for spec in filesystem_specs.includes
+        for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
     )
     addresses: set[Address] = set()
-    for spec, owners in zip(filesystem_specs.includes, owners_per_include):
+    for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
         if (
             owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FilesystemLiteralSpec)
+            and isinstance(spec, FileLiteralSpec)
             and not owners
         ):
             _log_or_raise_unmatched_owners(

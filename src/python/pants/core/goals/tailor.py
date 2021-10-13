@@ -478,24 +478,18 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
 
     Error on all other specs.
 
-    This is a hack that allows us to emulate "directory specs", until we are able to
-    support those more intrinsically.
-
-    TODO: If other goals need "directory specs", move this logic to a rule that produces them.
+    This is a hack that allows us to emulate "directory specs" while we deprecate the shorthand of
+    `dir` being `dir:dir`.
     """
-    # Specs that look like directories are interpreted by the SpecsParser as the address
-    # of the target with the same name as the directory of the BUILD file.
-    # Note that we can't tell the difference between the user specifying foo/bar and the
-    # user specifying foo/bar:bar, so we will consider the latter a "directory spec" too.
-    dir_specs = []
+    dir_specs = [dir_spec.v for dir_spec in specs.filesystem_specs.dir_includes]
     other_specs: list[Spec] = [
-        *specs.filesystem_specs.includes,
+        *specs.filesystem_specs.file_includes,
         *specs.filesystem_specs.ignores,
         *specs.address_specs.globs,
     ]
     for spec in specs.address_specs.literals:
         if spec.is_directory_shorthand:
-            dir_specs.append(spec)
+            dir_specs.append(spec.path_component)
         else:
             other_specs.append(spec)
     if other_specs:
@@ -504,8 +498,8 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
             f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
             "specify no arguments to run against the entire repository."
         )
-    # No specs at all means search the entire repo (represented by ("",)).
-    return tuple(spec.path_component for spec in specs.address_specs.literals) or ("",)
+    # No specs at all means search the entire repo.
+    return tuple(dir_specs) or ("",)
 
 
 @goal_rule
