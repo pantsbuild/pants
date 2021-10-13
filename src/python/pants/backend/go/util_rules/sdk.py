@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import shlex
 import textwrap
 from dataclasses import dataclass
 from typing import Iterable, Mapping
@@ -50,10 +49,16 @@ class GoSdkProcess:
         self.output_directories = tuple(output_directories)
 
 
-@rule
-async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: BashBinary) -> Process:
-    working_dir_cmd = f"cd '{request.working_dir}'" if request.working_dir else ""
+@dataclass(frozen=True)
+class GoSdkRunSetup:
+    digest: Digest
+    script: FileContent
 
+    CHDIR_ENV = "__PANTS_CHDIR_TO"
+
+
+@rule
+async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
@@ -65,16 +70,28 @@ async def setup_go_sdk_process(request: GoSdkProcess, goroot: GoRoot, bash: Bash
             export GOPATH="$(/bin/pwd)/gopath"
             export GOCACHE="$(/bin/pwd)/cache"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
-            {working_dir_cmd}
-            exec "{goroot.path}/bin/go" {' '.join(shlex.quote(arg) for arg in request.command)}
+            if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
+              cd "${GoSdkRunSetup.CHDIR_ENV}"
+            fi
+            exec "{goroot.path}/bin/go" "$@"
             """
         ).encode("utf-8"),
     )
 
-    script_digest = await Get(Digest, CreateDigest([go_run_script]))
-    input_digest = await Get(Digest, MergeDigests([script_digest, request.input_digest]))
+    digest = await Get(Digest, CreateDigest([go_run_script]))
+    return GoSdkRunSetup(digest, go_run_script)
+
+
+@rule
+async def setup_go_sdk_process(
+    request: GoSdkProcess, go_sdk_run: GoSdkRunSetup, bash: BashBinary
+) -> Process:
+    input_digest = await Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest]))
     return Process(
-        argv=[bash.path, go_run_script.path],
+        argv=[bash.path, go_sdk_run.script.path, *request.command],
+        env={
+            GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+        },
         input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,
