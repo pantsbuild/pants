@@ -32,6 +32,7 @@ class CliAliasInvalidError(CliAliasError):
 
 class CliOptions(Subsystem):
     options_scope = "cli"
+    help = "Options for configuring CLI behavior, such as command line aliases."
 
     @staticmethod
     def register_options(register):
