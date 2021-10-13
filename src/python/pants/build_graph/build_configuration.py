@@ -15,6 +15,7 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.option.alias import CliOptions
 from pants.option.global_options import GlobalOptions
 from pants.option.scope import normalize_scope
 from pants.option.subsystem import Subsystem
@@ -31,7 +32,7 @@ _RESERVED_NAMES = {"global", "goals", "targets", "tools"}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: Set[Type[Subsystem]] = {GlobalOptions, Changed}
+_GLOBAL_SUBSYSTEMS: Set[Type[Subsystem]] = {GlobalOptions, Changed, CliOptions}
 
 
 @dataclass(frozen=True)

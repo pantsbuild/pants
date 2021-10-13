@@ -1,0 +1,129 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import logging
+import re
+import shlex
+from dataclasses import dataclass, field
+from itertools import chain
+from typing import Generator
+
+from pants.option.errors import OptionsError
+from pants.option.scope import ScopeInfo
+from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
+
+logger = logging.getLogger(__name__)
+
+
+class CliAliasError(OptionsError):
+    pass
+
+
+class CliAliasCycleError(CliAliasError):
+    pass
+
+
+class CliAliasInvalidError(CliAliasError):
+    pass
+
+
+class CliOptions(Subsystem):
+    options_scope = "cli"
+    help = "Options for configuring CLI behavior, such as command line aliases."
+
+    @staticmethod
+    def register_options(register):
+        register(
+            "--alias",
+            type=dict,
+            default={},
+            help=(
+                "Register command line aliases.\nExample:\n\n"
+                "    [cli.alias]\n"
+                '    green = "fmt lint check"\n'
+                '    all-changed = "--changed-since=HEAD --changed-dependees=transitive"\n'
+                "\n"
+                "This would allow you to run `./pants green all-changed`, which is shorthand for "
+                "`./pants fmt lint check --changed-since=HEAD --changed-dependees=transitive`.\n\n"
+                "Notice: this option must be placed in a config file (e.g. `pants.toml` or "
+                "`pantsrc`) to have any effect."
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class CliAlias:
+    definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
+
+    def __post_init__(self):
+        valid_alias_re = re.compile(r"\w(\w|-)*\w$", re.IGNORECASE)
+        for alias in self.definitions.keys():
+            if not re.match(valid_alias_re, alias):
+                raise CliAliasInvalidError(
+                    f"Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha "
+                    "numerical letters and the separators `-` and `_`, and may not begin/end "
+                    "with a `-`."
+                )
+
+    @classmethod
+    def from_dict(cls, aliases: dict[str, str]) -> CliAlias:
+        definitions = {key: tuple(shlex.split(value)) for key, value in aliases.items()}
+
+        def expand(
+            definition: tuple[str, ...], *trail: str
+        ) -> Generator[tuple[str, ...], None, None]:
+            for arg in definition:
+                if arg not in definitions:
+                    yield (arg,)
+                else:
+                    if arg in trail:
+                        raise CliAliasCycleError(
+                            "CLI alias cycle detected in `[cli].alias` option: "
+                            + " -> ".join([arg, *trail])
+                        )
+                    yield from expand(definitions[arg], arg, *trail)
+
+        return cls(
+            FrozenDict(
+                {
+                    alias: tuple(chain.from_iterable(expand(definition)))
+                    for alias, definition in definitions.items()
+                }
+            )
+        )
+
+    def check_name_conflicts(self, known_scopes: dict[str, ScopeInfo]) -> None:
+        for alias in self.definitions.keys():
+            scope = known_scopes.get(alias)
+            if scope:
+                raise CliAliasInvalidError(
+                    f"Invalid alias in `[cli].alias` option: {alias!r}. This is already a "
+                    "registered " + ("goal." if scope.is_goal else "subsystem.")
+                )
+
+    def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
+        if not self.definitions:
+            return args
+        return tuple(self._do_expand_args(args))
+
+    def _do_expand_args(self, args: tuple[str, ...]) -> Generator[str, None, None]:
+        args_iter = iter(args)
+        for arg in args_iter:
+            if arg == "--":
+                # Do not expand pass through arguments.
+                yield arg
+                yield from args_iter
+                return
+
+            expanded = self.maybe_expand(arg)
+            if expanded:
+                logger.debug(f"Expanded [cli.alias].{arg} => {' '.join(expanded)}")
+                yield from expanded
+            else:
+                yield arg
+
+    def maybe_expand(self, arg: str) -> tuple[str, ...] | None:
+        return self.definitions.get(arg)
