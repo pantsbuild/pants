@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shlex
 from dataclasses import dataclass, field
 from itertools import chain
@@ -21,6 +22,10 @@ class CliAliasError(OptionsError):
 
 
 class CliAliasCycleError(CliAliasError):
+    pass
+
+
+class CliAliasInvalidError(CliAliasError):
     pass
 
 
@@ -50,6 +55,15 @@ class CliOptions(Subsystem):
 @dataclass(frozen=True)
 class CliAlias:
     definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
+
+    def __post_init__(self):
+        valid_alias_re = re.compile(r"\w(\w|-)*\w$", re.IGNORECASE)
+        for alias in self.definitions.keys():
+            if not re.match(valid_alias_re, alias):
+                raise CliAliasInvalidError(
+                    f"Invalid alias: {alias!r}. May only contain alpha numerical letters and the "
+                    "separators `-` and `_`, and may not begin/end with a `-`."
+                )
 
     @classmethod
     def from_dict(cls, aliases: dict[str, str]) -> CliAlias:

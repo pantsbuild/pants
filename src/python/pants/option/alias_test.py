@@ -7,7 +7,7 @@ from typing import ContextManager
 
 import pytest
 
-from pants.option.alias import CliAlias, CliAliasCycleError
+from pants.option.alias import CliAlias, CliAliasCycleError, CliAliasInvalidError
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 
@@ -114,3 +114,21 @@ def test_nested_alias(alias, definitions: dict | ContextManager) -> None:
         cli_alias = CliAlias.from_dict(alias)
         if isinstance(definitions, dict):
             assert cli_alias.definitions == FrozenDict(definitions)
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        # Check that we do not allow any alias that may resemble a valid option/spec.
+        "dir/spec",
+        "file.name",
+        "target:name",
+        "-o",
+        "--o",
+        "-option",
+        "--option",
+    ],
+)
+def test_invalid_alias_name(alias: str) -> None:
+    with pytest.raises(CliAliasInvalidError):
+        CliAlias.from_dict({alias: ""})
