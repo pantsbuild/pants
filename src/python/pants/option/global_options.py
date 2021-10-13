@@ -486,20 +486,6 @@ class GlobalOptions(Subsystem):
         default_rel_distdir = f"/{default_distdir_name}/"
 
         register(
-            "--alias",
-            advanced=True,
-            type=dict,
-            default={},
-            help=(
-                "Register command line aliases.\nExample:\n\n"
-                "    [GLOBAL.alias]\n"
-                "    some-alias = \"--replaced-flag 'option value'\"\n\n"
-                "So `./pants some-alias ...` will be translated to "
-                "`./pants --replaced-flag 'option value' ...`.\n\n"
-                "Notice: this option must be placed in a configuration file to have any effect."
-            ),
-        )
-        register(
             "--backend-packages",
             advanced=True,
             type=list,

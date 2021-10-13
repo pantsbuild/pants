@@ -415,7 +415,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 out.write(
                     dedent(
                         """\
-                        [GLOBAL.alias]
+                        [cli.alias]
                         pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
                         """
                     )

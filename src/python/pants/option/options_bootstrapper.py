@@ -13,7 +13,7 @@ from typing import Iterable, Mapping, Sequence
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.option.alias import OptionAlias
+from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
@@ -160,7 +160,7 @@ class OptionsBootstrapper:
 
             # Finally, we expand any aliases and re-populates the bootstrap args, in case there was
             # any from an alias.
-            alias = OptionAlias.from_dict(post_bootstrap_config.get("GLOBAL", "alias", dict, {}))
+            alias = CliAlias.from_dict(post_bootstrap_config.get("cli", "alias", dict, {}))
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
 

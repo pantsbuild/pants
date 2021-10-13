@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import pytest
 
-from pants.option.alias import OptionAlias
+from pants.option.alias import CliAlias
 
 
 def test_maybe_nothing() -> None:
-    alias = OptionAlias()
-    assert alias.maybe_expand("arg") is None
+    cli_alias = CliAlias()
+    assert cli_alias.maybe_expand("arg") is None
 
 
 @pytest.mark.parametrize(
@@ -24,26 +24,38 @@ def test_maybe_nothing() -> None:
     ],
 )
 def test_maybe_expand_alias(alias: str, expanded: tuple[str, ...] | None) -> None:
-    option_alias = OptionAlias.from_dict(
+    cli_alias = CliAlias.from_dict(
         {
             "alias": alias,
         }
     )
-    assert option_alias.maybe_expand("alias") == expanded
+    assert cli_alias.maybe_expand("alias") == expanded
 
 
-def test_expand_args() -> None:
-    option_alias = OptionAlias.from_dict(
+@pytest.mark.parametrize(
+    "args, expanded",
+    [
+        (
+            ("some", "alias", "target"),
+            ("some", "--flag", "goal", "target"),
+        ),
+        (
+            # Don't touch pass through args.
+            ("some", "--", "alias", "target"),
+            ("some", "--", "alias", "target"),
+        ),
+    ],
+)
+def test_expand_args(args: tuple[str, ...], expanded: tuple[str, ...]) -> None:
+    cli_alias = CliAlias.from_dict(
         {
-            "alias": "--flag value",
+            "alias": "--flag goal",
         }
     )
-    args = ("some", "alias", "here")
-    expanded = ("some", "--flag", "value", "here")
-    assert option_alias.expand_args(args) == expanded
+    assert cli_alias.expand_args(args) == expanded
 
 
 def test_no_expand_when_no_aliases() -> None:
     args = ("./pants",)
-    option_alias = OptionAlias()
-    assert option_alias.expand_args(args) is args
+    cli_alias = CliAlias()
+    assert cli_alias.expand_args(args) is args
