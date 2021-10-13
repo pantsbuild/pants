@@ -7,13 +7,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Set, cast
 
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Targets, UnexpandedTargets
+from pants.engine.target import AllTargets, AllTargetsRequest, Dependencies, DependenciesRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -27,12 +26,7 @@ class AddressToDependees:
 
 @rule(desc="Map all targets to their dependees", level=LogLevel.DEBUG)
 async def map_addresses_to_dependees() -> AddressToDependees:
-    # Get every target in the project so that we can iterate over them to find their dependencies.
-    with_generated_targets, without_generated_targets = await MultiGet(
-        Get(Targets, AddressSpecs([DescendantAddresses("")])),
-        Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")])),
-    )
-    all_targets = {*with_generated_targets, *without_generated_targets}
+    all_targets = await Get(AllTargets, AllTargetsRequest(include_target_generators=True))
     dependencies_per_target = await MultiGet(
         Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
         for tgt in all_targets

@@ -23,12 +23,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
     Dependencies,
     DependenciesRequest,
     FieldSet,
@@ -257,7 +258,7 @@ async def setup_pylint_lockfile(
     # dependencies (which will AND across each target in the closure). Then, it ORs all unique
     # resulting interpreter constraints. The net effect is that every possible Python interpreter
     # used will be covered.
-    all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
     relevant_targets = tuple(tgt for tgt in all_tgts if PylintFieldSet.is_applicable(tgt))
     direct_deps_per_target = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in relevant_targets

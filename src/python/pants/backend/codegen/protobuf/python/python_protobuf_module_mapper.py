@@ -4,16 +4,19 @@
 from collections import defaultdict
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    AllProtobufTargets,
+    ProtobufGrpcToggleField,
+    ProtobufSourceField,
+)
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
 )
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesPathsRequest, Target, Targets
+from pants.engine.target import SourcesPathsRequest, Target
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -30,10 +33,9 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
 
 @rule(desc="Creating map of Protobuf targets to generated Python modules", level=LogLevel.DEBUG)
 async def map_protobuf_to_python_modules(
+    protobuf_targets: AllProtobufTargets,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
         for tgt in protobuf_targets

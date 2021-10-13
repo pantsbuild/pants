@@ -9,9 +9,8 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
@@ -71,12 +70,12 @@ async def setup_ipython_lockfile(
     #
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
     # interpreter used will be covered.
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(
             [tgt[InterpreterConstraintsField]], python_setup
         )
-        for tgt in all_build_targets
+        for tgt in all_tgts
         if tgt.has_field(InterpreterConstraintsField)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))

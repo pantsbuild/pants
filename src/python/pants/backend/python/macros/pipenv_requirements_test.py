@@ -10,16 +10,14 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
-from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.target import AllTargets
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Targets, (Specs,))],
         target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
     )
@@ -35,10 +33,7 @@ def assert_pipenv_requirements(
     pipfile_lock_relpath: str = "Pipfile.lock",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pipfile_lock_relpath: dumps(pipfile_lock)})
-    targets = rule_runner.request(
-        Targets,
-        [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
-    )
+    targets = rule_runner.request(AllTargets, [])
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 

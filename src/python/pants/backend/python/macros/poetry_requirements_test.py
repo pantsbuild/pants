@@ -24,11 +24,10 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_str_version,
 )
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
-from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.target import AllTargets
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.mark.parametrize(
@@ -384,7 +383,6 @@ def test_parse_multi_reqs() -> None:
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Targets, (Specs,))],
         target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"poetry_requirements": PoetryRequirements},
     )
@@ -400,10 +398,7 @@ def assert_poetry_requirements(
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
-    targets = rule_runner.request(
-        Targets,
-        [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
-    )
+    targets = rule_runner.request(AllTargets, [])
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 

@@ -5,6 +5,7 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     BoolField,
     Dependencies,
     GeneratedTargets,
@@ -14,10 +15,12 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Target,
+    Targets,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url, git_url
+from pants.util.logging import LogLevel
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -30,6 +33,15 @@ class ProtobufGrpcToggleField(BoolField):
     alias = "grpc"
     default = False
     help = "Whether to generate gRPC code or not."
+
+
+class AllProtobufTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Protobuf targets in project", level=LogLevel.DEBUG)
+def find_all_protobuf_targets(targets: AllTargets) -> AllProtobufTargets:
+    return AllProtobufTargets(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
 
 
 # -----------------------------------------------------------------------------------------------
