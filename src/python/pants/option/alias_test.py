@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
+from typing import ContextManager
+
 import pytest
 
-from pants.option.alias import CliAlias
+from pants.option.alias import CliAlias, CliAliasCycleError
+from pants.testutil.pytest_util import no_exception
+from pants.util.frozendict import FrozenDict
 
 
 def test_maybe_nothing() -> None:
@@ -59,3 +63,54 @@ def test_no_expand_when_no_aliases() -> None:
     args = ("./pants",)
     cli_alias = CliAlias()
     assert cli_alias.expand_args(args) is args
+
+
+@pytest.mark.parametrize(
+    "alias, definitions",
+    [
+        (
+            {
+                "basic": "goal",
+                "nested": "--option=advanced basic",
+            },
+            {
+                "basic": ("goal",),
+                "nested": (
+                    "--option=advanced",
+                    "goal",
+                ),
+            },
+        ),
+        (
+            {
+                "multi-nested": "deep nested",
+                "basic": "goal",
+                "nested": "--option=advanced basic",
+            },
+            {
+                "multi-nested": ("deep", "--option=advanced", "goal"),
+                "basic": ("goal",),
+                "nested": (
+                    "--option=advanced",
+                    "goal",
+                ),
+            },
+        ),
+        (
+            {
+                "cycle": "other-alias",
+                "other-alias": "cycle",
+            },
+            pytest.raises(
+                CliAliasCycleError,
+                match=r"CLI alias cycle detected: other-alias -> cycle -> other-alias",
+            ),
+        ),
+    ],
+)
+def test_nested_alias(alias, definitions: dict | ContextManager) -> None:
+    expect: ContextManager = no_exception() if isinstance(definitions, dict) else definitions
+    with expect:
+        cli_alias = CliAlias.from_dict(alias)
+        if isinstance(definitions, dict):
+            assert cli_alias.definitions == FrozenDict(definitions)

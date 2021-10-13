@@ -6,12 +6,22 @@ from __future__ import annotations
 import logging
 import shlex
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import Generator
 
+from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
+
+
+class CliAliasError(OptionsError):
+    pass
+
+
+class CliAliasCycleError(CliAliasError):
+    pass
 
 
 class CliOptions(Subsystem):
@@ -42,9 +52,29 @@ class CliAlias:
     definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
 
     @classmethod
-    def from_dict(cls, definitions: dict[str, str]) -> CliAlias:
+    def from_dict(cls, aliases: dict[str, str]) -> CliAlias:
+        definitions = {key: tuple(shlex.split(value)) for key, value in aliases.items()}
+
+        def expand(
+            definition: tuple[str, ...], *trail: str
+        ) -> Generator[tuple[str, ...], None, None]:
+            for arg in definition:
+                if arg not in definitions:
+                    yield (arg,)
+                else:
+                    if arg in trail:
+                        raise CliAliasCycleError(
+                            f"CLI alias cycle detected: {' -> '.join([arg, *trail])}"
+                        )
+                    yield from expand(definitions[arg], arg, *trail)
+
         return cls(
-            FrozenDict({key: tuple(shlex.split(value)) for key, value in definitions.items()})
+            FrozenDict(
+                {
+                    alias: tuple(chain.from_iterable(expand(definition)))
+                    for alias, definition in definitions.items()
+                }
+            )
         )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
