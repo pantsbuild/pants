@@ -112,14 +112,14 @@ class SpecsParser:
             return FileLiteralSpec(spec_path)
         return DirLiteralSpec(spec_path)
 
-    def parse_specs(self, specs: Iterable[str], *, dir_address_shorthand: bool) -> Specs:
+    def parse_specs(self, specs: Iterable[str]) -> Specs:
         address_specs: OrderedSet[AddressSpec] = OrderedSet()
         filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
         for spec_str in specs:
             parsed_spec = self.parse_spec(spec_str)
             if isinstance(parsed_spec, AddressSpec):
                 address_specs.add(parsed_spec)
-            elif dir_address_shorthand and isinstance(parsed_spec, DirLiteralSpec):
+            elif isinstance(parsed_spec, DirLiteralSpec):
                 address_specs.add(parsed_spec.to_address_literal())
             else:
                 filesystem_specs.add(parsed_spec)

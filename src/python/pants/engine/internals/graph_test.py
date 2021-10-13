@@ -594,7 +594,7 @@ def test_resolve_specs_snapshot() -> None:
         {"demo/f1.txt": "", "demo/f2.txt": "", "demo/BUILD": "target(sources=['*.txt'])"}
     )
     specs = SpecsParser(rule_runner.build_root).parse_specs(
-        ["demo:demo", "demo/f1.txt", "demo/BUILD"], dir_address_shorthand=True
+        ["demo:demo", "demo/f1.txt", "demo/BUILD"]
     )
     result = rule_runner.request(SpecsSnapshot, [specs])
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
@@ -867,7 +867,7 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
     no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(specs_rule_runner.build_root).parse_specs(
-        [*no_interaction_specs, *multiple_files_specs], dir_address_shorthand=True
+        [*no_interaction_specs, *multiple_files_specs]
     )
 
     result = specs_rule_runner.request(Addresses, [specs])
