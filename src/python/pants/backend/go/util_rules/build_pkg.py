@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
@@ -26,7 +27,7 @@ from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, Third
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.dirutil import fast_relpath
@@ -56,6 +57,40 @@ class BuildGoPackageRequest(EngineAwareParameter):
         return self.import_path
 
 
+class BuildPackageResult(Enum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class FallibleBuiltGoPackage:
+    """Fallible version of `BuiltGoPackage with error details."""
+
+    output: BuiltGoPackage | None
+    result: BuildPackageResult
+    exit_code: int
+    stdout: str | None = None
+    stderr: str | None = None
+
+    @classmethod
+    def from_fallible_process_result(
+        cls,
+        process_result: FallibleProcessResult,
+        output: BuiltGoPackage | None,
+    ) -> FallibleBuiltGoPackage:
+        return cls(
+            result=(
+                BuildPackageResult.SUCCEEDED
+                if process_result.exit_code == 0
+                else BuildPackageResult.FAILED
+            ),
+            output=output,
+            exit_code=process_result.exit_code,
+            stdout=process_result.stdout.decode("utf-8"),
+            stderr=process_result.stderr.decode("utf-8"),
+        )
+
+
 @dataclass(frozen=True)
 class BuiltGoPackage:
     """A package and its dependencies compiled as `__pkg__.a` files.
@@ -68,7 +103,7 @@ class BuiltGoPackage:
 
 
 @rule
-async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
+async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPackage:
     built_deps = await MultiGet(
         Get(BuiltGoPackage, BuildGoPackageRequest, build_request)
         for build_request in request.direct_dependencies
@@ -119,7 +154,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
     )
     compile_args.extend(["--", *relativized_sources])
     compile_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=input_digest,
             command=tuple(compile_args),
@@ -127,6 +162,8 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
             output_files=("__pkg__.a",),
         ),
     )
+    if compile_result.exit_code != 0:
+        return FallibleBuiltGoPackage.from_fallible_process_result(compile_result, None)
 
     compilation_digest = compile_result.output_digest
     if assembly_digests:
@@ -139,6 +176,9 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
                 request.subpath,
             ),
         )
+        if assembly_result.result.exit_code != 0:
+            return FallibleBuiltGoPackage.from_fallible_process_result(assembly_result.result, None)
+        assert assembly_result.merged_output_digest
         compilation_digest = assembly_result.merged_output_digest
 
     path_prefix = os.path.join("__pkgs__", path_safe(request.import_path))
@@ -146,7 +186,16 @@ async def build_go_package(request: BuildGoPackageRequest) -> BuiltGoPackage:
     output_digest = await Get(Digest, AddPrefix(compilation_digest, path_prefix))
     merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
 
-    return BuiltGoPackage(merged_result_digest, FrozenDict(import_paths_to_pkg_a_files))
+    output = BuiltGoPackage(merged_result_digest, FrozenDict(import_paths_to_pkg_a_files))
+    return FallibleBuiltGoPackage.from_fallible_process_result(compile_result, output)
+
+
+@rule
+def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltGoPackage:
+    if fallible_result.result == BuildPackageResult.SUCCEEDED:
+        assert fallible_result.output
+        return fallible_result.output
+    raise Exception("Compile failed.")
 
 
 @dataclass(frozen=True)
