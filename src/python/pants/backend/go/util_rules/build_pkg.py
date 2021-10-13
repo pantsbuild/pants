@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from enum import Enum
 
 from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
@@ -57,17 +56,11 @@ class BuildGoPackageRequest(EngineAwareParameter):
         return self.import_path
 
 
-class BuildPackageResult(Enum):
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-
-
 @dataclass(frozen=True)
 class FallibleBuiltGoPackage:
     """Fallible version of `BuiltGoPackage with error details."""
 
     output: BuiltGoPackage | None
-    result: BuildPackageResult
     exit_code: int
     stdout: str | None = None
     stderr: str | None = None
@@ -79,11 +72,6 @@ class FallibleBuiltGoPackage:
         output: BuiltGoPackage | None,
     ) -> FallibleBuiltGoPackage:
         return cls(
-            result=(
-                BuildPackageResult.SUCCEEDED
-                if process_result.exit_code == 0
-                else BuildPackageResult.FAILED
-            ),
             output=output,
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode("utf-8"),
@@ -192,10 +180,11 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
 
 @rule
 def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltGoPackage:
-    if fallible_result.result == BuildPackageResult.SUCCEEDED:
+    if fallible_result.exit_code == 0:
         assert fallible_result.output
         return fallible_result.output
-    raise Exception("Compile failed.")
+    # TODO(12927): Wire up to streaming workunit system to log compilation results.
+    raise Exception(f"Compile failed:\n{fallible_result.stderr}")
 
 
 @dataclass(frozen=True)
