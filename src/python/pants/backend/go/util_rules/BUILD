@@ -4,7 +4,4 @@
 python_sources(dependencies=[":analyzer_sources"])
 python_tests(name='tests', timeout=120)
 
-resources(
-  name="analyzer_sources",
-  sources=["analyze_test_sources.go"],
-)
+resource(name="analyzer_sources", source="analyze_test_sources.go")

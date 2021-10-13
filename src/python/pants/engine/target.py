@@ -1464,8 +1464,8 @@ class SourcesField(AsyncFieldMixin, Field):
                 raise InvalidFieldException(
                     f"The {repr(self.alias)} field in target {self.address} can only contain "
                     f"files that end in {expected}, but it had these files: {sorted(bad_files)}."
-                    f"\n\nMaybe create a `resources()` or `files()` target and include it in the "
-                    f"`dependencies` field?"
+                    "\n\nMaybe create a `resource`/`resources` or `file`/`files` target and "
+                    "include it in the `dependencies` field?"
                 )
         if self.expected_num_files is not None:
             num_files = len(files)

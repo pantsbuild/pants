@@ -10,9 +10,11 @@ from pants.core.goals import check, fmt, lint, package, publish, repl, run, tail
 from pants.core.target_types import (
     ArchiveTarget,
     FilesGeneratorTarget,
+    FileTarget,
     GenericTarget,
     RelocatedFiles,
     ResourcesGeneratorTarget,
+    ResourceTarget,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -62,8 +64,10 @@ def rules():
 def target_types():
     return [
         ArchiveTarget,
+        FileTarget,
         FilesGeneratorTarget,
         GenericTarget,
+        ResourceTarget,
         ResourcesGeneratorTarget,
         RelocatedFiles,
     ]

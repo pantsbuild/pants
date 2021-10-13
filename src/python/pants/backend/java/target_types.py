@@ -59,10 +59,7 @@ class JunitTestsGeneratorTarget(Target):
         JavaTestsGeneratorSourcesField,
         Dependencies,
     )
-    help = (
-        "Generate a `junit_test` target for each file in the `sources` field (defaults to "
-        "all files in the directory that end in `Test.java` )."
-    )
+    help = "Generate a `junit_test` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromJunitTests(GenerateTargetsRequest):
@@ -108,11 +105,7 @@ class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
 class JavaSourcesGeneratorTarget(Target):
     alias = "java_sources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JavaSourcesGeneratorSourcesField)
-    help = (
-        "Generate a `java_source` target for each file in the `sources` field (defaults to "
-        "all files named in the directory whose names end in `.java` except for those which "
-        "end in `Test.java`)."
-    )
+    help = "Generate a `java_source` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromJavaSources(GenerateTargetsRequest):

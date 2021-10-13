@@ -49,7 +49,4 @@ python_tests(
   sources=['*_test.py', '!pants_integration_test.py']
 )
 
-resources(
-  name="py_typed",
-  sources=["py.typed"],
-)
+resource(name="py_typed", source="py.typed")
