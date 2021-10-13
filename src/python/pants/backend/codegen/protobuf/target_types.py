@@ -42,17 +42,17 @@ class ProtobufSourceField(SingleSourceField):
 
 
 class ProtobufSourceTarget(Target):
-    alias = "protobuf_sources"  # TODO(#12954): rename to `protobuf_source` when ready. Update `help` too.
+    alias = "protobuf_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
-    help = f"A Protobuf file used to generate various languages.\n\nSee f{doc_url('protobuf')}."
-
-    deprecated_alias = "protobuf_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
+    help = (
+        "A single Protobuf file used to generate various languages.\n\n"
+        f"See {doc_url('protobuf')}."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ class ProtobufSourcesGeneratorTarget(Target):
         ProtobufSourcesGeneratingSourcesField,
         ProtobufGrpcToggleField,
     )
-    help = f"Protobuf files used to generate various languages.\n\nSee f{doc_url('protobuf')}."
+    help = "Generates a `protobuf_source` target for each file in the `sources` field."
 
     deprecated_alias = "protobuf_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
