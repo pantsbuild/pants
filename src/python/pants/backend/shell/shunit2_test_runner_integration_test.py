@@ -19,7 +19,7 @@ from pants.backend.shell.shunit2_test_runner import (
     Shunit2RunnerRequest,
 )
 from pants.backend.shell.target_types import (
-    ShellSourcesGeneratorTarget,
+    ShellSourceTarget,
     Shunit2Shell,
     Shunit2ShellField,
     Shunit2TestsGeneratorTarget,
@@ -56,7 +56,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
         target_types=[
-            ShellSourcesGeneratorTarget,
+            ShellSourceTarget,
             Shunit2TestsGeneratorTarget,
             PythonSourcesGeneratorTarget,
             PexBinary,
@@ -163,8 +163,8 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 shunit2_tests(name="t", dependencies=[':direct'])
-                shell_sources(name="direct", sources=['direct.sh'], dependencies=[':transitive'])
-                shell_sources(name="transitive", sources=['transitive.sh'])
+                shell_source(name="direct", source='direct.sh', dependencies=[':transitive'])
+                shell_source(name="transitive", source='transitive.sh')
                 """
             ),
         }
