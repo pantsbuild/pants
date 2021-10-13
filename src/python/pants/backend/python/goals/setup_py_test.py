@@ -556,6 +556,7 @@ def test_get_sources() -> None:
             get_sources,
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             *python_sources.rules(),
             QueryRule(OwnedDependencies, (DependencyOwner,)),
             QueryRule(SetupPySources, (SetupPyChrootRequest,)),
