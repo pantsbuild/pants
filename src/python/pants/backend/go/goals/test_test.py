@@ -74,7 +74,7 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -96,7 +96,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
@@ -131,7 +131,7 @@ def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -156,7 +156,7 @@ def test_internal_example_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -184,7 +184,7 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "foo.TestMain called" in result.stdout
@@ -219,7 +219,7 @@ def test_external_test_success(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -252,7 +252,7 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
@@ -290,7 +290,7 @@ def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -324,7 +324,7 @@ def test_external_example_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert result.stdout == "PASS\n"
@@ -364,7 +364,7 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "foo_test.TestMain called" in result.stdout
@@ -408,7 +408,7 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo", relative_file_path=""))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout

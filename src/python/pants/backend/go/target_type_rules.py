@@ -223,8 +223,8 @@ async def generate_targets_from_go_mod(
                     sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
                 ),
             },
-            # E.g. `src/go:mod#./subdir`.
-            generator_addr.create_generated(f"./{subpath}"),
+            # E.g. `src/go/subdir:../mod`.
+            generator_addr.create_filesystem(subpath),
         )
 
     first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)

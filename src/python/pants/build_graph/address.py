@@ -154,63 +154,76 @@ class AddressInput:
 
         return cls(path_component, target_component, generated_component)
 
-    def file_to_address(self) -> Address:
-        """Converts to an Address by assuming that the path_component is a file on disk."""
-        if self.target_component is None:
-            # Use the default target in the same directory as the file.
-            spec_path, relative_file_path = os.path.split(self.path_component)
+    def to_address(self, *, path_component_is_dir: bool) -> Address:
+        # The target component may be "above" (but not below) the path in the filesystem.
+        # Determine how many levels above the path it is, and validate that the path is relative.
+        parent_count = (
+            0 if self.target_component is None else self.target_component.count(os.path.sep)
+        )
+        if parent_count == 0 or self.target_component is None:
+            if path_component_is_dir:
+                # Use the default target located inside the directory.
+                spec_path, relative_file_path = self.path_component, None
+            else:
+                # Use the default target in the same directory as the file.
+                spec_path, relative_file_path = os.path.split(self.path_component)
             # We validate that this is not a top-level file. We couldn't do this earlier in the
             # AddressSpec constructor because we weren't sure if the path_spec referred to a file
             # vs. a directory.
-            if not spec_path:
+            if not spec_path and self.target_component is None:
                 raise InvalidTargetName(
                     "Top-level file specs must include which target they come from, such as "
                     f"`{self.path_component}:original_target`, but {self.path_component} did not "
                     f"have an address."
                 )
-            return Address(spec_path=spec_path, relative_file_path=relative_file_path)
-
-        # The target component may be "above" (but not below) the file in the filesystem.
-        # Determine how many levels above the file it is, and validate that the path is relative.
-        parent_count = self.target_component.count(os.path.sep)
-        if parent_count == 0:
-            spec_path, relative_file_path = os.path.split(self.path_component)
             return Address(
                 spec_path=spec_path,
-                relative_file_path=relative_file_path,
                 target_name=self.target_component,
+                relative_file_path=relative_file_path,
+                generated_name=self.generated_component,
             )
 
+        # The target is above the path: validate and re-relativize it.
         expected_prefix = f"..{os.path.sep}" * parent_count
-        if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
+        actual_prefix = self.target_component[: self.target_component.rfind(os.path.sep) + 1]
+        if actual_prefix != expected_prefix:
             raise InvalidTargetName(
                 "A target may only be defined in a directory containing a file that it owns in "
-                f"the filesystem: `{self.target_component}` is not at-or-above the file "
-                f"`{self.path_component}`."
+                f"the filesystem: the target `{self.target_component}` is not at-or-above the "
+                f"path `{self.path_component}`."
             )
 
         # Split the path_component into a spec_path and relative_file_path at the appropriate
         # position.
+        if path_component_is_dir:
+            # If the path_component refers to a directory `:target` refers to the target living
+            # within the directory, as opposed to next to it, as with a file.
+            parent_count -= 1
         path_components = self.path_component.split(os.path.sep)
         if len(path_components) <= parent_count:
             raise InvalidTargetName(
-                "Targets are addressed relative to the files that they own: "
-                f"`{self.target_component}` is too far above the file `{self.path_component}` to "
+                "Targets are addressed relative to the paths that they own: "
+                f"`{self.target_component}` is too far above the path `{self.path_component}` to "
                 "be valid."
             )
         offset = -1 * (parent_count + 1)
         spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
         relative_file_path = os.path.join(*path_components[offset:])
         target_name = os.path.basename(self.target_component)
-        return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
+        return Address(
+            spec_path,
+            relative_file_path=relative_file_path,
+            target_name=target_name,
+            generated_name=self.generated_component,
+        )
+
+    def file_to_address(self) -> Address:
+        """Converts to an Address by assuming that the path_component is a file on disk."""
+        return self.to_address(path_component_is_dir=False)
 
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
-        return Address(
-            spec_path=self.path_component,
-            target_name=self.target_component,
-            generated_name=self.generated_component,
-        )
+        return self.to_address(path_component_is_dir=True)
 
 
 class Address(EngineAwareParameter):
@@ -286,6 +299,7 @@ class Address(EngineAwareParameter):
 
     @property
     def is_file_target(self) -> bool:
+        """TODO: Rename to is_filesystem_target."""
         return self._relative_file_path is not None
 
     @property
@@ -376,9 +390,21 @@ class Address(EngineAwareParameter):
             )
         return self
 
+    def create_filesystem(self, relative_file_path: str) -> Address:
+        if self.is_file_target:
+            raise AssertionError(
+                f"Cannot generate filesystem Addresses below a filesystem Address: {self}"
+            )
+        a = self.__class__(
+            self.spec_path, target_name=self.target_name, relative_file_path=relative_file_path
+        )
+        return a
+
     def create_generated(self, generated_name: str) -> Address:
         if self.is_generated_target:
-            raise AssertionError("Cannot call ")
+            raise AssertionError(
+                f"Cannot generate additional targets below generated Address: {self}"
+            )
         return self.__class__(
             self.spec_path, target_name=self._target_name, generated_name=generated_name
         )

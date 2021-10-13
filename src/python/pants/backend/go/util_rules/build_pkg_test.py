@@ -208,7 +208,7 @@ def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
     )
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./"),
+        Address("", target_name="mod", relative_file_path=""),
         expected_import_path="example.com/greeter",
         expected_subpath="",
         expected_go_file_names=["greeter.go"],
@@ -358,7 +358,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     quoter_import_path = "example.com/project/greeter/quoter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./greeter/quoter"),
+        Address("", target_name="mod", relative_file_path="greeter/quoter"),
         expected_import_path=quoter_import_path,
         expected_subpath="greeter/quoter",
         expected_go_file_names=["lib.go"],
@@ -369,17 +369,17 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     greeter_import_path = "example.com/project/greeter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./greeter"),
+        Address("", target_name="mod", relative_file_path="greeter"),
         expected_import_path=greeter_import_path,
         expected_subpath="greeter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[quoter_import_path, xerrors_import_path],
+        expected_direct_dependency_import_paths=[xerrors_import_path, quoter_import_path],
         expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
     )
 
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./"),
+        Address("", target_name="mod", relative_file_path=""),
         expected_import_path="example.com/project",
         expected_subpath="",
         expected_go_file_names=["main.go"],

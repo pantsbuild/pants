@@ -43,7 +43,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
 )
-from pants.testutil.rule_runner import RuleRunner, engine_error
+from pants.testutil.rule_runner import RuleRunner, engine_error, logging
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -112,14 +112,16 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
+    tgt1 = rule_runner.get_target(Address("foo", relative_file_path="cmd"))
     inferred_deps1 = rule_runner.request(
         InferredDependencies,
         [InferGoPackageDependenciesRequest(tgt1[GoFirstPartyPackageSourcesField])],
     )
-    assert inferred_deps1.dependencies == FrozenOrderedSet([Address("foo", generated_name="./pkg")])
+    assert inferred_deps1.dependencies == FrozenOrderedSet(
+        [Address("foo", relative_file_path="pkg")]
+    )
 
-    tgt2 = rule_runner.get_target(Address("foo", generated_name="./pkg"))
+    tgt2 = rule_runner.get_target(Address("foo", relative_file_path="pkg"))
     inferred_deps2 = rule_runner.request(
         InferredDependencies,
         [InferGoPackageDependenciesRequest(tgt2[GoFirstPartyPackageSourcesField])],
@@ -177,7 +179,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                 GoFirstPartyPackageSubpathField.alias: rel_dir,
                 GoFirstPartyPackageSourcesField.alias: tuple(sources),
             },
-            Address("src/go", generated_name=f"./{rel_dir}"),
+            Address("src/go", relative_file_path=rel_dir),
         )
 
     def gen_third_party_tgt(
@@ -266,6 +268,7 @@ def test_package_targets_cannot_be_manually_created() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
+@logging
 def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -277,7 +280,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": "go_mod(name='mod')",
             "explicit/f.go": "",
-            "explicit/BUILD": "go_binary(main='//:mod#./explicit')",
+            "explicit/BUILD": "go_binary(main='explicit:../mod')",
             "inferred/f.go": "",
             "inferred/BUILD": "go_binary()",
             "ambiguous/f.go": "",
@@ -311,10 +314,10 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
         return main_addr
 
     assert get_main(Address("explicit")) == Address(
-        "", target_name="mod", generated_name="./explicit"
+        "", target_name="mod", relative_file_path="explicit"
     )
     assert get_main(Address("inferred")) == Address(
-        "", target_name="mod", generated_name="./inferred"
+        "", target_name="mod", relative_file_path="inferred"
     )
 
     with engine_error(ResolveError, contains="none were found"):

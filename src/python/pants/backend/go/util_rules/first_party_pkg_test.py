@@ -86,7 +86,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
     ) -> None:
         info = rule_runner.request(
             FirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{subpath}"))],
+            [FirstPartyPkgInfoRequest(Address("foo", relative_file_path=subpath))],
         )
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
         expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{subpath}/*.go"])])
@@ -152,5 +152,5 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     with engine_error(NotImplementedError):
         rule_runner.request(
             FirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+            [FirstPartyPkgInfoRequest(Address("", target_name="mod", relative_file_path=""))],
         )

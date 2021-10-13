@@ -126,7 +126,7 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.go": GOOD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    tgt = rule_runner.get_target(Address("", target_name="mod", relative_file_path=""))
     lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
@@ -138,7 +138,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    tgt = rule_runner.get_target(Address("", target_name="mod", relative_file_path=""))
     lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
@@ -152,7 +152,7 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"good.go": GOOD_FILE, "bad.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"}
     )
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    tgt = rule_runner.get_target(Address("", target_name="mod", relative_file_path=""))
     lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
@@ -174,8 +174,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         }
     )
     tgts = [
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./good")),
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./bad")),
+        rule_runner.get_target(Address("", target_name="mod", relative_file_path="good")),
+        rule_runner.get_target(Address("", target_name="mod", relative_file_path="bad")),
     ]
     lint_results, fmt_result = run_gofmt(rule_runner, tgts)
     assert len(lint_results) == 1
@@ -190,7 +190,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    tgt = rule_runner.get_target(Address("", target_name="mod", relative_file_path=""))
     lint_results, fmt_result = run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-skip"])
     assert not lint_results
     assert fmt_result.skipped is True

@@ -835,11 +835,7 @@ def generate_file_level_targets(
         all_generated_addresses.append(
             generator.address.create_generated(relativized_fp)
             if use_generated_address_syntax
-            else Address(
-                generator.address.spec_path,
-                target_name=generator.address.target_name,
-                relative_file_path=relativized_fp,
-            )
+            else generator.address.create_filesystem(relativized_fp)
         )
 
     all_generated_address_specs = (
