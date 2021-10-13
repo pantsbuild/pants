@@ -80,13 +80,13 @@ class DockerRegistriesField(StringSequenceField):
     )
 
 
-class DockerRepositoryNameField(StringField):
-    alias = "repository_name"
+class DockerRepositoryField(StringField):
+    alias = "repository"
     help = (
         'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
-        "It uses the `[docker].default_repository_name` by default."
-        "This field value is formatted, see the documentation for "
-        "`[docker].default_repository_name` for details."
+        "It uses the `[docker].default_repository` by default."
+        "This field value may contain format strings that will be interpolated at runtime. "
+        "See the documentation for `[docker].default_repository` for details."
     )
 
 
@@ -105,7 +105,7 @@ class DockerImage(Target):
         DockerImageTags,
         DockerImageVersion,
         DockerRegistriesField,
-        DockerRepositoryNameField,
+        DockerRepositoryField,
         DockerSkipPushField,
         RestartableField,
     )

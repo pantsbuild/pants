@@ -14,7 +14,7 @@ from pants.backend.docker.target_types import (
     DockerImageTags,
     DockerImageVersion,
     DockerRegistriesField,
-    DockerRepositoryNameField,
+    DockerRepositoryField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
@@ -59,7 +59,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSources,)
 
     registries: DockerRegistriesField
-    repository: DockerRepositoryNameField
+    repository: DockerRepositoryField
     sources: DockerImageSources
     tags: DockerImageTags
     version: DockerImageVersion
@@ -74,47 +74,52 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     def dockerfile_path(self) -> str:
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
-    def image_tags(
+    def image_refs(
         self,
-        default_repository_name: str,
+        default_repository: str,
         registries: DockerRegistries,
         version_context: FrozenDict[str, DockerVersionContextValue],
     ) -> tuple[str, ...]:
-        """This method will always return a non-empty tuple.
+        """The image refs are the full image name, including any registry and version tag.
 
-        Returns all image tags to apply to the Docker image, on the form:
+        In the Docker world, the term `tag` is used both for what we here prefer to call the image
+        `ref`, as well as for the image version, or tag, that is at the end of the image name
+        separated with a colon. By introducing the image `ref` we can retain the use of `tag` for
+        the version part of the image name.
+
+        Returns all image refs to apply to the Docker image, on the form:
 
             [<registry>/]<repository-name>[:<tag>]
 
         Where the `<repository-name>` may have contain any number of separating slashes `/`,
-        depending on the `default_repository_name` from configuration or the `repository_name` field
+        depending on the `default_repository` from configuration or the `repository` field
         on the target `docker_image`.
+
+        This method will always return a non-empty tuple.
         """
         directory = path.basename(self.address.spec_path)
         parent_directory = path.basename(path.dirname(self.address.spec_path))
-        repository_name = self.repository.value or default_repository_name
+        repository_fmt = self.repository.value or default_repository
         try:
-            repository_name = repository_name.format(
+            repository = repository_fmt.format(
                 name=self.address.target_name,
                 directory=directory,
                 parent_directory=parent_directory,
             )
         except KeyError as e:
             if self.repository.value:
-                source = (
-                    "`repository_name` field of the `docker_image` target " f"at {self.address}"
-                )
+                source = "`repository` field of the `docker_image` target " f"at {self.address}"
             else:
-                source = "`[docker].default_repository_name` configuration option"
+                source = "`[docker].default_repository` configuration option"
 
             raise DockerRepositoryNameError(
-                f"Invalid value for the {source}: {repository_name!r}. Unknown key: {e}.\n\n"
+                f"Invalid value for the {source}: {repository_fmt!r}. Unknown key: {e}.\n\n"
                 f"You may only reference any of `name`, `directory` or `parent_directory`."
             ) from e
 
         try:
             image_names = tuple(
-                ":".join(s for s in [repository_name, tag] if s)
+                ":".join(s for s in [repository, tag] if s)
                 for tag in [
                     cast(str, self.version.value).format(**version_context),
                     *(self.tags.value or []),
@@ -140,6 +145,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
+            # The image name is also valid as image ref without registry.
             return image_names
 
         return tuple(
@@ -173,8 +179,8 @@ async def build_docker_image(
 
     version_context = context.version_context.merge({"build_args": build_args_context})
 
-    tags = field_set.image_tags(
-        default_repository_name=options.default_repository_name,
+    tags = field_set.image_refs(
+        default_repository=options.default_repository,
         registries=options.registries(),
         version_context=version_context,
     )

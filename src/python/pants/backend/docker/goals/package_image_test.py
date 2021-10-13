@@ -72,7 +72,7 @@ def assert_build(
     if options:
         opts = options or {}
         opts.setdefault("registries", {})
-        opts.setdefault("default_repository_name", "{directory}/{name}")
+        opts.setdefault("default_repository", "{directory}/{name}")
         opts.setdefault("build_args", [])
         opts.setdefault("env_vars", [])
 
@@ -124,7 +124,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="test1",
                   version="1.2.3",
-                  repository_name="{directory}/{name}",
+                  repository="{directory}/{name}",
                 )
                 docker_image(
                   name="test2",
@@ -133,12 +133,12 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="test3",
                   version="1.2.3",
-                  repository_name="{parent_directory}/{directory}/{name}",
+                  repository="{parent_directory}/{directory}/{name}",
                 )
                 docker_image(
                   name="test4",
                   version="1.2.3",
-                  repository_name="{directory}/four/test-four",
+                  repository="{directory}/four/test-four",
                 )
                 docker_image(
                   name="test5",
@@ -146,7 +146,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 )
                 docker_image(
                   name="err1",
-                  repository_name="{bad_template}",
+                  repository="{bad_template}",
                 )
                 """
             ),
@@ -183,11 +183,11 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             "  * test/test5:alpha-1.0\n"
             "  * test/test5:alpha-1"
         ),
-        options=dict(default_repository_name="{directory}/{name}"),
+        options=dict(default_repository="{directory}/{name}"),
     )
 
     err1 = (
-        r"Invalid value for the `repository_name` field of the `docker_image` target at "
+        r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\. Unknown key: 'bad_template'\.\n\n"
         r"You may only reference any of `name`, `directory` or `parent_directory`\."
     )
@@ -219,7 +219,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
     )
 
     options = {
-        "default_repository_name": "{name}",
+        "default_repository": "{name}",
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
@@ -300,7 +300,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
         fs = DockerFieldSet.create(tgt)
-        tags = fs.image_tags(
+        tags = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
             version_context,

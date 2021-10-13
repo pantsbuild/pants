@@ -46,25 +46,25 @@ class DockerOptions(Subsystem):
                 'or with an alias of `"default"`.'
             )
         )
-        default_repository_name_help = (
+        default_repository_help = (
             "Configure the default repository name used in the Docker image tag.\n\n"
             "The value is formatted and may reference these variables:\n\n"
             + bullet_list(["name", "directory", "parent_directory"])
             + "\n\n"
-            'Example: `--default-repository-name="{directory}/{name}"`.\n\n'
+            'Example: `--default-repository="{directory}/{name}"`.\n\n'
             "The `name` variable is the `docker_image`'s target name, `directory` and "
             "`parent_directory` are the name of the directory in which the BUILD file is for the "
             "target, and its parent directory respectively.\n\n"
-            "Use the `repository_name` field to set this value directly on a `docker_image` "
+            "Use the `repository` field to set this value directly on a `docker_image` "
             "target.\nAny registries or tags are added to the image name as required, and should "
             "not be part of the repository name."
         )
         super().register_options(register)
         register("--registries", type=dict, fromfile=True, help=registries_help)
         register(
-            "--default-repository-name",
+            "--default-repository",
             type=str,
-            help=default_repository_name_help,
+            help=default_repository_help,
             default="{name}",
         )
 
@@ -108,8 +108,8 @@ class DockerOptions(Subsystem):
         )
 
     @property
-    def default_repository_name(self) -> str:
-        return cast(str, self.options.default_repository_name)
+    def default_repository(self) -> str:
+        return cast(str, self.options.default_repository)
 
     @memoized_method
     def registries(self) -> DockerRegistries:

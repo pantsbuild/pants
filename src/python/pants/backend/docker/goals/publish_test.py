@@ -59,8 +59,8 @@ def build(tgt: DockerImage, options: DockerOptions):
             EMPTY_DIGEST,
             (
                 BuiltDockerImage.create(
-                    fs.image_tags(
-                        options.default_repository_name,
+                    fs.image_refs(
+                        options.default_repository,
                         options.registries(),
                         FrozenDict(),
                     ),
@@ -75,7 +75,7 @@ def run_publish(
 ) -> tuple[PublishProcesses, DockerBinary]:
     opts = options or {}
     opts.setdefault("registries", {})
-    opts.setdefault("default_repository_name", "{directory}/{name}")
+    opts.setdefault("default_repository", "{directory}/{name}")
     docker_options = create_subsystem(DockerOptions, **opts)
     tgt = cast(DockerImage, rule_runner.get_target(address))
     fs = PublishDockerImageFieldSet.create(tgt)
