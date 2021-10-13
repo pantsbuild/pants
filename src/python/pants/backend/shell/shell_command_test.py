@@ -358,9 +358,8 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         tgt = rule_runner.get_target(Address("src", target_name=target))
         run = RunShellCommand.create(tgt)
         request = rule_runner.request(RunRequest, [run])
-        assert request.args == args
+        assert args[0] in request.args[0]
+        assert request.args[1:] == args[1:]
 
-    assert_run_args("test", ("/bin/bash", "-c", "some cmd string"))
-    assert_run_args(
-        "cd-test", ("/bin/bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string")
-    )
+    assert_run_args("test", ("bash", "-c", "some cmd string"))
+    assert_run_args("cd-test", ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string"))
