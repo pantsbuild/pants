@@ -273,7 +273,7 @@ class ShellCommandSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
-class ShellCommandTimeout(IntField):
+class ShellCommandTimeoutField(IntField):
     alias = "timeout"
     default = 30
     help = "Command execution timeout (in seconds)."
@@ -305,6 +305,12 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
+class ShellCommandRunWorkdirField(StringField):
+    alias = "workdir"
+    default = "."
+    help = "Sets the current working directory of the command, relative to the project root."
+
+
 class ShellCommand(Target):
     alias = "experimental_shell_command"
     core_fields = (
@@ -314,7 +320,7 @@ class ShellCommand(Target):
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
         ShellCommandSourcesField,
-        ShellCommandTimeout,
+        ShellCommandTimeoutField,
         ShellCommandToolsField,
     )
     help = (
@@ -339,6 +345,37 @@ class ShellCommand(Target):
         "`python_tests` or `docker_image`. When relevant, Pants will run your `command` and "
         "insert the `outputs` into that consumer's context.\n\n"
         "The command may be retried and/or cancelled, so ensure that it is idempotent."
+    )
+
+
+class ShellCommandRun(Target):
+    alias = "experimental_run_shell_command"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ShellCommandCommandField,
+        ShellCommandRunWorkdirField,
+    )
+    help = (
+        "Run any tool in the workspace, with all dependencies packaged/copied into a CHROOT.\n"
+        + dedent(
+            """\
+
+            Example BUILD file:
+
+                experimental_run_shell_command(
+                  command="./scripts/my-script.sh --data-files-dir={chroot}",
+                  dependencies=["src/project/files:data"],
+                )
+
+            """
+        )
+        + "The `command` may use either `{chroot}` on the command line, or the `$CHROOT` "
+        "environment variable to get the root directory for where any dependencies are located.\n\n"
+        "In contrast to the `experimental_shell_command`, in addition to `workdir` you only have "
+        "the `command` and `dependencies` fields as the `tools` you are going to use are already "
+        "on the PATH which is inherited from the Pants environment. Also, the `outputs` does not "
+        "apply, as any output files produced will end up directly in your project tree."
     )
 
 

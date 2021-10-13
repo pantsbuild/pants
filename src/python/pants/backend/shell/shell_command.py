@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent
@@ -14,8 +15,9 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
+    ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
-    ShellCommandTimeout,
+    ShellCommandTimeoutField,
     ShellCommandToolsField,
 )
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
@@ -65,11 +67,14 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 @dataclass(frozen=True)
 class ShellCommandProcessRequest(WrappedTarget):
-    interactive: bool = False
+    pass
 
 
 class RunShellCommand(RunFieldSet):
-    required_fields = (ShellCommandCommandField,)
+    required_fields = (
+        ShellCommandCommandField,
+        ShellCommandRunWorkdirField,
+    )
 
 
 @rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
@@ -95,18 +100,22 @@ async def prepare_shell_command_process(
     request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
 ) -> Process:
     shell_command = request.target
-    working_directory = shell_command.address.spec_path
+    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
+    if interactive:
+        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
+    else:
+        working_directory = shell_command.address.spec_path
     command = shell_command[ShellCommandCommandField].value
-    timeout = shell_command[ShellCommandTimeout].value
-    tools = shell_command[ShellCommandToolsField].value
-    outputs = shell_command[ShellCommandOutputsField].value or ()
+    timeout = shell_command.get(ShellCommandTimeoutField).value
+    tools = shell_command.get(ShellCommandToolsField).value
+    outputs = shell_command.get(ShellCommandOutputsField).value or ()
 
     if not command:
         raise ValueError(
             f"Missing `command` line in `shell_command` target {shell_command.address}."
         )
 
-    if request.interactive:
+    if interactive:
         command_env = {
             "CHROOT": "{chroot}",
         }
@@ -167,7 +176,7 @@ async def prepare_shell_command_process(
         Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
     )
 
-    if request.interactive or working_directory in sources.snapshot.dirs:
+    if interactive or not working_directory or working_directory in sources.snapshot.dirs:
         work_dir = EMPTY_DIGEST
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
@@ -179,12 +188,15 @@ async def prepare_shell_command_process(
     output_files = [f for f in outputs if not f.endswith("/")]
     output_directories = [d for d in outputs if d.endswith("/")]
 
-    if request.interactive:
-        setup_tool_symlinks_script = ""
+    if interactive:
+        relpath = os.path.relpath(
+            working_directory or ".", start="/" if os.path.isabs(working_directory) else "."
+        )
+        boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
     else:
         # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
         bin_relpath = ".bin"
-        setup_tool_symlinks_script = ";".join(
+        boot_script = ";".join(
             dedent(
                 f"""\
                 $mkdir -p {bin_relpath}
@@ -195,8 +207,8 @@ async def prepare_shell_command_process(
         )
 
     return Process(
-        argv=(bash.path, "-c", setup_tool_symlinks_script + command),
-        description=f"Running experimental_shell_command {shell_command.address}",
+        argv=(bash.path, "-c", boot_script + command),
+        description=f"Running {shell_command.alias} {shell_command.address}",
         env=command_env,
         input_digest=input_digest,
         output_directories=output_directories,
@@ -209,7 +221,7 @@ async def prepare_shell_command_process(
 @rule
 async def run_shell_command_request(shell_command: RunShellCommand) -> RunRequest:
     wrapped_tgt = await Get(WrappedTarget, Address, shell_command.address)
-    process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target, interactive=True))
+    process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
     return RunRequest(
         digest=process.input_digest,
         args=process.argv,

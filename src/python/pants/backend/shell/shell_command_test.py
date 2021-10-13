@@ -10,7 +10,11 @@ import pytest
 
 from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest, RunShellCommand
 from pants.backend.shell.shell_command import rules as shell_command_rules
-from pants.backend.shell.target_types import ShellCommand, ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import (
+    ShellCommand,
+    ShellCommandRun,
+    ShellSourcesGeneratorTarget,
+)
 from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
@@ -43,6 +47,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             ShellCommand,
+            ShellCommandRun,
             ShellSourcesGeneratorTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
@@ -334,16 +339,28 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                experimental_run_shell_command(
                   name="test",
                   command="some cmd string",
+                )
+
+                experimental_run_shell_command(
+                  name="cd-test",
+                  command="some cmd string",
+                  workdir="src/with space'n quote",
                 )
                 """
             ),
         }
     )
 
-    tgt = rule_runner.get_target(Address("src", target_name="test"))
-    run = RunShellCommand.create(tgt)
-    request = rule_runner.request(RunRequest, [run])
-    assert request.args == ("/bin/bash", "-c", "some cmd string")
+    def assert_run_args(target: str, args: tuple[str, ...]) -> None:
+        tgt = rule_runner.get_target(Address("src", target_name=target))
+        run = RunShellCommand.create(tgt)
+        request = rule_runner.request(RunRequest, [run])
+        assert request.args == args
+
+    assert_run_args("test", ("/bin/bash", "-c", "some cmd string"))
+    assert_run_args(
+        "cd-test", ("/bin/bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string")
+    )

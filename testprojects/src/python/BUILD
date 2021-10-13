@@ -51,8 +51,8 @@ files(
   sources = ['sources/**/*'],
 )
 
-experimental_shell_command(
+experimental_run_shell_command(
     name="cmd",
-    command='{{ tree {chroot}; echo "in: {chroot}"; }} | tee output.log',
+    command='{{ tree {chroot}; echo "in: $CHROOT"; }} | tee output.log',
     dependencies=[":hello_directory"],
 )
