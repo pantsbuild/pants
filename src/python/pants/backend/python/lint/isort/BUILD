@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resources(name="lockfile", sources=["lockfile.txt"])
+resource(name="lockfile", source="lockfile.txt")
 
 python_tests(
     name="rules_integration_test",

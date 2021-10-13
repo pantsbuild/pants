@@ -16,7 +16,7 @@ python_sources(
   dependencies=[":dockerfile_tool", ":lockfile"],
 )
 
-resources(name="lockfile", sources=["dockerfile_lockfile.txt"])
+resource(name="lockfile", source="dockerfile_lockfile.txt")
 
 python_sources(
   name="dockerfile_tool",
