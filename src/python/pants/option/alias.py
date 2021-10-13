@@ -11,6 +11,7 @@ from itertools import chain
 from typing import Generator
 
 from pants.option.errors import OptionsError
+from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
@@ -90,6 +91,15 @@ class CliAlias:
                 }
             )
         )
+
+    def check_name_conflicts(self, known_scopes: dict[str, ScopeInfo]) -> None:
+        for alias in self.definitions.keys():
+            scope = known_scopes.get(alias)
+            if scope:
+                raise CliAliasInvalidError(
+                    f"Invalid alias: {alias!r}. This is already a registered "
+                    + ("goal." if scope.is_goal else "subsystem.")
+                )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
         if not self.definitions:

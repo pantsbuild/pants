@@ -35,6 +35,7 @@ class OptionsBootstrapper:
     bootstrap_args: tuple[str, ...]
     args: tuple[str, ...]
     config: Config
+    alias: CliAlias
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
@@ -165,7 +166,11 @@ class OptionsBootstrapper:
             bargs = cls._get_bootstrap_args(args)
 
             return cls(
-                env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
+                env_tuples=env_tuples,
+                bootstrap_args=bargs,
+                args=args,
+                config=post_bootstrap_config,
+                alias=alias,
             )
 
     @classmethod
@@ -273,4 +278,5 @@ class OptionsBootstrapper:
             known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options
         )
         GlobalOptions.validate_instance(options.for_global_scope())
+        self.alias.check_name_conflicts(options.known_scope_to_info)
         return options

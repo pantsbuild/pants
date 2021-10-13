@@ -8,6 +8,7 @@ from typing import ContextManager
 import pytest
 
 from pants.option.alias import CliAlias, CliAliasCycleError, CliAliasInvalidError
+from pants.option.scope import ScopeInfo
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 
@@ -130,5 +131,13 @@ def test_nested_alias(alias, definitions: dict | ContextManager) -> None:
     ],
 )
 def test_invalid_alias_name(alias: str) -> None:
-    with pytest.raises(CliAliasInvalidError):
+    with pytest.raises(CliAliasInvalidError, match=f"Invalid alias: {alias!r}\\."):
         CliAlias.from_dict({alias: ""})
+
+
+def test_banned_alias_names() -> None:
+    cli_alias = CliAlias.from_dict({"fmt": "--cleverness format"})
+    with pytest.raises(
+        CliAliasInvalidError, match=r"Invalid alias: 'fmt'\. This is already a registered goal\."
+    ):
+        cli_alias.check_name_conflicts({"fmt": ScopeInfo("fmt", is_goal=True)})
