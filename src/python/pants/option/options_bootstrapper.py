@@ -161,6 +161,8 @@ class OptionsBootstrapper:
 
             # Finally, we expand any aliases and re-populates the bootstrap args, in case there was
             # any from an alias.
+            # stuhood: This could potentially break the rust client when aliases are used:
+            # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
             alias = CliAlias.from_dict(post_bootstrap_config.get("cli", "alias", dict, {}))
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
@@ -175,24 +177,14 @@ class OptionsBootstrapper:
 
     @classmethod
     def _get_bootstrap_args(cls, args: Sequence[str]) -> tuple[str, ...]:
-        flags = set()
-        short_flags = set()
-
-        def capture_the_flags(*args: str, **kwargs) -> None:
-            for arg in args:
-                flags.add(arg)
-                if len(arg) == 2:
-                    short_flags.add(arg)
-                elif kwargs.get("type") == bool:
-                    flags.add(f"--no-{arg[2:]}")
-
-        GlobalOptions.register_bootstrap_options(capture_the_flags)
+        # TODO(13244): there is a typing issue with `memoized_classmethod`.
+        options = GlobalOptions.get_options_flags()  # type: ignore[call-arg]
 
         def is_bootstrap_option(arg: str) -> bool:
             components = arg.split("=", 1)
-            if components[0] in flags:
+            if components[0] in options.flags:
                 return True
-            for flag in short_flags:
+            for flag in options.short_flags:
                 if arg.startswith(flag):
                     return True
             return False

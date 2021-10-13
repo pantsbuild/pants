@@ -48,8 +48,8 @@ class CliOptions(Subsystem):
                 "\n"
                 "This would allow you to run `./pants green all-changed`, which is shorthand for "
                 "`./pants fmt lint check --changed-since=HEAD --changed-dependees=transitive`.\n\n"
-                "Notice: this option must be placed in a config file (e.g. `pants.toml`) to have "
-                "any effect."
+                "Notice: this option must be placed in a config file (e.g. `pants.toml` or "
+                "`pantsrc`) to have any effect."
             ),
         )
 
