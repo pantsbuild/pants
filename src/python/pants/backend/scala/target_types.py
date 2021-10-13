@@ -9,7 +9,8 @@ from pants.engine.target import (
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Sources,
+    MultipleSourcesField,
+    SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
@@ -18,12 +19,11 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 
 
-class ScalaSourceField(Sources):
+class ScalaSourceField(SingleSourceField):
     expected_file_extensions = (".scala",)
-    expected_num_files = 1
 
 
-class ScalaGeneratorSources(Sources):
+class ScalaGeneratorSources(MultipleSourcesField):
     expected_file_extensions = (".scala",)
 
 
@@ -85,6 +85,7 @@ async def generate_targets_from_scala_junit_tests(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=True,
+        use_source_field=True,
     )
 
 
@@ -139,6 +140,7 @@ async def generate_targets_from_scala_sources(
         paths.files,
         union_membership,
         add_dependencies_on_all_siblings=True,
+        use_source_field=True,
     )
 
 
