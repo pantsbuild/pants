@@ -132,6 +132,10 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     ]
+    assert analysis.consumed_unqualified_types == [
+        "some.other.Thing",
+        "Date",
+    ]
 
 
 @maybe_skip_jdk_test
@@ -242,3 +246,4 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     assert analysis.declared_package == ""
     assert analysis.imports == []
     assert analysis.top_level_types == ["SimpleSource", "Foo"]
+    assert analysis.consumed_unqualified_types == []
