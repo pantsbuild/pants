@@ -51,7 +51,7 @@ def assert_imports_parsed(
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.write_files(
         {
-            "BUILD": f"python_sources(name='t', source={repr(filename)})",
+            "BUILD": f"python_source(name='t', source={repr(filename)})",
             filename: content,
         }
     )

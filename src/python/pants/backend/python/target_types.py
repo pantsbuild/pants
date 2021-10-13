@@ -620,7 +620,7 @@ _PYTHON_TEST_COMMON_FIELDS = (
 
 
 class PythonTestTarget(Target):
-    alias = "python_tests"  # TODO: rename to `python_test`
+    alias = "python_test"
     core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestSourceField)
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
@@ -645,11 +645,7 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
 class PythonTestsGeneratorTarget(Target):
     alias = "python_tests"
     core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestsGeneratingSourcesField)
-    help = (
-        "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
-        "other than `conftest.py`, should go into a dedicated `python_sources()` target and then "
-        f"be included in the `dependencies` field.\n\nSee {doc_url('python-test-goal')}."
-    )
+    help = "Generate a `python_test` target for each file in the `sources` field."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -658,7 +654,7 @@ class PythonTestsGeneratorTarget(Target):
 
 
 class PythonSourceTarget(Target):
-    alias = "python_sources"  # TODO: rename to `python_source`
+    alias = "python_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
@@ -682,11 +678,7 @@ class PythonSourcesGeneratorTarget(Target):
         Dependencies,
         PythonSourcesGeneratingSourcesField,
     )
-    help = (
-        "Python source code.\n\nA `python_sources` does not necessarily correspond to a "
-        "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
-        "`python_sources` targets may be packaged into a distribution or binary."
-    )
+    help = "Generate a `python_source` target for each file in the `sources` field."
 
     deprecated_alias = "python_library"
     deprecated_alias_removal_version = "2.9.0.dev0"

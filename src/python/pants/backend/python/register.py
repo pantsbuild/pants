@@ -30,7 +30,9 @@ from pants.backend.python.target_types import (
     PythonRequirementsFile,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     PythonTestsGeneratorTarget,
+    PythonTestTarget,
 )
 from pants.backend.python.util_rules import (
     ancestor_files,
@@ -86,8 +88,10 @@ def target_types():
     return [
         PexBinary,
         PythonDistribution,
+        PythonSourceTarget,
         PythonSourcesGeneratorTarget,
         PythonRequirementTarget,
         PythonRequirementsFile,
+        PythonTestTarget,
         PythonTestsGeneratorTarget,
     ]
