@@ -46,28 +46,26 @@ class DockerOptions(Subsystem):
                 'or with an alias of `"default"`.'
             )
         )
-        image_name_default = "{repository}/{name}"
-        image_name_help = (
-            "Configure the default template used to construct the final Docker image name.\n\n"
-            "The template is a format string that may use these variables:\n\n"
-            + bullet_list(["name", "repository", "sub_repository"])
+        default_repository_help = (
+            "Configure the default repository name used in the Docker image tag.\n\n"
+            "The value is formatted and may reference these variables:\n\n"
+            + bullet_list(["name", "directory", "parent_directory"])
             + "\n\n"
-            "The `name` is the value of the `docker_image(image_name)` field, which defaults to "
-            "the target name, and the `repository` is the `docker_image(repository)` field, which "
-            "defaults to the name of the directory in which the BUILD file is for the target, and "
-            "finally the `sub_repository` is like that of repository but including the parent "
-            "directory as well.\n\n"
-            "Use the `docker_image(image_name_template)` field to override this default template.\n"
-            "Any registries or tags are added to the image name as required, and should not be "
-            "part of the name template."
+            'Example: `--default-repository="{directory}/{name}"`.\n\n'
+            "The `name` variable is the `docker_image`'s target name, `directory` and "
+            "`parent_directory` are the name of the directory in which the BUILD file is for the "
+            "target, and its parent directory respectively.\n\n"
+            "Use the `repository` field to set this value directly on a `docker_image` "
+            "target.\nAny registries or tags are added to the image name as required, and should "
+            "not be part of the repository name."
         )
         super().register_options(register)
         register("--registries", type=dict, fromfile=True, help=registries_help)
         register(
-            "--default-image-name-template",
+            "--default-repository",
             type=str,
-            help=image_name_help,
-            default=image_name_default,
+            help=default_repository_help,
+            default="{name}",
         )
 
         register(
@@ -110,8 +108,8 @@ class DockerOptions(Subsystem):
         )
 
     @property
-    def default_image_name_template(self) -> str:
-        return cast(str, self.options.default_image_name_template)
+    def default_repository(self) -> str:
+        return cast(str, self.options.default_repository)
 
     @memoized_method
     def registries(self) -> DockerRegistries:
