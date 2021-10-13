@@ -67,7 +67,7 @@ class FilesGeneratingSourcesField(MultipleSourcesField):
 class FilesGeneratorTarget(Target):
     alias = "files"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesGeneratingSourcesField)
-    help = "Generates a `file` target for each file in the `sources` field."
+    help = "Generate a `file` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromFiles(GenerateTargetsRequest):
@@ -244,7 +244,7 @@ class ResourcesGeneratingSourcesField(MultipleSourcesField):
 class ResourcesGeneratorTarget(Target):
     alias = "resources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesGeneratingSourcesField)
-    help = "Generates `resource` targets based on the `sources` field."
+    help = "Generate a `resource` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromResources(GenerateTargetsRequest):
