@@ -5,13 +5,21 @@ from pants.backend.shell import dependency_inference, shell_command, shunit2_tes
 from pants.backend.shell.target_types import (
     ShellCommand,
     ShellSourcesGeneratorTarget,
+    ShellSourceTarget,
     Shunit2TestsGeneratorTarget,
+    Shunit2TestTarget,
 )
 from pants.backend.shell.target_types import rules as target_types_rules
 
 
 def target_types():
-    return [ShellCommand, ShellSourcesGeneratorTarget, Shunit2TestsGeneratorTarget]
+    return [
+        ShellCommand,
+        ShellSourcesGeneratorTarget,
+        Shunit2TestsGeneratorTarget,
+        ShellSourceTarget,
+        Shunit2TestTarget,
+    ]
 
 
 def rules():
