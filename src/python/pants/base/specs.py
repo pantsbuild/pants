@@ -60,7 +60,11 @@ class AddressLiteralSpec(AddressSpec):
         return self.target_component is None and self.generated_component is None
 
 
+@dataclass(frozen=True)  # type: ignore[misc]
 class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
+
+    directory: str
+
     @abstractmethod
     def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
         """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
@@ -92,14 +96,11 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
         )
 
 
-@dataclass(frozen=True)
 class MaybeEmptySiblingAddresses(AddressGlobSpec):
     """An AddressSpec representing all addresses located directly within the given directory.
 
     It is not an error if there are no such addresses.
     """
-
-    directory: str
 
     def __str__(self) -> str:
         return f"{self.directory}:"
@@ -114,7 +115,6 @@ class MaybeEmptySiblingAddresses(AddressGlobSpec):
         return (maybe_af,) if maybe_af is not None else ()
 
 
-@dataclass(frozen=True)
 class SiblingAddresses(MaybeEmptySiblingAddresses):
     """An AddressSpec representing all addresses located directly within the given directory.
 
@@ -141,14 +141,11 @@ class SiblingAddresses(MaybeEmptySiblingAddresses):
         return matching
 
 
-@dataclass(frozen=True)
 class MaybeEmptyDescendantAddresses(AddressGlobSpec):
     """An AddressSpec representing all addresses located recursively under the given directory.
 
     It is not an error if there are no such addresses.
     """
-
-    directory: str
 
     def __str__(self) -> str:
         return f"{self.directory}::"
@@ -181,12 +178,9 @@ class DescendantAddresses(MaybeEmptyDescendantAddresses):
         return matching
 
 
-@dataclass(frozen=True)
 class AscendantAddresses(AddressGlobSpec):
     """An AddressSpec representing all addresses located recursively in and above the given
     directory."""
-
-    directory: str
 
     def __str__(self) -> str:
         return f"{self.directory}^"

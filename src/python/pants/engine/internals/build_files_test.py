@@ -285,21 +285,21 @@ def resolve_address_specs(
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
     address_specs_rule_runner.write_files(
-        {"demo/f.txt": "", "demo/BUILD": "mock_tgt(sources=['f.txt'])"}
+        {"demo/f.txt": "", "demo/BUILD": "generator(sources=['f.txt'])"}
     )
     specs = [
         AddressLiteralSpec("demo"),
         SiblingAddresses("demo"),
         DescendantAddresses("demo"),
         AscendantAddresses("demo"),
-        # We also include a generated target and file address to ensure that that is included in
-        # the result.
-        AddressLiteralSpec("demo", None, "gen"),
+        # We also include targets generated from `demo` to ensure that the final result has both
+        # the generator and its generated targets.
+        AddressLiteralSpec("demo", None, "f.txt"),
         AddressLiteralSpec("demo/f.txt"),
     ]
     assert resolve_address_specs(address_specs_rule_runner, specs) == {
         Address("demo"),
-        Address("demo", generated_name="gen"),
+        Address("demo", generated_name="f.txt"),
         Address("demo", relative_file_path="f.txt"),
     }
 
@@ -351,8 +351,8 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                mock_tgt(name="exclude_me", sources=["f.txt"])
-                mock_tgt(name="not_me", sources=["f.txt"])
+                generator(name="exclude_me", sources=["f.txt"])
+                generator(name="not_me", sources=["f.txt"])
                 """
             ),
         }

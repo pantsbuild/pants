@@ -14,7 +14,7 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpec
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -162,29 +162,19 @@ async def addresses_from_address_specs(
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
 
-    # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be generated
-    # addresses. This will raise an exception if any of the addresses are not valid.
-    literal_addresses = await MultiGet(
+    # Resolve all `AddressLiteralSpec`s. Will error on invalid addresses.
+    literal_wrapped_targets = await MultiGet(
         Get(
-            Address,
+            WrappedTarget,
             AddressInput(spec.path_component, spec.target_component, spec.generated_component),
         )
         for spec in address_specs.literals
     )
-    literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_target_generator())
-        for addr in literal_addresses
+    matched_addresses.update(
+        wrapped_tgt.target.address
+        for wrapped_tgt in literal_wrapped_targets
+        if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
     )
-    # We convert to targets for the side effect of validating that any generated targets actually
-    # belong to their target generator.
-    await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_generated_target)
-    )
-    for literal_spec, addr, target_adaptor in zip(
-        address_specs.literals, literal_addresses, literal_target_adaptors
-    ):
-        if filtering_disabled or specs_filter.matches(addr, target_adaptor):
-            matched_addresses.add(addr)
 
     # Then, convert all `AddressGlobSpecs`. Resolve all BUILD files covered by the specs, then
     # group by directory.
@@ -208,7 +198,7 @@ async def addresses_from_address_specs(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
             # TODO(#11123): handle the edge case if a generated target's `tags` != its generator's.
-            if filtering_disabled or specs_filter.matches(addr, tgt)
+            if filtering_disabled or specs_filter.matches_tgt_adaptor(addr, tgt)
         )
 
     return Addresses(sorted(matched_addresses))

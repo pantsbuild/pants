@@ -11,6 +11,7 @@ from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import Tags, Target
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -177,6 +178,16 @@ class AddressSpecsFilter:
 
     @memoized_property
     def _tag_filter(self):
+        def filter_for_tag(tag: str) -> Callable[[Target], bool]:
+            def filter_target(tgt: Target) -> bool:
+                return tag in (tgt.get(Tags).value or [])
+
+            return filter_target
+
+        return and_filters(create_filters(self.tags, filter_for_tag))
+
+    @memoized_property
+    def _tag_filter_adaptor(self):
         def filter_for_tag(tag: str) -> Callable[[TargetAdaptor], bool]:
             def filter_target(tgt: TargetAdaptor) -> bool:
                 # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
@@ -188,7 +199,12 @@ class AddressSpecsFilter:
 
         return and_filters(create_filters(self.tags, filter_for_tag))
 
-    def matches(self, address: Address, target: TargetAdaptor) -> bool:
-        """Check that the target matches the provided `--tags` and `--exclude-target-regexp`
+    def matches(self, target: Target) -> bool:
+        """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return self._tag_filter(target) and not self._is_excluded_by_pattern(address)
+        return self._tag_filter(target) and not self._is_excluded_by_pattern(target.address)
+
+    def matches_tgt_adaptor(self, address: Address, target: TargetAdaptor) -> bool:
+        """Check that the target adaptor matches the provided `--tag` and `--exclude-target-regexp`
+        options."""
+        return self._tag_filter_adaptor(target) and not self._is_excluded_by_pattern(address)
