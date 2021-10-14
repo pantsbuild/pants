@@ -601,14 +601,14 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         template = dedent(
             """
             python_sources(
-              name = 'A',
-              source = 'A.py',
+              name='A',
+              sources='A.py',
               {a_deps}
             )
 
             python_sources(
-              name = 'B',
-              source = 'B.py',
+              name='B',
+              sources='B.py',
               {b_deps}
             )
             """
