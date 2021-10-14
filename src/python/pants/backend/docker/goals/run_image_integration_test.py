@@ -35,5 +35,6 @@ def test_docker_run() -> None:
         "{tmpdir}:run-image",
     )
 
+    print("pants stderr\n", result.stderr)
     assert "Hello from Docker image\n" == result.stdout
     result.assert_success()
