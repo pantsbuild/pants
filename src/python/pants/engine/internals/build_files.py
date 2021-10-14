@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+import itertools
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Dict
+from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs
@@ -17,7 +18,7 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpec
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import UnexpandedTargets, WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -211,28 +212,27 @@ async def addresses_from_address_specs(
     )
     dirnames = {os.path.dirname(f) for f in build_file_paths.files}
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
+    candidate_addresses = Addresses(
+        itertools.chain.from_iterable(
+            address_family.addresses_to_target_adaptors for address_family in address_families
+        )
+    )
 
-    residence_dir_to_addresses_and_target_adaptors: DefaultDict[
-        str, list[tuple[Address, TargetAdaptor]]
-    ] = defaultdict(list)
-    for address_family in address_families:
-        for address, target_adaptor in address_family.addresses_to_target_adaptors.items():
-            residence_dir_to_addresses_and_target_adaptors[address.spec_path].append(
-                (address, target_adaptor)
-            )
+    targets = await Get(UnexpandedTargets, Addresses, candidate_addresses)
+    residence_dir_to_targets = defaultdict(list)
+    for tgt in targets:
+        residence_dir_to_targets[tgt.address.spec_path].append(tgt)
 
     matched_globs = set()
     for glob_spec in address_specs.globs:
-        for residence_dir in residence_dir_to_addresses_and_target_adaptors:
+        for residence_dir in residence_dir_to_targets:
             if not glob_spec.matches(residence_dir):
                 continue
             matched_globs.add(glob_spec)
             matched_addresses.update(
-                address_and_tgt_adaptor[0]
-                for address_and_tgt_adaptor in residence_dir_to_addresses_and_target_adaptors[
-                    residence_dir
-                ]
-                if filtering_disabled or specs_filter.matches_tgt_adaptor(*address_and_tgt_adaptor)
+                tgt.address
+                for tgt in residence_dir_to_targets[residence_dir]
+                if filtering_disabled or specs_filter.matches(tgt)
             )
 
     unmatched_globs = [
