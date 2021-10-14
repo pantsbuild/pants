@@ -24,6 +24,7 @@ from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAd
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BuildFileOptions,
     evaluate_preludes,
     parse_address_family,
 )
@@ -43,8 +44,6 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
-from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -55,7 +54,7 @@ def test_parse_address_family_empty() -> None:
         parse_address_family,
         rule_args=[
             Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases()),
-            create_subsystem(GlobalOptions, build_patterns=["BUILD"], build_ignore=[]),
+            BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),
         ],
@@ -73,7 +72,7 @@ def test_parse_address_family_empty() -> None:
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
+        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,

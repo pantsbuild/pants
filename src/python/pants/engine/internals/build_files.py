@@ -25,8 +25,8 @@ from pants.util.ordered_set import OrderedSet
 @dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
-    ignores: tuple[str, ...]
-    prelude_globs: tuple[str, ...]
+    ignores: tuple[str, ...] = ()
+    prelude_globs: tuple[str, ...] = ()
 
 
 @rule
