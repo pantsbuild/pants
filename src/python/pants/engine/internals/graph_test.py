@@ -42,6 +42,8 @@ from pants.engine.internals.graph import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
     AsyncFieldMixin,
     CoarsenedTargets,
     Dependencies,
@@ -132,6 +134,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
         rules=[
             generate_mock_generated_target,
             UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
+            QueryRule(AllTargets, [AllTargetsRequest]),
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -527,7 +530,6 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
         TransitiveTargets,
         [TransitiveTargetsRequest([Address("", target_name="t1")])],
     )
-    print(result)
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", target_name="t1")
     assert {tgt.address for tgt in result.dependencies} == {
@@ -578,6 +580,38 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
         {MultipleSourcesField.alias: ["f1.txt"]},
         non_generator_file_address.maybe_convert_to_target_generator(),
     )
+
+
+def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "f1.txt": "",
+            "f2.txt": "",
+            "f3.txt": "",
+            "no_owner.txt": "",
+            "BUILD": dedent(
+                """\
+                generator(name='generator', sources=['f1.txt', 'f2.txt'])
+                target(name='non-generator', sources=['f1.txt'])
+                """
+            ),
+            "dir/BUILD": "target()",
+        }
+    )
+    all_tgts = transitive_targets_rule_runner.request(AllTargets, [AllTargetsRequest()])
+    expected = {
+        Address("", target_name="generator", relative_file_path="f1.txt"),
+        Address("", target_name="generator", relative_file_path="f2.txt"),
+        Address("", target_name="non-generator"),
+        Address("dir"),
+    }
+    assert {t.address for t in all_tgts} == expected
+
+    pytest.xfail("The singleton rule is being evaluated, rather than the one with the param")
+    with_generators = transitive_targets_rule_runner.request(  # type: ignore[unreachable]
+        AllTargets, [AllTargetsRequest(include_target_generators=True)]
+    )
+    assert {t.address for t in with_generators} == {*expected, Address("", target_name="generator")}
 
 
 def test_resolve_specs_snapshot() -> None:

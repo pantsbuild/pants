@@ -9,10 +9,9 @@ from dataclasses import dataclass
 from pants.backend.java.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets
+from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.logging import LogLevel
 
@@ -22,6 +21,17 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # First-party package mapping
 # -----------------------------------------------------------------------------------------------
+
+
+# TODO: add third-party targets here? That would allow us to avoid iterating over AllTargets twice.
+#  See `backend/python/dependency_inference/module_mapper.py` for an example.
+class AllJavaTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Java targets in project", level=LogLevel.DEBUG)
+def find_all_java_targets(tgts: AllTargets) -> AllJavaTargets:
+    return AllJavaTargets(tgt for tgt in tgts if tgt.has_field(JavaSourceField))
 
 
 @dataclass(frozen=True)
@@ -76,12 +86,10 @@ class FirstPartyJavaTargetsMappingMarker(FirstPartyJavaMappingImplMarker):
     pass
 
 
-@rule(desc="Creating map of first party Java targets to Java packages", level=LogLevel.DEBUG)
+@rule(desc="Map all first party Java targets to their packages", level=LogLevel.DEBUG)
 async def map_first_party_java_targets_to_symbols(
-    _: FirstPartyJavaTargetsMappingMarker,
+    _: FirstPartyJavaTargetsMappingMarker, java_targets: AllJavaTargets
 ) -> FirstPartyJavaMappingImpl:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    java_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(JavaSourceField))
     source_files = await MultiGet(
         Get(SourceFiles, SourceFilesRequest([target[JavaSourceField]])) for target in java_targets
     )

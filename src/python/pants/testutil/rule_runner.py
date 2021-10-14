@@ -33,7 +33,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import AllTargets, Target, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
@@ -198,6 +198,7 @@ class RuleRunner:
             *(rules or ()),
             *source_root.rules(),
             QueryRule(WrappedTarget, [Address]),
+            QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()

@@ -9,17 +9,15 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
-from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.target import AllTargets
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Targets, (Specs,))],
         target_types=[PythonRequirementTarget, PythonRequirementsFile],
         context_aware_object_factories={"python_requirements": PythonRequirements},
     )
@@ -35,10 +33,7 @@ def assert_python_requirements(
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
-    targets = rule_runner.request(
-        Targets,
-        [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
-    )
+    targets = rule_runner.request(AllTargets, [])
     assert {expected_file_dep, *expected_targets} == set(targets)
 
 

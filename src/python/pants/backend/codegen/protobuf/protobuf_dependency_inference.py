@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
-from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestContents
@@ -24,7 +23,6 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     SourcesPathsRequest,
-    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -42,9 +40,7 @@ class ProtobufMapping:
 
 
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
-async def map_protobuf_files() -> ProtobufMapping:
-    targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    protobuf_targets = tuple(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
+async def map_protobuf_files(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
         for tgt in protobuf_targets

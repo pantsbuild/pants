@@ -24,11 +24,16 @@ from pants.backend.python.target_types import (
     format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
@@ -240,7 +245,7 @@ async def setup_pytest_lockfile(
     # (which will AND across each target in the closure). Then, it ORs all unique resulting
     # interpreter constraints. The net effect is that every possible Python interpreter used will
     # be covered.
-    all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
     transitive_targets_per_test = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in all_tgts

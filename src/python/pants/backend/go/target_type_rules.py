@@ -35,12 +35,13 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgInfoRequest,
 )
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs, AscendantAddresses, DescendantAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    AllTargets,
     GeneratedTargets,
     GenerateTargetsRequest,
     InferDependenciesRequest,
@@ -60,19 +61,24 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-# TODO: Figure out how to merge (or not) this with ResolvedImportPaths as a base class.
+class AllGoTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Go targets in project", level=LogLevel.DEBUG)
+def find_all_go_targets(tgts: AllTargets) -> AllGoTargets:
+    return AllGoTargets(t for t in tgts if t.has_field(GoImportPathField))
+
+
 @dataclass(frozen=True)
 class ImportPathToPackages:
     mapping: FrozenDict[str, tuple[Address, ...]]
 
 
-@rule
-async def map_import_paths_to_packages() -> ImportPathToPackages:
+@rule(desc="Map all Go targets to their import paths", level=LogLevel.DEBUG)
+async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPackages:
     mapping: dict[str, list[Address]] = defaultdict(list)
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    for tgt in all_targets:
-        if not tgt.has_field(GoImportPathField):
-            continue
+    for tgt in go_tgts:
         import_path = tgt[GoImportPathField].value
         mapping[import_path].append(tgt.address)
     frozen_mapping = FrozenDict({ip: tuple(tgts) for ip, tgts in mapping.items()})

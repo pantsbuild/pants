@@ -13,7 +13,6 @@ from typing import DefaultDict
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import ShellSourceField
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -22,6 +21,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    AllTargets,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -42,6 +42,15 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+class AllShellTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Shell targets in project", level=LogLevel.DEBUG)
+def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
+    return AllShellTargets(tgt for tgt in all_tgts if tgt.has_field(ShellSourceField))
+
+
 @dataclass(frozen=True)
 class ShellMapping:
     """A mapping of Shell file names to their owning file address."""
@@ -51,16 +60,14 @@ class ShellMapping:
 
 
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
-async def map_shell_files() -> ShellMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    shell_tgts = tuple(tgt for tgt in all_targets if tgt.has_field(ShellSourceField))
+async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     sources_per_target = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourceField])) for tgt in shell_tgts
+        Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourceField])) for tgt in tgts
     )
 
     files_to_addresses: dict[str, Address] = {}
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
-    for tgt, sources in zip(shell_tgts, sources_per_target):
+    for tgt, sources in zip(tgts, sources_per_target):
         for f in sources.files:
             if f in files_to_addresses:
                 files_with_multiple_owners[f].update({files_to_addresses[f], tgt.address})
