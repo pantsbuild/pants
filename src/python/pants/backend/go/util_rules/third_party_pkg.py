@@ -274,7 +274,7 @@ async def compute_third_party_module_metadata(
             command=("list", "-mod=readonly", "-json", "./..."),
             env={"GOPROXY": "off"},
             description=(
-                "Determine metadata for Go third-party module"
+                "Determine metadata for Go third-party module "
                 f"{request.module_path}@{request.version}"
             ),
         ),
