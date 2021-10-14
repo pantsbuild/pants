@@ -7,6 +7,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,8 +16,8 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"strconv"
 	"strings"
+	"text/template"
 	"unicode"
 	"unicode/utf8"
 )
@@ -53,9 +54,8 @@ type Example struct {
 	Unordered bool   `json:"unordered"`
 }
 
-// TestSourcesMetadata contains metadata about tests/benchmarks extracted from the parsed sources.
-// TODO: "Examples" and "fuzz targets" (Go 1.18+).
-type TestSourcesMetadata struct {
+// Analysis contains metadata about tests/benchmarks extracted from the parsed sources.
+type Analysis struct {
 	// Names of all functions in the test sources that heuristically look like test functions.
 	Tests []*TestFunc `json:"tests,omitempty"`
 
@@ -67,6 +67,12 @@ type TestSourcesMetadata struct {
 
 	// True if the sources already contain a `TestMain` function (which is the entry point for test binaries).
 	TestMain *TestFunc `json:"test_main,omitempty"`
+
+	ImportPath  string
+	ImportTest  bool
+	ImportXTest bool
+	NeedTest    bool
+	NeedXTest   bool
 }
 
 // isTestFunc tells whether fn has the type of a testing function. arg
@@ -118,23 +124,23 @@ func checkTestFunc(fileSet *token.FileSet, fn *ast.FuncDecl, arg string) error {
 	return nil
 }
 
-func processFile(fileSet *token.FileSet, pkgName string, filename string) (*TestSourcesMetadata, error) {
+func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Analysis, error) {
 	p, err := parser.ParseFile(fileSet, filename, nil, parser.ParseComments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse: %s", err)
 	}
 
-	var metadata TestSourcesMetadata
+	var analysis Analysis
 
 	for _, e := range doc.Examples(p) {
 		if e.Output == "" && !e.EmptyOutput {
 			// Don't run examples with no output directive.
 			continue
 		}
-		metadata.Examples = append(metadata.Examples, &Example{
+		analysis.Examples = append(analysis.Examples, &Example{
 			Name:      "Example" + e.Name,
 			Package:   pkgName,
-			Output:    strconv.Quote(e.Output),
+			Output:    e.Output,
 			Unordered: e.Unordered,
 		})
 	}
@@ -156,7 +162,7 @@ func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Test
 		case name == "TestMain":
 			if isTestFunc(fn, "T") {
 				// Handle a TestMain function that is actually a test and not a true TestMain.
-				metadata.Tests = append(metadata.Tests, &TestFunc{
+				analysis.Tests = append(analysis.Tests, &TestFunc{
 					Name:    fn.Name.Name,
 					Package: pkgName,
 				})
@@ -166,10 +172,10 @@ func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Test
 			if err != nil {
 				return nil, err
 			}
-			if metadata.TestMain != nil {
+			if analysis.TestMain != nil {
 				return nil, errors.New("multiple definitions of TestMain")
 			}
-			metadata.TestMain = &TestFunc{
+			analysis.TestMain = &TestFunc{
 				Name:    fn.Name.Name,
 				Package: pkgName,
 			}
@@ -178,7 +184,7 @@ func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Test
 			if err != nil {
 				return nil, err
 			}
-			metadata.Tests = append(metadata.Tests, &TestFunc{
+			analysis.Tests = append(analysis.Tests, &TestFunc{
 				Name:    fn.Name.Name,
 				Package: pkgName,
 			})
@@ -187,58 +193,164 @@ func processFile(fileSet *token.FileSet, pkgName string, filename string) (*Test
 			if err != nil {
 				return nil, err
 			}
-			metadata.Benchmarks = append(metadata.Benchmarks, &TestFunc{
+			analysis.Benchmarks = append(analysis.Benchmarks, &TestFunc{
 				Name:    fn.Name.Name,
 				Package: pkgName,
 			})
 		}
 	}
 
-	return &metadata, nil
+	if len(analysis.Tests) > 0 || len(analysis.Benchmarks) > 0 || len(analysis.Examples) > 0 || analysis.TestMain != nil {
+		switch pkgName {
+		case "_test":
+			analysis.NeedTest = true
+		case "_xtest":
+			analysis.NeedXTest = true
+		default:
+			panic("Unknown package name")
+		}
+	}
+
+	return &analysis, nil
 }
 
-func main() {
-	var allMetadata TestSourcesMetadata
+func analyze(importPath string, files []string) (*Analysis, error) {
+	analysis := Analysis{
+		ImportPath: importPath,
+	}
 
 	fileSet := token.NewFileSet()
-	for _, arg := range os.Args[1:] {
+	for _, arg := range files {
 		parts := strings.SplitN(arg, ":", 2)
+		switch parts[0] {
+		case "_test":
+			analysis.ImportTest = true
+		case "_xtest":
+			analysis.ImportXTest = true
+		default:
+			panic("Unknown package name")
+		}
 
 		fileMetadata, err := processFile(fileSet, parts[0], parts[1])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", parts[1], err)
-			os.Exit(1)
+			return nil, fmt.Errorf("%s: %s", parts[1], err)
 		}
 
 		// TODO: Flag duplicate test and benchmark names.
-		allMetadata.Tests = append(allMetadata.Tests, fileMetadata.Tests...)
-		allMetadata.Benchmarks = append(allMetadata.Benchmarks, fileMetadata.Benchmarks...)
-		allMetadata.Examples = append(allMetadata.Examples, fileMetadata.Examples...)
+		analysis.Tests = append(analysis.Tests, fileMetadata.Tests...)
+		analysis.Benchmarks = append(analysis.Benchmarks, fileMetadata.Benchmarks...)
+		analysis.Examples = append(analysis.Examples, fileMetadata.Examples...)
 		if fileMetadata.TestMain != nil {
-			if allMetadata.TestMain != nil {
-				fmt.Fprintf(os.Stderr, "multiple definitions of TestMain\n")
-				os.Exit(1)
+			if analysis.TestMain != nil {
+				return nil, errors.New("multiple definitions of TestMain")
 			}
-			allMetadata.TestMain = fileMetadata.TestMain
+			analysis.TestMain = fileMetadata.TestMain
 		}
+		analysis.NeedTest = analysis.NeedTest || fileMetadata.NeedTest
+		analysis.NeedXTest = analysis.NeedXTest || fileMetadata.NeedXTest
 	}
 
-	output, err := json.Marshal(&allMetadata)
+	return &analysis, nil
+}
+
+var testMainTemplate = `
+// Code generated by Pants for test binary. DO NOT EDIT.
+package main
+import (
+    "os"
+{{if .TestMain}}
+	"reflect"
+{{end}}
+	"testing"
+    "testing/internal/testdeps"
+{{if .ImportTest}}
+	{{if .NeedTest}}_test{{else}}_{{end}} {{.ImportPath | printf "%q"}}
+{{end}}
+{{if .ImportXTest}}
+	{{if .NeedXTest}}_xtest{{else}}_{{end}} {{.ImportPath | printf "%s_test" | printf "%q"}}
+{{end}}
+)
+
+var tests = []testing.InternalTest{
+{{range .Tests}}
+	{"{{.Name}}", {{.Package}}.{{.Name}}},
+{{end}}
+}
+var benchmarks = []testing.InternalBenchmark{
+{{range .Benchmarks}}
+	{"{{.Name}}", {{.Package}}.{{.Name}}},
+{{end}}
+}
+var examples = []testing.InternalExample{
+{{range .Examples}}
+	{"{{.Name}}", {{.Package}}.{{.Name}}, {{.Output | printf "%q"}}, {{.Unordered}}},
+{{end}}
+}
+
+func init() {
+    testdeps.ImportPath = "{{.ImportPath}}"
+}
+
+func main() {
+	m := testing.MainStart(testdeps.TestDeps{}, tests, benchmarks, examples)
+{{with .TestMain}}
+	{{.Package}}.{{.Name}}(m)
+	os.Exit(int(reflect.ValueOf(m).Elem().FieldByName("exitCode").Int()))
+{{else}}
+	os.Exit(m.Run())
+{{end}}
+}
+`
+
+func generate(analysis *Analysis) ([]byte, error) {
+	tmpl, err := template.New("testmain").Parse(testMainTemplate)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to marshall JSON output: %s\n", err)
+		return nil, err
+	}
+
+	var buffer bytes.Buffer
+
+	err = tmpl.Execute(&buffer, analysis)
+	if err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func main() {
+	analysis, err := analyze(os.Args[1], os.Args[2:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 
-	output = append(output, []byte{'\n'}...)
+	testmain, err := generate(analysis)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to generate _testmain.go: %s\n", err)
+		os.Exit(1)
+	}
 
-	amtWritten := 0
-	for amtWritten < len(output) {
-		n, err := os.Stdout.Write(output[amtWritten:])
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to write output: %s\n", err)
-			os.Exit(1)
-		}
-		amtWritten += n
+	err = os.WriteFile("_testmain.go", testmain, 0600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write _testmain.go: %s\n", err)
+		os.Exit(1)
+	}
+
+	metadata := map[string]interface{}{
+		"has_tests":  analysis.NeedTest,
+		"has_xtests": analysis.NeedXTest,
+	}
+
+	metadataBytes, err := json.Marshal(&metadata)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to encode metadata: %s\n", err)
+		os.Exit(1)
+	}
+	_, err = os.Stdout.Write(metadataBytes)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write metadata: %s\n", err)
+		os.Exit(1)
 	}
 
 	os.Exit(0)

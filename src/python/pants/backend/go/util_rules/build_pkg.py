@@ -206,7 +206,9 @@ def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltG
         assert fallible_result.output
         return fallible_result.output
     # TODO(12927): Wire up to streaming workunit system to log compilation results.
-    raise Exception(f"Compile failed:\n{fallible_result.stderr}")
+    raise Exception(
+        f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
+    )
 
 
 @dataclass(frozen=True)
