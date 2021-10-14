@@ -28,7 +28,7 @@ class TerraformTool(TemplatedExternalTool):
         "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{platform}.zip"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "darwin_amd64",
+        "macos_arm64": "darwin_arm64",
         "macos_x86_64": "darwin_amd64",
         "linux_x86_64": "linux_amd64",
     }

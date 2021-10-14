@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import textwrap
 from abc import ABCMeta, abstractmethod
@@ -182,8 +184,6 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     def generate_url(self, plat: Platform) -> str:
         """Returns the URL for the given version of the tool, runnable on the given os+arch.
 
-        os and arch default to those of the current system.
-
         Implementations should raise ExternalToolError if they cannot resolve the arguments
         to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
@@ -201,27 +201,36 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
         for known_version in self.known_versions:
-            try:
-                ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
-            except ValueError:
-                raise ExternalToolError(
-                    f"Bad value for --known-versions (see {self.options.pants_bin_name} "
-                    f"help-advanced {self.options_scope}): {known_version}"
-                )
+            ver, plat_val, sha256, length = self.split_known_version_str(known_version)
             if plat.value == plat_val and ver == self.version:
-                digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
-                try:
-                    url = self.generate_url(plat)
-                    exe = self.generate_exe(plat)
-                except ExternalToolError as e:
-                    raise ExternalToolError(
-                        f"Couldn't find {self.name} version {self.version} on {plat.value}"
-                    ) from e
-                return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
+                return self.get_request_for(plat_val, sha256, length)
         raise UnknownVersion(
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
+
+    @classmethod
+    def split_known_version_str(cls, known_version: str) -> tuple[str, str, str, int]:
+        try:
+            ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
+        except ValueError:
+            raise ExternalToolError(
+                f"Bad value for [{cls.options_scope}].known_versions: {known_version}"
+            )
+        return ver, plat_val, sha256, int(length)
+
+    def get_request_for(self, plat_val: str, sha256: str, length: int) -> ExternalToolRequest:
+        """Generate a request for this tool from the given info."""
+        plat = Platform(plat_val)
+        digest = FileDigest(fingerprint=sha256, serialized_bytes_length=length)
+        try:
+            url = self.generate_url(plat)
+            exe = self.generate_exe(plat)
+        except ExternalToolError as e:
+            raise ExternalToolError(
+                f"Couldn't find {self.name} version {self.version} on {plat.value}"
+            ) from e
+        return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
 
     @classmethod
     def check_version_constraints(
