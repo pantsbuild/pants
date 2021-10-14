@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import os
+from typing import Sequence
 
+from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
@@ -25,6 +27,35 @@ from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
+# Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
+# The bool value represents whether the option is expected to take a value or not.
+# To regenerate this list, run `go run ./gentestflags.go` and copy the output below.
+TEST_FLAGS = {
+    "bench": True,
+    "benchmem": False,
+    "benchtime": True,
+    "blockprofile": True,
+    "blockprofilerate": True,
+    "count": True,
+    "coverprofile": True,
+    "cpu": True,
+    "cpuprofile": True,
+    "failfast": False,
+    "list": True,
+    "memprofile": True,
+    "memprofilerate": True,
+    "mutexprofile": True,
+    "mutexprofilefraction": True,
+    "outputdir": True,
+    "parallel": True,
+    "run": True,
+    "short": False,
+    "shuffle": True,
+    "timeout": True,
+    "trace": True,
+    "v": False,
+}
+
 
 class GoTestFieldSet(TestFieldSet):
     required_fields = (GoFirstPartyPackageSourcesField,)
@@ -32,8 +63,56 @@ class GoTestFieldSet(TestFieldSet):
     sources: GoFirstPartyPackageSourcesField
 
 
+def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
+    result = []
+
+    i = 0
+    next_arg_is_option_value = False
+    while i < len(args):
+        arg = args[i]
+        i += 1
+
+        # If this argument is an option value, then append it to the result and continue to next argument.
+        if next_arg_is_option_value:
+            result.append(arg)
+            next_arg_is_option_value = False
+            continue
+
+        # Non-arguments stop option processing.
+        if arg[0] != "-":
+            result.append(arg)
+            break
+
+        # Stop processing since "-" is a non-argument and "--" is terminator.
+        if arg == "-" or arg == "--":
+            result.append(arg)
+            break
+
+        start_index = 2 if arg[1] == "-" else 1
+        equals_index = arg.find("=", start_index)
+        if equals_index != -1:
+            arg_name = arg[start_index:equals_index]
+            option_value = arg[equals_index:]
+        else:
+            arg_name = arg[start_index:]
+            option_value = ""
+
+        if arg_name in TEST_FLAGS:
+            rewritten_arg = f"{arg[0:start_index]}test.{arg_name}{option_value}"
+            result.append(rewritten_arg)
+            if TEST_FLAGS[arg_name] and option_value == "":
+                next_arg_is_option_value = True
+        else:
+            result.append(arg)
+
+    result.extend(args[i:])
+    return tuple(result)
+
+
 @rule
-async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem) -> TestResult:
+async def run_go_tests(
+    field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
+) -> TestResult:
     pkg_info, wrapped_target = await MultiGet(
         Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
         Get(WrappedTarget, Address, field_set.address),
@@ -140,7 +219,7 @@ async def run_go_tests(field_set: GoTestFieldSet, test_subsystem: TestSubsystem)
     result = await Get(
         FallibleProcessResult,
         Process(
-            ["./test_runner"],
+            ["./test_runner", *transform_test_args(go_test_subsystem.args)],
             input_digest=binary.digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
