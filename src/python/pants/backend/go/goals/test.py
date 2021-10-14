@@ -29,10 +29,10 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
 # The bool value represents whether the option is expected to take a value or not.
-# See https://github.com/golang/go/blob/9e4dc6f37f75840d1193accae697a0e9283f5384/src/cmd/go/internal/test/flagdefs.go#L11-L38.
-TEST_ARGS = {
+# To regenerate this list, run `go run ./gentestflags.go` and copy the output below.
+TEST_FLAGS = {
     "bench": True,
-    "benchmem": True,
+    "benchmem": False,
     "benchtime": True,
     "blockprofile": True,
     "blockprofilerate": True,
@@ -47,7 +47,6 @@ TEST_ARGS = {
     "mutexprofile": True,
     "mutexprofilefraction": True,
     "outputdir": True,
-    "paniconexit0": False,
     "parallel": True,
     "run": True,
     "short": False,
@@ -98,10 +97,10 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
             arg_name = arg[start_index:]
             option_value = ""
 
-        if arg_name in TEST_ARGS:
+        if arg_name in TEST_FLAGS:
             rewritten_arg = f"{arg[0:start_index]}test.{arg_name}{option_value}"
             result.append(rewritten_arg)
-            if TEST_ARGS[arg_name] and option_value == "":
+            if TEST_FLAGS[arg_name] and option_value == "":
                 next_arg_is_option_value = True
         else:
             result.append(arg)
