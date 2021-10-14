@@ -150,24 +150,3 @@ def test_address_specs_filter_tags() -> None:
     assert matches(untagged_tgt) is False
     assert matches(b_tagged_tgt) is True
     assert matches(a_and_b_tagged_tgt) is False
-
-    def make_target_adaptor(target_name: str, **kwargs) -> TargetAdaptor:
-        parsed_address = Address("", target_name=target_name)
-        return TargetAdaptor(
-            type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
-        )
-
-    untagged_target_adaptor = make_target_adaptor(target_name="untagged")
-    b_tagged_target_adaptor = make_target_adaptor(target_name="b-tagged", tags=["b"])
-    a_and_b_tagged_target_adaptor = make_target_adaptor(
-        target_name="a-and-b-tagged", tags=["a", "b"]
-    )
-    none_tagged_target_adaptor = make_target_adaptor(target_name="none-tagged-target", tags=None)
-
-    def matches_adaptor(tgt: TargetAdaptor) -> bool:
-        return specs_filter.matches_tgt_adaptor(tgt.kwargs["address"], tgt)
-
-    assert matches_adaptor(untagged_target_adaptor) is False
-    assert matches_adaptor(b_tagged_target_adaptor) is True
-    assert matches_adaptor(a_and_b_tagged_target_adaptor) is False
-    assert matches_adaptor(none_tagged_target_adaptor) is False

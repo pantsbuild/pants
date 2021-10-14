@@ -186,25 +186,7 @@ class AddressSpecsFilter:
 
         return and_filters(create_filters(self.tags, filter_for_tag))
 
-    @memoized_property
-    def _tag_filter_adaptor(self):
-        def filter_for_tag(tag: str) -> Callable[[TargetAdaptor], bool]:
-            def filter_target(tgt: TargetAdaptor) -> bool:
-                # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
-                # with `or`.
-                tags = tgt.kwargs.get("tags", []) or []
-                return tag in [str(t_tag) for t_tag in tags]
-
-            return filter_target
-
-        return and_filters(create_filters(self.tags, filter_for_tag))
-
     def matches(self, target: Target) -> bool:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
         return self._tag_filter(target) and not self._is_excluded_by_pattern(target.address)
-
-    def matches_tgt_adaptor(self, address: Address, target: TargetAdaptor) -> bool:
-        """Check that the target adaptor matches the provided `--tag` and `--exclude-target-regexp`
-        options."""
-        return self._tag_filter_adaptor(target) and not self._is_excluded_by_pattern(address)
