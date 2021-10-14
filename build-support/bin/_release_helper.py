@@ -14,7 +14,7 @@ import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from enum import Enum
 from functools import total_ordering
 from math import ceil
@@ -229,19 +229,44 @@ class Package:
             for version, artifacts in self._json_package_data["releases"].items()
             if artifacts
         ]
-        versions_by_freshness_ascending = sorted(
+        all_versions_by_freshness_ascending = sorted(
             (pv for pv in maybe_versions if pv), key=lambda pv: pv.freshness_key
         )
-        max_artifacts_size_mb = max(pv.size_mb for pv in versions_by_freshness_ascending)
 
-        # Pop versions from the end of the list (the "freshest") until we reach the threshold
-        # for size. We leave a little more than the max size of an artifact as buffer space in
-        # case a new release is particularly large.
+        # The stalest artifacts which do fit into our threshold will be considered to be stale.
+        # We leave a little more than the max size of an artifact as buffer space in case a new
+        # release is particularly large.
+        max_artifacts_size_mb = max(pv.size_mb for pv in all_versions_by_freshness_ascending)
         available_mb = self.max_size_mb - (max_artifacts_size_mb * 1.1)
+
+        # Exclude all artifacts which are younger than a threshold, both as a safety measure, and
+        # to account for the fact that although we would generally want to delete a dev release
+        # before a stable release (etc), that breaks down for very recent releases.
+        versions_by_freshness_ascending = []
+        for version in all_versions_by_freshness_ascending:
+            if version.most_recent_upload_date + MINIMUM_STALE_AGE < date.today():
+                # Eligible to be removed.
+                versions_by_freshness_ascending.append(version)
+                continue
+            # Not eligible: must be kept.
+            available_mb -= version.size_mb
+
+        # If we have no versions that we can prune, and are already beyond the threshold, it's
+        # very likely that a release will fail.
+        if not versions_by_freshness_ascending and available_mb < 0:
+            print(
+                f"There are no stale artifacts to prune (older than {MINIMUM_STALE_AGE}) and "
+                "we are over capacity: the release is very likely to fail. See "
+                "[https://github.com/pantsbuild/pants/issues/11614].",
+                file=sys.stderr,
+            )
+
+        # Pop versions from the end of the list (the "freshest") while we have remaining space.
         while versions_by_freshness_ascending:
             if versions_by_freshness_ascending[-1].size_mb > available_mb:
                 break
             available_mb -= versions_by_freshness_ascending.pop().size_mb
+
         return versions_by_freshness_ascending
 
 
@@ -322,6 +347,10 @@ def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str
         ],
         check=True,
     )
+
+
+# Artifacts created within this time range will never be considered to be stale.
+MINIMUM_STALE_AGE = timedelta(days=180)
 
 
 # NB: This a native wheel. We expect a distinct wheel for each Python version and each
@@ -890,8 +919,9 @@ def prompt_artifact_freshness() -> None:
         input(
             "\nTo ensure that there is adequate storage for new artifacts, the stale release "
             "artifacts listed above should be deleted via [https://pypi.org/]'s UI.\n"
-            "If you have any concerns about the listed artifacts, please raise them on Slack "
-            "or on [https://github.com/pantsbuild/pants/issues/11614].\n"
+            "If you have any concerns about the listed artifacts, or do not have access to "
+            "delete them yourself, please raise an issue in #development Slack or on "
+            "[https://github.com/pantsbuild/pants/issues/11614].\n"
             "Press enter when you have deleted the listed artifacts: "
         )
     else:
