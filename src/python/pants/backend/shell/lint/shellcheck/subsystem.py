@@ -18,9 +18,10 @@ class Shellcheck(TemplatedExternalTool):
 
     default_version = "v0.7.1"
     default_known_versions = [
-        f"{default_version}|macos_arm64 |b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
-        f"{default_version}|macos_x86_64|b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
-        f"{default_version}|linux_x86_64|64f17152d96d7ec261ad3086ed42d18232fcb65148b44571b564d688269d36c8|1443836",
+        "v0.7.1|macos_arm64 |b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
+        "v0.7.1|macos_x86_64|b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
+        "v0.7.1|linux_arm64 |b50cc31509b354ab5bbfc160bc0967567ed98cd9308fd43f38551b36cccc4446|1432492",
+        "v0.7.1|linux_x86_64|64f17152d96d7ec261ad3086ed42d18232fcb65148b44571b564d688269d36c8|1443836",
     ]
 
     default_url_template = (
@@ -30,6 +31,7 @@ class Shellcheck(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "darwin.x86_64",
         "macos_x86_64": "darwin.x86_64",
+        "linux_arm64": "linux.aarch64",
         "linux_x86_64": "linux.x86_64",
     }
 

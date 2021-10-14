@@ -12,6 +12,7 @@ from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
 
 
 class Platform(Enum):
+    linux_arm64 = "linux_arm64"
     linux_x86_64 = "linux_x86_64"
     macos_arm64 = "macos_arm64"
     macos_x86_64 = "macos_x86_64"

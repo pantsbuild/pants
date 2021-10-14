@@ -68,6 +68,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         options_scope = "my-external-tool"
         default_version = "1.2.3"
         default_known_versions = [
+          "1.2.3|linux_arm64 |feed6789feed6789feed6789feed6789feed6789feed6789feed6789feed6789|112233",
           "1.2.3|linux_x86_64|cafebabacafebabacafebabacafebabacafebabacafebabacafebabacafebaba|878986",
           "1.2.3|macos_arm64 |deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
           "1.2.3|macos_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",

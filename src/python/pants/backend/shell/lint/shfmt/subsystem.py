@@ -18,9 +18,10 @@ class Shfmt(TemplatedExternalTool):
 
     default_version = "v3.2.4"
     default_known_versions = [
-        f"{default_version}|macos_arm64 |e70fc42e69debe3e400347d4f918630cdf4bf2537277d672bbc43490387508ec|2998546",
-        f"{default_version}|macos_x86_64|43a0461a1b54070ddc04fbbf1b78f7861ee39a65a61f5466d15a39c4aba4f917|2980208",
-        f"{default_version}|linux_x86_64|3f5a47f8fec27fae3e06d611559a2063f5d27e4b9501171dde9959b8c60a3538|2797568",
+        "v3.2.4|macos_arm64 |e70fc42e69debe3e400347d4f918630cdf4bf2537277d672bbc43490387508ec|2998546",
+        "v3.2.4|macos_x86_64|43a0461a1b54070ddc04fbbf1b78f7861ee39a65a61f5466d15a39c4aba4f917|2980208",
+        "v3.2.4|linux_arm64 |6474d9cc08a1c9fe2ef4be7a004951998e3067d46cf55a011ddd5ff7bfab3de6|2752512",
+        "v3.2.4|linux_x86_64|3f5a47f8fec27fae3e06d611559a2063f5d27e4b9501171dde9959b8c60a3538|2797568",
     ]
 
     default_url_template = (
@@ -29,6 +30,7 @@ class Shfmt(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "darwin_arm64",
         "macos_x86_64": "darwin_amd64",
+        "linux_arm64": "linux_arm64",
         "linux_x86_64": "linux_amd64",
     }
 
