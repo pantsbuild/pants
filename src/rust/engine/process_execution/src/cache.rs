@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cache::PersistentCache;
 use futures::{future, FutureExt};
-use hashing::Digest;
 use log::{debug, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -69,9 +68,13 @@ impl crate::CommandRunner for CommandRunner {
       .0
       .values()
       .any(|process| process.cache_scope == ProcessCacheScope::Always);
-    let key = crate::digest(req.clone(), &self.metadata);
+    let key = CacheKey {
+      digest: Some(crate::digest(req.clone(), &self.metadata).into()),
+      key_type: CacheKeyType::Process.into(),
+    };
 
     let context2 = context.clone();
+    let key2 = key.clone();
     let cache_read_result = in_workunit!(
       context.workunit_store.clone(),
       "local_cache_read".to_owned(),
@@ -83,7 +86,7 @@ impl crate::CommandRunner for CommandRunner {
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-        match self.lookup(key).await {
+        match self.lookup(&key2).await {
           Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
             let lookup_elapsed = cache_lookup_start.elapsed();
             workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
@@ -120,7 +123,6 @@ impl crate::CommandRunner for CommandRunner {
           }
         }
       }
-      .boxed()
     )
     .await;
 
@@ -139,7 +141,7 @@ impl crate::CommandRunner for CommandRunner {
           ..WorkunitMetadata::default()
         },
         |workunit| async move {
-          if let Err(err) = self.store(key, &result).await {
+          if let Err(err) = self.store(&key, &result).await {
             warn!(
               "Error storing process execution result to local cache: {} - ignoring and continuing",
               err
@@ -157,18 +159,12 @@ impl crate::CommandRunner for CommandRunner {
 impl CommandRunner {
   async fn lookup(
     &self,
-    action_key: Digest,
+    action_key: &CacheKey,
   ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
     use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
-    let maybe_cache_value = self
-      .cache
-      .load(CacheKey {
-        digest: Some(action_key.into()),
-        key_type: CacheKeyType::Process.into(),
-      })
-      .await?;
+    let maybe_cache_value = self.cache.load(action_key).await?;
     let maybe_execute_response = if let Some(bytes) = maybe_cache_value {
       let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes)
         .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
@@ -219,7 +215,7 @@ impl CommandRunner {
 
   async fn store(
     &self,
-    action_key: Digest,
+    action_key: &CacheKey,
     result: &FallibleProcessResultWithPlatform,
   ) -> Result<(), String> {
     let stdout_digest = result.stdout_digest;
@@ -263,15 +259,6 @@ impl CommandRunner {
       )
     })?;
 
-    self
-      .cache
-      .store(
-        CacheKey {
-          digest: Some(action_key.into()),
-          key_type: CacheKeyType::Process.into(),
-        },
-        bytes_to_store,
-      )
-      .await
+    self.cache.store(action_key, bytes_to_store).await
   }
 }

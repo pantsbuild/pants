@@ -70,12 +70,12 @@ impl PersistentCache {
     Ok(Self { store })
   }
 
-  pub async fn store(&self, key: CacheKey, value: Bytes) -> Result<(), String> {
+  pub async fn store(&self, key: &CacheKey, value: Bytes) -> Result<(), String> {
     let fingerprint = Digest::of_bytes(&key.to_bytes()).hash;
     self.store.store_bytes(fingerprint, value, false).await
   }
 
-  pub async fn load(&self, key: CacheKey) -> Result<Option<Bytes>, String> {
+  pub async fn load(&self, key: &CacheKey) -> Result<Option<Bytes>, String> {
     let fingerprint = Digest::of_bytes(&key.to_bytes()).hash;
     self
       .store
