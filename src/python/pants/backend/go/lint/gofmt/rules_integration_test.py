@@ -174,8 +174,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         }
     )
     tgts = [
-        rule_runner.get_target(Address("", target_name="mod", relative_file_path="good")),
-        rule_runner.get_target(Address("", target_name="mod", relative_file_path="bad")),
+        rule_runner.get_target(Address("", target_name="mod", relative_file_path="good/")),
+        rule_runner.get_target(Address("", target_name="mod", relative_file_path="bad/")),
     ]
     lint_results, fmt_result = run_gofmt(rule_runner, tgts)
     assert len(lint_results) == 1

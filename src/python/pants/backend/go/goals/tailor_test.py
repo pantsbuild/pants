@@ -53,7 +53,7 @@ def test_find_putative_go_targets(rule_runner: RuleRunner) -> None:
             "src/go/owned/pkg2/BUILD": "go_binary()",
             # Has a `go_binary` defined in a different directory.
             "src/go/owned/pkg3/subdir/app.go": "package main",
-            "src/go/owned/pkg3/BUILD": "go_binary(main='src/go/owned#./pkg3/subdir')",
+            "src/go/owned/pkg3/BUILD": "go_binary(main='src/go/owned/pkg3/subdir/:../../owned')",
         }
     )
     putative_targets = rule_runner.request(

@@ -358,7 +358,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     quoter_import_path = "example.com/project/greeter/quoter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", relative_file_path="greeter/quoter"),
+        Address("", target_name="mod", relative_file_path="greeter/quoter/"),
         expected_import_path=quoter_import_path,
         expected_subpath="greeter/quoter",
         expected_go_file_names=["lib.go"],
@@ -369,7 +369,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     greeter_import_path = "example.com/project/greeter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", relative_file_path="greeter"),
+        Address("", target_name="mod", relative_file_path="greeter/"),
         expected_import_path=greeter_import_path,
         expected_subpath="greeter",
         expected_go_file_names=["lib.go"],

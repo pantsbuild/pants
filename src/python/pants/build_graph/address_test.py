@@ -80,10 +80,16 @@ def test_address_input_parse_spec() -> None:
     assert_parsed("subdir/f.txt", relative_to="here", path_component="subdir/f.txt")
     assert_parsed("a/b/c.txt#gen", path_component="a/b/c.txt", generated_component="gen")
 
+    # Dirs
+    assert_parsed("d/", path_component="d/")
+    assert_parsed("a/d/", path_component="a/d/")
+    assert_parsed("a/:x", path_component="a/", target_component="x")
+    assert_parsed("a/:../x", path_component="a/", target_component="../x")
+
 
 @pytest.mark.parametrize(
     "spec",
-    ["..", ".", "//..", "//.", "a/.", "a/..", "../a", "a/../a", "a/:a", "a/b/:b", "/a", "///a"],
+    ["..", ".", "//..", "//.", "a/.", "a/..", "../a", "a/../a", "/a", "///a"],
 )
 def test_address_input_parse_bad_path_component(spec: str) -> None:
     with pytest.raises(InvalidSpecPath):
@@ -204,6 +210,18 @@ def test_address_input_from_dir() -> None:
     assert AddressInput(
         "a", target_component="b", generated_component="gen"
     ).dir_to_address() == Address("a", target_name="b", generated_name="gen")
+    assert AddressInput("a/", target_component="../x").dir_to_address() == Address(
+        "", target_name="x", relative_file_path="a/"
+    )
+
+
+@pytest.mark.parametrize(
+    "spec",
+    ["a/", "a/:b", "a/#c", "a/:b#c"],
+)
+def test_address_input_from_file_invalid(spec: str) -> None:
+    with pytest.raises(InvalidSpecPath):
+        AddressInput.parse(spec).file_to_address()
 
 
 def test_address_normalize_target_name() -> None:
@@ -316,12 +334,18 @@ def test_address_spec() -> None:
         expected="a/b/subdir/dir2/f.txt:../../b",
         expected_path_spec="a.b.subdir.dir2.f.txt@@b",
     )
+    assert_spec(Address("a/b", relative_file_path=""), expected="a/b/", expected_path_spec="a.b@")
+    assert_spec(
+        Address("a", relative_file_path="b/"), expected="a/b/:../a", expected_path_spec="a.b.@a"
+    )
+    assert_spec(Address("", relative_file_path=""), expected="///", expected_path_spec="@")
 
 
 def test_address_maybe_convert_to_target_generator() -> None:
     def assert_converts(addr: Address, *, expected: Address) -> None:
         assert addr.maybe_convert_to_target_generator() == expected
 
+    # Generated.
     assert_converts(
         Address(
             "a/b",
@@ -333,6 +357,7 @@ def test_address_maybe_convert_to_target_generator() -> None:
     assert_converts(Address("a/b", generated_name="generated"), expected=Address("a/b"))
     assert_converts(Address("a/b", generated_name="subdir/generated"), expected=Address("a/b"))
 
+    # Files.
     assert_converts(
         Address("a/b", relative_file_path="c.txt", target_name="c"),
         expected=Address("a/b", target_name="c"),
@@ -342,6 +367,14 @@ def test_address_maybe_convert_to_target_generator() -> None:
     assert_converts(
         Address("a/b", relative_file_path="subdir/f.txt", target_name="original"),
         expected=Address("a/b", target_name="original"),
+    )
+
+    # Dirs.
+    assert_converts(Address("a", relative_file_path="b/"), expected=Address("a"))
+    assert_converts(Address("a", relative_file_path="b/c/"), expected=Address("a"))
+    assert_converts(
+        Address("a", relative_file_path="b/c/", target_name="x"),
+        expected=Address("a", target_name="x"),
     )
 
     def assert_noops(addr: Address) -> None:

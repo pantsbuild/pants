@@ -48,6 +48,10 @@ class AddressInput:
         if self.path_component == "":
             return
         components = self.path_component.split(os.sep)
+        if not components[-1]:
+            # An empty trailing component means a trailing slash, which indicates a directory and
+            # should be preserved.
+            components = components[:-1]
         if any(component in (".", "..", "") for component in components):
             raise InvalidSpecPath(
                 f"Address spec has un-normalized path part '{self.path_component}'"
@@ -155,6 +159,13 @@ class AddressInput:
         return cls(path_component, target_component, generated_component)
 
     def to_address(self, *, path_component_is_dir: bool) -> Address:
+        if self.path_component.endswith(os.path.sep) and not path_component_is_dir:
+            raise InvalidSpecPath(
+                f"The path `{self.path_component}` has a trailing slash (signaling that a "
+                "directory was expected), but that path is not a directory. If you meant to "
+                "match the file at that path, remove the trailing slash."
+            )
+
         # The target component may be "above" (but not below) the path in the filesystem.
         # Determine how many levels above the path it is, and validate that the path is relative.
         parent_count = (
@@ -195,10 +206,6 @@ class AddressInput:
 
         # Split the path_component into a spec_path and relative_file_path at the appropriate
         # position.
-        if path_component_is_dir:
-            # If the path_component refers to a directory `:target` refers to the target living
-            # within the directory, as opposed to next to it, as with a file.
-            parent_count -= 1
         path_components = self.path_component.split(os.path.sep)
         if len(path_components) <= parent_count:
             raise InvalidTargetName(
@@ -249,9 +256,10 @@ class Address(EngineAwareParameter):
         :param generated_name: The name of what is generated. You can use a file path if the
             generated target represents an entity from the file system, such as `a/b/c` or
             `subdir/f.ext`.
-        :param relative_file_path: The relative path from the spec_path to an addressed file,
+        :param relative_file_path: The relative path from the spec_path to an addressed path,
           if any. Because files must always be located below targets that apply metadata to
-          them, this will always be relative.
+          them, this will always be relative. If the relative_file_path is the empty string,
+          or ends with a trailing `/`, then the path refers to a directory.
         """
         self.spec_path = spec_path
         self.generated_name = generated_name
@@ -316,6 +324,8 @@ class Address(EngineAwareParameter):
             raise AssertionError(
                 f"Only a file Address (`self.is_file_target`) has a filename: {self}"
             )
+        if not self.spec_path and not self._relative_file_path:
+            return "/"
         return os.path.join(self.spec_path, self._relative_file_path)
 
     @property
@@ -351,10 +361,14 @@ class Address(EngineAwareParameter):
         """
         :API: public
         """
-        if self._relative_file_path:
-            parent_count = self._relative_file_path.count(os.path.sep)
-            parent_prefix = "@" * parent_count if parent_count else "."
-            file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
+        if self._relative_file_path is not None:
+            if self._relative_file_path:
+                parent_count = self._relative_file_path.count(os.path.sep)
+                parent_prefix = "@" * parent_count if parent_count else "."
+                file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
+            else:
+                parent_prefix = "."
+                file_portion = "@"
         else:
             parent_prefix = "."
             file_portion = ""

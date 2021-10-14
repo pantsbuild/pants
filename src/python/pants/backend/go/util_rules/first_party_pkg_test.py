@@ -86,7 +86,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
     ) -> None:
         info = rule_runner.request(
             FirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("foo", relative_file_path=subpath))],
+            [FirstPartyPkgInfoRequest(Address("foo", relative_file_path=f"{subpath}/"))],
         )
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
         expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{subpath}/*.go"])])

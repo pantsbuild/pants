@@ -78,8 +78,7 @@ async def find_putative_go_targets(
     unowned_main_package_dirs = set(main_package_dirs) - {
         # We can be confident `go_first_party_package` targets were generated, meaning that the
         # below will get us the full path to the package's directory.
-        # TODO: generalize this
-        os.path.join(pkg.address.spec_path, pkg.address.generated_name[2:]).rstrip("/")  # type: ignore[index]
+        pkg.address.filename.rstrip("/")
         for pkg in owned_main_packages
     }
     putative_targets.extend(
