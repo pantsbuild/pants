@@ -1,19 +1,27 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
+import sys
 from abc import ABCMeta
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple, cast
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.process import (
+    BinaryNotFoundError,
+    BinaryPathRequest,
+    BinaryPaths,
+    InteractiveProcess,
+    InteractiveProcessResult,
+)
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -65,10 +73,15 @@ class RunRequest:
         self.extra_env = FrozenDict(extra_env or {})
 
 
+@dataclass(frozen=True)
+class RunConsoleScriptRequest:
+    console_script: str
+
+
 class RunSubsystem(GoalSubsystem):
     name = "run"
     help = (
-        "Runs a binary target.\n\n"
+        "Runs a binary target or plugin console script.\n\n"
         "This goal propagates the return code of the underlying executable.\n\n"
         "If your application can safely be restarted while it is running, you can pass "
         "`restartable=True` on your binary target (for supported types), and the `run` goal "
@@ -89,10 +102,19 @@ class RunSubsystem(GoalSubsystem):
             help="Arguments to pass directly to the executed target, e.g. "
             '`--run-args="val1 val2 --debug"`',
         )
+        register(
+            "--console-script",
+            type=shell_str,
+            help="Execute a console script from Pants virtual environment.",
+        )
 
     @property
     def args(self) -> Tuple[str, ...]:
         return tuple(self.options.args)
+
+    @property
+    def console_script(self) -> Optional[str]:
+        return cast("str|None", self.options.console_script)
 
 
 class Run(Goal):
@@ -108,28 +130,34 @@ async def run(
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
 ) -> Run:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            RunFieldSet,
-            goal_description="the `run` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            expect_single_field_set=True,
-        ),
-    )
-    field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, RunFieldSet, field_set)
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
-    restartable = wrapped_target.target.get(RestartableField).value
+    if run_subsystem.console_script:
+        restartable = False  # TODO: option flag?
+        request = await Get(RunRequest, RunConsoleScriptRequest(run_subsystem.console_script))
+    else:
+        targets_to_valid_field_sets = await Get(
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                RunFieldSet,
+                goal_description="the `run` goal",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+                expect_single_field_set=True,
+            ),
+        )
+        field_set = targets_to_valid_field_sets.field_sets[0]
+        request, wrapped_target = await MultiGet(
+            Get(RunRequest, RunFieldSet, field_set), Get(WrappedTarget, Address, field_set.address)
+        )
+        restartable = wrapped_target.target.get(RestartableField).value
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
-        )
+        if request.digest != EMPTY_DIGEST:
+            workspace.write_digest(
+                request.digest,
+                path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+                # We don't want to influence whether the InteractiveProcess is able to restart. Because
+                # we're writing into a temp directory, we can safely mark this side_effecting=False.
+                side_effecting=False,
+            )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
@@ -145,6 +173,24 @@ async def run(
         exit_code = result.exit_code
 
     return Run(exit_code)
+
+
+@rule
+async def find_console_script_to_run(run: RunConsoleScriptRequest) -> RunRequest:
+    search_path = [re.sub(r"/lib/python[^/]*/site-packages$", "/bin", path) for path in sys.path]
+    request = BinaryPathRequest(binary_name=run.console_script, search_path=search_path)
+
+    binary = await Get(BinaryPaths, BinaryPathRequest, request)
+
+    if not binary.first_path:
+        raise BinaryNotFoundError.from_request(
+            request, rationale="run the requested console script"
+        )
+
+    return RunRequest(
+        digest=EMPTY_DIGEST,
+        args=(binary.first_path.path,),
+    )
 
 
 def rules():
