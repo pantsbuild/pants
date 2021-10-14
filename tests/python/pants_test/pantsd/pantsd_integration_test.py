@@ -600,15 +600,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_dependencies_swap(self):
         template = dedent(
             """
-            python_sources(
+            python_source(
               name='A',
-              sources='A.py',
+              source='A.py',
               {a_deps}
             )
 
-            python_sources(
+            python_source(
               name='B',
-              sources='B.py',
+              source='B.py',
               {b_deps}
             )
             """
