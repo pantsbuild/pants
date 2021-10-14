@@ -10,6 +10,7 @@ from enum import Enum
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -86,3 +87,16 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
     def cacheable(self) -> bool:
         # Failed compile outputs should be re-rendered in every run.
         return self.exit_code == 0
+
+
+@rule
+def required_classfiles(fallible_result: FallibleCompiledClassfiles) -> CompiledClassfiles:
+    if fallible_result.result == CompileResult.SUCCEEDED:
+        assert fallible_result.output
+        return fallible_result.output
+    # NB: The compile outputs will already have been streamed as FallibleCompiledClassfiles finish.
+    raise Exception("Compile failed.")
+
+
+def rules():
+    return collect_rules()

@@ -22,15 +22,15 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
     FieldSet,
     Target,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -295,7 +295,7 @@ async def setup_mypy_lockfile(
 
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+        all_tgts = await Get(AllTargets, AllTargetsRequest())
         all_transitive_targets = await MultiGet(
             Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
             for tgt in all_tgts

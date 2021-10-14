@@ -8,10 +8,14 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
+from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
@@ -52,10 +56,10 @@ async def setup_setuptools_lockfile(
     if not setuptools.uses_lockfile:
         return PythonLockfileRequest.from_tool(setuptools)
 
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
     transitive_targets_per_python_dist = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_build_targets
+        for tgt in all_tgts
         if PythonDistributionFieldSet.is_applicable(tgt)
     )
     unique_constraints = {

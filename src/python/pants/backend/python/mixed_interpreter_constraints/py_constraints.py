@@ -10,17 +10,16 @@ from typing import cast
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
     RegisteredTargetTypes,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership
 from pants.python.python_setup import PythonSetup
@@ -77,17 +76,10 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        with_generated_targets, without_generated_targets = await MultiGet(
-            Get(Targets, AddressSpecs([DescendantAddresses("")])),
-            Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")])),
-        )
-        all_python_targets = sorted(
-            {
-                t
-                for t in (*with_generated_targets, *without_generated_targets)
-                if t.has_field(InterpreterConstraintsField)
-            },
-            key=lambda tgt: cast(Address, tgt.address),
+        # TODO: Stop including the target generator? I don't think it's relevant for this goal.
+        all_targets = await Get(AllTargets, AllTargetsRequest(include_target_generators=True))
+        all_python_targets = tuple(
+            t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
 
         constraints_per_tgt = [

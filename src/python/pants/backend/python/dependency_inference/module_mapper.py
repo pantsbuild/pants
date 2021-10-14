@@ -23,11 +23,10 @@ from pants.backend.python.target_types import (
     PythonSourceField,
     TypeStubsModuleMappingField,
 )
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesPathsRequest, Targets
+from pants.engine.target import AllTargets, SourcesPathsRequest, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -45,6 +44,24 @@ class PythonModule:
             path.parent if path.name == "__init__.py" else path.with_suffix("")
         )
         return cls(module_name_with_slashes.as_posix().replace("/", "."))
+
+
+@dataclass(frozen=True)
+class AllPythonTargets:
+    first_party: tuple[Target, ...]
+    third_party: tuple[Target, ...]
+
+
+@rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
+def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
+    first_party = []
+    third_party = []
+    for tgt in all_targets:
+        if tgt.has_field(PythonSourceField):
+            first_party.append(tgt)
+        if tgt.has_field(PythonRequirementsField):
+            third_party.append(tgt)
+    return AllPythonTargets(tuple(first_party), tuple(third_party))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -171,18 +188,16 @@ class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
 
 @rule(desc="Creating map of first party Python targets to Python modules", level=LogLevel.DEBUG)
 async def map_first_party_python_targets_to_modules(
-    _: FirstPartyPythonTargetsMappingMarker,
+    _: FirstPartyPythonTargetsMappingMarker, all_python_targets: AllPythonTargets
 ) -> FirstPartyPythonMappingImpl:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSourceField))
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSourceField]))
-        for tgt in python_targets
+        for tgt in all_python_targets.first_party
     )
 
     modules_to_addresses: DefaultDict[str, list[Address]] = defaultdict(list)
     modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
-    for tgt, stripped_sources in zip(python_targets, stripped_sources_per_target):
+    for tgt, stripped_sources in zip(all_python_targets.first_party, stripped_sources_per_target):
         # `PythonSourceFile` validates that each target has exactly one file.
         assert len(stripped_sources) == 1
         stripped_f = stripped_sources[0]
@@ -248,8 +263,9 @@ class ThirdPartyPythonModuleMapping:
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
-async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+async def map_third_party_modules_to_addresses(
+    all_python_tgts: AllPythonTargets,
+) -> ThirdPartyPythonModuleMapping:
     modules_to_addresses: dict[str, Address] = {}
     modules_to_stub_addresses: dict[str, Address] = {}
     modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
@@ -274,10 +290,7 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             else:
                 modules_to_stub_addresses[module] = address
 
-    for tgt in all_targets:
-        if not tgt.has_field(PythonRequirementsField):
-            continue
-
+    for tgt in all_python_tgts.third_party:
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:
             add_modules(explicit_modules, tgt.address)

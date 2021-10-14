@@ -10,15 +10,23 @@ from pathlib import PurePath
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+
+
+@dataclass(frozen=True)
+class FallibleAssemblyPreCompilation:
+    results: tuple[FallibleProcessResult, ...]
+    output: AssemblyPreCompilation | None
+
+    def has_failures(self) -> bool:
+        return any(result.exit_code != 0 for result in self.results)
 
 
 @dataclass(frozen=True)
 class AssemblyPreCompilation:
     merged_compilation_input_digest: Digest
     assembly_digests: tuple[Digest, ...]
-    EXTRA_COMPILATION_ARGS = ("-symabis", "./symabis")
 
 
 @dataclass(frozen=True)
@@ -35,7 +43,8 @@ class AssemblyPreCompilationRequest:
 
 @dataclass(frozen=True)
 class AssemblyPostCompilation:
-    merged_output_digest: Digest
+    result: FallibleProcessResult
+    merged_output_digest: Digest | None
 
 
 @dataclass(frozen=True)
@@ -52,7 +61,7 @@ class AssemblyPostCompilationRequest:
 async def setup_assembly_pre_compilation(
     request: AssemblyPreCompilationRequest,
     goroot: GoRoot,
-) -> AssemblyPreCompilation:
+) -> FallibleAssemblyPreCompilation:
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
@@ -64,7 +73,7 @@ async def setup_assembly_pre_compilation(
         Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
     symabis_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=symabis_input_digest,
             command=(
@@ -82,6 +91,8 @@ async def setup_assembly_pre_compilation(
             output_files=("symabis",),
         ),
     )
+    if symabis_result.exit_code != 0:
+        return FallibleAssemblyPreCompilation((symabis_result,), None)
     merged = await Get(
         Digest,
         MergeDigests([request.compilation_input, symabis_result.output_digest]),
@@ -89,7 +100,7 @@ async def setup_assembly_pre_compilation(
 
     assembly_results = await MultiGet(
         Get(
-            ProcessResult,
+            FallibleProcessResult,
             GoSdkProcess(
                 input_digest=request.compilation_input,
                 command=(
@@ -109,8 +120,9 @@ async def setup_assembly_pre_compilation(
         )
         for s_file in request.s_files
     )
-    return AssemblyPreCompilation(
-        merged, tuple(result.output_digest for result in assembly_results)
+    return FallibleAssemblyPreCompilation(
+        tuple(assembly_results),
+        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results)),
     )
 
 
@@ -122,7 +134,7 @@ async def link_assembly_post_compilation(
         Digest, MergeDigests([request.compilation_result, *request.assembly_digests])
     )
     pack_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=merged_digest,
             command=(
@@ -139,7 +151,9 @@ async def link_assembly_post_compilation(
             output_files=("__pkg__.a",),
         ),
     )
-    return AssemblyPostCompilation(pack_result.output_digest)
+    return AssemblyPostCompilation(
+        pack_result, pack_result.output_digest if pack_result.exit_code == 0 else None
+    )
 
 
 def rules():

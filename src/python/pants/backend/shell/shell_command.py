@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
@@ -13,13 +15,16 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
+    ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
-    ShellCommandTimeout,
+    ShellCommandTimeoutField,
     ShellCommandToolsField,
 )
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -47,6 +52,7 @@ from pants.engine.target import (
     SourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -59,55 +65,92 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
     output = FileSourceField
 
 
-@rule(desc="Running experimental_shell_command", level=LogLevel.DEBUG)
+@dataclass(frozen=True)
+class ShellCommandProcessRequest(WrappedTarget):
+    pass
+
+
+class RunShellCommand(RunFieldSet):
+    required_fields = (
+        ShellCommandCommandField,
+        ShellCommandRunWorkdirField,
+    )
+
+
+@rule(desc="Running shell command", level=LogLevel.DEBUG)
 async def run_shell_command(
     request: GenerateFilesFromShellCommandRequest,
-    shell_setup: ShellSetup,
-    bash: BashBinary,
 ) -> GeneratedSources:
     shell_command = request.protocol_target
+    result = await Get(ProcessResult, ShellCommandProcessRequest(shell_command))
+
+    if shell_command[ShellCommandLogOutputField].value:
+        if result.stdout:
+            logger.info(result.stdout.decode())
+        if result.stderr:
+            logger.warning(result.stderr.decode())
+
     working_directory = shell_command.address.spec_path
+    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    return GeneratedSources(output)
+
+
+@rule
+async def prepare_shell_command_process(
+    request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
+) -> Process:
+    shell_command = request.target
+    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
+    if interactive:
+        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
+    else:
+        working_directory = shell_command.address.spec_path
     command = shell_command[ShellCommandCommandField].value
-    timeout = shell_command[ShellCommandTimeout].value
-    tools = shell_command[ShellCommandToolsField].value
-    outputs = shell_command[ShellCommandOutputsField].value or ()
+    timeout = shell_command.get(ShellCommandTimeoutField).value
+    tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value
+    outputs = shell_command.get(ShellCommandOutputsField).value or ()
 
     if not command:
         raise ValueError(
-            f"Missing `command` line in `shell_command` target {shell_command.address}."
+            f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
         )
 
-    if not tools:
-        raise ValueError(
-            f"Must provide any `tools` used by the `shell_command` {shell_command.address}."
-        )
-
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_path = shell_setup.executable_search_path(env)
-    tool_requests = [
-        BinaryPathRequest(
-            binary_name=tool,
-            search_path=search_path,
-        )
-        for tool in {*tools, *["mkdir", "ln"]}
-        if tool not in BASH_BUILTIN_COMMANDS
-    ]
-    tool_paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
-    )
-
-    command_env = {
-        "TOOLS": " ".join(shlex.quote(tool.binary_name) for tool in tool_requests),
-    }
-
-    for binary, tool_request in zip(tool_paths, tool_requests):
-        if binary.first_path:
-            command_env[tool_request.binary_name] = binary.first_path.path
-        else:
-            raise BinaryNotFoundError.from_request(
-                tool_request,
-                rationale=f"execute experimental_shell_command {shell_command.address}",
+    if interactive:
+        command_env = {
+            "CHROOT": "{chroot}",
+        }
+    else:
+        if not tools:
+            raise ValueError(
+                f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
+
+        env = await Get(Environment, EnvironmentRequest(["PATH"]))
+        search_path = shell_setup.executable_search_path(env)
+        tool_requests = [
+            BinaryPathRequest(
+                binary_name=tool,
+                search_path=search_path,
+            )
+            for tool in {*tools, *["mkdir", "ln"]}
+            if tool not in BASH_BUILTIN_COMMANDS
+        ]
+        tool_paths = await MultiGet(
+            Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
+        )
+
+        command_env = {
+            "TOOLS": " ".join(shlex.quote(tool.binary_name) for tool in tool_requests),
+        }
+
+        for binary, tool_request in zip(tool_paths, tool_requests):
+            if binary.first_path:
+                command_env[tool_request.binary_name] = binary.first_path.path
+            else:
+                raise BinaryNotFoundError.from_request(
+                    tool_request,
+                    rationale=f"execute `{shell_command.alias}` {shell_command.address}",
+                )
 
     transitive_targets = await Get(
         TransitiveTargets,
@@ -133,7 +176,7 @@ async def run_shell_command(
         Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
     )
 
-    if working_directory in sources.snapshot.dirs:
+    if interactive or not working_directory or working_directory in sources.snapshot.dirs:
         work_dir = EMPTY_DIGEST
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
@@ -145,44 +188,50 @@ async def run_shell_command(
     output_files = [f for f in outputs if not f.endswith("/")]
     output_directories = [d for d in outputs if d.endswith("/")]
 
-    # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
-    bin_relpath = ".bin"
-    setup_tool_symlinks_script = ";".join(
-        dedent(
-            f"""\
-            $mkdir -p {bin_relpath}
-            for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}/; done
-            export PATH="$PWD/{bin_relpath}"
-            """
-        ).split("\n")
+    if interactive:
+        relpath = os.path.relpath(
+            working_directory or ".", start="/" if os.path.isabs(working_directory) else "."
+        )
+        boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
+    else:
+        # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
+        bin_relpath = ".bin"
+        boot_script = ";".join(
+            dedent(
+                f"""\
+                $mkdir -p {bin_relpath}
+                for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}; done
+                export PATH="$PWD/{bin_relpath}"
+                """
+            ).split("\n")
+        )
+
+    return Process(
+        argv=(bash.path, "-c", boot_script + command),
+        description=f"Running {shell_command.alias} {shell_command.address}",
+        env=command_env,
+        input_digest=input_digest,
+        output_directories=output_directories,
+        output_files=output_files,
+        timeout_seconds=timeout,
+        working_directory=working_directory,
     )
 
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(bash.path, "-c", setup_tool_symlinks_script + command),
-            description=f"Running experimental_shell_command {shell_command.address}",
-            env=command_env,
-            input_digest=input_digest,
-            output_directories=output_directories,
-            output_files=output_files,
-            timeout_seconds=timeout,
-            working_directory=working_directory,
-        ),
+
+@rule
+async def run_shell_command_request(shell_command: RunShellCommand) -> RunRequest:
+    wrapped_tgt = await Get(WrappedTarget, Address, shell_command.address)
+    process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
+    return RunRequest(
+        digest=process.input_digest,
+        args=process.argv,
+        extra_env=process.env,
     )
-
-    if shell_command[ShellCommandLogOutputField].value:
-        if result.stdout:
-            logger.info(result.stdout.decode())
-        if result.stderr:
-            logger.warning(result.stderr.decode())
-
-    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
-    return GeneratedSources(output)
 
 
 def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
+        UnionRule(RunFieldSet, RunShellCommand),
     ]

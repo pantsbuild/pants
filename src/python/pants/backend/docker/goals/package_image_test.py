@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerFieldSet,
-    DockerNameTemplateError,
+    DockerRepositoryNameError,
     build_docker_image,
 )
 from pants.backend.docker.registries import DockerRegistries
@@ -72,7 +72,7 @@ def assert_build(
     if options:
         opts = options or {}
         opts.setdefault("registries", {})
-        opts.setdefault("default_image_name_template", "{repository}/{name}")
+        opts.setdefault("default_repository", "{directory}/{name}")
         opts.setdefault("build_args", [])
         opts.setdefault("env_vars", [])
 
@@ -124,7 +124,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="test1",
                   version="1.2.3",
-                  image_name_template="{name}",
+                  repository="{directory}/{name}",
                 )
                 docker_image(
                   name="test2",
@@ -133,14 +133,12 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="test3",
                   version="1.2.3",
-                  image_name_template="{sub_repository}/{name}",
+                  repository="{parent_directory}/{directory}/{name}",
                 )
                 docker_image(
                   name="test4",
                   version="1.2.3",
-                  image_name="test-four",
-                  image_name_template="{sub_repository}/{name}",
-                  repository="four",
+                  repository="{directory}/four/test-four",
                 )
                 docker_image(
                   name="test5",
@@ -148,7 +146,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 )
                 docker_image(
                   name="err1",
-                  image_name_template="{bad_template}",
+                  repository="{bad_template}",
                 )
                 """
             ),
@@ -157,12 +155,14 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     )
 
     assert_build(
-        rule_runner, Address("docker/test", target_name="test1"), "Built docker image: test1:1.2.3"
+        rule_runner,
+        Address("docker/test", target_name="test1"),
+        "Built docker image: test/test1:1.2.3",
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="test2"),
-        "Built docker image: test/test2:1.2.3",
+        "Built docker image: test2:1.2.3",
     )
     assert_build(
         rule_runner,
@@ -183,14 +183,15 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             "  * test/test5:alpha-1.0\n"
             "  * test/test5:alpha-1"
         ),
+        options=dict(default_repository="{directory}/{name}"),
     )
 
     err1 = (
-        r"Invalid image name template from the `image_name_template` field of the docker_image "
-        r"target at docker/test:err1: '{bad_template}'\. Unknown key: 'bad_template'\.\n\n"
-        r"Use any of 'name', 'repository' or 'sub_repository' in the template string\."
+        r"Invalid value for the `repository` field of the `docker_image` target at "
+        r"docker/test:err1: '{bad_template}'\. Unknown key: 'bad_template'\.\n\n"
+        r"You may only reference any of `name`, `directory` or `parent_directory`\."
     )
-    with pytest.raises(DockerNameTemplateError, match=err1):
+    with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
             rule_runner,
             Address("docker/test", target_name="err1"),
@@ -218,7 +219,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
     )
 
     options = {
-        "default_image_name_template": "{name}",
+        "default_repository": "{name}",
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
@@ -299,7 +300,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
         fs = DockerFieldSet.create(tgt)
-        tags = fs.image_names(
+        tags = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
             version_context,
@@ -327,8 +328,8 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     assert_tags("ver_2", "image:3.8-latest", "image:beta")
 
     err_1 = (
-        r"Invalid format string for the `version` field of the docker_image target at docker/test:err_1: "
-        r"'{unknown_stage}'\.\n\n"
+        r"Invalid format string for the `version` field of the `docker_image` target at "
+        r"docker/test:err_1: '{unknown_stage}'\.\n\n"
         r"The key 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, interim, "
         r"stage2, output\."
     )
@@ -336,8 +337,8 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
         assert_tags("err_1")
 
     err_2 = (
-        r"Invalid format string for the `version` field of the docker_image target at docker/test:err_2: "
-        r"'{stage0.unknown_value}'\.\n\n"
+        r"Invalid format string for the `version` field of the `docker_image` target at "
+        r"docker/test:err_2: '{stage0.unknown_value}'\.\n\n"
         r"The key 'unknown_value' is unknown\. Try with one of: tag\."
     )
     with pytest.raises(DockerVersionContextError, match=err_2):
@@ -359,7 +360,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "-t",
-            "test/env1:1.2.3",
+            "env1:1.2.3",
             "-f",
             "docker/test/Dockerfile",
             ".",
@@ -393,7 +394,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "-t",
-            "test/args1:1.2.3",
+            "args1:1.2.3",
             "--build-arg",
             "INHERIT",
             "--build-arg",
@@ -431,5 +432,5 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
     assert_build(
         rule_runner,
         Address("docker/test", target_name="ver1"),
-        "Built docker image: test/ver1:1.2.3",
+        "Built docker image: ver1:1.2.3",
     )

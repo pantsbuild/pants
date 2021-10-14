@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Type, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -36,7 +36,8 @@ from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import OrderedSet
+from pants.util.memo import memoized_classmethod
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
 from pants.version import VERSION
 
@@ -1599,3 +1600,29 @@ class GlobalOptions(Subsystem):
         )
 
         return tuple(invalidation_globs)
+
+    @memoized_classmethod
+    def get_options_flags(cls) -> GlobalOptionsFlags:
+        return GlobalOptionsFlags.create(cast("Type[GlobalOptions]", cls))
+
+
+@dataclass(frozen=True)
+class GlobalOptionsFlags:
+    flags: FrozenOrderedSet[str]
+    short_flags: FrozenOrderedSet[str]
+
+    @classmethod
+    def create(cls, GlobalOptionsType: Type[GlobalOptions]) -> GlobalOptionsFlags:
+        flags = set()
+        short_flags = set()
+
+        def capture_the_flags(*args: str, **kwargs) -> None:
+            for arg in args:
+                flags.add(arg)
+                if len(arg) == 2:
+                    short_flags.add(arg)
+                elif kwargs.get("type") == bool:
+                    flags.add(f"--no-{arg[2:]}")
+
+        GlobalOptionsType.register_bootstrap_options(capture_the_flags)
+        return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

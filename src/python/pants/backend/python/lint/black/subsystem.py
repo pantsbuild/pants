@@ -11,10 +11,9 @@ from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
 from pants.python.python_setup import PythonSetup
@@ -122,9 +121,10 @@ async def setup_black_lockfile(
 
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
-        all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
+        all_tgts = await Get(AllTargets, AllTargetsRequest())
+        # TODO: fix to use `FieldSet.is_applicable()`.
         code_constraints = InterpreterConstraints.create_from_targets(
-            (tgt for tgt in all_build_targets if not tgt.get(SkipBlackField).value), python_setup
+            (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
         )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints

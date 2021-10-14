@@ -17,12 +17,8 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
-from pants.backend.go.util_rules.tests_analysis import (
-    AnalyzedTestSources,
-    AnalyzeTestSourcesRequest,
-    Example,
-    TestFunc,
-)
+from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -42,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *link.rules(),
             *sdk.rules(),
-            QueryRule(AnalyzedTestSources, [AnalyzeTestSourcesRequest]),
+            QueryRule(GeneratedTestMain, [GenerateTestMainRequest]),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -78,22 +74,20 @@ def test_basic_test_analysis(rule_runner: RuleRunner) -> None:
     ).digest
 
     metadata = rule_runner.request(
-        AnalyzedTestSources,
+        GeneratedTestMain,
         [
-            AnalyzeTestSourcesRequest(
-                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(["bar_test.go"])
+            GenerateTestMainRequest(
+                input_digest,
+                FrozenOrderedSet(["foo_test.go"]),
+                FrozenOrderedSet(["bar_test.go"]),
+                "foo",
             )
         ],
     )
 
-    assert metadata == AnalyzedTestSources(
-        tests=FrozenOrderedSet([TestFunc("TestThisIsATest", "_test"), TestFunc("Test", "_test")]),
-        benchmarks=FrozenOrderedSet(
-            [TestFunc("BenchmarkThisIsABenchmark", "_xtest"), TestFunc("Benchmark", "_xtest")]
-        ),
-        examples=FrozenOrderedSet(),
-        test_main=None,
-    )
+    assert metadata.digest != EMPTY_DIGEST
+    assert metadata.has_tests
+    assert metadata.has_xtests
 
 
 def test_collect_examples(rule_runner: RuleRunner) -> None:
@@ -124,35 +118,17 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
     ).digest
 
     metadata = rule_runner.request(
-        AnalyzedTestSources,
+        GeneratedTestMain,
         [
-            AnalyzeTestSourcesRequest(
-                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet()
+            GenerateTestMainRequest(
+                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(), "foo"
             )
         ],
     )
 
-    assert metadata == AnalyzedTestSources(
-        tests=FrozenOrderedSet(),
-        benchmarks=FrozenOrderedSet(),
-        examples=FrozenOrderedSet(
-            [
-                Example(
-                    package="_test",
-                    name="ExampleAnotherOne",
-                    output='"foo\\nbar\\n"',
-                    unordered=False,
-                ),
-                Example(
-                    package="_test", name="ExampleEmptyOutputExpected", output='""', unordered=False
-                ),
-                Example(
-                    package="_test", name="ExampleSomeOutput", output='"foo\\n"', unordered=False
-                ),
-            ]
-        ),
-        test_main=None,
-    )
+    assert metadata.digest != EMPTY_DIGEST
+    assert metadata.has_tests
+    assert not metadata.has_xtests
 
 
 def test_incorrect_signatures(rule_runner: RuleRunner) -> None:
@@ -184,10 +160,10 @@ def test_incorrect_signatures(rule_runner: RuleRunner) -> None:
 
         with pytest.raises(ExecutionError) as exc_info:
             rule_runner.request(
-                AnalyzedTestSources,
+                GeneratedTestMain,
                 [
-                    AnalyzeTestSourcesRequest(
-                        input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet()
+                    GenerateTestMainRequest(
+                        input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(), "foo"
                     )
                 ],
             )
@@ -213,12 +189,13 @@ def test_duplicate_test_mains_same_file(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(ExecutionError) as exc_info:
         rule_runner.request(
-            AnalyzedTestSources,
+            GeneratedTestMain,
             [
-                AnalyzeTestSourcesRequest(
+                GenerateTestMainRequest(
                     input_digest,
                     FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
                     FrozenOrderedSet(),
+                    "foo",
                 )
             ],
         )
@@ -250,12 +227,13 @@ def test_duplicate_test_mains_different_files(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(ExecutionError) as exc_info:
         rule_runner.request(
-            AnalyzedTestSources,
+            GeneratedTestMain,
             [
-                AnalyzeTestSourcesRequest(
+                GenerateTestMainRequest(
                     input_digest,
                     FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
                     FrozenOrderedSet(),
+                    "foo",
                 )
             ],
         )

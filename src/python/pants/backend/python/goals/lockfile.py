@@ -34,7 +34,6 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     calculate_invalidation_digest,
 )
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
-from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     CreateDigest,
@@ -47,7 +46,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, UnexpandedTargets
+from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -269,12 +268,11 @@ class _UserLockfileRequests(Collection[PythonLockfileRequest]):
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: _SpecifiedUserResolves, python_setup: PythonSetup
+    requested: _SpecifiedUserResolves, all_targets: AllTargets, python_setup: PythonSetup
 ) -> _UserLockfileRequests:
     # First, associate all resolves with their consumers.
-    all_build_targets = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     resolves_to_roots = defaultdict(list)
-    for tgt in all_build_targets:
+    for tgt in all_targets:
         if not tgt.has_field(PythonResolveField):
             continue
         tgt[PythonResolveField].validate(python_setup)
