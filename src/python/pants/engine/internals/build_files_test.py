@@ -396,7 +396,7 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
     )
 
     def assert_resolve_error(specs: Iterable[AddressSpec], *, expected: str) -> None:
-        with engine_error(contains=expected) as exc:
+        with engine_error(contains=expected):
             resolve_address_specs(address_specs_rule_runner, specs)
 
     # Literal addresses require for the relevant BUILD file to exist and for the target to be
