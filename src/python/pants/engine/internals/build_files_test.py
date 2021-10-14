@@ -44,7 +44,13 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -390,11 +396,11 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
     )
 
     def assert_resolve_error(specs: Iterable[AddressSpec], *, expected: str) -> None:
-        with pytest.raises(ExecutionError) as exc:
+        with engine_error(contains=expected) as exc:
             resolve_address_specs(address_specs_rule_runner, specs)
-        assert expected in str(exc.value)
 
-    # Literal addresses require both a BUILD file to exist and for a target to be resolved.
+    # Literal addresses require for the relevant BUILD file to exist and for the target to be
+    # resolved.
     assert_resolve_error(
         [AddressLiteralSpec("fake", "tgt")], expected="'fake' does not exist on disk"
     )
@@ -408,20 +414,16 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
     assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
     assert_resolve_error([AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean))
 
-    # SiblingAddresses requires the BUILD file to exist and at least one match.
+    # SiblingAddresses requires at least one match.
     assert_resolve_error(
         [SiblingAddresses("fake")],
-        expected=(
-            "'fake' does not contain any BUILD files, but 'fake:' expected matching targets "
-            "there."
-        ),
+        expected="No targets found for the address glob `fake:`",
     )
     assert_resolve_error(
-        [SiblingAddresses("empty")],
-        expected="Address spec 'empty:' does not match any targets",
+        [SiblingAddresses("empty")], expected="No targets found for the address glob `empty:`"
     )
 
-    # MaybeEmptySiblingAddresses does not require a BUILD file to exist nor any matches.
+    # MaybeEmptySiblingAddresses does not require any matches.
     assert not resolve_address_specs(
         address_specs_rule_runner, [MaybeEmptySiblingAddresses("fake")]
     )
@@ -429,13 +431,13 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
         address_specs_rule_runner, [MaybeEmptySiblingAddresses("empty")]
     )
 
-    # DescendantAddresses requires at least one match, even if BUILD files exist.
+    # DescendantAddresses requires at least one match.
     assert_resolve_error(
         [DescendantAddresses("fake"), DescendantAddresses("empty")],
-        expected="Address spec 'fake::' does not match any targets",
+        expected="No targets found for these address globs: ['empty::', 'fake::']",
     )
 
-    # AscendantAddresses does not require any matches or BUILD files.
+    # AscendantAddresses does not require any matches.
     assert not resolve_address_specs(
         address_specs_rule_runner, [AscendantAddresses("fake"), AscendantAddresses("empty")]
     )

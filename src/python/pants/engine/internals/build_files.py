@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os.path
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, DefaultDict, Dict
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs
@@ -18,6 +19,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -195,30 +197,59 @@ async def addresses_from_address_specs(
         for wrapped_tgt in literal_wrapped_targets
         if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
     )
+    if not address_specs.globs:
+        return Addresses(matched_addresses)
 
-    # Then, convert all `AddressGlobSpecs`. Resolve all BUILD files covered by the specs, then
-    # group by directory.
-    paths = await Get(
+    # Resolve all `AddressGlobSpecs`.
+    build_file_paths = await Get(
         Paths,
         PathGlobs,
-        address_specs.to_path_globs(
+        address_specs.to_build_file_path_globs(
             build_patterns=build_file_options.patterns,
             build_ignore_patterns=build_file_options.ignores,
         ),
     )
-    dirnames = {os.path.dirname(f) for f in paths.files}
+    dirnames = {os.path.dirname(f) for f in build_file_paths.files}
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
-    address_family_by_directory = {af.namespace: af for af in address_families}
 
+    residence_dir_to_addresses_and_target_adaptors: DefaultDict[
+        str, list[tuple[Address, TargetAdaptor]]
+    ] = defaultdict(list)
+    for address_family in address_families:
+        for address, target_adaptor in address_family.addresses_to_target_adaptors.items():
+            residence_dir_to_addresses_and_target_adaptors[address.spec_path].append(
+                (address, target_adaptor)
+            )
+
+    matched_globs = set()
     for glob_spec in address_specs.globs:
-        # These may raise ResolveError, depending on the type of spec.
-        addr_families_for_spec = glob_spec.matching_address_families(address_family_by_directory)
-        addr_target_pairs_for_spec = glob_spec.matching_addresses(addr_families_for_spec)
-        matched_addresses.update(
-            addr
-            for (addr, tgt) in addr_target_pairs_for_spec
-            # TODO(#11123): handle the edge case if a generated target's `tags` != its generator's.
-            if filtering_disabled or specs_filter.matches_tgt_adaptor(addr, tgt)
+        for residence_dir in residence_dir_to_addresses_and_target_adaptors:
+            if not glob_spec.matches(residence_dir):
+                continue
+            matched_globs.add(glob_spec)
+            matched_addresses.update(
+                address_and_tgt_adaptor[0]
+                for address_and_tgt_adaptor in residence_dir_to_addresses_and_target_adaptors[
+                    residence_dir
+                ]
+                if filtering_disabled or specs_filter.matches_tgt_adaptor(*address_and_tgt_adaptor)
+            )
+
+    unmatched_globs = [
+        glob
+        for glob in address_specs.globs
+        if glob not in matched_globs and glob.error_if_no_matches
+    ]
+    if unmatched_globs:
+        glob_description = (
+            f"the address glob `{unmatched_globs[0]}`"
+            if len(unmatched_globs) == 1
+            else f"these address globs: {sorted(str(glob) for glob in unmatched_globs)}"
+        )
+        raise ResolveError(
+            f"No targets found for {glob_description}\n\n"
+            f"Do targets exist in those directories? Maybe run `./pants tailor` to generate "
+            f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
         )
 
     return Addresses(sorted(matched_addresses))

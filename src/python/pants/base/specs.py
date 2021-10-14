@@ -7,18 +7,12 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
+from typing import ClassVar, Iterable
 
-from pants.base.exceptions import ResolveError
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.build_graph.address import Address
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.meta import frozen_after_init
-
-if TYPE_CHECKING:
-    from pants.engine.internals.mapper import AddressFamily
 
 
 class Spec(ABC):
@@ -62,144 +56,91 @@ class AddressLiteralSpec(AddressSpec):
 
 @dataclass(frozen=True)  # type: ignore[misc]
 class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
-
     directory: str
+    error_if_no_matches: ClassVar[bool]
 
     @abstractmethod
-    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
-        """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
+    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
+        """Generate glob patterns matching all the BUILD files this address spec must inspect to
+        resolve the addresses."""
 
     @abstractmethod
-    def matching_address_families(
-        self, address_families_dict: Mapping[str, AddressFamily]
-    ) -> tuple[AddressFamily, ...]:
-        """Given a dict of (namespace path) -> AddressFamily, return the values matching this
-        address spec.
-
-        :raises: :class:`ResolveError` if no address families matched this spec and this spec type
-            expects a match.
-        """
-
-    def matching_addresses(
-        self, address_families: Sequence[AddressFamily]
-    ) -> Sequence[tuple[Address, TargetAdaptor]]:
-        """Given a list of AddressFamily, return (Address, TargetAdaptor) pairs matching this
-        address spec.
-
-        :raises: :class:`ResolveError` if no addresses could be matched and this spec type expects
-            a match.
-        """
-        return tuple(
-            itertools.chain.from_iterable(
-                af.addresses_to_target_adaptors.items() for af in address_families
-            )
-        )
+    def matches(self, tgt_residence_dir: str) -> bool:
+        """Does a target residing in `tgt_residence_dir` match the spec?"""
 
 
-class MaybeEmptySiblingAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located directly within the given directory.
+class SiblingAddresses(AddressGlobSpec):
+    """An AddressSpec representing all addresses residing within the given directory.
 
-    It is not an error if there are no such addresses.
+    At least one such address must exist.
     """
+
+    error_if_no_matches = True
 
     def __str__(self) -> str:
         return f"{self.directory}:"
 
-    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
-        return tuple(os.path.join(self.directory, pat) for pat in build_patterns)
+    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
+        return {os.path.join(self.directory, pat) for pat in build_patterns}
 
-    def matching_address_families(
-        self, address_families_dict: Mapping[str, AddressFamily]
-    ) -> tuple[AddressFamily, ...]:
-        maybe_af = address_families_dict.get(self.directory)
-        return (maybe_af,) if maybe_af is not None else ()
+    def matches(self, tgt_residence_dir: str) -> bool:
+        return tgt_residence_dir == self.directory
 
 
-class SiblingAddresses(MaybeEmptySiblingAddresses):
-    """An AddressSpec representing all addresses located directly within the given directory.
-
-    At least one such address must exist.
-    """
-
-    def matching_address_families(
-        self, address_families_dict: Mapping[str, AddressFamily]
-    ) -> tuple[AddressFamily, ...]:
-        address_families_tuple = super().matching_address_families(address_families_dict)
-        if not address_families_tuple:
-            raise ResolveError(
-                f"Path '{self.directory}' does not contain any BUILD files, but '{self}' expected "
-                "matching targets there."
-            )
-        return address_families_tuple
-
-    def matching_addresses(
-        self, address_families: Sequence[AddressFamily]
-    ) -> Sequence[tuple[Address, TargetAdaptor]]:
-        matching = super().matching_addresses(address_families)
-        if len(matching) == 0:
-            raise ResolveError(f"Address spec '{self}' does not match any targets.")
-        return matching
-
-
-class MaybeEmptyDescendantAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located recursively under the given directory.
+class MaybeEmptySiblingAddresses(SiblingAddresses):
+    """An AddressSpec representing all addresses residing within the given directory.
 
     It is not an error if there are no such addresses.
     """
 
-    def __str__(self) -> str:
-        return f"{self.directory}::"
-
-    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
-        return tuple(os.path.join(self.directory, "**", pat) for pat in build_patterns)
-
-    def matching_address_families(
-        self, address_families_dict: Mapping[str, AddressFamily]
-    ) -> tuple[AddressFamily, ...]:
-        return tuple(
-            af
-            for ns, af in address_families_dict.items()
-            if fast_relpath_optional(ns, self.directory) is not None
-        )
+    error_if_no_matches = False
 
 
-class DescendantAddresses(MaybeEmptyDescendantAddresses):
-    """An AddressSpec representing all addresses located recursively under the given directory.
+class DescendantAddresses(AddressGlobSpec):
+    """An AddressSpec representing all addresses residing recursively under the given directory.
 
     At least one such address must exist.
     """
 
-    def matching_addresses(
-        self, address_families: Sequence[AddressFamily]
-    ) -> Sequence[tuple[Address, TargetAdaptor]]:
-        matching = super().matching_addresses(address_families)
-        if len(matching) == 0:
-            raise ResolveError(f"Address spec '{self}' does not match any targets.")
-        return matching
+    error_if_no_matches = True
+
+    def __str__(self) -> str:
+        return f"{self.directory}::"
+
+    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
+        return {os.path.join(self.directory, "**", pat) for pat in build_patterns}
+
+    def matches(self, tgt_residence_dir: str) -> bool:
+        return fast_relpath_optional(tgt_residence_dir, self.directory) is not None
+
+
+class MaybeEmptyDescendantAddresses(DescendantAddresses):
+    """An AddressSpec representing all addresses residing recursively under the given directory.
+
+    It is not an error if there are no such addresses.
+    """
+
+    error_if_no_matches = False
 
 
 class AscendantAddresses(AddressGlobSpec):
     """An AddressSpec representing all addresses located recursively in and above the given
     directory."""
 
+    error_if_no_matches = False
+
     def __str__(self) -> str:
         return f"{self.directory}^"
 
-    def to_globs(self, build_patterns: Iterable[str]) -> tuple[str, ...]:
-        return tuple(
+    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
+        return {
             os.path.join(f, pattern)
             for pattern in build_patterns
             for f in recursive_dirname(self.directory)
-        )
+        }
 
-    def matching_address_families(
-        self, address_families_dict: Mapping[str, AddressFamily]
-    ) -> tuple[AddressFamily, ...]:
-        return tuple(
-            af
-            for ns, af in address_families_dict.items()
-            if fast_relpath_optional(self.directory, ns) is not None
-        )
+    def matches(self, tgt_residence_dir: str) -> bool:
+        return fast_relpath_optional(self.directory, tgt_residence_dir) is not None
 
 
 @frozen_after_init
@@ -235,11 +176,13 @@ class AddressSpecs:
     def specs(self) -> tuple[AddressSpec, ...]:
         return (*self.literals, *self.globs)
 
-    def to_path_globs(
+    def to_build_file_path_globs(
         self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
     ) -> PathGlobs:
         includes = set(
-            itertools.chain.from_iterable(spec.to_globs(build_patterns) for spec in self.globs)
+            itertools.chain.from_iterable(
+                spec.to_build_file_globs(build_patterns) for spec in self.globs
+            )
         )
         ignores = (f"!{p}" for p in build_ignore_patterns)
         return PathGlobs(globs=(*includes, *ignores))
