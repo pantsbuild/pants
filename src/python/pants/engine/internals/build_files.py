@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os.path
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -14,18 +16,34 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpec
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
 
+@dataclass(frozen=True)
+class BuildFileOptions:
+    patterns: tuple[str, ...]
+    ignores: tuple[str, ...] = ()
+    prelude_globs: tuple[str, ...] = ()
+
+
+@rule
+def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
+    return BuildFileOptions(
+        patterns=tuple(global_options.options.build_patterns),
+        ignores=tuple(global_options.options.build_ignore),
+        prelude_globs=tuple(global_options.options.build_file_prelude_globs),
+    )
+
+
 @rule(desc="Expand macros")
-async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            global_options.options.build_file_prelude_globs,
+            build_file_options.prelude_globs,
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
@@ -82,10 +100,10 @@ class AddressFamilyDir(EngineAwareParameter):
         return self.path
 
 
-@rule(desc="Search for addresses in BUILD files.")
+@rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
-    global_options: GlobalOptions,
+    build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
 ) -> AddressFamily:
@@ -97,8 +115,8 @@ async def parse_address_family(
         DigestContents,
         PathGlobs(
             globs=(
-                *(os.path.join(directory.path, p) for p in global_options.options.build_patterns),
-                *(f"!{p}" for p in global_options.options.build_ignore),
+                *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                *(f"!{p}" for p in build_file_options.ignores),
             )
         ),
     )
@@ -157,34 +175,26 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
 
 @rule
 async def addresses_from_address_specs(
-    address_specs: AddressSpecs, global_options: GlobalOptions, specs_filter: AddressSpecsFilter
+    address_specs: AddressSpecs,
+    build_file_options: BuildFileOptions,
+    specs_filter: AddressSpecsFilter,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
 
-    # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be generated
-    # addresses. This will raise an exception if any of the addresses are not valid.
-    literal_addresses = await MultiGet(
+    # Resolve all `AddressLiteralSpec`s. Will error on invalid addresses.
+    literal_wrapped_targets = await MultiGet(
         Get(
-            Address,
+            WrappedTarget,
             AddressInput(spec.path_component, spec.target_component, spec.generated_component),
         )
         for spec in address_specs.literals
     )
-    literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_target_generator())
-        for addr in literal_addresses
+    matched_addresses.update(
+        wrapped_tgt.target.address
+        for wrapped_tgt in literal_wrapped_targets
+        if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
     )
-    # We convert to targets for the side effect of validating that any generated targets actually
-    # belong to their target generator.
-    await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_generated_target)
-    )
-    for literal_spec, addr, target_adaptor in zip(
-        address_specs.literals, literal_addresses, literal_target_adaptors
-    ):
-        if filtering_disabled or specs_filter.matches(addr, target_adaptor):
-            matched_addresses.add(addr)
 
     # Then, convert all `AddressGlobSpecs`. Resolve all BUILD files covered by the specs, then
     # group by directory.
@@ -192,8 +202,8 @@ async def addresses_from_address_specs(
         Paths,
         PathGlobs,
         address_specs.to_path_globs(
-            build_patterns=global_options.options.build_patterns,
-            build_ignore_patterns=global_options.options.build_ignore,
+            build_patterns=build_file_options.patterns,
+            build_ignore_patterns=build_file_options.ignores,
         ),
     )
     dirnames = {os.path.dirname(f) for f in paths.files}
@@ -208,7 +218,7 @@ async def addresses_from_address_specs(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
             # TODO(#11123): handle the edge case if a generated target's `tags` != its generator's.
-            if filtering_disabled or specs_filter.matches(addr, tgt)
+            if filtering_disabled or specs_filter.matches_tgt_adaptor(addr, tgt)
         )
 
     return Addresses(sorted(matched_addresses))

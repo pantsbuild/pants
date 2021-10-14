@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
@@ -16,6 +18,7 @@ from pants.engine.internals.mapper import (
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import Tags, Target
 from pants.util.frozendict import FrozenDict
 
 
@@ -127,24 +130,44 @@ def test_address_family_duplicate_names() -> None:
         )
 
 
-def test_address_specs_filter() -> None:
-    def make_target(target_name: str, **kwargs) -> TargetAdaptor:
+def test_address_specs_filter_tags() -> None:
+    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
+
+    class MockTgt(Target):
+        alias = "tgt"
+        core_fields = (Tags,)
+
+    def make_tgt(name: str, tags: list[str] | None = None) -> MockTgt:
+        return MockTgt({Tags.alias: tags}, Address("", target_name=name))
+
+    untagged_tgt = make_tgt(name="untagged")
+    b_tagged_tgt = make_tgt(name="b-tagged", tags=["b"])
+    a_and_b_tagged_tgt = make_tgt(name="a-and-b-tagged", tags=["a", "b"])
+
+    def matches(tgt: MockTgt) -> bool:
+        return specs_filter.matches(tgt)
+
+    assert matches(untagged_tgt) is False
+    assert matches(b_tagged_tgt) is True
+    assert matches(a_and_b_tagged_tgt) is False
+
+    def make_target_adaptor(target_name: str, **kwargs) -> TargetAdaptor:
         parsed_address = Address("", target_name=target_name)
         return TargetAdaptor(
             type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
         )
 
-    untagged_target = make_target(target_name="untagged")
-    b_tagged_target = make_target(target_name="b-tagged", tags=["b"])
-    a_and_b_tagged_target = make_target(target_name="a-and-b-tagged", tags=["a", "b"])
-    none_tagged_target = make_target(target_name="none-tagged-target", tags=None)
+    untagged_target_adaptor = make_target_adaptor(target_name="untagged")
+    b_tagged_target_adaptor = make_target_adaptor(target_name="b-tagged", tags=["b"])
+    a_and_b_tagged_target_adaptor = make_target_adaptor(
+        target_name="a-and-b-tagged", tags=["a", "b"]
+    )
+    none_tagged_target_adaptor = make_target_adaptor(target_name="none-tagged-target", tags=None)
 
-    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
+    def matches_adaptor(tgt: TargetAdaptor) -> bool:
+        return specs_filter.matches_tgt_adaptor(tgt.kwargs["address"], tgt)
 
-    def matches(tgt: TargetAdaptor) -> bool:
-        return specs_filter.matches(tgt.kwargs["address"], tgt)
-
-    assert matches(untagged_target) is False
-    assert matches(b_tagged_target) is True
-    assert matches(a_and_b_tagged_target) is False
-    assert matches(none_tagged_target) is False
+    assert matches_adaptor(untagged_target_adaptor) is False
+    assert matches_adaptor(b_tagged_target_adaptor) is True
+    assert matches_adaptor(a_and_b_tagged_target_adaptor) is False
+    assert matches_adaptor(none_tagged_target_adaptor) is False

@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 from textwrap import dedent
 from typing import Iterable, Set, cast
@@ -22,6 +24,7 @@ from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAd
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BuildFileOptions,
     evaluate_preludes,
     parse_address_family,
 )
@@ -41,8 +44,6 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
-from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -53,7 +54,7 @@ def test_parse_address_family_empty() -> None:
         parse_address_family,
         rule_args=[
             Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases()),
-            create_subsystem(GlobalOptions, build_patterns=["BUILD"], build_ignore=[]),
+            BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),
         ],
@@ -71,7 +72,7 @@ def test_parse_address_family_empty() -> None:
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
+        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
@@ -285,21 +286,21 @@ def resolve_address_specs(
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
     address_specs_rule_runner.write_files(
-        {"demo/f.txt": "", "demo/BUILD": "mock_tgt(sources=['f.txt'])"}
+        {"demo/f.txt": "", "demo/BUILD": "generator(sources=['f.txt'])"}
     )
     specs = [
         AddressLiteralSpec("demo"),
         SiblingAddresses("demo"),
         DescendantAddresses("demo"),
         AscendantAddresses("demo"),
-        # We also include a generated target and file address to ensure that that is included in
-        # the result.
-        AddressLiteralSpec("demo", None, "gen"),
+        # We also include targets generated from `demo` to ensure that the final result has both
+        # the generator and its generated targets.
+        AddressLiteralSpec("demo", None, "f.txt"),
         AddressLiteralSpec("demo/f.txt"),
     ]
     assert resolve_address_specs(address_specs_rule_runner, specs) == {
         Address("demo"),
-        Address("demo", generated_name="gen"),
+        Address("demo", generated_name="f.txt"),
         Address("demo", relative_file_path="f.txt"),
     }
 
@@ -351,8 +352,8 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                mock_tgt(name="exclude_me", sources=["f.txt"])
-                mock_tgt(name="not_me", sources=["f.txt"])
+                generator(name="exclude_me", sources=["f.txt"])
+                generator(name="not_me", sources=["f.txt"])
                 """
             ),
         }
