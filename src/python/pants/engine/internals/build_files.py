@@ -18,7 +18,7 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpec
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import UnexpandedTargets, WrappedTarget
+from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -218,10 +218,13 @@ async def addresses_from_address_specs(
         )
     )
 
-    targets = await Get(UnexpandedTargets, Addresses, candidate_addresses)
+    tgts_generators_kept, tgts_generators_replaced = await MultiGet(
+        Get(UnexpandedTargets, Addresses, candidate_addresses),
+        Get(Targets, Addresses, candidate_addresses),
+    )
     residence_dir_to_targets = defaultdict(list)
-    for tgt in targets:
-        residence_dir_to_targets[tgt.address.spec_path].append(tgt)
+    for tgt in (*tgts_generators_kept, *tgts_generators_replaced):
+        residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
     matched_globs = set()
     for glob_spec in address_specs.globs:
